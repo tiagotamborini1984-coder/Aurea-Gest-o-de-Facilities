@@ -68,7 +68,6 @@ export function AppSidebar() {
       return false
     })
     .map((item) => {
-      // Filter subItems for Operacional role
       if (role === 'Operacional' && item.title === 'Cadastros' && item.subItems) {
         return {
           ...item,
@@ -81,17 +80,17 @@ export function AppSidebar() {
     })
 
   return (
-    <Sidebar className="border-none bg-[var(--sidebar-background)] text-white h-full shadow-xl">
-      <SidebarHeader className="p-4 pt-6 pb-8 flex items-center justify-center border-b border-white/10">
+    <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground h-full shadow-[4px_0_24px_rgba(0,0,0,0.4)]">
+      <SidebarHeader className="p-4 pt-6 pb-8 flex items-center justify-center border-b border-sidebar-border">
         <div className="flex items-center gap-3 w-full pl-2">
-          <div className="bg-secondary p-2.5 rounded-lg shadow-sm">
-            <Building2 className="h-6 w-6 text-white" />
+          <div className="bg-brand-deepBlue border border-brand-cyan/30 p-2.5 rounded-lg shadow-[0_0_10px_rgba(0,255,255,0.2)]">
+            <Building2 className="h-6 w-6 text-brand-cyan" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight text-white leading-none">
+            <span className="font-bold text-lg tracking-tight text-sidebar-foreground leading-none">
               Gestão de Facilities
             </span>
-            <span className="text-[0.65rem] text-secondary-foreground/70 uppercase tracking-widest font-semibold mt-1.5">
+            <span className="text-[0.65rem] text-brand-cyan uppercase tracking-widest font-semibold mt-1.5 opacity-80">
               {activeClient ? activeClient.name : 'SaaS Mode'}
             </span>
           </div>
@@ -110,14 +109,14 @@ export function AppSidebar() {
                 >
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="py-5 mb-1 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200">
-                        <item.icon className="h-5 w-5" />
-                        <span className="font-medium">{item.title}</span>
+                      <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-300 relative group overflow-hidden">
+                        <item.icon className="h-5 w-5 group-hover:text-brand-cyan/70 transition-colors" />
+                        <span className="font-medium tracking-wide">{item.title}</span>
                         <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="border-white/10 mr-0 pr-0 ml-4 pl-3">
+                      <SidebarMenuSub className="border-sidebar-border mr-0 pr-0 ml-4 pl-3">
                         {item.subItems.map((sub) => {
                           const isActive = location.pathname === sub.path
                           return (
@@ -126,8 +125,9 @@ export function AppSidebar() {
                                 asChild
                                 isActive={isActive}
                                 className={cn(
-                                  'py-4 text-white/60 hover:text-white hover:bg-white/10 transition-colors my-0.5 rounded-md',
-                                  isActive && 'bg-secondary text-white font-medium shadow-sm',
+                                  'py-4 text-sidebar-foreground/60 hover:text-brand-cyan hover:bg-brand-cyan/5 transition-colors my-0.5 rounded-md',
+                                  isActive &&
+                                    'bg-brand-cyan/10 text-brand-cyan font-medium shadow-[inset_0_0_8px_rgba(0,255,255,0.05)] border-l border-brand-cyan',
                                 )}
                               >
                                 <Link to={sub.path}>{sub.title}</Link>
@@ -149,17 +149,22 @@ export function AppSidebar() {
                   asChild
                   isActive={isActive}
                   className={cn(
-                    'w-full mb-1 transition-all duration-200 py-5 rounded-md',
+                    'w-full mb-1 transition-all duration-300 py-5 rounded-md relative overflow-hidden group',
                     isActive
-                      ? 'bg-secondary text-white shadow-sm'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white',
+                      ? 'bg-brand-cyan/10 text-brand-cyan shadow-[inset_0_0_12px_rgba(0,255,255,0.05)] border-l-2 border-brand-cyan'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
                   )}
                 >
                   <Link to={item.path} className="flex items-center gap-3">
                     <item.icon
-                      className={cn('h-5 w-5', isActive ? 'text-white' : 'text-white/70')}
+                      className={cn(
+                        'h-5 w-5 transition-colors',
+                        isActive
+                          ? 'text-brand-cyan'
+                          : 'text-sidebar-foreground/70 group-hover:text-brand-cyan/50',
+                      )}
                     />
-                    <span className="font-medium">{item.title}</span>
+                    <span className="font-medium tracking-wide">{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

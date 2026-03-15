@@ -1,26 +1,41 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, User, Lock, Loader2 } from 'lucide-react'
+import { User, Lock, Loader2, Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [requirePasswordChange, setRequirePasswordChange] = useState(false)
   const { signIn, user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
   useEffect(() => {
-    if (user) {
-      navigate('/clientes', { replace: true })
+    const checkUser = async () => {
+      if (user && !requirePasswordChange) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('force_password_change')
+          .eq('id', user.id)
+          .single()
+        if (data?.force_password_change) {
+          setRequirePasswordChange(true)
+        } else {
+          navigate('/gestao-terceiros', { replace: true })
+        }
+      }
     }
-  }, [user, navigate])
+    checkUser()
+  }, [user, navigate, requirePasswordChange])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,109 +43,164 @@ export default function Login() {
 
     const { error } = await signIn(email, password)
 
-    if (!error) {
-      toast({
-        title: 'Login bem-sucedido',
-        description: 'Bem-vindo ao painel administrativo.',
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-      navigate('/clientes', { replace: true })
-    } else {
+    if (error) {
       toast({
         variant: 'destructive',
-        title: 'Credenciais inválidas',
-        description: 'O e-mail ou senha fornecidos estão incorretos.',
+        title: 'Acesso Negado',
+        description: 'Credenciais inválidas ou não autorizadas.',
       })
       setIsSubmitting(false)
     }
   }
 
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro de Autenticação', description: error.message })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (user) {
+      await supabase.from('profiles').update({ force_password_change: false }).eq('id', user.id)
+    }
+
+    toast({
+      title: 'Acesso Atualizado',
+      description: 'Sua credencial foi reconfigurada com sucesso.',
+      className: 'bg-brand-cyan/20 text-brand-cyan border-brand-cyan/50 backdrop-blur-md',
+    })
+    navigate('/gestao-terceiros', { replace: true })
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-brand-light relative overflow-hidden">
-      {/* Background Decorators */}
-      <div className="absolute top-0 left-0 w-full h-1/2 bg-primary -skew-y-6 origin-top-left -z-0 transition-colors duration-500" />
-      <div className="absolute top-0 right-0 w-1/3 h-full bg-secondary/10 blur-3xl rounded-full -z-0 transition-colors duration-500" />
+    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden font-sans">
+      {/* High-tech backdrop */}
+      <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-brand-cyan/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-brand-deepBlue/30 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none opacity-40"></div>
 
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 z-10 animate-fade-in-up">
-        <div className="w-full max-w-md space-y-6">
-          <div className="flex flex-col items-center justify-center space-y-3 mb-8">
-            <div className="bg-white p-3 rounded-2xl shadow-md border border-border">
-              <Building2 className="h-10 w-10 text-primary" />
-            </div>
-            <div className="text-center">
-              <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-sm">
-                Gestão <span className="text-secondary font-light">Facilities</span>
-              </h1>
-              <p className="text-white/80 text-sm font-medium mt-1">SaaS de Operação</p>
-            </div>
+        <div className="w-full max-w-md space-y-8">
+          <div className="flex flex-col items-center justify-center text-center space-y-2">
+            <h1 className="text-3xl sm:text-4xl font-light tracking-[0.2em] text-foreground drop-shadow-sm uppercase">
+              Gestão de <br />
+              <span className="font-bold text-brand-cyan drop-shadow-[0_0_12px_rgba(0,255,255,0.6)]">
+                Facilities
+              </span>
+            </h1>
+            <p className="text-brand-cyan/70 text-xs tracking-widest font-medium uppercase mt-4">
+              System Authentication
+            </p>
           </div>
 
-          <Card className="shadow-elevation border-0 bg-white/95 backdrop-blur-sm">
-            <CardHeader className="space-y-1 pb-6 text-center">
-              <CardTitle className="text-2xl font-bold text-foreground">Acesso Restrito</CardTitle>
-              <CardDescription>
-                Insira suas credenciais para acessar os módulos de gestão.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2 relative">
-                  <Label htmlFor="email">E-mail</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="admin@aurea.com"
-                      className="pl-9 h-11"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
+          <Card className="border-brand-cyan/20 bg-card/80 backdrop-blur-xl shadow-[0_0_40px_-10px_rgba(0,255,255,0.1)]">
+            <CardContent className="pt-8">
+              {!requirePasswordChange ? (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="email"
+                      className="text-muted-foreground uppercase text-[10px] tracking-wider"
+                    >
+                      Identificação (E-mail)
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-brand-cyan/70" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="admin@aurea.com"
+                        className="pl-9 h-11 bg-background/50 border-brand-cyan/20 focus-visible:ring-brand-cyan text-foreground placeholder:text-muted-foreground/50 transition-all"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2 relative">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Senha</Label>
-                    <a href="#" className="text-xs text-primary hover:underline font-medium">
-                      Esqueceu a senha?
-                    </a>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor="password"
+                        className="text-muted-foreground uppercase text-[10px] tracking-wider"
+                      >
+                        Código de Acesso (Senha)
+                      </Label>
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-brand-cyan/70" />
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        className="pl-9 h-11 bg-background/50 border-brand-cyan/20 focus-visible:ring-brand-cyan text-foreground placeholder:text-muted-foreground/50 transition-all"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      className="pl-9 h-11"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
 
-                <Button
-                  type="submit"
-                  className="w-full h-11 transition-all shadow-md mt-2"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
+                  <Button
+                    type="submit"
+                    variant="tech"
+                    className="w-full h-12 uppercase tracking-wider text-xs font-bold mt-4"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Autenticando...
-                    </>
-                  ) : (
-                    'Entrar'
-                  )}
-                </Button>
-
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-muted-foreground bg-slate-100 p-2 rounded-md border border-slate-200">
-                    Dica: Use admin@aurea.com e AureaAdmin2024!
-                  </p>
-                </div>
-              </form>
+                    ) : (
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                    )}
+                    {isSubmitting ? 'Validando...' : 'Iniciar Sessão'}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleUpdatePassword} className="space-y-6 animate-fade-in">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-medium text-foreground">Atualização Obrigatória</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Por favor, defina uma nova credencial para continuar.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="new-password"
+                      className="text-muted-foreground uppercase text-[10px] tracking-wider"
+                    >
+                      Nova Credencial Segura
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-brand-cyan/70" />
+                      <Input
+                        id="new-password"
+                        type="password"
+                        placeholder="••••••••"
+                        className="pl-9 h-11 bg-background/50 border-brand-cyan/20 focus-visible:ring-brand-cyan text-foreground transition-all"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="tech"
+                    className="w-full h-12 uppercase tracking-wider text-xs font-bold"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      'Confirmar Atualização'
+                    )}
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -38,7 +38,6 @@ export default function QuadroContratado() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [entryType, setEntryType] = useState('colaboradores')
 
-  // Filters
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterType, setFilterType] = useState('all')
 
@@ -120,7 +119,7 @@ export default function QuadroContratado() {
         if (error) throw error
         toast({
           title: 'Meta lançada com sucesso',
-          className: 'bg-green-50 text-green-900 border-green-200',
+          className: 'bg-green-500/20 text-brand-cyan border-brand-cyan/50',
         })
       } else {
         if (!form.plant_id || !form.quantity) {
@@ -145,15 +144,15 @@ export default function QuadroContratado() {
             .eq('id', editingId)
           if (error) throw error
           toast({
-            title: 'Quadro contratado atualizado com sucesso',
-            className: 'bg-green-50 text-green-900 border-green-200',
+            title: 'Quadro contratado atualizado',
+            className: 'bg-green-500/20 text-brand-cyan border-brand-cyan/50',
           })
         } else {
           const { error } = await supabase.from('contracted_headcount').insert(payload)
           if (error) throw error
           toast({
-            title: 'Quadro contratado salvo com sucesso',
-            className: 'bg-green-50 text-green-900 border-green-200',
+            title: 'Quadro contratado salvo',
+            className: 'bg-green-500/20 text-brand-cyan border-brand-cyan/50',
           })
         }
         loadData()
@@ -170,7 +169,10 @@ export default function QuadroContratado() {
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('contracted_headcount').delete().eq('id', id)
     if (!error) {
-      toast({ title: 'Registro removido' })
+      toast({
+        title: 'Registro removido',
+        className: 'bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20',
+      })
       loadData()
       refetch()
     }
@@ -186,8 +188,8 @@ export default function QuadroContratado() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2.5 rounded-xl">
-            <ClipboardList className="h-6 w-6 text-primary" />
+          <div className="bg-brand-cyan/10 p-2.5 rounded-xl border border-brand-cyan/20 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
+            <ClipboardList className="h-6 w-6 text-brand-cyan" />
           </div>
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground">Quadro Contratado</h2>
@@ -196,16 +198,15 @@ export default function QuadroContratado() {
             </p>
           </div>
         </div>
-        <Button onClick={openAdd} className="shadow-sm">
+        <Button onClick={openAdd} variant="tech">
           <Plus className="w-4 h-4 mr-2" /> Novo Registro
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-white p-3 rounded-xl border border-border shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
         <div className="w-full sm:w-64">
           <Select value={filterPlant} onValueChange={setFilterPlant}>
-            <SelectTrigger className="bg-slate-50 border-slate-200">
+            <SelectTrigger className="bg-background border-input text-foreground">
               <SelectValue placeholder="Filtrar por Planta" />
             </SelectTrigger>
             <SelectContent>
@@ -220,7 +221,7 @@ export default function QuadroContratado() {
         </div>
         <div className="w-full sm:w-64">
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="bg-slate-50 border-slate-200">
+            <SelectTrigger className="bg-background border-input text-foreground">
               <SelectValue placeholder="Filtrar por Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -232,64 +233,64 @@ export default function QuadroContratado() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50/80 border-b border-border">
-            <TableRow>
-              <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
-              <TableHead className="font-semibold text-slate-600">Planta</TableHead>
-              <TableHead className="font-semibold text-slate-600">Local / Equipamento</TableHead>
-              <TableHead className="font-semibold text-slate-600">Função</TableHead>
-              <TableHead className="font-semibold text-slate-600">Quantidade</TableHead>
-              <TableHead className="font-semibold text-slate-600 text-right pr-6">Ações</TableHead>
+          <TableHeader className="bg-muted/50 border-b border-border">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="font-semibold text-foreground">Tipo</TableHead>
+              <TableHead className="font-semibold text-foreground">Planta</TableHead>
+              <TableHead className="font-semibold text-foreground">Local / Equipamento</TableHead>
+              <TableHead className="font-semibold text-foreground">Função</TableHead>
+              <TableHead className="font-semibold text-foreground">Quantidade</TableHead>
+              <TableHead className="font-semibold text-foreground text-right pr-6">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-10">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-cyan" />
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                  Nenhum registro encontrado para os filtros selecionados.
+                  Nenhum registro encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               filteredData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-slate-50/50">
+                <TableRow key={item.id} className="hover:bg-muted/50 border-border">
                   <TableCell>
                     {item.type === 'colaborador' ? (
-                      <Badge className="bg-blue-500 hover:bg-blue-600 text-white font-medium border-0">
+                      <Badge className="bg-brand-deepBlue/40 text-brand-cyan border border-brand-cyan/30 shadow-[0_0_10px_rgba(0,255,255,0.1)] hover:bg-brand-deepBlue/60">
                         Colaborador
                       </Badge>
                     ) : (
-                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white font-medium border-0">
+                      <Badge className="bg-muted text-foreground border border-border hover:bg-muted/80">
                         Equipamento
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium text-slate-700">
+                  <TableCell className="font-medium text-foreground">
                     {plants.find((p) => p.id === item.plant_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell className="text-muted-foreground">
                     {item.type === 'colaborador'
                       ? locations.find((l) => l.id === item.location_id)?.name || '-'
                       : equipment.find((e) => e.id === item.equipment_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell className="text-muted-foreground">
                     {functions.find((f) => f.id === item.function_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="font-bold text-slate-800">{item.quantity}</TableCell>
+                  <TableCell className="font-bold text-foreground">{item.quantity}</TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => openEdit(item)}
-                        className="text-slate-400 hover:text-primary hover:bg-slate-100"
+                        className="text-muted-foreground hover:text-brand-cyan hover:bg-brand-cyan/10"
                         title="Editar"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -298,7 +299,7 @@ export default function QuadroContratado() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(item.id)}
-                        className="text-red-400 hover:text-red-700 hover:bg-red-50"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         title="Remover"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -313,32 +314,46 @@ export default function QuadroContratado() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl bg-card border-border">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Registro' : 'Novo Registro'}</DialogTitle>
+            <DialogTitle className="text-foreground">
+              {editingId ? 'Editar Registro' : 'Novo Registro'}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-5 py-2">
             {!editingId && (
               <RadioGroup
                 value={entryType}
                 onValueChange={setEntryType}
-                className="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-lg border border-border"
+                className="flex flex-wrap gap-4 bg-muted/30 p-4 rounded-xl border border-border"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="colaboradores" id="r1" />
-                  <Label htmlFor="r1" className="cursor-pointer">
+                  <RadioGroupItem
+                    value="colaboradores"
+                    id="r1"
+                    className="text-brand-cyan border-brand-cyan/50"
+                  />
+                  <Label htmlFor="r1" className="cursor-pointer text-foreground font-medium">
                     Colaboradores
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="equipamentos" id="r2" />
-                  <Label htmlFor="r2" className="cursor-pointer">
+                  <RadioGroupItem
+                    value="equipamentos"
+                    id="r2"
+                    className="text-brand-cyan border-brand-cyan/50"
+                  />
+                  <Label htmlFor="r2" className="cursor-pointer text-foreground font-medium">
                     Equipamentos
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="metas" id="r3" />
-                  <Label htmlFor="r3" className="cursor-pointer">
+                  <RadioGroupItem
+                    value="metas"
+                    id="r3"
+                    className="text-brand-cyan border-brand-cyan/50"
+                  />
+                  <Label htmlFor="r3" className="cursor-pointer text-foreground font-medium">
                     Metas
                   </Label>
                 </div>
@@ -347,12 +362,12 @@ export default function QuadroContratado() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Planta *</Label>
+                <Label className="text-foreground">Planta *</Label>
                 <Select
                   value={form.plant_id}
                   onValueChange={(v) => setForm({ ...form, plant_id: v })}
                 >
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -367,12 +382,12 @@ export default function QuadroContratado() {
 
               {entryType === 'colaboradores' && (
                 <div className="space-y-2">
-                  <Label>Função</Label>
+                  <Label className="text-foreground">Função</Label>
                   <Select
                     value={form.function_id}
                     onValueChange={(v) => setForm({ ...form, function_id: v })}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -389,12 +404,12 @@ export default function QuadroContratado() {
 
               {entryType === 'equipamentos' && (
                 <div className="space-y-2">
-                  <Label>Equipamento *</Label>
+                  <Label className="text-foreground">Equipamento *</Label>
                   <Select
                     value={form.equipment_id}
                     onValueChange={(v) => setForm({ ...form, equipment_id: v })}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -414,12 +429,12 @@ export default function QuadroContratado() {
               {entryType === 'metas' && (
                 <>
                   <div className="space-y-2">
-                    <Label>Meta *</Label>
+                    <Label className="text-foreground">Meta *</Label>
                     <Select
                       value={form.goal_id}
                       onValueChange={(v) => setForm({ ...form, goal_id: v })}
                     >
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-background">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -434,22 +449,22 @@ export default function QuadroContratado() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Mês de Referência *</Label>
+                    <Label className="text-foreground">Mês de Referência *</Label>
                     <Input
                       type="month"
                       value={form.reference_month}
                       onChange={(e) => setForm({ ...form, reference_month: e.target.value })}
-                      className="bg-white"
+                      className="bg-background"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Valor *</Label>
+                    <Label className="text-foreground">Valor *</Label>
                     <Input
                       type="number"
                       step="0.01"
                       value={form.value}
                       onChange={(e) => setForm({ ...form, value: e.target.value })}
-                      className="bg-white"
+                      className="bg-background"
                     />
                   </div>
                 </>
@@ -457,13 +472,13 @@ export default function QuadroContratado() {
 
               {entryType !== 'metas' && (
                 <div className="space-y-2">
-                  <Label>Quantidade *</Label>
+                  <Label className="text-foreground">Quantidade *</Label>
                   <Input
                     type="number"
                     min="1"
                     value={form.quantity}
                     onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                    className="bg-white"
+                    className="bg-background"
                   />
                 </div>
               )}
@@ -473,7 +488,7 @@ export default function QuadroContratado() {
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" variant="tech" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar
               </Button>
             </div>

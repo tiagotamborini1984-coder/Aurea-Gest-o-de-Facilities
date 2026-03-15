@@ -31,9 +31,9 @@ export default {
       },
       colors: {
         brand: {
-          blue: 'hsl(215 25% 27%)', // mapped to Slate 700
-          cyan: 'hsl(78 85% 67%)', // mapped to Lime 300
-          graphite: 'hsl(215 25% 27%)',
+          deepBlue: 'hsl(222, 50%, 25%)',
+          cyan: 'hsl(185, 100%, 40%)',
+          graphite: 'hsl(222, 25%, 13%)',
           light: 'hsl(214 32% 91%)',
         },
         border: 'hsl(var(--border))',
