@@ -10,12 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { useAppStore } from '@/store/AppContext'
 
 export function AppHeader() {
-  const location = useLocation()
   const navigate = useNavigate()
   const { isMobile } = useSidebar()
   const { signOut } = useAuth()
@@ -27,12 +26,12 @@ export function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background/95 backdrop-blur-md px-4 sm:px-6 shadow-sm text-foreground transition-colors duration-500 print:hidden">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-white/95 backdrop-blur-md px-4 sm:px-6 shadow-sm text-foreground transition-colors duration-500 print:hidden">
       <div className="flex items-center gap-2">
         {isMobile && (
-          <SidebarTrigger className="text-muted-foreground hover:text-white hover:bg-brand-deepBlue/50" />
+          <SidebarTrigger className="text-muted-foreground hover:text-brand-deepBlue hover:bg-slate-100" />
         )}
-        <h1 className="text-lg font-semibold tracking-tight hidden sm:block text-white drop-shadow-sm">
+        <h1 className="text-lg font-semibold tracking-tight hidden sm:block text-brand-graphite">
           Gestão de Facilities
         </h1>
       </div>
@@ -43,21 +42,21 @@ export function AppHeader() {
           <Input
             type="search"
             placeholder="Buscar no sistema..."
-            className="w-full bg-muted/50 border-border text-foreground placeholder:text-muted-foreground pl-9 focus-visible:ring-1 focus-visible:ring-brand-deepBlue focus-visible:bg-muted transition-all rounded-full h-9"
+            className="w-full bg-slate-100/50 border-border text-foreground placeholder:text-muted-foreground pl-9 focus-visible:ring-1 focus-visible:ring-brand-deepBlue focus-visible:bg-white transition-all rounded-full h-9"
           />
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-white hover:bg-brand-deepBlue/50 rounded-full h-9 w-9 relative"
+          className="text-muted-foreground hover:text-brand-deepBlue hover:bg-slate-100 rounded-full h-9 w-9 relative"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-400 border-2 border-background shadow-[0_0_5px_rgba(96,165,250,0.8)]"></span>
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-brand-deepBlue border-2 border-white shadow-sm"></span>
         </Button>
 
         <div className="flex items-center gap-3 pl-3 border-l border-border">
           <div className="hidden sm:flex flex-col text-right">
-            <span className="text-sm font-semibold leading-none text-blue-400 uppercase tracking-wider text-[10px]">
+            <span className="text-sm font-semibold leading-none text-brand-deepBlue uppercase tracking-wider text-[10px]">
               {profile?.role || 'User'}
             </span>
             <span className="text-xs text-muted-foreground truncate max-w-[150px] mt-1">
@@ -70,14 +69,14 @@ export function AppHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full h-9 w-9 text-muted-foreground hover:text-white hover:bg-brand-deepBlue/50"
+                className="rounded-full h-9 w-9 text-muted-foreground hover:text-brand-deepBlue hover:bg-slate-100"
               >
                 <UserCircle className="h-6 w-6" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="w-56 mt-2 border-border/50 bg-card/95 backdrop-blur-lg"
+              className="w-56 mt-2 border-border/50 bg-white/95 backdrop-blur-lg"
             >
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">

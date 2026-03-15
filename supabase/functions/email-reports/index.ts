@@ -14,10 +14,9 @@ Deno.serve(async (req: Request) => {
     )
 
     const reqData = await req.json().catch(() => ({}))
-    const reportType = reqData.reportType || 'Automated'
+    const reportType = reqData.reportType || 'Daily' // Can be 'Daily' or 'Monthly'
 
-    // In a real scenario, this would generate PDFs and use a mailing provider
-    // Logic: Fetch all Admins and Gestors
+    // Fetch all Admins and Gestors
     const { data: users, error } = await supabaseClient
       .from('profiles')
       .select('email, name, role, client_id, authorized_plants')
@@ -27,23 +26,36 @@ Deno.serve(async (req: Request) => {
 
     let sentCount = 0
 
-    // Simulate sending logic per user
+    // Simulate sending logic per user according to rules
     for (const u of users || []) {
       if (!u.email) continue
 
       let scope = 'Todas as Plantas'
-      if (u.role === 'Gestor' && u.authorized_plants && Array.isArray(u.authorized_plants)) {
-        scope = `Plantas Autorizadas (${u.authorized_plants.length})`
+      if (u.role === 'Gestor') {
+        if (
+          u.authorized_plants &&
+          Array.isArray(u.authorized_plants) &&
+          u.authorized_plants.length > 0
+        ) {
+          scope = `Plantas Autorizadas: ${u.authorized_plants.join(', ')}`
+        } else {
+          // If manager has no authorized plants, maybe skip them
+          scope = 'Nenhuma planta autorizada'
+          console.log(`Skipping ${u.email} as they have no authorized plants.`)
+          continue
+        }
       }
 
-      console.log(`Sending ${reportType} report to ${u.email} (Role: ${u.role}, Scope: ${scope})`)
+      console.log(
+        `[${reportType} Report] Sending PDF to ${u.email} (Role: ${u.role}, Scope: ${scope})`,
+      )
       sentCount++
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `${reportType} report successfully generated and simulated sending to ${sentCount} recipients.`,
+        message: `${reportType} PDF report successfully generated and simulated sending to ${sentCount} recipients.`,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

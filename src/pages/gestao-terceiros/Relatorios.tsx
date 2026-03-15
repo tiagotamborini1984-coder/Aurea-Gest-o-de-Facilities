@@ -185,14 +185,14 @@ export default function Relatorios() {
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 pb-12 animate-fade-in print:max-w-none print:w-full">
       <div className="print:text-center print:mb-8">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Relatórios</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-brand-graphite">Relatórios</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Presenças e faltas por colaborador, local e planta (
           {format(new Date(dateFrom), 'dd/MM/yyyy')} a {format(new Date(dateTo), 'dd/MM/yyyy')})
         </p>
       </div>
 
-      <Card className="shadow-sm border-border overflow-hidden print:hidden">
+      <Card className="shadow-sm border-gray-100 overflow-hidden print:hidden">
         <CardContent className="p-6 space-y-6 bg-white">
           <div className="flex flex-wrap gap-6">
             <div className="space-y-1.5">
@@ -223,7 +223,7 @@ export default function Relatorios() {
             <Label className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
               Filtrar por Planta (múltipla seleção)
             </Label>
-            <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-border">
+            <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
               {plants.map((p) => (
                 <div key={p.id} className="flex items-center space-x-2">
                   <Checkbox
@@ -250,7 +250,7 @@ export default function Relatorios() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-          <TabsList className="bg-white border border-border p-1 h-12 w-full sm:w-auto">
+          <TabsList className="bg-white border border-gray-200 p-1 h-12 w-full sm:w-auto">
             <TabsTrigger value="colaborador" className="data-[state=active]:bg-slate-100">
               Por Colaborador
             </TabsTrigger>
@@ -270,24 +270,24 @@ export default function Relatorios() {
             variant="outline"
             onClick={handleExportPDF}
             disabled={reportData.length === 0}
-            className="bg-white hover:bg-slate-50"
+            className="bg-white hover:bg-slate-50 border-gray-200"
           >
-            <Printer className="h-4 w-4 mr-2" /> PDF
+            <Printer className="h-4 w-4 mr-2" /> Exportar para PDF
           </Button>
           <Button
             variant="outline"
             onClick={handleExportCSV}
             disabled={reportData.length === 0}
-            className="bg-white hover:bg-slate-50"
+            className="bg-white hover:bg-slate-50 border-gray-200"
           >
-            <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+            <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar para Excel
           </Button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden print:border-none print:shadow-none">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
         <Table className="print:border-collapse print:w-full">
-          <TableHeader className="bg-slate-50/80 border-b border-border print:bg-transparent print:border-b-2 print:border-slate-800">
+          <TableHeader className="bg-slate-50/80 border-b border-gray-100 print:bg-transparent print:border-b-2 print:border-slate-800">
             <TableRow>
               <TableHead className="font-semibold text-slate-600 h-12 print:text-black print:p-2">
                 {entityKey}

@@ -43,7 +43,6 @@ export default function QuadroContratado() {
 
   const [form, setForm] = useState({
     plant_id: '',
-    location_id: 'none',
     function_id: 'none',
     equipment_id: 'none',
     quantity: '',
@@ -72,7 +71,6 @@ export default function QuadroContratado() {
     setEditingId(null)
     setForm({
       plant_id: filterPlant !== 'all' ? filterPlant : '',
-      location_id: 'none',
       function_id: 'none',
       equipment_id: 'none',
       quantity: '',
@@ -89,7 +87,6 @@ export default function QuadroContratado() {
     setEntryType(item.type === 'colaborador' ? 'colaboradores' : 'equipamentos')
     setForm({
       plant_id: item.plant_id || '',
-      location_id: item.location_id || 'none',
       function_id: item.function_id || 'none',
       equipment_id: item.equipment_id || 'none',
       quantity: item.quantity?.toString() || '',
@@ -119,7 +116,7 @@ export default function QuadroContratado() {
         if (error) throw error
         toast({
           title: 'Meta lançada com sucesso',
-          className: 'bg-green-500/20 text-brand-cyan border-brand-cyan/50',
+          className: 'bg-green-500/20 text-brand-deepBlue border-brand-deepBlue/50',
         })
       } else {
         if (!form.plant_id || !form.quantity) {
@@ -131,7 +128,7 @@ export default function QuadroContratado() {
           client_id: profile!.client_id,
           type: isStaff ? 'colaborador' : 'equipamento',
           plant_id: form.plant_id,
-          location_id: isStaff && form.location_id !== 'none' ? form.location_id : null,
+          location_id: null, // Hidden per acceptance criteria for colaboradores
           function_id: isStaff && form.function_id !== 'none' ? form.function_id : null,
           equipment_id: !isStaff && form.equipment_id !== 'none' ? form.equipment_id : null,
           quantity: Number(form.quantity),
@@ -145,14 +142,14 @@ export default function QuadroContratado() {
           if (error) throw error
           toast({
             title: 'Quadro contratado atualizado',
-            className: 'bg-green-500/20 text-brand-cyan border-brand-cyan/50',
+            className: 'bg-green-500/20 text-brand-deepBlue border-brand-deepBlue/50',
           })
         } else {
           const { error } = await supabase.from('contracted_headcount').insert(payload)
           if (error) throw error
           toast({
             title: 'Quadro contratado salvo',
-            className: 'bg-green-500/20 text-brand-cyan border-brand-cyan/50',
+            className: 'bg-green-500/20 text-brand-deepBlue border-brand-deepBlue/50',
           })
         }
         loadData()
@@ -171,7 +168,6 @@ export default function QuadroContratado() {
     if (!error) {
       toast({
         title: 'Registro removido',
-        className: 'bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20',
       })
       loadData()
       refetch()
@@ -188,8 +184,8 @@ export default function QuadroContratado() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="bg-brand-cyan/10 p-2.5 rounded-xl border border-brand-cyan/20 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
-            <ClipboardList className="h-6 w-6 text-brand-cyan" />
+          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
+            <ClipboardList className="h-6 w-6 text-brand-deepBlue" />
           </div>
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground">Quadro Contratado</h2>
@@ -203,10 +199,10 @@ export default function QuadroContratado() {
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
         <div className="w-full sm:w-64">
           <Select value={filterPlant} onValueChange={setFilterPlant}>
-            <SelectTrigger className="bg-background border-input text-foreground">
+            <SelectTrigger className="bg-white border-gray-200 text-foreground">
               <SelectValue placeholder="Filtrar por Planta" />
             </SelectTrigger>
             <SelectContent>
@@ -221,7 +217,7 @@ export default function QuadroContratado() {
         </div>
         <div className="w-full sm:w-64">
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="bg-background border-input text-foreground">
+            <SelectTrigger className="bg-white border-gray-200 text-foreground">
               <SelectValue placeholder="Filtrar por Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -233,23 +229,23 @@ export default function QuadroContratado() {
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-muted/50 border-b border-border">
+          <TableHeader className="bg-slate-50/80 border-b border-gray-100">
             <TableRow className="hover:bg-transparent">
-              <TableHead className="font-semibold text-foreground">Tipo</TableHead>
-              <TableHead className="font-semibold text-foreground">Planta</TableHead>
-              <TableHead className="font-semibold text-foreground">Local / Equipamento</TableHead>
-              <TableHead className="font-semibold text-foreground">Função</TableHead>
-              <TableHead className="font-semibold text-foreground">Quantidade</TableHead>
-              <TableHead className="font-semibold text-foreground text-right pr-6">Ações</TableHead>
+              <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
+              <TableHead className="font-semibold text-slate-600">Planta</TableHead>
+              <TableHead className="font-semibold text-slate-600">Equipamento</TableHead>
+              <TableHead className="font-semibold text-slate-600">Função</TableHead>
+              <TableHead className="font-semibold text-slate-600">Quantidade</TableHead>
+              <TableHead className="font-semibold text-slate-600 text-right pr-6">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-10">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-cyan" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
@@ -260,37 +256,37 @@ export default function QuadroContratado() {
               </TableRow>
             ) : (
               filteredData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/50 border-border">
+                <TableRow key={item.id} className="hover:bg-slate-50/50 border-gray-100">
                   <TableCell>
                     {item.type === 'colaborador' ? (
-                      <Badge className="bg-brand-deepBlue/40 text-brand-cyan border border-brand-cyan/30 shadow-[0_0_10px_rgba(0,255,255,0.1)] hover:bg-brand-deepBlue/60">
+                      <Badge className="bg-brand-deepBlue text-white hover:bg-brand-deepBlue/90">
                         Colaborador
                       </Badge>
                     ) : (
-                      <Badge className="bg-muted text-foreground border border-border hover:bg-muted/80">
+                      <Badge className="bg-slate-200 text-slate-800 hover:bg-slate-300">
                         Equipamento
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium text-foreground">
+                  <TableCell className="font-medium text-slate-700">
                     {plants.find((p) => p.id === item.plant_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-slate-600">
                     {item.type === 'colaborador'
-                      ? locations.find((l) => l.id === item.location_id)?.name || '-'
+                      ? '-'
                       : equipment.find((e) => e.id === item.equipment_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-slate-600">
                     {functions.find((f) => f.id === item.function_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="font-bold text-foreground">{item.quantity}</TableCell>
+                  <TableCell className="font-bold text-slate-800">{item.quantity}</TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => openEdit(item)}
-                        className="text-muted-foreground hover:text-brand-cyan hover:bg-brand-cyan/10"
+                        className="text-gray-400 hover:text-brand-deepBlue hover:bg-slate-100"
                         title="Editar"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -299,7 +295,7 @@ export default function QuadroContratado() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(item.id)}
-                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        className="text-gray-400 hover:text-red-600 hover:bg-red-50"
                         title="Remover"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -314,7 +310,7 @@ export default function QuadroContratado() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl bg-card border-border">
+        <DialogContent className="sm:max-w-xl bg-white border-gray-200">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {editingId ? 'Editar Registro' : 'Novo Registro'}
@@ -325,15 +321,15 @@ export default function QuadroContratado() {
               <RadioGroup
                 value={entryType}
                 onValueChange={setEntryType}
-                className="flex flex-wrap gap-4 bg-muted/30 p-4 rounded-xl border border-border"
+                className="flex flex-wrap gap-4 bg-slate-50 p-4 rounded-xl border border-gray-200"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem
                     value="colaboradores"
                     id="r1"
-                    className="text-brand-cyan border-brand-cyan/50"
+                    className="text-brand-deepBlue border-brand-deepBlue"
                   />
-                  <Label htmlFor="r1" className="cursor-pointer text-foreground font-medium">
+                  <Label htmlFor="r1" className="cursor-pointer text-slate-700 font-medium">
                     Colaboradores
                   </Label>
                 </div>
@@ -341,9 +337,9 @@ export default function QuadroContratado() {
                   <RadioGroupItem
                     value="equipamentos"
                     id="r2"
-                    className="text-brand-cyan border-brand-cyan/50"
+                    className="text-brand-deepBlue border-brand-deepBlue"
                   />
-                  <Label htmlFor="r2" className="cursor-pointer text-foreground font-medium">
+                  <Label htmlFor="r2" className="cursor-pointer text-slate-700 font-medium">
                     Equipamentos
                   </Label>
                 </div>
@@ -351,9 +347,9 @@ export default function QuadroContratado() {
                   <RadioGroupItem
                     value="metas"
                     id="r3"
-                    className="text-brand-cyan border-brand-cyan/50"
+                    className="text-brand-deepBlue border-brand-deepBlue"
                   />
-                  <Label htmlFor="r3" className="cursor-pointer text-foreground font-medium">
+                  <Label htmlFor="r3" className="cursor-pointer text-slate-700 font-medium">
                     Metas
                   </Label>
                 </div>
@@ -362,12 +358,12 @@ export default function QuadroContratado() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-foreground">Planta *</Label>
+                <Label className="text-slate-700">Planta *</Label>
                 <Select
                   value={form.plant_id}
                   onValueChange={(v) => setForm({ ...form, plant_id: v })}
                 >
-                  <SelectTrigger className="bg-background">
+                  <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,12 +378,12 @@ export default function QuadroContratado() {
 
               {entryType === 'colaboradores' && (
                 <div className="space-y-2">
-                  <Label className="text-foreground">Função</Label>
+                  <Label className="text-slate-700">Função</Label>
                   <Select
                     value={form.function_id}
                     onValueChange={(v) => setForm({ ...form, function_id: v })}
                   >
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="bg-white">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -404,12 +400,12 @@ export default function QuadroContratado() {
 
               {entryType === 'equipamentos' && (
                 <div className="space-y-2">
-                  <Label className="text-foreground">Equipamento *</Label>
+                  <Label className="text-slate-700">Equipamento *</Label>
                   <Select
                     value={form.equipment_id}
                     onValueChange={(v) => setForm({ ...form, equipment_id: v })}
                   >
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="bg-white">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -429,12 +425,12 @@ export default function QuadroContratado() {
               {entryType === 'metas' && (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-foreground">Meta *</Label>
+                    <Label className="text-slate-700">Meta *</Label>
                     <Select
                       value={form.goal_id}
                       onValueChange={(v) => setForm({ ...form, goal_id: v })}
                     >
-                      <SelectTrigger className="bg-background">
+                      <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -449,22 +445,22 @@ export default function QuadroContratado() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-foreground">Mês de Referência *</Label>
+                    <Label className="text-slate-700">Mês de Referência *</Label>
                     <Input
                       type="month"
                       value={form.reference_month}
                       onChange={(e) => setForm({ ...form, reference_month: e.target.value })}
-                      className="bg-background"
+                      className="bg-white"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-foreground">Valor *</Label>
+                    <Label className="text-slate-700">Valor *</Label>
                     <Input
                       type="number"
                       step="0.01"
                       value={form.value}
                       onChange={(e) => setForm({ ...form, value: e.target.value })}
-                      className="bg-background"
+                      className="bg-white"
                     />
                   </div>
                 </>
@@ -472,19 +468,19 @@ export default function QuadroContratado() {
 
               {entryType !== 'metas' && (
                 <div className="space-y-2">
-                  <Label className="text-foreground">Quantidade *</Label>
+                  <Label className="text-slate-700">Quantidade *</Label>
                   <Input
                     type="number"
                     min="1"
                     value={form.quantity}
                     onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                    className="bg-background"
+                    className="bg-white"
                   />
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>

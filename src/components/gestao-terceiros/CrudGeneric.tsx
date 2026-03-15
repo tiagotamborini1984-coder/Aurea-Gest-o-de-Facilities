@@ -41,6 +41,7 @@ export type FieldDef = {
   type: 'text' | 'number' | 'select' | 'toggle'
   options?: { value: string; label: string }[]
   required?: boolean
+  hidden?: (form: any) => boolean
 }
 
 export type ColumnDef = {
@@ -103,6 +104,7 @@ export function CrudGeneric({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     for (const field of fields) {
+      if (field.hidden && field.hidden(form)) continue
       if (field.required !== false && field.type !== 'toggle') {
         const val = form[field.name]
         if (val === undefined || val === null || val === '') {
@@ -112,7 +114,15 @@ export function CrudGeneric({
       }
     }
     setIsSubmitting(true)
-    const success = editingItem ? await onUpdate(editingItem.id, form) : await onAdd(form)
+    const payload = { ...form }
+    // Clean up hidden fields before sending
+    for (const field of fields) {
+      if (field.hidden && field.hidden(form)) {
+        payload[field.name] = null
+      }
+    }
+
+    const success = editingItem ? await onUpdate(editingItem.id, payload) : await onAdd(payload)
     if (success) {
       toast({
         title: `${title} salvo com sucesso`,
@@ -167,11 +177,7 @@ export function CrudGeneric({
           <h2 className="text-3xl font-bold tracking-tight text-brand-graphite">{title}</h2>
           {subtitle && <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>}
         </div>
-        <Button
-          onClick={openAdd}
-          style={{ backgroundColor: activeClient?.primaryColor || '#22c55e' }}
-          className="text-white shadow-sm"
-        >
+        <Button onClick={openAdd} variant="tech" className="shadow-sm">
           <Plus className="w-4 h-4 mr-2" /> Novo Registro
         </Button>
       </div>
@@ -242,14 +248,14 @@ export function CrudGeneric({
                         <button
                           type="button"
                           onClick={() => openEdit(item)}
-                          className="p-1.5 text-gray-400 hover:text-gray-900 bg-white hover:bg-gray-100 rounded-md"
+                          className="p-1.5 text-gray-400 hover:text-brand-deepBlue bg-white hover:bg-slate-100 rounded-md transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setItemToDelete(item.id)}
-                          className="p-1.5 text-red-400 hover:text-red-600 bg-white hover:bg-red-50 rounded-md"
+                          className="p-1.5 text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 rounded-md transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -286,7 +292,7 @@ export function CrudGeneric({
                     style={{
                       backgroundColor:
                         item.is_active !== false
-                          ? activeClient?.primaryColor || '#22c55e'
+                          ? activeClient?.primaryColor || '#1e3a8a'
                           : '#94a3b8',
                     }}
                   >
@@ -296,14 +302,14 @@ export function CrudGeneric({
                     <button
                       type="button"
                       onClick={() => openEdit(item)}
-                      className="p-2 text-gray-400 hover:text-gray-900 bg-white border border-gray-100 rounded-full shadow-sm"
+                      className="p-2 text-gray-400 hover:text-brand-deepBlue bg-white border border-gray-100 rounded-full shadow-sm"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setItemToDelete(item.id)}
-                      className="p-2 text-red-400 hover:text-red-600 bg-white border border-gray-100 rounded-full shadow-sm"
+                      className="p-2 text-gray-400 hover:text-red-600 bg-white border border-gray-100 rounded-full shadow-sm"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -322,70 +328,75 @@ export function CrudGeneric({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {fields.map((f: FieldDef) => (
-                <div
-                  key={f.name}
-                  className={cn(
-                    'space-y-2',
-                    f.type === 'toggle'
-                      ? 'col-span-1 sm:col-span-2 flex items-center justify-between border border-gray-200 p-3 rounded-lg'
-                      : '',
-                  )}
-                >
-                  {f.type !== 'toggle' && (
-                    <label className="text-sm font-medium">
-                      {f.label} {f.required !== false && <span className="text-red-500">*</span>}
-                    </label>
-                  )}
-                  {(f.type === 'text' || f.type === 'number') && (
-                    <Input
-                      type={f.type}
-                      value={form[f.name] ?? ''}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value,
-                        })
-                      }
-                    />
-                  )}
-                  {f.type === 'select' && (
-                    <Select
-                      value={form[f.name] === null ? 'none' : form[f.name]?.toString() || 'none'}
-                      onValueChange={(v) => setForm({ ...form, [f.name]: v === 'none' ? null : v })}
-                    >
-                      <SelectTrigger className="w-full bg-white h-10">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none" className="text-muted-foreground">
-                          Nenhum / Não aplicável
-                        </SelectItem>
-                        {f.options?.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {f.type === 'toggle' && (
-                    <>
-                      <label className="text-sm font-medium">{f.label}</label>
-                      <Switch
-                        checked={form[f.name] || false}
-                        onCheckedChange={(v) => setForm({ ...form, [f.name]: v })}
+              {fields.map((f: FieldDef) => {
+                if (f.hidden && f.hidden(form)) return null
+                return (
+                  <div
+                    key={f.name}
+                    className={cn(
+                      'space-y-2',
+                      f.type === 'toggle'
+                        ? 'col-span-1 sm:col-span-2 flex items-center justify-between border border-gray-200 p-3 rounded-lg'
+                        : '',
+                    )}
+                  >
+                    {f.type !== 'toggle' && (
+                      <label className="text-sm font-medium">
+                        {f.label} {f.required !== false && <span className="text-red-500">*</span>}
+                      </label>
+                    )}
+                    {(f.type === 'text' || f.type === 'number') && (
+                      <Input
+                        type={f.type}
+                        value={form[f.name] ?? ''}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value,
+                          })
+                        }
                       />
-                    </>
-                  )}
-                </div>
-              ))}
+                    )}
+                    {f.type === 'select' && (
+                      <Select
+                        value={form[f.name] === null ? 'none' : form[f.name]?.toString() || 'none'}
+                        onValueChange={(v) =>
+                          setForm({ ...form, [f.name]: v === 'none' ? null : v })
+                        }
+                      >
+                        <SelectTrigger className="w-full bg-white h-10">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-muted-foreground">
+                            Nenhum / Não aplicável
+                          </SelectItem>
+                          {f.options?.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {f.type === 'toggle' && (
+                      <>
+                        <label className="text-sm font-medium">{f.label}</label>
+                        <Switch
+                          checked={form[f.name] || false}
+                          onCheckedChange={(v) => setForm({ ...form, [f.name]: v })}
+                        />
+                      </>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" variant="tech" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar
               </Button>
             </div>

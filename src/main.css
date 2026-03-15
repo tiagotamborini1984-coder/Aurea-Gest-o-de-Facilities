@@ -6,38 +6,39 @@
 
 @layer base {
   :root {
-    /* Modern Facilities Design System - Graphite & Deep Blue Theme */
-    --background: 215 28% 17%; /* Graphite */
-    --foreground: 210 40% 98%;
+    /* UI/UX Layout - Clean White Content Area & Deep Blue Highlights */
+    --background: 0 0% 100%; /* White */
+    --foreground: 215 28% 17%; /* Graphite text */
 
-    --card: 215 28% 19%; /* Slightly lighter Graphite for cards */
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
 
-    --popover: 215 28% 19%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
 
     --primary: 224 64% 33%; /* Deep Blue */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 215 28% 25%; /* Lighter Graphite */
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 215 16% 94%;
+    --secondary-foreground: 215 28% 17%;
 
-    --muted: 215 28% 22%;
+    --muted: 215 16% 94%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 224 64% 33%; /* Deep Blue for hovers */
-    --accent-foreground: 210 40% 98%;
+    --accent: 215 16% 94%;
+    --accent-foreground: 215 28% 17%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 215 28% 25%;
-    --input: 215 28% 25%;
+    --border: 215 16% 90%;
+    --input: 215 16% 90%;
     --ring: 224 64% 33%; /* Deep Blue focus rings */
 
     --radius: 0.5rem;
 
-    --sidebar-background: 215 28% 15%; /* Darker Graphite for sidebar */
+    /* UI/UX Layout - Grafite Sidebar */
+    --sidebar-background: 215 28% 17%; /* Graphite */
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 224 64% 33%;
     --sidebar-primary-foreground: 210 40% 98%;
@@ -48,27 +49,27 @@
   }
 
   .dark {
-    /* Identical configuration enforcing global dark tech theme */
-    --background: 215 28% 17%;
-    --foreground: 210 40% 98%;
-    --card: 215 28% 19%;
-    --card-foreground: 210 40% 98%;
-    --popover: 215 28% 19%;
-    --popover-foreground: 210 40% 98%;
+    /* Identical configuration enforcing global light content / dark sidebar theme */
+    --background: 0 0% 100%;
+    --foreground: 215 28% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
     --primary: 224 64% 33%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 215 28% 25%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 215 28% 22%;
+    --secondary: 215 16% 94%;
+    --secondary-foreground: 215 28% 17%;
+    --muted: 215 16% 94%;
     --muted-foreground: 215 20% 65%;
-    --accent: 224 64% 33%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 215 16% 94%;
+    --accent-foreground: 215 28% 17%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 215 28% 25%;
-    --input: 215 28% 25%;
+    --border: 215 16% 90%;
+    --input: 215 16% 90%;
     --ring: 224 64% 33%;
-    --sidebar-background: 215 28% 15%;
+    --sidebar-background: 215 28% 17%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 224 64% 33%;
     --sidebar-primary-foreground: 210 40% 98%;

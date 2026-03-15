@@ -167,7 +167,9 @@ export function useCadastrosConfig(
               header: 'Tipo',
               accessor: 'type',
               render: (item: any) => (
-                <span className="capitalize font-medium text-brand-blue bg-brand-blue/10 px-2 py-0.5 rounded text-xs">
+                <span
+                  className={`capitalize font-medium px-2 py-0.5 rounded text-xs ${item.type === 'colaborador' ? 'bg-brand-deepBlue text-white' : 'bg-slate-200 text-slate-800'}`}
+                >
                   {item.type}
                 </span>
               ),
@@ -215,6 +217,7 @@ export function useCadastrosConfig(
               type: 'select',
               options: locationOptions,
               required: false,
+              hidden: (form: any) => form.type === 'colaborador', // Hidden for colaborador as per requirement
             },
             {
               name: 'function_id',
@@ -222,6 +225,7 @@ export function useCadastrosConfig(
               type: 'select',
               options: functionOptions,
               required: false,
+              hidden: (form: any) => form.type === 'equipamento',
             },
             {
               name: 'equipment_id',
@@ -229,6 +233,7 @@ export function useCadastrosConfig(
               type: 'select',
               options: equipmentOptions,
               required: false,
+              hidden: (form: any) => form.type === 'colaborador',
             },
             { name: 'quantity', label: 'Quantidade', type: 'number' },
           ],
