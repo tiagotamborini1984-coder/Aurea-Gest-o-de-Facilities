@@ -18,15 +18,28 @@ export default function Layout() {
       document.documentElement.style.removeProperty('--primary')
       document.documentElement.style.removeProperty('--sidebar-background')
     }
+
+    if (activeClient?.secondaryColor) {
+      const secondaryHsl = hexToHsl(activeClient.secondaryColor)
+      document.documentElement.style.setProperty('--secondary', secondaryHsl)
+      document.documentElement.style.setProperty('--sidebar-primary', secondaryHsl)
+    } else {
+      document.documentElement.style.removeProperty('--secondary')
+      document.documentElement.style.removeProperty('--sidebar-primary')
+    }
   }, [activeClient])
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background overflow-hidden transition-colors duration-500">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 w-full overflow-hidden">
-          <AppHeader />
-          <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 animate-fade-in relative">
+        <div className="print:hidden h-full">
+          <AppSidebar />
+        </div>
+        <div className="flex flex-col flex-1 w-full overflow-hidden print:w-full print:block">
+          <div className="print:hidden">
+            <AppHeader />
+          </div>
+          <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 animate-fade-in relative print:p-0 print:overflow-visible">
             <Outlet />
           </main>
         </div>

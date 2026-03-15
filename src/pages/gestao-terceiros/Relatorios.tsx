@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
-import { FileSpreadsheet, Loader2 } from 'lucide-react'
+import { FileSpreadsheet, Loader2, Printer } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { exportToCSV } from '@/lib/export'
@@ -169,6 +169,10 @@ export default function Relatorios() {
     }
   }
 
+  const handleExportPDF = () => {
+    window.print()
+  }
+
   const entityKey =
     activeTab === 'colaborador'
       ? 'Colaborador'
@@ -179,15 +183,16 @@ export default function Relatorios() {
           : 'Equipamento'
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6 pb-12 animate-fade-in">
-      <div>
+    <div className="max-w-[1400px] mx-auto space-y-6 pb-12 animate-fade-in print:max-w-none print:w-full">
+      <div className="print:text-center print:mb-8">
         <h2 className="text-3xl font-bold tracking-tight text-foreground">Relatórios</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Presenças e faltas por colaborador, local e planta
+          Presenças e faltas por colaborador, local e planta (
+          {format(new Date(dateFrom), 'dd/MM/yyyy')} a {format(new Date(dateTo), 'dd/MM/yyyy')})
         </p>
       </div>
 
-      <Card className="shadow-sm border-border overflow-hidden">
+      <Card className="shadow-sm border-border overflow-hidden print:hidden">
         <CardContent className="p-6 space-y-6 bg-white">
           <div className="flex flex-wrap gap-6">
             <div className="space-y-1.5">
@@ -243,7 +248,7 @@ export default function Relatorios() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
           <TabsList className="bg-white border border-border p-1 h-12 w-full sm:w-auto">
             <TabsTrigger value="colaborador" className="data-[state=active]:bg-slate-100">
@@ -260,32 +265,46 @@ export default function Relatorios() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <Button
-          variant="outline"
-          onClick={handleExportCSV}
-          disabled={reportData.length === 0}
-          className="bg-white"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportPDF}
+            disabled={reportData.length === 0}
+            className="bg-white hover:bg-slate-50"
+          >
+            <Printer className="h-4 w-4 mr-2" /> PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportCSV}
+            disabled={reportData.length === 0}
+            className="bg-white hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50/80 border-b border-border">
+      <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden print:border-none print:shadow-none">
+        <Table className="print:border-collapse print:w-full">
+          <TableHeader className="bg-slate-50/80 border-b border-border print:bg-transparent print:border-b-2 print:border-slate-800">
             <TableRow>
-              <TableHead className="font-semibold text-slate-600 h-12">{entityKey}</TableHead>
-              <TableHead className="font-semibold text-slate-600 text-center">
+              <TableHead className="font-semibold text-slate-600 h-12 print:text-black print:p-2">
+                {entityKey}
+              </TableHead>
+              <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
                 Média Presenças
               </TableHead>
-              <TableHead className="font-semibold text-slate-600 text-center">
+              <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
                 Média Faltas
               </TableHead>
-              <TableHead className="font-semibold text-slate-600 text-center">Contratado</TableHead>
-              <TableHead className="font-semibold text-slate-600 text-center">
+              <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                Contratado
+              </TableHead>
+              <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
                 Taxa Presença
               </TableHead>
-              <TableHead className="font-semibold text-slate-600 text-center">
+              <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
                 Absenteísmo
               </TableHead>
             </TableRow>
@@ -305,28 +324,35 @@ export default function Relatorios() {
               </TableRow>
             ) : (
               reportData.map((row, i) => (
-                <TableRow key={i} className="hover:bg-slate-50/50">
-                  <TableCell className="font-medium text-slate-700">{row.Entidade}</TableCell>
-                  <TableCell className="text-center">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-green-100 text-green-800">
+                <TableRow
+                  key={i}
+                  className="hover:bg-slate-50/50 print:border-b print:border-slate-200"
+                >
+                  <TableCell className="font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
+                    {row.Entidade}
+                  </TableCell>
+                  <TableCell className="text-center print:p-2 print:break-inside-avoid">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-green-100 text-green-800 print:bg-transparent print:text-black">
                       {Number(row['Média Presenças']).toFixed(1)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-red-100 text-red-800">
+                  <TableCell className="text-center print:p-2 print:break-inside-avoid">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-red-100 text-red-800 print:bg-transparent print:text-black">
                       {Number(row['Média Faltas']).toFixed(1)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center font-bold text-slate-700">
+                  <TableCell className="text-center font-bold text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
                     {row.Contratado}
                   </TableCell>
-                  <TableCell className="text-center font-medium text-slate-700">
+                  <TableCell className="text-center font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
                     {Number(row['Taxa Presença']).toFixed(1)}%
                   </TableCell>
                   <TableCell
                     className={cn(
-                      'text-center font-semibold',
-                      Number(row.Absenteísmo) > 0 ? 'text-red-600' : 'text-slate-600',
+                      'text-center font-semibold print:text-black print:p-2 print:break-inside-avoid',
+                      Number(row.Absenteísmo) > 0
+                        ? 'text-red-600 print:text-black'
+                        : 'text-slate-600 print:text-black',
                     )}
                   >
                     {Number(row.Absenteísmo).toFixed(1)}%

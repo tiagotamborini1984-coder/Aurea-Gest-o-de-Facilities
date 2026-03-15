@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Loader2, Trash2, ClipboardList } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit2, ClipboardList } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -35,7 +35,12 @@ export default function QuadroContratado() {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [entryType, setEntryType] = useState('colaboradores')
+
+  // Filters
+  const [filterPlant, setFilterPlant] = useState('all')
+  const [filterType, setFilterType] = useState('all')
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -65,8 +70,9 @@ export default function QuadroContratado() {
   }, [profile])
 
   const openAdd = () => {
+    setEditingId(null)
     setForm({
-      plant_id: '',
+      plant_id: filterPlant !== 'all' ? filterPlant : '',
       location_id: 'none',
       function_id: 'none',
       equipment_id: 'none',
@@ -76,6 +82,22 @@ export default function QuadroContratado() {
       value: '',
     })
     setEntryType('colaboradores')
+    setIsModalOpen(true)
+  }
+
+  const openEdit = (item: any) => {
+    setEditingId(item.id)
+    setEntryType(item.type === 'colaborador' ? 'colaboradores' : 'equipamentos')
+    setForm({
+      plant_id: item.plant_id || '',
+      location_id: item.location_id || 'none',
+      function_id: item.function_id || 'none',
+      equipment_id: item.equipment_id || 'none',
+      quantity: item.quantity?.toString() || '',
+      goal_id: '',
+      reference_month: '',
+      value: '',
+    })
     setIsModalOpen(true)
   }
 
@@ -105,7 +127,8 @@ export default function QuadroContratado() {
           throw new Error('Preencha Planta e Quantidade.')
         }
         const isStaff = entryType === 'colaboradores'
-        const { error } = await supabase.from('contracted_headcount').insert({
+
+        const payload = {
           client_id: profile!.client_id,
           type: isStaff ? 'colaborador' : 'equipamento',
           plant_id: form.plant_id,
@@ -113,12 +136,26 @@ export default function QuadroContratado() {
           function_id: isStaff && form.function_id !== 'none' ? form.function_id : null,
           equipment_id: !isStaff && form.equipment_id !== 'none' ? form.equipment_id : null,
           quantity: Number(form.quantity),
-        })
-        if (error) throw error
-        toast({
-          title: 'Quadro contratado salvo com sucesso',
-          className: 'bg-green-50 text-green-900 border-green-200',
-        })
+        }
+
+        if (editingId) {
+          const { error } = await supabase
+            .from('contracted_headcount')
+            .update(payload)
+            .eq('id', editingId)
+          if (error) throw error
+          toast({
+            title: 'Quadro contratado atualizado com sucesso',
+            className: 'bg-green-50 text-green-900 border-green-200',
+          })
+        } else {
+          const { error } = await supabase.from('contracted_headcount').insert(payload)
+          if (error) throw error
+          toast({
+            title: 'Quadro contratado salvo com sucesso',
+            className: 'bg-green-50 text-green-900 border-green-200',
+          })
+        }
         loadData()
         refetch()
       }
@@ -139,6 +176,12 @@ export default function QuadroContratado() {
     }
   }
 
+  const filteredData = data.filter((item) => {
+    if (filterPlant !== 'all' && item.plant_id !== filterPlant) return false
+    if (filterType !== 'all' && item.type !== filterType) return false
+    return true
+  })
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -156,6 +199,37 @@ export default function QuadroContratado() {
         <Button onClick={openAdd} className="shadow-sm">
           <Plus className="w-4 h-4 mr-2" /> Novo Registro
         </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-white p-3 rounded-xl border border-border shadow-sm">
+        <div className="w-full sm:w-64">
+          <Select value={filterPlant} onValueChange={setFilterPlant}>
+            <SelectTrigger className="bg-slate-50 border-slate-200">
+              <SelectValue placeholder="Filtrar por Planta" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Plantas</SelectItem>
+              {plants.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-full sm:w-64">
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="bg-slate-50 border-slate-200">
+              <SelectValue placeholder="Filtrar por Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Tipos</SelectItem>
+              <SelectItem value="colaborador">Colaborador</SelectItem>
+              <SelectItem value="equipamento">Equipamento</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
@@ -177,41 +251,59 @@ export default function QuadroContratado() {
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ) : data.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                  Nenhum registro encontrado.
+                  Nenhum registro encontrado para os filtros selecionados.
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => (
+              filteredData.map((item) => (
                 <TableRow key={item.id} className="hover:bg-slate-50/50">
                   <TableCell>
-                    <Badge variant="outline" className="capitalize bg-primary/5 text-primary">
-                      {item.type}
-                    </Badge>
+                    {item.type === 'colaborador' ? (
+                      <Badge className="bg-blue-500 hover:bg-blue-600 text-white font-medium border-0">
+                        Colaborador
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white font-medium border-0">
+                        Equipamento
+                      </Badge>
+                    )}
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-slate-700">
                     {plants.find((p) => p.id === item.plant_id)?.name || '-'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-slate-600">
                     {item.type === 'colaborador'
                       ? locations.find((l) => l.id === item.location_id)?.name || '-'
                       : equipment.find((e) => e.id === item.equipment_id)?.name || '-'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-slate-600">
                     {functions.find((f) => f.id === item.function_id)?.name || '-'}
                   </TableCell>
-                  <TableCell className="font-bold">{item.quantity}</TableCell>
+                  <TableCell className="font-bold text-slate-800">{item.quantity}</TableCell>
                   <TableCell className="text-right pr-6">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(item.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(item)}
+                        className="text-slate-400 hover:text-primary hover:bg-slate-100"
+                        title="Editar"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-400 hover:text-red-700 hover:bg-red-50"
+                        title="Remover"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -223,33 +315,35 @@ export default function QuadroContratado() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Novo Registro</DialogTitle>
+            <DialogTitle>{editingId ? 'Editar Registro' : 'Novo Registro'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-5 py-2">
-            <RadioGroup
-              value={entryType}
-              onValueChange={setEntryType}
-              className="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-lg border border-border"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="colaboradores" id="r1" />
-                <Label htmlFor="r1" className="cursor-pointer">
-                  Colaboradores
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="equipamentos" id="r2" />
-                <Label htmlFor="r2" className="cursor-pointer">
-                  Equipamentos
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="metas" id="r3" />
-                <Label htmlFor="r3" className="cursor-pointer">
-                  Metas
-                </Label>
-              </div>
-            </RadioGroup>
+            {!editingId && (
+              <RadioGroup
+                value={entryType}
+                onValueChange={setEntryType}
+                className="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-lg border border-border"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="colaboradores" id="r1" />
+                  <Label htmlFor="r1" className="cursor-pointer">
+                    Colaboradores
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="equipamentos" id="r2" />
+                  <Label htmlFor="r2" className="cursor-pointer">
+                    Equipamentos
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="metas" id="r3" />
+                  <Label htmlFor="r3" className="cursor-pointer">
+                    Metas
+                  </Label>
+                </div>
+              </RadioGroup>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -272,48 +366,25 @@ export default function QuadroContratado() {
               </div>
 
               {entryType === 'colaboradores' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Local</Label>
-                    <Select
-                      value={form.location_id}
-                      onValueChange={(v) => setForm({ ...form, location_id: v })}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {locations
-                          .filter((l) => l.plant_id === form.plant_id)
-                          .map((l) => (
-                            <SelectItem key={l.id} value={l.id}>
-                              {l.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Função</Label>
-                    <Select
-                      value={form.function_id}
-                      onValueChange={(v) => setForm({ ...form, function_id: v })}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhuma</SelectItem>
-                        {functions.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
+                <div className="space-y-2">
+                  <Label>Função</Label>
+                  <Select
+                    value={form.function_id}
+                    onValueChange={(v) => setForm({ ...form, function_id: v })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {functions.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
 
               {entryType === 'equipamentos' && (

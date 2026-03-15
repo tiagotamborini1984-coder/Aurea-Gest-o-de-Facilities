@@ -27,7 +27,7 @@ export function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-[var(--primary)] px-4 sm:px-6 shadow-sm text-white transition-colors duration-500">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-[var(--primary)] px-4 sm:px-6 shadow-sm text-white transition-colors duration-500 print:hidden">
       <div className="flex items-center gap-2">
         {isMobile && <SidebarTrigger className="text-white hover:bg-white/20" />}
         <h1 className="text-lg font-semibold tracking-tight hidden sm:block">

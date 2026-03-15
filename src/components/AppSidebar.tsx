@@ -81,17 +81,17 @@ export function AppSidebar() {
     })
 
   return (
-    <Sidebar className="border-none bg-[var(--sidebar-background)] text-white">
+    <Sidebar className="border-none bg-[var(--sidebar-background)] text-white h-full shadow-xl">
       <SidebarHeader className="p-4 pt-6 pb-8 flex items-center justify-center border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="bg-secondary p-2 rounded-lg">
-            <Building2 className="h-6 w-6 text-primary" />
+        <div className="flex items-center gap-3 w-full pl-2">
+          <div className="bg-secondary p-2.5 rounded-lg shadow-sm">
+            <Building2 className="h-6 w-6 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-xl tracking-tight text-white leading-none">
+            <span className="font-bold text-lg tracking-tight text-white leading-none">
               Gestão de Facilities
             </span>
-            <span className="text-[0.65rem] text-secondary uppercase tracking-widest font-semibold mt-1">
+            <span className="text-[0.65rem] text-secondary-foreground/70 uppercase tracking-widest font-semibold mt-1.5">
               {activeClient ? activeClient.name : 'SaaS Mode'}
             </span>
           </div>
@@ -117,7 +117,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="border-white/20 mr-0 pr-0">
+                      <SidebarMenuSub className="border-white/10 mr-0 pr-0 ml-4 pl-3">
                         {item.subItems.map((sub) => {
                           const isActive = location.pathname === sub.path
                           return (
@@ -126,8 +126,8 @@ export function AppSidebar() {
                                 asChild
                                 isActive={isActive}
                                 className={cn(
-                                  'py-4 text-white/60 hover:text-white hover:bg-white/10 transition-colors',
-                                  isActive && 'bg-white/20 text-white font-medium',
+                                  'py-4 text-white/60 hover:text-white hover:bg-white/10 transition-colors my-0.5 rounded-md',
+                                  isActive && 'bg-secondary text-white font-medium shadow-sm',
                                 )}
                               >
                                 <Link to={sub.path}>{sub.title}</Link>
@@ -149,15 +149,15 @@ export function AppSidebar() {
                   asChild
                   isActive={isActive}
                   className={cn(
-                    'w-full mb-1 transition-all duration-200 py-5',
+                    'w-full mb-1 transition-all duration-200 py-5 rounded-md',
                     isActive
-                      ? 'bg-secondary text-primary shadow-sm'
+                      ? 'bg-secondary text-white shadow-sm'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                   )}
                 >
                   <Link to={item.path} className="flex items-center gap-3">
                     <item.icon
-                      className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-white/70')}
+                      className={cn('h-5 w-5', isActive ? 'text-white' : 'text-white/70')}
                     />
                     <span className="font-medium">{item.title}</span>
                   </Link>

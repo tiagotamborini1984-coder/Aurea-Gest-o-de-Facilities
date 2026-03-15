@@ -1,4 +1,5 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
+import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req: Request) => {
@@ -7,15 +8,42 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { reportType } = await req.json()
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
 
-    // Here we would implement real email sending via Resend, SendGrid, etc.
-    // For now, we mock success.
+    const reqData = await req.json().catch(() => ({}))
+    const reportType = reqData.reportType || 'Automated'
+
+    // In a real scenario, this would generate PDFs and use a mailing provider
+    // Logic: Fetch all Admins and Gestors
+    const { data: users, error } = await supabaseClient
+      .from('profiles')
+      .select('email, name, role, client_id, authorized_plants')
+      .in('role', ['Administrador', 'Master', 'Gestor'])
+
+    if (error) throw error
+
+    let sentCount = 0
+
+    // Simulate sending logic per user
+    for (const u of users || []) {
+      if (!u.email) continue
+
+      let scope = 'Todas as Plantas'
+      if (u.role === 'Gestor' && u.authorized_plants && Array.isArray(u.authorized_plants)) {
+        scope = `Plantas Autorizadas (${u.authorized_plants.length})`
+      }
+
+      console.log(`Sending ${reportType} report to ${u.email} (Role: ${u.role}, Scope: ${scope})`)
+      sentCount++
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `${reportType} report successfully generated and emailed.`,
+        message: `${reportType} report successfully generated and simulated sending to ${sentCount} recipients.`,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
