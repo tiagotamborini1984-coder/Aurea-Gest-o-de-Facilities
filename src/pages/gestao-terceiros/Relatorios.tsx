@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Table,
   TableBody,
@@ -16,46 +16,91 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Download, FileText } from 'lucide-react'
+import { Download, FileText, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { exportToCSV } from '@/lib/export'
 import { format, subDays } from 'date-fns'
+import { supabase } from '@/lib/supabase/client'
 
 export default function Relatorios() {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [reportType, setReportType] = useState('colaboradores')
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
   const { toast } = useToast()
-  const { employees, plants } = useMasterData()
+  const { employees, equipment, plants } = useMasterData()
 
-  const generateMockData = () => {
-    if (reportType === 'colaboradores') {
-      return employees
-        .map((e) => ({
-          Nome: e.name,
-          Planta: plants.find((p) => p.id === e.plant_id)?.name || 'N/A',
-          Empresa: e.company_name,
-          Presencas: Math.floor(Math.random() * 25) + 5,
-          Faltas: Math.floor(Math.random() * 5),
-        }))
-        .map((d) => ({
-          ...d,
-          Taxa: ((d.Presencas / (d.Presencas + d.Faltas)) * 100).toFixed(1) + '%',
-        }))
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      const { data: logs } = await supabase
+        .from('daily_logs')
+        .select('*')
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+
+      const safeLogs = logs || []
+
+      if (reportType === 'colaboradores') {
+        const mapped = employees
+          .map((e) => {
+            const empLogs = safeLogs.filter((l) => l.reference_id === e.id && l.type === 'staff')
+            const presencas = empLogs.filter((l) => l.status).length
+            const faltas = empLogs.length - presencas
+            const taxa =
+              empLogs.length > 0 ? ((presencas / empLogs.length) * 100).toFixed(1) + '%' : '0%'
+            return {
+              Nome: e.name,
+              Planta: plants.find((p) => p.id === e.plant_id)?.name || 'N/A',
+              Empresa: e.company_name,
+              Lançamentos: empLogs.length,
+              Presenças: presencas,
+              Faltas: faltas,
+              Taxa: taxa,
+            }
+          })
+          .filter((m) => m.Lançamentos > 0)
+        setData(mapped)
+      } else if (reportType === 'equipamentos') {
+        const mapped = equipment
+          .map((e) => {
+            const eqLogs = safeLogs.filter((l) => l.reference_id === e.id && l.type === 'equipment')
+            const presencas = eqLogs.filter((l) => l.status).length
+            const taxa =
+              eqLogs.length > 0 ? ((presencas / eqLogs.length) * 100).toFixed(1) + '%' : '0%'
+            return {
+              Equipamento: e.name,
+              Planta: plants.find((p) => p.id === e.plant_id)?.name || 'N/A',
+              Tipo: e.type,
+              Lançamentos: eqLogs.length,
+              Disponível: presencas,
+              Indisponível: eqLogs.length - presencas,
+              Taxa_Disponibilidade: taxa,
+            }
+          })
+          .filter((m) => m.Lançamentos > 0)
+        setData(mapped)
+      } else {
+        setData([])
+      }
+      setLoading(false)
     }
-    return []
-  }
+
+    if (plants.length > 0) {
+      fetchData()
+    }
+  }, [dateFrom, dateTo, reportType, employees, equipment, plants])
 
   const handleExportCSV = () => {
-    const data = generateMockData()
     if (data.length > 0) {
       exportToCSV(`relatorio_${reportType}_${dateFrom}_${dateTo}.csv`, data)
       toast({ title: 'Exportado com sucesso' })
     }
   }
 
-  const data = generateMockData()
+  const columns = data.length > 0 ? Object.keys(data[0]) : []
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-fade-in">
@@ -67,11 +112,11 @@ export default function Relatorios() {
           <p className="text-muted-foreground mt-1">Extraia dados consolidados da operação.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportCSV}>
+          <Button variant="outline" onClick={handleExportCSV} disabled={data.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Excel
           </Button>
-          <Button onClick={() => toast({ title: 'Gerando PDF...' })}>
-            <FileText className="h-4 w-4 mr-2" /> PDF
+          <Button onClick={handleExportCSV} disabled={data.length === 0}>
+            <FileText className="h-4 w-4 mr-2" /> PDF / CSV
           </Button>
         </div>
       </div>
@@ -85,7 +130,6 @@ export default function Relatorios() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="colaboradores">Por Colaborador</SelectItem>
-              <SelectItem value="locais">Por Local</SelectItem>
               <SelectItem value="equipamentos">Por Equipamento</SelectItem>
             </SelectContent>
           </Select>
@@ -104,28 +148,38 @@ export default function Relatorios() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead>Colaborador</TableHead>
-              <TableHead>Planta</TableHead>
-              <TableHead>Empresa</TableHead>
-              <TableHead>Presenças (Simulado)</TableHead>
-              <TableHead>Taxa de Presença</TableHead>
+              {columns.map((col) => (
+                <TableHead key={col}>{col.replace(/_/g, ' ')}</TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                  Sem dados para exibir.
+                <TableCell colSpan={Math.max(columns.length, 1)} className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-blue" />
+                </TableCell>
+              </TableRow>
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={Math.max(columns.length, 1)}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  Sem dados para exibir no período selecionado.
                 </TableCell>
               </TableRow>
             ) : (
               data.map((row, i) => (
                 <TableRow key={i}>
-                  <TableCell className="font-medium">{row.Nome}</TableCell>
-                  <TableCell>{row.Planta}</TableCell>
-                  <TableCell>{row.Empresa}</TableCell>
-                  <TableCell>{row.Presencas}</TableCell>
-                  <TableCell className="text-green-600 font-medium">{row.Taxa}</TableCell>
+                  {columns.map((col) => (
+                    <TableCell
+                      key={col}
+                      className={col.includes('Taxa') ? 'text-green-600 font-medium' : ''}
+                    >
+                      {row[col]}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))
             )}

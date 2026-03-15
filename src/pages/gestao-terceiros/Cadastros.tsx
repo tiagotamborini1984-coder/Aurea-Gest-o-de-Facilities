@@ -77,7 +77,10 @@ export default function Cadastros() {
               name: 'location_id',
               label: 'Local',
               type: 'select',
-              options: locations.map((l) => ({ value: l.id, label: l.name })),
+              options: locations.map((l) => ({
+                value: l.id,
+                label: `${l.name} (${plants.find((p) => p.id === l.plant_id)?.name})`,
+              })),
               render: (v: string) => locations.find((l) => l.id === v)?.name,
             },
             {
@@ -128,11 +131,31 @@ export default function Cadastros() {
               render: (v: string) => plants.find((p) => p.id === v)?.name,
             },
             {
+              name: 'location_id',
+              label: 'Local (Se Colaborador)',
+              type: 'select',
+              options: locations.map((l) => ({
+                value: l.id,
+                label: `${l.name} (${plants.find((p) => p.id === l.plant_id)?.name})`,
+              })),
+              render: (v: string) => locations.find((l) => l.id === v)?.name,
+            },
+            {
               name: 'function_id',
               label: 'Função (Se Colaborador)',
               type: 'select',
               options: functions.map((f) => ({ value: f.id, label: f.name })),
               render: (v: string) => functions.find((f) => f.id === v)?.name,
+            },
+            {
+              name: 'equipment_id',
+              label: 'Equipamento (Se Equipamento)',
+              type: 'select',
+              options: equipment.map((e) => ({
+                value: e.id,
+                label: `${e.name} (${plants.find((p) => p.id === e.plant_id)?.name})`,
+              })),
+              render: (v: string) => equipment.find((e) => e.id === v)?.name,
             },
             { name: 'quantity', label: 'Quantidade Prevista', type: 'number' },
           ] as FieldDef[],
@@ -172,16 +195,26 @@ export default function Cadastros() {
   const handleAdd = async (data: any) => {
     const payload = { ...data }
     if (config.tableName !== 'locations') payload.client_id = profile.client_id
+
+    // Clean empty strings for relations
+    const relationKeys = ['location_id', 'function_id', 'equipment_id', 'plant_id']
+    relationKeys.forEach((k) => {
+      if (payload[k] === '') payload[k] = null
+    })
+
     if (config.tableName === 'contracted_headcount') {
-      if (!payload.function_id) delete payload.function_id
-      if (!payload.location_id) delete payload.location_id
-      if (!payload.equipment_id) delete payload.equipment_id
+      if (!payload.function_id) payload.function_id = null
+      if (!payload.location_id) payload.location_id = null
+      if (!payload.equipment_id) payload.equipment_id = null
     }
+
     const { error } = await supabase.from(config.tableName).insert([payload])
     if (!error) {
       refetch()
       if (user)
-        logAudit(profile.client_id, user.id, `Cadastro de ${config.title}`, JSON.stringify(data))
+        logAudit(profile.client_id, user.id, `Cadastro de ${config.title}`, JSON.stringify(payload))
+    } else {
+      console.error('Insert error:', error)
     }
     return !error
   }
@@ -189,6 +222,7 @@ export default function Cadastros() {
   const handleRemove = (id: string) => {
     if (user)
       logAudit(profile.client_id, user.id, `Exclusão em ${config.title}`, `Registro ID: ${id}`)
+    refetch()
   }
 
   return (

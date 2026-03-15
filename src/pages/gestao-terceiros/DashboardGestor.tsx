@@ -17,6 +17,7 @@ export default function DashboardGestor() {
   )
   const { plants, contracted, locations, goals } = useMasterData()
   const [logs, setLogs] = useState<any[]>([])
+  const [monthlyGoals, setMonthlyGoals] = useState<any[]>([])
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -27,6 +28,15 @@ export default function DashboardGestor() {
         .gte('date', dateFrom)
         .lte('date', dateTo)
       setLogs(data || [])
+
+      const mFrom = `${dateFrom.substring(0, 7)}-01`
+      const mTo = `${dateTo.substring(0, 7)}-31`
+      const { data: mg } = await supabase
+        .from('monthly_goals_data')
+        .select('*')
+        .gte('reference_month', mFrom)
+        .lte('reference_month', mTo)
+      setMonthlyGoals(mg || [])
     }
     fetchLogs()
   }, [dateFrom, dateTo, plants])
@@ -36,13 +46,15 @@ export default function DashboardGestor() {
   }
 
   const metrics = useMemo(() => {
-    const days = Math.max(
-      1,
-      (new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (1000 * 60 * 60 * 24),
-    )
     const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
-
     const filteredLogs = logs.filter((l) => validPlants.includes(l.plant_id))
+
+    // Unique dates with records to calculate averages accurately
+    const staffDates =
+      new Set(filteredLogs.filter((l) => l.type === 'staff').map((l) => l.date)).size || 1
+    const equipDates =
+      new Set(filteredLogs.filter((l) => l.type === 'equipment').map((l) => l.date)).size || 1
+
     const staffLogs = filteredLogs.filter((l) => l.type === 'staff')
     const equipLogs = filteredLogs.filter((l) => l.type === 'equipment')
 
@@ -53,20 +65,25 @@ export default function DashboardGestor() {
       .filter((c) => c.type === 'equipamento' && validPlants.includes(c.plant_id))
       .reduce((a, b) => a + b.quantity, 0)
 
-    const staffLancado = Math.round(staffLogs.length / days)
-    const staffPresente = Math.round(staffLogs.filter((l) => l.status).length / days)
-    const staffAusente = Math.max(0, staffLancado - staffPresente)
+    const staffLancado = Math.round(staffLogs.length / staffDates)
+    const staffPresente = Math.round(staffLogs.filter((l) => l.status).length / staffDates)
+    const staffAusente = Math.max(
+      0,
+      contractedStaff > 0 ? contractedStaff - staffPresente : staffLancado - staffPresente,
+    )
     const staffAbs =
       contractedStaff > 0
         ? Math.max(0, ((contractedStaff - staffPresente) / contractedStaff) * 100)
         : 0
 
-    const equipLancado = Math.round(equipLogs.length / days)
-    const equipPresente = Math.round(equipLogs.filter((l) => l.status).length / days)
-    const equipAbs =
-      contractedEquip > 0
-        ? Math.max(0, ((contractedEquip - equipPresente) / contractedEquip) * 100)
-        : 0
+    const equipLancado = Math.round(equipLogs.length / equipDates)
+    const equipPresente = Math.round(equipLogs.filter((l) => l.status).length / equipDates)
+    const equipAusente = Math.max(
+      0,
+      contractedEquip > 0 ? contractedEquip - equipPresente : equipLancado - equipPresente,
+    )
+    const equipDisp =
+      contractedEquip > 0 ? Math.min(100, (equipPresente / contractedEquip) * 100) : 0
 
     return {
       staff: {
@@ -80,13 +97,46 @@ export default function DashboardGestor() {
         lancado: equipLancado,
         contratado: contractedEquip,
         presente: equipPresente,
-        ausente: Math.max(0, equipLancado - equipPresente),
-        absenteismo: equipAbs,
+        ausente: equipAusente,
+        absenteismo: 100 - equipDisp,
+        disponibilidade: equipDisp,
       },
     }
-  }, [logs, contracted, dateFrom, dateTo, selectedPlants, plants])
+  }, [logs, contracted, selectedPlants, plants])
 
   const activeMetrics = activeTab === 'colaboradores' ? metrics.staff : metrics.equip
+
+  const getGoalsGeneralNote = () => {
+    let sum = 0
+    let count = 0
+
+    // Abs Goal
+    const absGoalAchieved = metrics.staff.absenteismo < 4 ? 100 : 0
+    sum += absGoalAchieved
+    count++
+
+    // Disp Goal
+    sum += metrics.equip.disponibilidade
+    count++
+
+    // Monthly Data Goals
+    const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
+    goals
+      .filter((g) => g.is_active)
+      .forEach((g) => {
+        const plantGoalValues = monthlyGoals.filter(
+          (m) => m.goal_id === g.id && validPlants.includes(m.plant_id),
+        )
+        if (plantGoalValues.length > 0) {
+          const avg =
+            plantGoalValues.reduce((a, b) => a + Number(b.value), 0) / plantGoalValues.length
+          sum += avg
+          count++
+        }
+      })
+
+    return count > 0 ? (sum / count).toFixed(1) : '0.0'
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
@@ -175,7 +225,7 @@ export default function DashboardGestor() {
           <Card className="shadow-sm">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Lançado</p>
+                <p className="text-xs font-medium text-muted-foreground">Lançados (Média)</p>
                 <p className="text-2xl font-bold mt-1">{activeMetrics.lancado}</p>
               </div>
               <div className="bg-muted p-2 rounded-full">
@@ -186,7 +236,7 @@ export default function DashboardGestor() {
           <Card className="shadow-sm border-orange-200">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-orange-600">Contratado/dia</p>
+                <p className="text-xs font-medium text-orange-600">Contratados</p>
                 <p className="text-2xl font-bold mt-1 text-orange-700">
                   {activeMetrics.contratado}
                 </p>
@@ -199,7 +249,7 @@ export default function DashboardGestor() {
           <Card className="shadow-sm border-green-200">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-green-600">Presentes</p>
+                <p className="text-xs font-medium text-green-600">Presentes (Média)</p>
                 <p className="text-2xl font-bold mt-1 text-green-700">{activeMetrics.presente}</p>
               </div>
               <div className="bg-green-100 p-2 rounded-full">
@@ -210,7 +260,7 @@ export default function DashboardGestor() {
           <Card className="shadow-sm border-red-200">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-red-600">Ausentes</p>
+                <p className="text-xs font-medium text-red-600">Ausentes (Média)</p>
                 <p className="text-2xl font-bold mt-1 text-red-700">{activeMetrics.ausente}</p>
               </div>
               <div className="bg-red-100 p-2 rounded-full">
@@ -221,9 +271,14 @@ export default function DashboardGestor() {
           <Card className="shadow-sm border-brand-blue">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-brand-blue">Absenteísmo</p>
+                <p className="text-xs font-medium text-brand-blue">
+                  {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Disponibilidade'}
+                </p>
                 <p className="text-2xl font-bold mt-1 text-brand-blue">
-                  {activeMetrics.absenteismo.toFixed(1)}%
+                  {activeTab === 'colaboradores'
+                    ? metrics.staff.absenteismo.toFixed(1)
+                    : metrics.equip.disponibilidade.toFixed(1)}
+                  %
                 </p>
               </div>
               <div className="bg-brand-blue/10 p-2 rounded-full">
@@ -236,7 +291,7 @@ export default function DashboardGestor() {
         <Card className="shadow-sm border-brand-light animate-fade-in">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Target className="h-5 w-5 text-brand-blue" /> Atingimento de Metas (Simulado)
+              <Target className="h-5 w-5 text-brand-blue" /> Atingimento de Metas
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -244,34 +299,44 @@ export default function DashboardGestor() {
               <div className="flex justify-between items-center p-3 border rounded-lg bg-green-50/50">
                 <span className="font-medium text-sm">Absenteísmo (Meta &lt; 4%)</span>
                 <span className="text-green-600 font-bold text-sm">
-                  100% Atingimento (Atual: {metrics.staff.absenteismo.toFixed(1)}%)
+                  {metrics.staff.absenteismo < 4 ? '100' : '0'}% Atingimento (Atual:{' '}
+                  {metrics.staff.absenteismo.toFixed(1)}%)
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 border rounded-lg">
                 <span className="font-medium text-sm">Disponibilidade de Equipamentos</span>
                 <span className="text-brand-graphite font-bold text-sm">
-                  {metrics.equip.contratado > 0
-                    ? ((metrics.equip.presente / metrics.equip.contratado) * 100).toFixed(1)
-                    : 0}
-                  %
+                  {metrics.equip.disponibilidade.toFixed(1)}%
                 </span>
               </div>
               {goals
                 .filter((g) => g.is_active)
-                .map((g) => (
-                  <div
-                    key={g.id}
-                    className="flex justify-between items-center p-3 border rounded-lg"
-                  >
-                    <span className="font-medium text-sm">{g.name}</span>
-                    <span className="text-muted-foreground text-sm italic">
-                      Aguardando fechamento do mês
-                    </span>
-                  </div>
-                ))}
+                .map((g) => {
+                  const validPlants =
+                    selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
+                  const plantGoalValues = monthlyGoals.filter(
+                    (m) => m.goal_id === g.id && validPlants.includes(m.plant_id),
+                  )
+                  const avg =
+                    plantGoalValues.length > 0
+                      ? (
+                          plantGoalValues.reduce((a, b) => a + Number(b.value), 0) /
+                          plantGoalValues.length
+                        ).toFixed(1)
+                      : 'N/A'
+                  return (
+                    <div
+                      key={g.id}
+                      className="flex justify-between items-center p-3 border rounded-lg"
+                    >
+                      <span className="font-medium text-sm">{g.name}</span>
+                      <span className="text-muted-foreground font-bold text-sm">{avg}%</span>
+                    </div>
+                  )
+                })}
               <div className="flex justify-between items-center p-3 bg-brand-blue/5 rounded-lg border border-brand-blue/20 mt-4">
                 <span className="font-bold text-brand-blue">Nota Geral (Média)</span>
-                <span className="text-xl font-bold text-brand-blue">87.5%</span>
+                <span className="text-xl font-bold text-brand-blue">{getGoalsGeneralNote()}%</span>
               </div>
             </div>
           </CardContent>
@@ -288,25 +353,35 @@ export default function DashboardGestor() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {locations
                   .filter((l) => selectedPlants.length === 0 || selectedPlants.includes(l.plant_id))
-                  .map((loc) => (
-                    <div
-                      key={loc.id}
-                      className="p-4 border rounded-xl hover:bg-muted/30 transition-colors"
-                    >
-                      <p className="font-semibold text-brand-graphite">{loc.name}</p>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {plants.find((p) => p.id === loc.plant_id)?.name}
-                      </p>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Presentes:</span>
-                        <span className="font-medium">
-                          {(activeTab === 'colaboradores'
-                            ? metrics.staff.presente
-                            : metrics.equip.presente) || '0'}
-                        </span>
+                  .map((loc) => {
+                    const lLogs = logs.filter(
+                      (l) =>
+                        l.type === activeTab &&
+                        activeTab === 'staff' &&
+                        l.status &&
+                        l.plant_id === loc.plant_id,
+                    ) // For true accuracy, we'd need location_id in logs or via relation
+                    // Approximating based on plant since logs only hold plant_id natively unless joined
+                    return (
+                      <div
+                        key={loc.id}
+                        className="p-4 border rounded-xl hover:bg-muted/30 transition-colors"
+                      >
+                        <p className="font-semibold text-brand-graphite">{loc.name}</p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          {plants.find((p) => p.id === loc.plant_id)?.name}
+                        </p>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Presentes (Plant Avg):</span>
+                          <span className="font-medium">
+                            {(activeTab === 'colaboradores'
+                              ? metrics.staff.presente
+                              : metrics.equip.presente) || '0'}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">

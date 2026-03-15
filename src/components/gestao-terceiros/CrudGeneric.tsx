@@ -33,6 +33,7 @@ export function CrudGeneric({ title, tableName, fields, fetchQuery, onAdd, onRem
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<any>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -48,6 +49,7 @@ export function CrudGeneric({ title, tableName, fields, fetchQuery, onAdd, onRem
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     const success = await onAdd(form)
     if (success) {
       toast({ title: `${title} salvo com sucesso` })
@@ -56,6 +58,7 @@ export function CrudGeneric({ title, tableName, fields, fetchQuery, onAdd, onRem
     } else {
       toast({ title: 'Erro ao salvar', variant: 'destructive' })
     }
+    setIsSubmitting(false)
   }
 
   const handleRemove = async (id: string) => {
@@ -92,14 +95,17 @@ export function CrudGeneric({ title, tableName, fields, fetchQuery, onAdd, onRem
               )}
               {f.type === 'select' && (
                 <Select
-                  value={form[f.name]}
-                  onValueChange={(v) => setForm({ ...form, [f.name]: v })}
+                  value={form[f.name] || 'none'}
+                  onValueChange={(v) => setForm({ ...form, [f.name]: v === 'none' ? '' : v })}
                   required
                 >
                   <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none" className="text-muted-foreground">
+                      Nenhum / Não se aplica
+                    </SelectItem>
                     {f.options?.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
@@ -118,8 +124,8 @@ export function CrudGeneric({ title, tableName, fields, fetchQuery, onAdd, onRem
               )}
             </div>
           ))}
-          <Button type="submit" className="mb-0.5 min-w-[120px]">
-            Salvar
+          <Button type="submit" disabled={isSubmitting} className="mb-0.5 min-w-[120px]">
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
           </Button>
         </form>
       </div>

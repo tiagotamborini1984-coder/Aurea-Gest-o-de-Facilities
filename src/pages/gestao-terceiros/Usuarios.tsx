@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -31,6 +32,16 @@ import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/hooks/use-toast'
 import { logAudit } from '@/services/audit'
 import { useAuth } from '@/hooks/use-auth'
+import { useMasterData } from '@/hooks/use-master-data'
+
+const MENU_OPTIONS = [
+  'Dashboard Gestor',
+  'Lançamentos',
+  'Cadastros',
+  'Relatórios',
+  'BI Dashboard',
+  'Email Reports',
+]
 
 export default function Usuarios() {
   const [usersList, setUsersList] = useState<any[]>([])
@@ -39,9 +50,18 @@ export default function Usuarios() {
   const [isOpen, setIsOpen] = useState(false)
   const { profile } = useAppStore()
   const { user } = useAuth()
+  const { plants } = useMasterData()
   const { toast } = useToast()
 
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'Operacional' })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'Operacional',
+    accessible_menus: [] as string[],
+    authorized_plants: [] as string[],
+    force_password_change: true,
+  })
 
   const fetchUsers = async () => {
     if (!profile?.client_id) return
@@ -63,8 +83,6 @@ export default function Usuarios() {
         body: {
           ...form,
           client_id: profile?.client_id,
-          accessible_menus: [],
-          authorized_plants: [],
         },
       })
 
@@ -79,7 +97,15 @@ export default function Usuarios() {
           `Email: ${form.email} | Nível: ${form.role}`,
         )
       setIsOpen(false)
-      setForm({ name: '', email: '', password: '', role: 'Operacional' })
+      setForm({
+        name: '',
+        email: '',
+        password: '',
+        role: 'Operacional',
+        accessible_menus: [],
+        authorized_plants: [],
+        force_password_change: true,
+      })
       fetchUsers()
     } catch (err: any) {
       toast({
@@ -90,6 +116,24 @@ export default function Usuarios() {
     } finally {
       setIsAdding(false)
     }
+  }
+
+  const toggleMenu = (menu: string) => {
+    setForm((prev) => ({
+      ...prev,
+      accessible_menus: prev.accessible_menus.includes(menu)
+        ? prev.accessible_menus.filter((m) => m !== menu)
+        : [...prev.accessible_menus, menu],
+    }))
+  }
+
+  const togglePlant = (plantId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      authorized_plants: prev.authorized_plants.includes(plantId)
+        ? prev.authorized_plants.filter((p) => p !== plantId)
+        : [...prev.authorized_plants, plantId],
+    }))
   }
 
   return (
@@ -108,51 +152,97 @@ export default function Usuarios() {
               <Plus className="mr-2 h-4 w-4" /> Novo Usuário
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Cadastrar Usuário</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddUser} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Nome Completo</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nome Completo</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>E-mail</Label>
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Senha Temporária</Label>
+                  <Input
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    minLength={6}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nível de Acesso</Label>
+                  <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Operacional">Operacional</SelectItem>
+                      <SelectItem value="Gestor">Gestor</SelectItem>
+                      <SelectItem value="Administrador">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Label className="mb-2 block">Menus Acessíveis</Label>
+                <div className="flex flex-wrap gap-2">
+                  {MENU_OPTIONS.map((menu) => (
+                    <Badge
+                      key={menu}
+                      variant={form.accessible_menus.includes(menu) ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => toggleMenu(menu)}
+                    >
+                      {menu}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Label className="mb-2 block">Plantas Autorizadas</Label>
+                <div className="flex flex-wrap gap-2">
+                  {plants.map((p) => (
+                    <Badge
+                      key={p.id}
+                      variant={form.authorized_plants.includes(p.id) ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => togglePlant(p.id)}
+                    >
+                      {p.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t mt-4">
+                <span className="text-sm font-medium">Forçar troca de senha no primeiro login</span>
+                <Switch
+                  checked={form.force_password_change}
+                  onCheckedChange={(v) => setForm({ ...form, force_password_change: v })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Senha Temporária</Label>
-                <Input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  minLength={6}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Nível de Acesso</Label>
-                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Operacional">Operacional</SelectItem>
-                    <SelectItem value="Gestor">Gestor</SelectItem>
-                    <SelectItem value="Administrador">Administrador</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
               <Button type="submit" className="w-full mt-4" disabled={isAdding}>
                 {isAdding ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null} Salvar Usuário
               </Button>

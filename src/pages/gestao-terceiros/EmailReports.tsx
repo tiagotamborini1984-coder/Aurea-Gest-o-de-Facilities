@@ -1,13 +1,35 @@
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
-import { Mail } from 'lucide-react'
+import { Mail, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
 
 export default function EmailReports() {
   const { toast } = useToast()
+  const [testing, setTesting] = useState(false)
 
   const handleSave = () => toast({ title: 'Configurações de email salvas com sucesso.' })
+
+  const sendTestEmail = async () => {
+    setTesting(true)
+    try {
+      const { error } = await supabase.functions.invoke('email-reports', {
+        body: { reportType: 'Test' },
+      })
+      if (error) throw error
+      toast({ title: 'E-mail de teste enviado para sua caixa de entrada.' })
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao enviar e-mail de teste',
+        description: e.message,
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-fade-in">
@@ -61,9 +83,8 @@ export default function EmailReports() {
       </Card>
 
       <div className="flex justify-end pt-4">
-        <Button
-          onClick={() => toast({ title: 'E-mail de teste enviado para sua caixa de entrada.' })}
-        >
+        <Button onClick={sendTestEmail} disabled={testing}>
+          {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Enviar E-mail de Teste Agora
         </Button>
       </div>
