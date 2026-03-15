@@ -31,10 +31,10 @@ export default {
       },
       colors: {
         brand: {
-          blue: 'hsl(218 56% 23%)',
-          cyan: 'hsl(196 100% 44%)',
-          graphite: 'hsl(240 5% 26%)',
-          light: 'hsl(240 5% 96%)',
+          blue: 'hsl(215 25% 27%)', // mapped to Slate 700
+          cyan: 'hsl(78 85% 67%)', // mapped to Lime 300
+          graphite: 'hsl(215 25% 27%)',
+          light: 'hsl(214 32% 91%)',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

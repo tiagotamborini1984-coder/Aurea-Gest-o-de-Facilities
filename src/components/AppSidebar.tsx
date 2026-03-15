@@ -7,7 +7,7 @@ import {
   PieChart,
   History,
   Users,
-  Triangle,
+  Building2,
   Mail,
   ChevronRight,
 } from 'lucide-react'
@@ -84,23 +84,15 @@ export function AppSidebar() {
     <Sidebar className="border-none bg-[var(--sidebar-background)] text-white">
       <SidebarHeader className="p-4 pt-6 pb-8 flex items-center justify-center border-b border-white/10">
         <div className="flex items-center gap-3">
-          {activeClient?.logo ? (
-            <img
-              src={activeClient.logo}
-              alt="Logo"
-              className="h-8 w-8 object-contain bg-white rounded p-1"
-            />
-          ) : (
-            <div className="bg-white/10 p-2 rounded-lg">
-              <Triangle className="h-6 w-6 text-brand-cyan fill-current -rotate-90" />
-            </div>
-          )}
+          <div className="bg-secondary p-2 rounded-lg">
+            <Building2 className="h-6 w-6 text-primary" />
+          </div>
           <div className="flex flex-col">
             <span className="font-bold text-xl tracking-tight text-white leading-none">
-              {activeClient ? activeClient.name : 'Áurea'}
+              Gestão de Facilities
             </span>
-            <span className="text-[0.65rem] text-white/70 uppercase tracking-widest font-medium mt-1">
-              Gestão de Terceiros
+            <span className="text-[0.65rem] text-secondary uppercase tracking-widest font-semibold mt-1">
+              {activeClient ? activeClient.name : 'SaaS Mode'}
             </span>
           </div>
         </div>
@@ -159,13 +151,13 @@ export function AppSidebar() {
                   className={cn(
                     'w-full mb-1 transition-all duration-200 py-5',
                     isActive
-                      ? 'bg-white/20 text-white shadow-sm'
+                      ? 'bg-secondary text-primary shadow-sm'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                   )}
                 >
                   <Link to={item.path} className="flex items-center gap-3">
                     <item.icon
-                      className={cn('h-5 w-5', isActive ? 'text-white' : 'text-white/70')}
+                      className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-white/70')}
                     />
                     <span className="font-medium">{item.title}</span>
                   </Link>

@@ -4,6 +4,7 @@ import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useCadastrosConfig } from './useCadastrosConfig'
+import QuadroContratado from './QuadroContratado'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -13,6 +14,11 @@ export default function Cadastros() {
   const config = useCadastrosConfig(type, plants, locations, functions, equipment)
 
   if (!profile?.client_id) return null
+
+  if (type === 'quadro-contratado') {
+    return <QuadroContratado />
+  }
+
   if (!config) return <Navigate to="/gestao-terceiros" replace />
 
   return (
