@@ -5,11 +5,12 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import ClientManagement from './pages/ClientManagement'
 import DashboardGestor from './pages/gestao-terceiros/DashboardGestor'
 import Lancamentos from './pages/gestao-terceiros/Lancamentos'
-import Cadastro from './pages/gestao-terceiros/Cadastro'
+import Cadastros from './pages/gestao-terceiros/Cadastros'
 import Relatorios from './pages/gestao-terceiros/Relatorios'
 import BIDashboard from './pages/gestao-terceiros/BIDashboard'
 import Auditoria from './pages/gestao-terceiros/Auditoria'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
+import EmailReports from './pages/gestao-terceiros/EmailReports'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -33,9 +34,10 @@ const App = () => (
                 <Route path="/clientes" element={<ClientManagement />} />
                 <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                 <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
-                <Route path="/gestao-terceiros/cadastro" element={<Cadastro />} />
+                <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
                 <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
                 <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
+                <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
                 <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
                 <Route path="/gestao-terceiros/usuarios" element={<Usuarios />} />
               </Route>
