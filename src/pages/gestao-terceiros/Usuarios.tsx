@@ -41,6 +41,8 @@ const MENU_OPTIONS = [
   'Relatórios',
   'BI Dashboard',
   'Email Reports',
+  'Log de Auditoria',
+  'Usuários',
 ]
 
 export default function Usuarios() {
@@ -88,7 +90,10 @@ export default function Usuarios() {
 
       if (error) throw error
 
-      toast({ title: 'Usuário criado com sucesso' })
+      toast({
+        title: 'Usuário criado com sucesso',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
       if (user && profile)
         logAudit(
           profile.client_id,
@@ -152,7 +157,7 @@ export default function Usuarios() {
               <Plus className="mr-2 h-4 w-4" /> Novo Usuário
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Cadastrar Usuário</DialogTitle>
             </DialogHeader>
@@ -167,7 +172,7 @@ export default function Usuarios() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>E-mail</Label>
+                  <Label>E-mail (Login)</Label>
                   <Input
                     type="email"
                     value={form.email}
@@ -203,21 +208,37 @@ export default function Usuarios() {
                 </div>
               </div>
 
-              <div className="pt-2">
-                <Label className="mb-2 block">Menus Acessíveis</Label>
-                <div className="flex flex-wrap gap-2">
-                  {MENU_OPTIONS.map((menu) => (
-                    <Badge
-                      key={menu}
-                      variant={form.accessible_menus.includes(menu) ? 'default' : 'outline'}
-                      className="cursor-pointer"
-                      onClick={() => toggleMenu(menu)}
-                    >
-                      {menu}
-                    </Badge>
-                  ))}
+              {form.role === 'Gestor' && (
+                <div className="pt-2 animate-in fade-in">
+                  <Label className="mb-2 block">Menus Acessíveis (Apenas para Gestores)</Label>
+                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                    {MENU_OPTIONS.map((menu) => (
+                      <Badge
+                        key={menu}
+                        variant={form.accessible_menus.includes(menu) ? 'default' : 'outline'}
+                        className="cursor-pointer hover:bg-slate-200 data-[state=checked]:bg-brand-blue"
+                        onClick={() => toggleMenu(menu)}
+                      >
+                        {menu}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {form.role === 'Administrador' && (
+                <div className="p-3 bg-brand-blue/5 border border-brand-blue/20 rounded-md text-sm text-brand-blue mt-2">
+                  <strong>Acesso Total:</strong> Administradores têm acesso irrestrito a todos os
+                  módulos e configurações.
+                </div>
+              )}
+
+              {form.role === 'Operacional' && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600 mt-2">
+                  <strong>Acesso Fixo:</strong> O nível Operacional possui acesso restrito aos
+                  módulos de <em>Lançamentos</em> e <em>Cadastros Básicos</em>.
+                </div>
+              )}
 
               <div className="pt-2">
                 <Label className="mb-2 block">Plantas Autorizadas</Label>
@@ -257,7 +278,7 @@ export default function Usuarios() {
             <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead>E-mail</TableHead>
-              <TableHead>Nível</TableHead>
+              <TableHead>Nível de Acesso</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -283,14 +304,14 @@ export default function Usuarios() {
                     <Badge
                       variant="outline"
                       className={
-                        u.role === 'Master'
-                          ? 'bg-brand-graphite text-white'
-                          : u.role === 'Administrador'
-                            ? 'bg-brand-blue text-white'
-                            : 'bg-muted'
+                        u.role === 'Administrador' || u.role === 'Master'
+                          ? 'bg-brand-blue text-white'
+                          : u.role === 'Gestor'
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-slate-100 text-slate-600'
                       }
                     >
-                      {u.role}
+                      {u.role === 'Master' ? 'Administrador' : u.role}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">

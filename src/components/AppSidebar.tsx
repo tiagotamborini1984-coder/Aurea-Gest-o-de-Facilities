@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
-  Building2,
   LayoutDashboard,
   ClipboardList,
   Database,
@@ -31,26 +30,15 @@ export function AppSidebar() {
   const location = useLocation()
   const { profile, activeClient } = useAppStore()
   const role = profile?.role || 'Operacional'
+  const accessibleMenus = profile?.accessible_menus || []
 
   const navItems = [
-    { title: 'Gestão de Clientes', path: '/clientes', icon: Building2, roles: ['Master'] },
-    {
-      title: 'Dashboard Gestor',
-      path: '/gestao-terceiros',
-      icon: LayoutDashboard,
-      roles: ['Master', 'Administrador', 'Gestor'],
-    },
-    {
-      title: 'Lançamentos',
-      path: '/gestao-terceiros/lancamentos',
-      icon: ClipboardList,
-      roles: ['Master', 'Administrador', 'Gestor', 'Operacional'],
-    },
+    { title: 'Dashboard Gestor', path: '/gestao-terceiros', icon: LayoutDashboard },
+    { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos', icon: ClipboardList },
     {
       title: 'Cadastros',
       path: '/gestao-terceiros/cadastros',
       icon: Database,
-      roles: ['Master', 'Administrador', 'Gestor'],
       subItems: [
         { title: 'Plantas', path: '/gestao-terceiros/cadastros/plantas' },
         { title: 'Locais', path: '/gestao-terceiros/cadastros/locais' },
@@ -61,39 +49,36 @@ export function AppSidebar() {
         { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
       ],
     },
-    {
-      title: 'Relatórios',
-      path: '/gestao-terceiros/relatorios',
-      icon: FileBarChart,
-      roles: ['Master', 'Administrador', 'Gestor'],
-    },
-    {
-      title: 'BI Dashboard',
-      path: '/gestao-terceiros/bi',
-      icon: PieChart,
-      roles: ['Master', 'Administrador', 'Gestor'],
-    },
-    {
-      title: 'Email Reports',
-      path: '/gestao-terceiros/email-reports',
-      icon: Mail,
-      roles: ['Master', 'Administrador', 'Gestor'],
-    },
-    {
-      title: 'Log de Auditoria',
-      path: '/gestao-terceiros/auditoria',
-      icon: History,
-      roles: ['Master', 'Administrador'],
-    },
-    {
-      title: 'Usuários',
-      path: '/gestao-terceiros/usuarios',
-      icon: Users,
-      roles: ['Master', 'Administrador'],
-    },
+    { title: 'Relatórios', path: '/gestao-terceiros/relatorios', icon: FileBarChart },
+    { title: 'BI Dashboard', path: '/gestao-terceiros/bi', icon: PieChart },
+    { title: 'Email Reports', path: '/gestao-terceiros/email-reports', icon: Mail },
+    { title: 'Log de Auditoria', path: '/gestao-terceiros/auditoria', icon: History },
+    { title: 'Usuários', path: '/gestao-terceiros/usuarios', icon: Users },
   ]
 
-  const visibleItems = navItems.filter((item) => item.roles.includes(role))
+  const visibleItems = navItems
+    .filter((item) => {
+      if (role === 'Administrador' || role === 'Master') return true
+      if (role === 'Gestor') return accessibleMenus.includes(item.title)
+      if (role === 'Operacional') {
+        if (item.title === 'Lançamentos') return true
+        if (item.title === 'Cadastros') return true
+        return false
+      }
+      return false
+    })
+    .map((item) => {
+      // Filter subItems for Operacional role
+      if (role === 'Operacional' && item.title === 'Cadastros' && item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.filter((sub) =>
+            ['Colaboradores', 'Equipamentos', 'Quadro Contratado'].includes(sub.title),
+          ),
+        }
+      }
+      return item
+    })
 
   return (
     <Sidebar className="border-none bg-[var(--sidebar-background)] text-white">
@@ -115,7 +100,7 @@ export function AppSidebar() {
               {activeClient ? activeClient.name : 'Áurea'}
             </span>
             <span className="text-[0.65rem] text-white/70 uppercase tracking-widest font-medium mt-1">
-              Facility Mgt
+              Gestão de Terceiros
             </span>
           </div>
         </div>

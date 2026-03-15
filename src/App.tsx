@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import ClientManagement from './pages/ClientManagement'
 import DashboardGestor from './pages/gestao-terceiros/DashboardGestor'
 import Lancamentos from './pages/gestao-terceiros/Lancamentos'
 import Cadastros from './pages/gestao-terceiros/Cadastros'
@@ -31,7 +30,6 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
-                <Route path="/clientes" element={<ClientManagement />} />
                 <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                 <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
                 <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />

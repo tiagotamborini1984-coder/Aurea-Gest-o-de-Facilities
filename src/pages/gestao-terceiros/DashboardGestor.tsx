@@ -84,7 +84,7 @@ export default function DashboardGestor() {
   }
 
   // Calculate Metrics
-  const { metrics, plantStats, locationStats, equipmentStats } = useMemo(() => {
+  const { metrics, plantStats, locationStats, equipmentStats, collaboratorStats } = useMemo(() => {
     const validPlants = selectedPlants
     const filteredLogs = logs.filter(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
@@ -166,38 +166,66 @@ export default function DashboardGestor() {
     if (activeTab === 'equipamentos') {
       const eqList = equipment.filter((e) => validPlants.includes(e.plant_id))
 
-      eqStats = eqList.map((eq) => {
-        const eqContratado =
-          contracted
-            .filter((c) => c.equipment_id === eq.id && c.type === 'equipamento')
-            .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
+      eqStats = eqList
+        .map((eq) => {
+          const eqContratado =
+            contracted
+              .filter((c) => c.equipment_id === eq.id && c.type === 'equipamento')
+              .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
 
-        const eqLogs = logs.filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
+          const eqLogs = logs
+            .filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
+            .sort((a, b) => a.date.localeCompare(b.date))
 
-        let presCount = 0
-        let absCount = 0
-        const history = daysIntervalArray.map((d) => {
-          const log = eqLogs.find((l) => l.date === d)
-          const status = log ? log.status : false
-          if (status) presCount++
-          else absCount++
-          return { date: d, status }
+          // Filter expanded view to only display days with recorded logs
+          const history = eqLogs.map((log) => ({ date: log.date, status: log.status }))
+
+          let presCount = eqLogs.filter((l) => l.status).length
+          let absCount = eqLogs.filter((l) => !l.status).length
+
+          const mediaPresenca = (presCount / totalPeriodDays) * eqContratado
+          const mediaFalta = (absCount / totalPeriodDays) * eqContratado
+          const taxaDisp = eqContratado > 0 ? (mediaPresenca / eqContratado) * 100 : 0
+
+          return {
+            id: eq.id,
+            name: eq.name,
+            contratado: eqContratado,
+            mediaPresenca,
+            mediaFalta,
+            taxaDisp,
+            history,
+          }
         })
+        .filter((eq) => eq.history.length > 0 || eq.contratado > 0)
+    }
 
-        const mediaPresenca = (presCount / totalPeriodDays) * eqContratado
-        const mediaFalta = (absCount / totalPeriodDays) * eqContratado
-        const taxaDisp = eqContratado > 0 ? (mediaPresenca / eqContratado) * 100 : 0
+    // Collaborator Specific Stats
+    let colStats: any[] = []
+    if (activeTab === 'colaboradores') {
+      const empList = employees.filter((e) => validPlants.includes(e.plant_id))
+      colStats = empList
+        .map((emp) => {
+          const empLogs = logs
+            .filter((l) => l.type === 'staff' && l.reference_id === emp.id)
+            .sort((a, b) => a.date.localeCompare(b.date))
 
-        return {
-          id: eq.id,
-          name: eq.name,
-          contratado: eqContratado,
-          mediaPresenca,
-          mediaFalta,
-          taxaDisp,
-          history,
-        }
-      })
+          // Filter expanded view to only display days with recorded logs
+          const history = empLogs.map((log) => ({ date: log.date, status: log.status }))
+
+          const presCount = empLogs.filter((l) => l.status).length
+          const absCount = empLogs.filter((l) => !l.status).length
+
+          return {
+            id: emp.id,
+            name: emp.name,
+            presencas: presCount,
+            faltas: absCount,
+            history,
+            location: locations.find((l) => l.id === emp.location_id)?.name || 'N/A',
+          }
+        })
+        .filter((c) => c.history.length > 0) // Only show those who have recorded logs in the period
     }
 
     return {
@@ -211,6 +239,7 @@ export default function DashboardGestor() {
       plantStats: pStats,
       locationStats: lStats,
       equipmentStats: eqStats,
+      collaboratorStats: colStats,
     }
   }, [
     logs,
@@ -624,7 +653,7 @@ export default function DashboardGestor() {
                   <div className="col-span-2 text-center">Média Falta</div>
                   <div className="col-span-2 text-right">Taxa Disp.</div>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto custom-scrollbar">
                   {equipmentStats.map((eq) => (
                     <Collapsible key={eq.id}>
                       <CollapsibleTrigger className="w-full group focus-visible:outline-none">
@@ -662,30 +691,36 @@ export default function DashboardGestor() {
                         <div className="px-6 py-5 bg-slate-50/80 border-t border-slate-100 shadow-inner">
                           <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-2">
                             <TrendingDown className="w-4 h-4 text-slate-400" />
-                            Histórico de Disponibilidade
+                            Histórico de Lançamentos (Apenas dias com registro)
                           </h4>
                           <div className="flex flex-wrap gap-2">
-                            {eq.history.map((day: any) => (
-                              <div
-                                key={day.date}
-                                className="flex flex-col items-center justify-center bg-white py-1.5 px-3 border border-slate-200 rounded-lg shadow-sm min-w-[70px]"
-                              >
-                                <span className="text-[10px] text-slate-400 font-medium mb-0.5">
-                                  {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
-                                </span>
-                                {day.status ? (
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-full bg-green-500"
-                                    title="Disponível"
-                                  />
-                                ) : (
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-full bg-red-500"
-                                    title="Indisponível"
-                                  />
-                                )}
-                              </div>
-                            ))}
+                            {eq.history.length === 0 ? (
+                              <span className="text-sm text-slate-500">
+                                Sem lançamentos no período.
+                              </span>
+                            ) : (
+                              eq.history.map((day: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="flex flex-col items-center justify-center bg-white py-1.5 px-3 border border-slate-200 rounded-lg shadow-sm min-w-[70px]"
+                                >
+                                  <span className="text-[10px] text-slate-400 font-medium mb-0.5">
+                                    {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
+                                  </span>
+                                  {day.status ? (
+                                    <div
+                                      className="w-2.5 h-2.5 rounded-full bg-green-500"
+                                      title="Disponível"
+                                    />
+                                  ) : (
+                                    <div
+                                      className="w-2.5 h-2.5 rounded-full bg-red-500"
+                                      title="Indisponível"
+                                    />
+                                  )}
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
                       </CollapsibleContent>
@@ -693,7 +728,107 @@ export default function DashboardGestor() {
                   ))}
                   {equipmentStats.length === 0 && (
                     <div className="p-8 text-center text-slate-400 text-sm">
-                      Nenhum equipamento vinculado às plantas selecionadas.
+                      Nenhum equipamento vinculado às plantas selecionadas com dados neste período.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Por Colaborador Details */}
+          {activeTab === 'colaboradores' && (
+            <Card className="shadow-subtle border-slate-200 animate-in fade-in slide-in-from-bottom-4">
+              <CardHeader className="pb-3 border-b border-slate-100 px-6">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-brand-graphite">
+                  <Users className="h-5 w-5 text-slate-400" /> Por Colaborador (Lançamentos no
+                  Período)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50">
+                  <div className="col-span-5">Colaborador / Local</div>
+                  <div className="col-span-3 text-center">Total Presenças</div>
+                  <div className="col-span-3 text-center">Total Faltas</div>
+                  <div className="col-span-1 text-right">Taxa</div>
+                </div>
+                <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto custom-scrollbar">
+                  {collaboratorStats.map((col) => {
+                    const total = col.presencas + col.faltas
+                    const taxa = total > 0 ? (col.presencas / total) * 100 : 0
+                    return (
+                      <Collapsible key={col.id}>
+                        <CollapsibleTrigger className="w-full group focus-visible:outline-none">
+                          <div className="px-6 py-4 grid grid-cols-12 gap-4 items-center group-hover:bg-slate-50/50 transition-colors cursor-pointer text-left">
+                            <div className="col-span-5">
+                              <div className="font-semibold text-brand-graphite flex items-center gap-2">
+                                <ChevronRight className="w-4 h-4 text-slate-400 group-data-[state=open]:rotate-90 transition-transform shrink-0" />
+                                <span className="truncate">{col.name}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground ml-6 mt-0.5">
+                                {col.location}
+                              </div>
+                            </div>
+                            <div className="col-span-3 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[32px] h-7 rounded-md bg-green-100 text-green-700 font-bold text-sm px-2">
+                                {col.presencas}
+                              </span>
+                            </div>
+                            <div className="col-span-3 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[32px] h-7 rounded-md bg-red-100 text-red-700 font-bold text-sm px-2">
+                                {col.faltas}
+                              </span>
+                            </div>
+                            <div className="col-span-1 text-right">
+                              <span className="font-bold text-sm text-brand-graphite">
+                                {taxa.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="px-6 py-5 bg-slate-50/80 border-t border-slate-100 shadow-inner">
+                            <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                              <TrendingDown className="w-4 h-4 text-slate-400" />
+                              Histórico de Lançamentos (Apenas dias com registro)
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {col.history.length === 0 ? (
+                                <span className="text-sm text-slate-500">
+                                  Sem lançamentos no período.
+                                </span>
+                              ) : (
+                                col.history.map((day: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex flex-col items-center justify-center bg-white py-1.5 px-3 border border-slate-200 rounded-lg shadow-sm min-w-[70px]"
+                                  >
+                                    <span className="text-[10px] text-slate-400 font-medium mb-0.5">
+                                      {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
+                                    </span>
+                                    {day.status ? (
+                                      <div
+                                        className="w-2.5 h-2.5 rounded-full bg-green-500"
+                                        title="Presente"
+                                      />
+                                    ) : (
+                                      <div
+                                        className="w-2.5 h-2.5 rounded-full bg-red-500"
+                                        title="Falta"
+                                      />
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )
+                  })}
+                  {collaboratorStats.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-sm">
+                      Nenhum colaborador com lançamentos registrados no período.
                     </div>
                   )}
                 </div>
@@ -703,7 +838,7 @@ export default function DashboardGestor() {
         </div>
       ) : (
         /* Book de Metas View */
-        <div className="space-y-4 max-w-5xl animate-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-4 max-w-5xl animate-in slide-in-from-bottom-4 duration-500 mt-6">
           {/* Automated Goal 1 */}
           <div
             className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-5 shadow-sm border-l-4"
