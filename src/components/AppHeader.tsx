@@ -12,23 +12,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
+import { useAppStore } from '@/store/AppContext'
 
 export function AppHeader() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isMobile } = useSidebar()
-  const { signOut, user } = useAuth()
-
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case '/clientes':
-        return 'Gestão de Clientes'
-      case '/gestao-terceiros':
-        return 'Gestão de Terceiros'
-      default:
-        return 'Áurea Facility Management'
-    }
-  }
+  const { signOut } = useAuth()
+  const { profile } = useAppStore()
 
   const handleLogout = async () => {
     await signOut()
@@ -36,10 +27,12 @@ export function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-brand-light bg-brand-blue px-4 sm:px-6 shadow-sm text-white">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-brand-light bg-[var(--primary)] px-4 sm:px-6 shadow-sm text-white transition-colors duration-500">
       <div className="flex items-center gap-2">
         {isMobile && <SidebarTrigger className="text-white hover:bg-white/20" />}
-        <h1 className="text-lg font-semibold tracking-tight hidden sm:block">{getPageTitle()}</h1>
+        <h1 className="text-lg font-semibold tracking-tight hidden sm:block">
+          Módulo Gestão de Terceiros
+        </h1>
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-4">
@@ -48,7 +41,7 @@ export function AppHeader() {
           <Input
             type="search"
             placeholder="Buscar no sistema..."
-            className="w-full bg-white/10 border-none text-white placeholder:text-white/50 pl-9 focus-visible:ring-1 focus-visible:ring-brand-cyan focus-visible:bg-white/20 transition-all rounded-full h-9"
+            className="w-full bg-white/10 border-none text-white placeholder:text-white/50 pl-9 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:bg-white/20 transition-all rounded-full h-9"
           />
         </div>
         <Button
@@ -57,15 +50,14 @@ export function AppHeader() {
           className="text-white hover:bg-white/20 rounded-full h-9 w-9 relative"
         >
           <Bell className="h-5 w-5" />
-          <span className="sr-only">Notificações</span>
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-brand-blue"></span>
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-transparent"></span>
         </Button>
 
         <div className="flex items-center gap-2 pl-2 border-l border-white/20">
           <div className="hidden sm:flex flex-col text-right">
-            <span className="text-sm font-medium leading-none">Administrador</span>
+            <span className="text-sm font-medium leading-none">{profile?.role || 'User'}</span>
             <span className="text-xs text-white/70 truncate max-w-[150px]">
-              {user?.email || 'Admin Global'}
+              {profile?.name || 'Loading...'}
             </span>
           </div>
 
@@ -82,8 +74,8 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-56 mt-2">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">Administrador</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  <p className="text-sm font-medium leading-none">{profile?.name}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{profile?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

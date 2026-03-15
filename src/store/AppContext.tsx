@@ -15,35 +15,25 @@ export type Client = {
   modules: string[]
 }
 
-export type ThirdParty = {
+export type Profile = {
   id: string
+  client_id?: string
   name: string
-  cnpj: string
-  status: 'Regularizado' | 'Pendente' | 'Inativo'
-  contractEnd: string
-  services: string
+  email: string
+  role: 'Master' | 'Administrador' | 'Gestor' | 'Operacional'
+  accessible_menus: string[]
+  authorized_plants: string[]
 }
 
 interface AppContextType {
   clients: Client[]
   isLoadingClients: boolean
+  profile: Profile | null
+  activeClient: Client | null
   addClient: (client: Omit<Client, 'id' | 'url'>) => Promise<boolean>
   updateClient: (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => Promise<boolean>
   deleteClient: (id: string) => Promise<boolean>
-  thirdParties: ThirdParty[]
-  addThirdParty: (tp: Omit<ThirdParty, 'id'>) => void
 }
-
-const defaultThirdParties: ThirdParty[] = [
-  {
-    id: '1',
-    name: 'CleanService Limpeza',
-    cnpj: '12.345.678/0001-90',
-    status: 'Regularizado',
-    contractEnd: '2027-12-31',
-    services: 'Limpeza Predial',
-  },
-]
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
@@ -51,7 +41,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
   const [isLoadingClients, setIsLoadingClients] = useState(true)
-  const [thirdParties, setThirdParties] = useState<ThirdParty[]>(defaultThirdParties)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [activeClient, setActiveClient] = useState<Client | null>(null)
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setProfile(data as Profile)
+        })
+    } else {
+      setProfile(null)
+      setActiveClient(null)
+      setClients([])
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (profile?.client_id) {
+      supabase
+        .from('clients')
+        .select('*')
+        .eq('id', profile.client_id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setActiveClient({
+              id: data.id,
+              name: data.name,
+              slug: data.url_slug,
+              url: `${window.location.origin}/${data.url_slug}`,
+              adminName: data.admin_name,
+              logo: data.logo_url || undefined,
+              primaryColor: data.primary_color || undefined,
+              secondaryColor: data.secondary_color || undefined,
+              status: data.status as 'Ativo' | 'Inativo',
+              modules: (data.modules as string[]) || [],
+            })
+          }
+        })
+    }
+  }, [profile])
 
   const fetchClients = async () => {
     setIsLoadingClients(true)
@@ -59,7 +93,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .from('clients')
       .select('*')
       .order('created_at', { ascending: false })
-
     if (data && !error) {
       setClients(
         data.map((d) => ({
@@ -80,12 +113,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   useEffect(() => {
-    if (user) {
-      fetchClients()
-    } else {
-      setClients([])
-    }
-  }, [user])
+    if (user && profile?.role === 'Master') fetchClients()
+  }, [user, profile])
 
   const addClient = async (client: Omit<Client, 'id' | 'url'>) => {
     const { data, error } = await supabase
@@ -104,68 +133,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ])
       .select()
       .single()
-
     if (data && !error) {
-      setClients((prev) => [
-        {
-          id: data.id,
-          name: data.name,
-          slug: data.url_slug,
-          url: `${window.location.origin}/${data.url_slug}`,
-          adminName: data.admin_name,
-          logo: data.logo_url || undefined,
-          primaryColor: data.primary_color || undefined,
-          secondaryColor: data.secondary_color || undefined,
-          status: data.status as 'Ativo' | 'Inativo',
-          modules: (data.modules as string[]) || [],
-        },
-        ...prev,
-      ])
+      await fetchClients()
       return true
     }
-    console.error('Error adding client:', error)
     return false
   }
 
   const updateClient = async (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => {
-    const updatePayload: any = {}
-    if (data.name !== undefined) updatePayload.name = data.name
-    if (data.slug !== undefined) updatePayload.url_slug = data.slug
-    if (data.adminName !== undefined) updatePayload.admin_name = data.adminName
-    if (data.logo !== undefined) updatePayload.logo_url = data.logo
-    if (data.primaryColor !== undefined) updatePayload.primary_color = data.primaryColor
-    if (data.secondaryColor !== undefined) updatePayload.secondary_color = data.secondaryColor
-    if (data.status !== undefined) updatePayload.status = data.status
-    if (data.modules !== undefined) updatePayload.modules = data.modules
-
-    const { error } = await supabase.from('clients').update(updatePayload).eq('id', id)
-
+    const payload: any = {
+      name: data.name,
+      url_slug: data.slug,
+      admin_name: data.adminName,
+      logo_url: data.logo,
+      primary_color: data.primaryColor,
+      secondary_color: data.secondaryColor,
+      status: data.status,
+      modules: data.modules,
+    }
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
+    const { error } = await supabase.from('clients').update(payload).eq('id', id)
     if (!error) {
-      setClients((prev) =>
-        prev.map((c) =>
-          c.id === id
-            ? { ...c, ...data, url: data.slug ? `${window.location.origin}/${data.slug}` : c.url }
-            : c,
-        ),
-      )
+      await fetchClients()
       return true
     }
-    console.error('Error updating client:', error)
     return false
   }
 
   const deleteClient = async (id: string) => {
     const { error } = await supabase.from('clients').delete().eq('id', id)
     if (!error) {
-      setClients((prev) => prev.filter((c) => c.id !== id))
+      await fetchClients()
       return true
     }
-    console.error('Error deleting client:', error)
     return false
-  }
-
-  const addThirdParty = (tp: Omit<ThirdParty, 'id'>) => {
-    setThirdParties((prev) => [{ ...tp, id: Math.random().toString(36).substr(2, 9) }, ...prev])
   }
 
   return (
@@ -173,11 +174,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       value={{
         clients,
         isLoadingClients,
+        profile,
+        activeClient,
         addClient,
         updateClient,
         deleteClient,
-        thirdParties,
-        addThirdParty,
       }}
     >
       {children}
