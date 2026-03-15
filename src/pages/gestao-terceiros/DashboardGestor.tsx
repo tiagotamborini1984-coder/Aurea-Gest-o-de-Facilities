@@ -93,28 +93,36 @@ export default function DashboardGestor() {
     const typeLog = activeTab === 'colaboradores' ? 'staff' : 'equipment'
     const typeCont = activeTab === 'colaboradores' ? 'colaborador' : 'equipamento'
 
-    const activeLogs = filteredLogs.filter((l) => l.type === typeLog)
-    const totalDays = new Set(activeLogs.map((l) => l.date)).size || 1
+    const dFrom = new Date(`${dateFrom}T12:00:00Z`)
+    const dTo = new Date(`${dateTo}T12:00:00Z`)
+    const daysIntervalArray =
+      dFrom <= dTo
+        ? eachDayOfInterval({ start: dFrom, end: dTo }).map((d) => format(d, 'yyyy-MM-dd'))
+        : []
+    const totalPeriodDays = Math.max(1, daysIntervalArray.length)
 
-    const lancado = Math.round(activeLogs.length / totalDays)
-    const presente = Math.round(activeLogs.filter((l) => l.status).length / totalDays)
-    const ausente = Math.round(activeLogs.filter((l) => !l.status).length / totalDays)
+    const activeLogs = filteredLogs.filter((l) => l.type === typeLog)
+
+    const avgLancado = activeLogs.length / totalPeriodDays
+    const avgPresente = activeLogs.filter((l) => l.status).length / totalPeriodDays
+    const avgAusente = activeLogs.filter((l) => !l.status).length / totalPeriodDays
 
     const contratado = contracted
       .filter((c) => c.type === typeCont && validPlants.includes(c.plant_id))
       .reduce((a, b) => a + b.quantity, 0)
 
     const absenteismo =
-      contratado > 0 ? Math.max(0, ((contratado - presente) / contratado) * 100) : 0
+      contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
+
+    const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
 
     // Plant Breakdowns
     const pStats = plants
       .filter((p) => validPlants.includes(p.id))
       .map((plant) => {
         const pLogs = activeLogs.filter((l) => l.plant_id === plant.id)
-        const pDays = new Set(pLogs.map((l) => l.date)).size || 1
-        const pPres = Math.round(pLogs.filter((l) => l.status).length / pDays)
-        const pAbs = Math.round(pLogs.filter((l) => !l.status).length / pDays)
+        const pPres = pLogs.filter((l) => l.status).length / totalPeriodDays
+        const pAbs = pLogs.filter((l) => !l.status).length / totalPeriodDays
         const pCont = contracted
           .filter((c) => c.plant_id === plant.id && c.type === typeCont)
           .reduce((sum, c) => sum + c.quantity, 0)
@@ -122,22 +130,21 @@ export default function DashboardGestor() {
         return {
           id: plant.id,
           name: plant.name,
-          presentes: pPres,
-          ausentes: pAbs,
+          presentes: formatStr(pPres),
+          ausentes: formatStr(pAbs),
           contratado: pCont,
           absenteismo: Math.max(0, pRate),
         }
       })
 
-    // Location Breakdowns (Mostly for Colaboradores)
+    // Location Breakdowns
     const lStats = locations
       .filter((loc) => validPlants.includes(loc.plant_id))
       .map((loc) => {
         const empIds = employees.filter((e) => e.location_id === loc.id).map((e) => e.id)
         const lLogs = activeLogs.filter((l) => empIds.includes(l.reference_id))
-        const lDays = new Set(lLogs.map((l) => l.date)).size || 1
-        const lPres = Math.round(lLogs.filter((l) => l.status).length / lDays)
-        const lAbs = Math.round(lLogs.filter((l) => !l.status).length / lDays)
+        const lPres = lLogs.filter((l) => l.status).length / totalPeriodDays
+        const lAbs = lLogs.filter((l) => !l.status).length / totalPeriodDays
         const lCont = contracted
           .filter((c) => c.location_id === loc.id && c.type === typeCont)
           .reduce((sum, c) => sum + c.quantity, 0)
@@ -146,29 +153,20 @@ export default function DashboardGestor() {
           id: loc.id,
           name: loc.name,
           plantName: plants.find((p) => p.id === loc.plant_id)?.name,
-          presentes: lPres,
-          ausentes: lAbs,
+          presentes: formatStr(lPres),
+          ausentes: formatStr(lAbs),
           contratado: lCont,
           absenteismo: Math.max(0, lRate),
         }
       })
-      .filter((l) => l.contratado > 0 || l.presentes > 0)
+      .filter((l) => l.contratado > 0 || parseFloat(l.presentes) > 0)
 
-    // Equipment Specific Stats (Média de disponibilidade, histórico diário)
+    // Equipment Specific Stats
     let eqStats: any[] = []
     if (activeTab === 'equipamentos') {
       const eqList = equipment.filter((e) => validPlants.includes(e.plant_id))
 
       eqStats = eqList.map((eq) => {
-        const dFrom = new Date(dateFrom)
-        const dTo = new Date(dateTo)
-        // ensure valid range
-        const days =
-          dFrom <= dTo
-            ? eachDayOfInterval({ start: dFrom, end: dTo }).map((d) => format(d, 'yyyy-MM-dd'))
-            : []
-        const eqTotalDays = days.length || 1
-
         const eqContratado =
           contracted
             .filter((c) => c.equipment_id === eq.id && c.type === 'equipamento')
@@ -178,7 +176,7 @@ export default function DashboardGestor() {
 
         let presCount = 0
         let absCount = 0
-        const history = days.map((d) => {
+        const history = daysIntervalArray.map((d) => {
           const log = eqLogs.find((l) => l.date === d)
           const status = log ? log.status : false
           if (status) presCount++
@@ -186,8 +184,8 @@ export default function DashboardGestor() {
           return { date: d, status }
         })
 
-        const mediaPresenca = (presCount / eqTotalDays) * eqContratado
-        const mediaFalta = (absCount / eqTotalDays) * eqContratado
+        const mediaPresenca = (presCount / totalPeriodDays) * eqContratado
+        const mediaFalta = (absCount / totalPeriodDays) * eqContratado
         const taxaDisp = eqContratado > 0 ? (mediaPresenca / eqContratado) * 100 : 0
 
         return {
@@ -203,7 +201,13 @@ export default function DashboardGestor() {
     }
 
     return {
-      metrics: { lancado, presente, ausente, contratado, absenteismo },
+      metrics: {
+        lancado: formatStr(avgLancado),
+        presente: formatStr(avgPresente),
+        ausente: formatStr(avgAusente),
+        contratado,
+        absenteismo,
+      },
       plantStats: pStats,
       locationStats: lStats,
       equipmentStats: eqStats,
@@ -399,8 +403,11 @@ export default function DashboardGestor() {
                   <FileText className="h-6 w-6 text-slate-500" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Lançado
+                  <p
+                    className="text-xs font-medium text-slate-500 uppercase tracking-wider cursor-help"
+                    title="Média diária no período selecionado"
+                  >
+                    Média Lançada/dia
                   </p>
                   <p className="text-3xl font-bold text-slate-800 mt-0.5">{metrics.lancado}</p>
                 </div>
@@ -413,8 +420,11 @@ export default function DashboardGestor() {
                   <ClipboardCheck className="h-6 w-6 text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">
-                    Contratado/dia
+                  <p
+                    className="text-xs font-medium text-amber-600 uppercase tracking-wider cursor-help"
+                    title="Média diária de contratação no período"
+                  >
+                    Média Contratado/dia
                   </p>
                   <p className="text-3xl font-bold text-amber-700 mt-0.5">{metrics.contratado}</p>
                 </div>
@@ -427,8 +437,11 @@ export default function DashboardGestor() {
                   <Users className="h-6 w-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-green-600 uppercase tracking-wider">
-                    Presentes
+                  <p
+                    className="text-xs font-medium text-green-600 uppercase tracking-wider cursor-help"
+                    title="Média diária no período selecionado"
+                  >
+                    Média {activeTab === 'colaboradores' ? 'Presentes' : 'Disponíveis'}/dia
                   </p>
                   <p className="text-3xl font-bold text-green-700 mt-0.5">{metrics.presente}</p>
                 </div>
@@ -441,8 +454,11 @@ export default function DashboardGestor() {
                   <XCircle className="h-6 w-6 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-red-600 uppercase tracking-wider">
-                    Ausentes
+                  <p
+                    className="text-xs font-medium text-red-600 uppercase tracking-wider cursor-help"
+                    title="Média diária no período selecionado"
+                  >
+                    Média {activeTab === 'colaboradores' ? 'Ausentes' : 'Indisponíveis'}/dia
                   </p>
                   <p className="text-3xl font-bold text-red-700 mt-0.5">{metrics.ausente}</p>
                 </div>
@@ -455,7 +471,10 @@ export default function DashboardGestor() {
                   <TrendingDown className="h-6 w-6 text-orange-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-orange-600 uppercase tracking-wider">
+                  <p
+                    className="text-xs font-medium text-orange-600 uppercase tracking-wider cursor-help"
+                    title="Taxa média geral do período"
+                  >
                     {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Indisponibilidade'}
                   </p>
                   <p className="text-3xl font-bold text-orange-700 mt-0.5">
@@ -477,8 +496,12 @@ export default function DashboardGestor() {
               <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
                 <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50 shrink-0">
                   <div className="col-span-4">Planta</div>
-                  <div className="col-span-2 text-center">Presença</div>
-                  <div className="col-span-2 text-center">Falta</div>
+                  <div className="col-span-2 text-center" title="Média Diária">
+                    Média Presença
+                  </div>
+                  <div className="col-span-2 text-center" title="Média Diária">
+                    Média Falta
+                  </div>
                   <div className="col-span-2 text-center">Contratado</div>
                   <div className="col-span-2 text-right">Taxa / Abs.</div>
                 </div>
@@ -532,8 +555,12 @@ export default function DashboardGestor() {
               <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
                 <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50 shrink-0">
                   <div className="col-span-4">Local / Planta</div>
-                  <div className="col-span-2 text-center">Presença</div>
-                  <div className="col-span-2 text-center">Falta</div>
+                  <div className="col-span-2 text-center" title="Média Diária">
+                    Média Presença
+                  </div>
+                  <div className="col-span-2 text-center" title="Média Diária">
+                    Média Falta
+                  </div>
                   <div className="col-span-2 text-center">Contratado</div>
                   <div className="col-span-2 text-right">Taxa / Abs.</div>
                 </div>
