@@ -1,8 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import Index from './pages/Index'
 import ClientManagement from './pages/ClientManagement'
 import ThirdPartyManagement from './pages/ThirdPartyManagement'
 import NotFound from './pages/NotFound'
@@ -17,7 +16,7 @@ const App = () => (
         <Sonner />
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Navigate to="/clientes" replace />} />
             <Route path="/clientes" element={<ClientManagement />} />
             <Route path="/gestao-terceiros" element={<ThirdPartyManagement />} />
           </Route>

@@ -24,7 +24,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
   const { toast } = useToast()
   const [formData, setFormData] = useState({
     name: '',
-    url: '',
+    slug: '',
     adminName: '',
     modules: {
       terceiros: true,
@@ -32,6 +32,9 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
       limpeza: false,
     },
   })
+
+  const baseUrl = window.location.origin
+  const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,7 +45,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
 
     addClient({
       name: formData.name,
-      url: formData.url,
+      url: `${baseUrl}/${formData.slug}`,
       adminName: formData.adminName,
       status: 'Ativo',
       modules: activeModules,
@@ -57,7 +60,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
     onOpenChange(false)
     setFormData({
       name: '',
-      url: '',
+      slug: '',
       adminName: '',
       modules: { terceiros: true, manutencao: false, limpeza: false },
     })
@@ -87,14 +90,23 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
               />
             </div>
             <div className="space-y-2 col-span-2 sm:col-span-1">
-              <Label htmlFor="url">URL Customizada *</Label>
+              <Label htmlFor="slug">Identificador (Slug) *</Label>
               <Input
-                id="url"
-                placeholder="aurea.com/empresa"
+                id="slug"
+                placeholder="ex: acme-corp"
                 required
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                value={formData.slug}
+                onChange={(e) => {
+                  const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                  setFormData({ ...formData, slug: val })
+                }}
               />
+              <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                Acesso:{' '}
+                <span className="font-medium text-[#2B95D6] inline-block max-w-full align-bottom truncate">
+                  {previewUrl}
+                </span>
+              </p>
             </div>
           </div>
 

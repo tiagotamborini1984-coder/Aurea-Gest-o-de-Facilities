@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Building2, Users, Triangle } from 'lucide-react'
+import { Building2, Triangle } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -13,11 +13,7 @@ import { cn } from '@/lib/utils'
 export function AppSidebar() {
   const location = useLocation()
 
-  const navItems = [
-    { title: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { title: 'Gestão de Clientes', path: '/clientes', icon: Building2 },
-    { title: 'Gestão de Terceiros', path: '/gestao-terceiros', icon: Users },
-  ]
+  const navItems = [{ title: 'Gestão de Clientes', path: '/clientes', icon: Building2 }]
 
   return (
     <Sidebar className="border-none bg-[#0F4C81] text-white">

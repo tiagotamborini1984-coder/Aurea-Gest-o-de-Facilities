@@ -18,13 +18,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useAppStore } from '@/store/AppContext'
 import { AddClientDialog } from '@/components/AddClientDialog'
 import { useToast } from '@/hooks/use-toast'
 
 export default function ClientManagement() {
-  const { clients } = useAppStore()
+  const { clients, deleteClient } = useAppStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [clientToDelete, setClientToDelete] = useState<string | null>(null)
   const { toast } = useToast()
 
   const handleAction = (action: string, clientName: string) => {
@@ -32,6 +43,17 @@ export default function ClientManagement() {
       title: `Ação: ${action}`,
       description: `Aplicado em: ${clientName}`,
     })
+  }
+
+  const handleDelete = () => {
+    if (clientToDelete) {
+      deleteClient(clientToDelete)
+      toast({
+        title: 'Empresa removida',
+        description: 'Os dados do cliente foram apagados com sucesso.',
+      })
+      setClientToDelete(null)
+    }
   }
 
   return (
@@ -56,7 +78,7 @@ export default function ClientManagement() {
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-[250px]">Empresa</TableHead>
-              <TableHead>URL Customizada</TableHead>
+              <TableHead>URL de Acesso</TableHead>
               <TableHead>Administrador</TableHead>
               <TableHead>Módulos Ativos</TableHead>
               <TableHead>Status</TableHead>
@@ -67,9 +89,9 @@ export default function ClientManagement() {
             {clients.map((client) => (
               <TableRow key={client.id} className="hover:bg-muted/30 transition-colors">
                 <TableCell className="font-medium text-foreground">{client.name}</TableCell>
-                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer">
-                  {client.url}{' '}
-                  <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate">
+                  <span className="truncate">{client.url}</span>
+                  <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </TableCell>
                 <TableCell>{client.adminName}</TableCell>
                 <TableCell>
@@ -117,10 +139,10 @@ export default function ClientManagement() {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => handleAction('Desativar Conta', client.name)}
+                        className="text-destructive focus:text-destructive cursor-pointer"
+                        onClick={() => setClientToDelete(client.id)}
                       >
-                        Desativar Conta
+                        Excluir Empresa
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -139,6 +161,30 @@ export default function ClientManagement() {
       </div>
 
       <AddClientDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+
+      <AlertDialog
+        open={!!clientToDelete}
+        onOpenChange={(open) => !open && setClientToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta empresa permanentemente? Todos os acessos e
+              registros associados a ela serão perdidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={handleDelete}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

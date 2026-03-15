@@ -892,6 +892,10 @@ section[aria-label='Notifications alt+T'] {
   display: block;
 }
 
+.inline-block{
+  display: inline-block;
+}
+
 .flex{
   display: flex;
 }
@@ -1220,6 +1224,14 @@ section[aria-label='Notifications alt+T'] {
   max-width: var(--skeleton-width);
 }
 
+.max-w-\[200px\]{
+  max-width: 200px;
+}
+
+.max-w-full{
+  max-width: 100%;
+}
+
 .max-w-lg{
   max-width: 32rem;
 }
@@ -1235,6 +1247,10 @@ section[aria-label='Notifications alt+T'] {
 
 .flex-1{
   flex: 1 1 0%;
+}
+
+.flex-shrink-0{
+  flex-shrink: 0;
 }
 
 .shrink-0{
@@ -1521,6 +1537,12 @@ section[aria-label='Notifications alt+T'] {
 
 .overflow-x-hidden{
   overflow-x: hidden;
+}
+
+.truncate{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .whitespace-nowrap{
@@ -2066,6 +2088,10 @@ section[aria-label='Notifications alt+T'] {
   vertical-align: middle;
 }
 
+.align-bottom{
+  vertical-align: bottom;
+}
+
 .font-mono{
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -2095,6 +2121,10 @@ section[aria-label='Notifications alt+T'] {
 
 .text-\[10px\]{
   font-size: 10px;
+}
+
+.text-\[11px\]{
+  font-size: 11px;
 }
 
 .text-base{

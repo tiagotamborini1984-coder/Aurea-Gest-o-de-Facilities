@@ -10,8 +10,6 @@ export function AppHeader() {
 
   const getPageTitle = () => {
     switch (location.pathname) {
-      case '/':
-        return 'Master Dashboard'
       case '/clientes':
         return 'Gestão de Clientes'
       case '/gestao-terceiros':

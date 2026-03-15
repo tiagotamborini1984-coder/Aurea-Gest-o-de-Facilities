@@ -21,15 +21,18 @@ export type ThirdParty = {
 interface AppContextType {
   clients: Client[]
   addClient: (client: Omit<Client, 'id'>) => void
+  deleteClient: (id: string) => void
   thirdParties: ThirdParty[]
   addThirdParty: (tp: Omit<ThirdParty, 'id'>) => void
 }
+
+const baseUrl = window.location.origin
 
 const defaultClients: Client[] = [
   {
     id: '1',
     name: 'TechCorp S.A.',
-    url: 'aurea.com/techcorp',
+    url: `${baseUrl}/techcorp`,
     adminName: 'Carlos Silva',
     status: 'Ativo',
     modules: ['Gestão de Terceiros', 'Manutenção'],
@@ -37,7 +40,7 @@ const defaultClients: Client[] = [
   {
     id: '2',
     name: 'GlobalFac Services',
-    url: 'aurea.com/globalfac',
+    url: `${baseUrl}/globalfac`,
     adminName: 'Marina Costa',
     status: 'Ativo',
     modules: ['Gestão de Terceiros'],
@@ -45,7 +48,7 @@ const defaultClients: Client[] = [
   {
     id: '3',
     name: 'InnovateX LTDA',
-    url: 'aurea.com/innovatex',
+    url: `${baseUrl}/innovatex`,
     adminName: 'Roberto Alves',
     status: 'Inativo',
     modules: ['Limpeza', 'Manutenção'],
@@ -97,12 +100,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setClients((prev) => [{ ...client, id: Math.random().toString(36).substr(2, 9) }, ...prev])
   }
 
+  const deleteClient = (id: string) => {
+    setClients((prev) => prev.filter((c) => c.id !== id))
+  }
+
   const addThirdParty = (tp: Omit<ThirdParty, 'id'>) => {
     setThirdParties((prev) => [{ ...tp, id: Math.random().toString(36).substr(2, 9) }, ...prev])
   }
 
   return (
-    <AppContext.Provider value={{ clients, addClient, thirdParties, addThirdParty }}>
+    <AppContext.Provider value={{ clients, addClient, deleteClient, thirdParties, addThirdParty }}>
       {children}
     </AppContext.Provider>
   )
