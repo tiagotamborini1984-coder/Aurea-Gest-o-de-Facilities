@@ -16,11 +16,11 @@ export function AppSidebar() {
   const navItems = [{ title: 'Gestão de Clientes', path: '/clientes', icon: Building2 }]
 
   return (
-    <Sidebar className="border-none bg-[#0F4C81] text-white">
+    <Sidebar className="border-none bg-brand-blue text-white">
       <SidebarHeader className="p-4 pt-6 pb-8 flex items-center justify-center border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="bg-white/10 p-2 rounded-lg">
-            <Triangle className="h-6 w-6 text-[#2B95D6] fill-current -rotate-90" />
+            <Triangle className="h-6 w-6 text-brand-cyan fill-current -rotate-90" />
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-xl tracking-tight text-white leading-none">Áurea</span>
@@ -42,7 +42,7 @@ export function AppSidebar() {
                   className={cn(
                     'w-full mb-1 transition-all duration-200 py-5',
                     isActive
-                      ? 'bg-[#2B95D6] text-white hover:bg-[#2B95D6]/90 hover:text-white shadow-sm'
+                      ? 'bg-brand-cyan text-white hover:bg-brand-cyan/90 hover:text-white shadow-sm'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                   )}
                 >

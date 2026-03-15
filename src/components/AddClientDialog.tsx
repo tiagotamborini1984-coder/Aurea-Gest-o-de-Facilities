@@ -26,6 +26,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
     name: '',
     slug: '',
     adminName: '',
+    logo: '',
     modules: {
       terceiros: true,
       manutencao: false,
@@ -45,8 +46,10 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
 
     addClient({
       name: formData.name,
+      slug: formData.slug,
       url: `${baseUrl}/${formData.slug}`,
       adminName: formData.adminName,
+      logo: formData.logo,
       status: 'Ativo',
       modules: activeModules,
     })
@@ -62,6 +65,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
       name: '',
       slug: '',
       adminName: '',
+      logo: '',
       modules: { terceiros: true, manutencao: false, limpeza: false },
     })
   }
@@ -70,7 +74,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] backdrop-blur-md bg-white/95">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-[#0F4C81]">
+          <DialogTitle className="text-xl font-bold text-brand-blue">
             Cadastrar Nova Empresa
           </DialogTitle>
           <DialogDescription>
@@ -103,14 +107,23 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
               />
               <p className="text-[11px] text-muted-foreground mt-1 truncate">
                 Acesso:{' '}
-                <span className="font-medium text-[#2B95D6] inline-block max-w-full align-bottom truncate">
+                <span className="font-medium text-brand-cyan inline-block max-w-full align-bottom truncate">
                   {previewUrl}
                 </span>
               </p>
             </div>
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="logo">URL do Logotipo (Opcional)</Label>
+              <Input
+                id="logo"
+                placeholder="https://exemplo.com/logo.png"
+                value={formData.logo}
+                onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-4 border rounded-xl p-4 bg-muted/30">
+          <div className="space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30">
             <h4 className="text-sm font-semibold text-foreground">Usuário Administrador</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2 col-span-2 sm:col-span-1">
@@ -130,7 +143,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
             </div>
           </div>
 
-          <div className="space-y-4 border rounded-xl p-4 bg-muted/30">
+          <div className="space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30">
             <h4 className="text-sm font-semibold text-foreground">Provisionamento de Módulos</h4>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -176,10 +189,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              className="bg-[#2B95D6] hover:bg-[#2B95D6]/90 text-white font-medium"
-            >
+            <Button type="submit" className="font-medium">
               Salvar Empresa
             </Button>
           </DialogFooter>

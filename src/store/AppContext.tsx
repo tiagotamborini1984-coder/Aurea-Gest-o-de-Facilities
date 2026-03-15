@@ -3,8 +3,10 @@ import React, { createContext, useContext, useState, ReactNode } from 'react'
 export type Client = {
   id: string
   name: string
+  slug: string
   url: string
   adminName: string
+  logo?: string
   status: 'Ativo' | 'Inativo'
   modules: string[]
 }
@@ -21,6 +23,7 @@ export type ThirdParty = {
 interface AppContextType {
   clients: Client[]
   addClient: (client: Omit<Client, 'id'>) => void
+  updateClient: (id: string, data: Partial<Client>) => void
   deleteClient: (id: string) => void
   thirdParties: ThirdParty[]
   addThirdParty: (tp: Omit<ThirdParty, 'id'>) => void
@@ -32,24 +35,30 @@ const defaultClients: Client[] = [
   {
     id: '1',
     name: 'TechCorp S.A.',
+    slug: 'techcorp',
     url: `${baseUrl}/techcorp`,
     adminName: 'Carlos Silva',
+    logo: 'https://img.usecurling.com/i?q=technology&color=blue',
     status: 'Ativo',
     modules: ['Gestão de Terceiros', 'Manutenção'],
   },
   {
     id: '2',
     name: 'GlobalFac Services',
+    slug: 'globalfac',
     url: `${baseUrl}/globalfac`,
     adminName: 'Marina Costa',
+    logo: 'https://img.usecurling.com/i?q=global&color=cyan',
     status: 'Ativo',
     modules: ['Gestão de Terceiros'],
   },
   {
     id: '3',
     name: 'InnovateX LTDA',
+    slug: 'innovatex',
     url: `${baseUrl}/innovatex`,
     adminName: 'Roberto Alves',
+    logo: 'https://img.usecurling.com/i?q=innovation&color=gray',
     status: 'Inativo',
     modules: ['Limpeza', 'Manutenção'],
   },
@@ -100,6 +109,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setClients((prev) => [{ ...client, id: Math.random().toString(36).substr(2, 9) }, ...prev])
   }
 
+  const updateClient = (id: string, data: Partial<Client>) => {
+    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
+  }
+
   const deleteClient = (id: string) => {
     setClients((prev) => prev.filter((c) => c.id !== id))
   }
@@ -109,7 +122,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AppContext.Provider value={{ clients, addClient, deleteClient, thirdParties, addThirdParty }}>
+    <AppContext.Provider
+      value={{ clients, addClient, updateClient, deleteClient, thirdParties, addThirdParty }}
+    >
       {children}
     </AppContext.Provider>
   )

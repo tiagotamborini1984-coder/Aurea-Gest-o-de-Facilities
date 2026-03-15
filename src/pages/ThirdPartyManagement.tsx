@@ -68,20 +68,17 @@ export default function ThirdPartyManagement() {
     <div className="max-w-7xl mx-auto space-y-6 pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#0F4C81]">Gestão de Terceiros</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-brand-blue">Gestão de Terceiros</h2>
           <p className="text-muted-foreground mt-1">
             Diretório de empresas prestadoras de serviço e contratos.
           </p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          className="bg-[#2B95D6] hover:bg-[#2B95D6]/90 text-white shadow-sm hover:scale-[1.02] transition-transform"
-        >
+        <Button onClick={() => setIsDialogOpen(true)} className="shadow-sm transition-transform">
           <Plus className="mr-2 h-4 w-4" /> Adicionar Terceiro
         </Button>
       </div>
 
-      <div className="flex items-center bg-white p-2 rounded-xl shadow-sm border">
+      <div className="flex items-center bg-white p-2 rounded-xl shadow-sm border border-brand-light">
         <Search className="w-5 h-5 text-muted-foreground ml-2" />
         <Input
           placeholder="Buscar por Razão Social ou CNPJ..."
@@ -92,7 +89,7 @@ export default function ThirdPartyManagement() {
       </div>
 
       <div
-        className="rounded-xl border bg-white shadow-sm overflow-hidden animate-slide-up"
+        className="rounded-xl border border-brand-light bg-white shadow-sm overflow-hidden animate-slide-up"
         style={{ animationDelay: '0.1s' }}
       >
         <Table>

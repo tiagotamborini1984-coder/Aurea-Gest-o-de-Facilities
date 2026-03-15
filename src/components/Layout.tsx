@@ -13,8 +13,8 @@ export default function Layout() {
           <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 animate-fade-in relative pb-16">
             <Outlet />
           </main>
-          <footer className="absolute bottom-0 left-0 right-0 h-12 flex items-center justify-center border-t bg-white/50 backdrop-blur-sm z-10">
-            <p className="text-xs text-muted-foreground">
+          <footer className="absolute bottom-0 left-0 right-0 h-12 flex items-center justify-center border-t border-brand-light bg-white/80 backdrop-blur-sm z-10">
+            <p className="text-xs text-brand-graphite/70 font-medium">
               Módulo do Sistema Áurea – Desenvolvido por Tiago Tamborini
             </p>
           </footer>

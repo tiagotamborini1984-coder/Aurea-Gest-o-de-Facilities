@@ -17672,7 +17672,7 @@ function createContext2(rootComponentName, defaultContext) {
 	}
 	return [Provider, useContext2];
 }
-function createContextScope(scopeName, createContextScopeDeps = []) {
+function createContextScope$1(scopeName, createContextScopeDeps = []) {
 	let defaultContexts = [];
 	function createContext3(rootComponentName, defaultContext) {
 		const BaseContext = import_react.createContext(defaultContext);
@@ -17710,9 +17710,9 @@ function createContextScope(scopeName, createContextScopeDeps = []) {
 		};
 	};
 	createScope.scopeName = scopeName;
-	return [createContext3, composeContextScopes(createScope, ...createContextScopeDeps)];
+	return [createContext3, composeContextScopes$1(createScope, ...createContextScopeDeps)];
 }
-function composeContextScopes(...scopes) {
+function composeContextScopes$1(...scopes) {
 	const baseScope = scopes[0];
 	if (scopes.length === 1) return baseScope;
 	const createScope = () => {
@@ -17830,7 +17830,7 @@ function getElementRef$2(element) {
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-collection@1.1.7_@types+react-dom@19.2.3_@types+react@19.2.14__@types+r_161926fa2509d0b7370b60b8bb4eb8b0/node_modules/@radix-ui/react-collection/dist/index.mjs
 function createCollection(name) {
 	const PROVIDER_NAME = name + "CollectionProvider";
-	const [createCollectionContext, createCollectionScope] = createContextScope(PROVIDER_NAME);
+	const [createCollectionContext, createCollectionScope] = createContextScope$1(PROVIDER_NAME);
 	const [CollectionProviderImpl, useCollectionContext] = createCollectionContext(PROVIDER_NAME, {
 		collectionRef: { current: null },
 		itemMap: /* @__PURE__ */ new Map()
@@ -18133,7 +18133,7 @@ function handleAndDispatchCustomEvent$1(name, handler, detail, { discrete }) {
 	if (discrete) dispatchDiscreteCustomEvent(target, event);
 	else target.dispatchEvent(event);
 }
-var Root$7 = DismissableLayer;
+var Root$8 = DismissableLayer;
 var Branch = DismissableLayerBranch;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-use-layout-effect@1.1.1_@types+react@19.2.14_react@19.2.4/node_modules/@radix-ui/react-use-layout-effect/dist/index.mjs
@@ -18333,12 +18333,12 @@ var VisuallyHidden = import_react.forwardRef((props, forwardedRef) => {
 	});
 });
 VisuallyHidden.displayName = NAME$3;
-var Root$6 = VisuallyHidden;
+var Root$7 = VisuallyHidden;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-toast@1.2.15_@types+react-dom@19.2.3_@types+react@19.2.14__@types+react_4581e89c6ba13e4159ce65546c8b2a16/node_modules/@radix-ui/react-toast/dist/index.mjs
 var PROVIDER_NAME$1 = "ToastProvider";
 var [Collection$3, useCollection$3, createCollectionScope$3] = createCollection("Toast");
-var [createToastContext, createToastScope] = createContextScope("Toast", [createCollectionScope$3]);
+var [createToastContext, createToastScope] = createContextScope$1("Toast", [createCollectionScope$3]);
 var [ToastProviderProvider, useToastProviderContext] = createToastContext(PROVIDER_NAME$1);
 var ToastProvider$1 = (props) => {
 	const { __scopeToast, label = "Notification", duration = 5e3, swipeDirection = "right", swipeThreshold = 50, children } = props;
@@ -18633,7 +18633,7 @@ var ToastImpl = import_react.forwardRef((props, forwardedRef) => {
 		onClose: handleClose,
 		children: import_react_dom.createPortal(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection$3.ItemSlot, {
 			scope: __scopeToast,
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$7, {
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$8, {
 				asChild: true,
 				onEscapeKeyDown: composeEventHandlers(onEscapeKeyDown, () => {
 					if (!context.isFocusedToastEscapeKeyDownRef.current) handleClose();
@@ -23407,7 +23407,7 @@ var Arrow$1 = import_react.forwardRef((props, forwardedRef) => {
 	});
 });
 Arrow$1.displayName = NAME$2;
-var Root$5 = Arrow$1;
+var Root$6 = Arrow$1;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-use-size@1.1.1_@types+react@19.2.14_react@19.2.4/node_modules/@radix-ui/react-use-size/dist/index.mjs
 function useSize(element) {
@@ -23447,7 +23447,7 @@ function useSize(element) {
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-popper@1.2.8_@types+react-dom@19.2.3_@types+react@19.2.14__@types+react_13e0521d8aea7ebfbfb8bee1fb615c05/node_modules/@radix-ui/react-popper/dist/index.mjs
 var POPPER_NAME = "Popper";
-var [createPopperContext, createPopperScope] = createContextScope(POPPER_NAME);
+var [createPopperContext, createPopperScope] = createContextScope$1(POPPER_NAME);
 var [PopperProvider, usePopperContext] = createPopperContext(POPPER_NAME);
 var Popper = (props) => {
 	const { __scopePopper, children } = props;
@@ -23628,7 +23628,7 @@ var PopperArrow = import_react.forwardRef(function PopperArrow2(props, forwarded
 			}[contentContext.placedSide],
 			visibility: contentContext.shouldHideArrow ? "hidden" : void 0
 		},
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$5, {
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$6, {
 			...arrowProps,
 			ref: forwardedRef,
 			style: {
@@ -23689,7 +23689,7 @@ var Content$1 = PopperContent;
 var Arrow = PopperArrow;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-tooltip@1.2.8_@types+react-dom@19.2.3_@types+react@19.2.14__@types+reac_9074d9fb06315b089b2bee17c4c65951/node_modules/@radix-ui/react-tooltip/dist/index.mjs
-var [createTooltipContext, createTooltipScope] = createContextScope("Tooltip", [createPopperScope]);
+var [createTooltipContext, createTooltipScope] = createContextScope$1("Tooltip", [createPopperScope]);
 var usePopperScope$2 = createPopperScope();
 var PROVIDER_NAME = "TooltipProvider";
 var DEFAULT_DELAY_DURATION = 700;
@@ -24012,7 +24012,7 @@ var TooltipContentImpl = import_react.forwardRef((props, forwardedRef) => {
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slottable$1, { children }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisuallyHiddenContentContextProvider, {
 				scope: __scopeTooltip,
 				isInside: true,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$6, {
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$7, {
 					id: context.contentId,
 					role: "tooltip",
 					children: ariaLabel || children
@@ -24633,7 +24633,7 @@ var EVENT_OPTIONS = {
 };
 var GROUP_NAME$3 = "RovingFocusGroup";
 var [Collection$2, useCollection$2, createCollectionScope$2] = createCollection(GROUP_NAME$3);
-var [createRovingFocusGroupContext, createRovingFocusGroupScope] = createContextScope(GROUP_NAME$3, [createCollectionScope$2]);
+var [createRovingFocusGroupContext, createRovingFocusGroupScope] = createContextScope$1(GROUP_NAME$3, [createCollectionScope$2]);
 var [RovingFocusProvider, useRovingFocusContext] = createRovingFocusGroupContext(GROUP_NAME$3);
 var RovingFocusGroup = import_react.forwardRef((props, forwardedRef) => {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection$2.Provider, {
@@ -24806,7 +24806,7 @@ function focusFirst$1(candidates, preventScroll = false) {
 function wrapArray$2(array, startIndex) {
 	return array.map((_, index) => array[(startIndex + index) % array.length]);
 }
-var Root$4 = RovingFocusGroup;
+var Root$5 = RovingFocusGroup;
 var Item$1 = RovingFocusGroupItem;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/aria-hidden@1.2.6/node_modules/aria-hidden/dist/es2015/index.js
@@ -25651,7 +25651,7 @@ var SUB_CLOSE_KEYS = {
 };
 var MENU_NAME = "Menu";
 var [Collection$1, useCollection$1, createCollectionScope$1] = createCollection(MENU_NAME);
-var [createMenuContext, createMenuScope] = createContextScope(MENU_NAME, [
+var [createMenuContext, createMenuScope] = createContextScope$1(MENU_NAME, [
 	createCollectionScope$1,
 	createPopperScope,
 	createRovingFocusGroupScope
@@ -25869,7 +25869,7 @@ var MenuContentImpl = import_react.forwardRef((props, forwardedRef) => {
 					onFocusOutside,
 					onInteractOutside,
 					onDismiss,
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$4, {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$5, {
 						asChild: true,
 						...rovingFocusGroupScope,
 						dir: rootContext.dir,
@@ -26388,7 +26388,7 @@ var SubContent = MenuSubContent;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-dropdown-menu@2.1.16_@types+react-dom@19.2.3_@types+react@19.2.14__@typ_73af8346b6b2e99f5d79f55f5dac0b34/node_modules/@radix-ui/react-dropdown-menu/dist/index.mjs
 var DROPDOWN_MENU_NAME = "DropdownMenu";
-var [createDropdownMenuContext, createDropdownMenuScope] = createContextScope(DROPDOWN_MENU_NAME, [createMenuScope]);
+var [createDropdownMenuContext, createDropdownMenuScope] = createContextScope$1(DROPDOWN_MENU_NAME, [createMenuScope]);
 var useMenuScope = createMenuScope();
 var [DropdownMenuProvider, useDropdownMenuContext] = createDropdownMenuContext(DROPDOWN_MENU_NAME);
 var DropdownMenu$1 = (props) => {
@@ -26764,7 +26764,7 @@ DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-dialog@1.1.15_@types+react-dom@19.2.3_@types+react@19.2.14__@types+reac_779045218dc2799d336e7197abef9d38/node_modules/@radix-ui/react-dialog/dist/index.mjs
 var DIALOG_NAME = "Dialog";
-var [createDialogContext, createDialogScope] = createContextScope(DIALOG_NAME);
+var [createDialogContext, createDialogScope] = createContextScope$1(DIALOG_NAME);
 var [DialogProvider, useDialogContext] = createDialogContext(DIALOG_NAME);
 var Dialog$1 = (props) => {
 	const { __scopeDialog, children, open: openProp, defaultOpen, onOpenChange, modal = true } = props;
@@ -27031,7 +27031,7 @@ var DescriptionWarning$1 = ({ contentRef, descriptionId }) => {
 	]);
 	return null;
 };
-var Root$3 = Dialog$1;
+var Root$4 = Dialog$1;
 var Trigger$1 = DialogTrigger$1;
 var Portal$1 = DialogPortal$1;
 var Overlay = DialogOverlay$1;
@@ -27042,12 +27042,12 @@ var Close = DialogClose$1;
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-alert-dialog@1.1.15_@types+react-dom@19.2.3_@types+react@19.2.14__@type_d492cfbed6c88f7a3980b921a627d48d/node_modules/@radix-ui/react-alert-dialog/dist/index.mjs
 var ROOT_NAME = "AlertDialog";
-var [createAlertDialogContext, createAlertDialogScope] = createContextScope(ROOT_NAME, [createDialogScope]);
+var [createAlertDialogContext, createAlertDialogScope] = createContextScope$1(ROOT_NAME, [createDialogScope]);
 var useDialogScope = createDialogScope();
 var AlertDialog$1 = (props) => {
 	const { __scopeAlertDialog, ...alertDialogProps } = props;
 	const dialogScope = useDialogScope(__scopeAlertDialog);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$3, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$4, {
 		...dialogScope,
 		...alertDialogProps,
 		modal: true
@@ -27260,30 +27260,338 @@ var AlertDialogCancel = import_react.forwardRef(({ className, ...props }, ref) =
 }));
 AlertDialogCancel.displayName = Cancel.displayName;
 //#endregion
+//#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-context@1.1.3_@types+react@19.2.14_react@19.2.4/node_modules/@radix-ui/react-context/dist/index.mjs
+function createContextScope(scopeName, createContextScopeDeps = []) {
+	let defaultContexts = [];
+	function createContext3(rootComponentName, defaultContext) {
+		const BaseContext = import_react.createContext(defaultContext);
+		BaseContext.displayName = rootComponentName + "Context";
+		const index = defaultContexts.length;
+		defaultContexts = [...defaultContexts, defaultContext];
+		const Provider = (props) => {
+			const { scope, children, ...context } = props;
+			const Context = scope?.[scopeName]?.[index] || BaseContext;
+			const value = import_react.useMemo(() => context, Object.values(context));
+			return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Context.Provider, {
+				value,
+				children
+			});
+		};
+		Provider.displayName = rootComponentName + "Provider";
+		function useContext2(consumerName, scope) {
+			const Context = scope?.[scopeName]?.[index] || BaseContext;
+			const context = import_react.useContext(Context);
+			if (context) return context;
+			if (defaultContext !== void 0) return defaultContext;
+			throw new Error(`\`${consumerName}\` must be used within \`${rootComponentName}\``);
+		}
+		return [Provider, useContext2];
+	}
+	const createScope = () => {
+		const scopeContexts = defaultContexts.map((defaultContext) => {
+			return import_react.createContext(defaultContext);
+		});
+		return function useScope(scope) {
+			const contexts = scope?.[scopeName] || scopeContexts;
+			return import_react.useMemo(() => ({ [`__scope${scopeName}`]: {
+				...scope,
+				[scopeName]: contexts
+			} }), [scope, contexts]);
+		};
+	};
+	createScope.scopeName = scopeName;
+	return [createContext3, composeContextScopes(createScope, ...createContextScopeDeps)];
+}
+function composeContextScopes(...scopes) {
+	const baseScope = scopes[0];
+	if (scopes.length === 1) return baseScope;
+	const createScope = () => {
+		const scopeHooks = scopes.map((createScope2) => ({
+			useScope: createScope2(),
+			scopeName: createScope2.scopeName
+		}));
+		return function useComposedScopes(overrideScopes) {
+			const nextScopes = scopeHooks.reduce((nextScopes2, { useScope, scopeName }) => {
+				const currentScope = useScope(overrideScopes)[`__scope${scopeName}`];
+				return {
+					...nextScopes2,
+					...currentScope
+				};
+			}, {});
+			return import_react.useMemo(() => ({ [`__scope${baseScope.scopeName}`]: nextScopes }), [nextScopes]);
+		};
+	};
+	createScope.scopeName = baseScope.scopeName;
+	return createScope;
+}
+//#endregion
+//#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-primitive@2.1.4_@types+react-dom@19.2.3_@types+react@19.2.14__@types+re_0243fb2db8a1fb85ca77b8d9e5c2d650/node_modules/@radix-ui/react-primitive/dist/index.mjs
+var Primitive = [
+	"a",
+	"button",
+	"div",
+	"form",
+	"h2",
+	"h3",
+	"img",
+	"input",
+	"label",
+	"li",
+	"nav",
+	"ol",
+	"p",
+	"select",
+	"span",
+	"svg",
+	"ul"
+].reduce((primitive, node) => {
+	const Slot = /* @__PURE__ */ createSlot(`Primitive.${node}`);
+	const Node = import_react.forwardRef((props, forwardedRef) => {
+		const { asChild, ...primitiveProps } = props;
+		const Comp = asChild ? Slot : node;
+		if (typeof window !== "undefined") window[Symbol.for("radix-ui")] = true;
+		return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Comp, {
+			...primitiveProps,
+			ref: forwardedRef
+		});
+	});
+	Node.displayName = `Primitive.${node}`;
+	return {
+		...primitive,
+		[node]: Node
+	};
+}, {});
+//#endregion
+//#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/use-sync-external-store@1.6.0_react@19.2.4/node_modules/use-sync-external-store/cjs/use-sync-external-store-shim.development.js
+/**
+* @license React
+* use-sync-external-store-shim.development.js
+*
+* Copyright (c) Meta Platforms, Inc. and affiliates.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+var require_use_sync_external_store_shim_development = /* @__PURE__ */ __commonJSMin(((exports) => {
+	(function() {
+		function is(x, y) {
+			return x === y && (0 !== x || 1 / x === 1 / y) || x !== x && y !== y;
+		}
+		function useSyncExternalStore$2(subscribe, getSnapshot) {
+			didWarnOld18Alpha || void 0 === React.startTransition || (didWarnOld18Alpha = !0, console.error("You are using an outdated, pre-release alpha of React 18 that does not support useSyncExternalStore. The use-sync-external-store shim will not work correctly. Upgrade to a newer pre-release."));
+			var value = getSnapshot();
+			if (!didWarnUncachedGetSnapshot) {
+				var cachedValue = getSnapshot();
+				objectIs(value, cachedValue) || (console.error("The result of getSnapshot should be cached to avoid an infinite loop"), didWarnUncachedGetSnapshot = !0);
+			}
+			cachedValue = useState({ inst: {
+				value,
+				getSnapshot
+			} });
+			var inst = cachedValue[0].inst, forceUpdate = cachedValue[1];
+			useLayoutEffect(function() {
+				inst.value = value;
+				inst.getSnapshot = getSnapshot;
+				checkIfSnapshotChanged(inst) && forceUpdate({ inst });
+			}, [
+				subscribe,
+				value,
+				getSnapshot
+			]);
+			useEffect(function() {
+				checkIfSnapshotChanged(inst) && forceUpdate({ inst });
+				return subscribe(function() {
+					checkIfSnapshotChanged(inst) && forceUpdate({ inst });
+				});
+			}, [subscribe]);
+			useDebugValue(value);
+			return value;
+		}
+		function checkIfSnapshotChanged(inst) {
+			var latestGetSnapshot = inst.getSnapshot;
+			inst = inst.value;
+			try {
+				var nextValue = latestGetSnapshot();
+				return !objectIs(inst, nextValue);
+			} catch (error) {
+				return !0;
+			}
+		}
+		function useSyncExternalStore$1(subscribe, getSnapshot) {
+			return getSnapshot();
+		}
+		"undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
+		var React = require_react(), objectIs = "function" === typeof Object.is ? Object.is : is, useState = React.useState, useEffect = React.useEffect, useLayoutEffect = React.useLayoutEffect, useDebugValue = React.useDebugValue, didWarnOld18Alpha = !1, didWarnUncachedGetSnapshot = !1, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
+		exports.useSyncExternalStore = void 0 !== React.useSyncExternalStore ? React.useSyncExternalStore : shim;
+		"undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
+	})();
+}));
+//#endregion
+//#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-use-is-hydrated@0.1.0_@types+react@19.2.14_react@19.2.4/node_modules/@radix-ui/react-use-is-hydrated/dist/index.mjs
+var import_shim = (/* @__PURE__ */ __commonJSMin(((exports, module) => {
+	module.exports = require_use_sync_external_store_shim_development();
+})))();
+function useIsHydrated() {
+	return (0, import_shim.useSyncExternalStore)(subscribe, () => true, () => false);
+}
+function subscribe() {
+	return () => {};
+}
+//#endregion
+//#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-avatar@1.1.11_@types+react-dom@19.2.3_@types+react@19.2.14__@types+reac_5e99ccf265cbb36ef8e7150da8f5489e/node_modules/@radix-ui/react-avatar/dist/index.mjs
+var AVATAR_NAME = "Avatar";
+var [createAvatarContext, createAvatarScope] = createContextScope(AVATAR_NAME);
+var [AvatarProvider, useAvatarContext] = createAvatarContext(AVATAR_NAME);
+var Avatar$1 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeAvatar, ...avatarProps } = props;
+	const [imageLoadingStatus, setImageLoadingStatus] = import_react.useState("idle");
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarProvider, {
+		scope: __scopeAvatar,
+		imageLoadingStatus,
+		onImageLoadingStatusChange: setImageLoadingStatus,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.span, {
+			...avatarProps,
+			ref: forwardedRef
+		})
+	});
+});
+Avatar$1.displayName = AVATAR_NAME;
+var IMAGE_NAME = "AvatarImage";
+var AvatarImage$1 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeAvatar, src, onLoadingStatusChange = () => {}, ...imageProps } = props;
+	const context = useAvatarContext(IMAGE_NAME, __scopeAvatar);
+	const imageLoadingStatus = useImageLoadingStatus(src, imageProps);
+	const handleLoadingStatusChange = useCallbackRef$1((status) => {
+		onLoadingStatusChange(status);
+		context.onImageLoadingStatusChange(status);
+	});
+	useLayoutEffect2(() => {
+		if (imageLoadingStatus !== "idle") handleLoadingStatusChange(imageLoadingStatus);
+	}, [imageLoadingStatus, handleLoadingStatusChange]);
+	return imageLoadingStatus === "loaded" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.img, {
+		...imageProps,
+		ref: forwardedRef,
+		src
+	}) : null;
+});
+AvatarImage$1.displayName = IMAGE_NAME;
+var FALLBACK_NAME = "AvatarFallback";
+var AvatarFallback$1 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeAvatar, delayMs, ...fallbackProps } = props;
+	const context = useAvatarContext(FALLBACK_NAME, __scopeAvatar);
+	const [canRender, setCanRender] = import_react.useState(delayMs === void 0);
+	import_react.useEffect(() => {
+		if (delayMs !== void 0) {
+			const timerId = window.setTimeout(() => setCanRender(true), delayMs);
+			return () => window.clearTimeout(timerId);
+		}
+	}, [delayMs]);
+	return canRender && context.imageLoadingStatus !== "loaded" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.span, {
+		...fallbackProps,
+		ref: forwardedRef
+	}) : null;
+});
+AvatarFallback$1.displayName = FALLBACK_NAME;
+function resolveLoadingStatus(image, src) {
+	if (!image) return "idle";
+	if (!src) return "error";
+	if (image.src !== src) image.src = src;
+	return image.complete && image.naturalWidth > 0 ? "loaded" : "loading";
+}
+function useImageLoadingStatus(src, { referrerPolicy, crossOrigin }) {
+	const isHydrated = useIsHydrated();
+	const imageRef = import_react.useRef(null);
+	const image = (() => {
+		if (!isHydrated) return null;
+		if (!imageRef.current) imageRef.current = new window.Image();
+		return imageRef.current;
+	})();
+	const [loadingStatus, setLoadingStatus] = import_react.useState(() => resolveLoadingStatus(image, src));
+	useLayoutEffect2(() => {
+		setLoadingStatus(resolveLoadingStatus(image, src));
+	}, [image, src]);
+	useLayoutEffect2(() => {
+		const updateStatus = (status) => () => {
+			setLoadingStatus(status);
+		};
+		if (!image) return;
+		const handleLoad = updateStatus("loaded");
+		const handleError = updateStatus("error");
+		image.addEventListener("load", handleLoad);
+		image.addEventListener("error", handleError);
+		if (referrerPolicy) image.referrerPolicy = referrerPolicy;
+		if (typeof crossOrigin === "string") image.crossOrigin = crossOrigin;
+		return () => {
+			image.removeEventListener("load", handleLoad);
+			image.removeEventListener("error", handleError);
+		};
+	}, [
+		image,
+		crossOrigin,
+		referrerPolicy
+	]);
+	return loadingStatus;
+}
+var Root$3 = Avatar$1;
+var Image = AvatarImage$1;
+var Fallback = AvatarFallback$1;
+//#endregion
+//#region src/components/ui/avatar.tsx
+var Avatar = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root$3, {
+	"data-uid": "src/components/ui/avatar.tsx:11:3",
+	"data-prohibitions": "[editContent]",
+	ref,
+	className: cn$1("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className),
+	...props
+}));
+Avatar.displayName = Root$3.displayName;
+var AvatarImage = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Image, {
+	"data-uid": "src/components/ui/avatar.tsx:23:3",
+	"data-prohibitions": "[editContent]",
+	ref,
+	className: cn$1("aspect-square h-full w-full", className),
+	...props
+}));
+AvatarImage.displayName = Image.displayName;
+var AvatarFallback = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Fallback, {
+	"data-uid": "src/components/ui/avatar.tsx:35:3",
+	"data-prohibitions": "[editContent]",
+	ref,
+	className: cn$1("flex h-full w-full items-center justify-center rounded-full bg-muted", className),
+	...props
+}));
+AvatarFallback.displayName = Fallback.displayName;
+//#endregion
 //#region src/store/AppContext.tsx
 var baseUrl = window.location.origin;
 var defaultClients = [
 	{
 		id: "1",
 		name: "TechCorp S.A.",
+		slug: "techcorp",
 		url: `${baseUrl}/techcorp`,
 		adminName: "Carlos Silva",
+		logo: "https://img.usecurling.com/i?q=technology&color=blue",
 		status: "Ativo",
 		modules: ["Gestão de Terceiros", "Manutenção"]
 	},
 	{
 		id: "2",
 		name: "GlobalFac Services",
+		slug: "globalfac",
 		url: `${baseUrl}/globalfac`,
 		adminName: "Marina Costa",
+		logo: "https://img.usecurling.com/i?q=global&color=cyan",
 		status: "Ativo",
 		modules: ["Gestão de Terceiros"]
 	},
 	{
 		id: "3",
 		name: "InnovateX LTDA",
+		slug: "innovatex",
 		url: `${baseUrl}/innovatex`,
 		adminName: "Roberto Alves",
+		logo: "https://img.usecurling.com/i?q=innovation&color=gray",
 		status: "Inativo",
 		modules: ["Limpeza", "Manutenção"]
 	}
@@ -27332,6 +27640,12 @@ var AppProvider = ({ children }) => {
 			id: Math.random().toString(36).substr(2, 9)
 		}, ...prev]);
 	};
+	const updateClient = (id, data) => {
+		setClients((prev) => prev.map((c) => c.id === id ? {
+			...c,
+			...data
+		} : c));
+	};
 	const deleteClient = (id) => {
 		setClients((prev) => prev.filter((c) => c.id !== id));
 	};
@@ -27342,11 +27656,12 @@ var AppProvider = ({ children }) => {
 		}, ...prev]);
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppContext.Provider, {
-		"data-uid": "src/store/AppContext.tsx:112:5",
+		"data-uid": "src/store/AppContext.tsx:125:5",
 		"data-prohibitions": "[editContent]",
 		value: {
 			clients,
 			addClient,
+			updateClient,
 			deleteClient,
 			thirdParties,
 			addThirdParty
@@ -27361,7 +27676,7 @@ var useAppStore = () => {
 };
 //#endregion
 //#region src/components/ui/dialog.tsx
-var Dialog = Root$3;
+var Dialog = Root$4;
 var DialogPortal = Portal$1;
 var DialogOverlay = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Overlay, {
 	"data-uid": "src/components/ui/dialog.tsx:20:3",
@@ -27445,43 +27760,6 @@ var Input = import_react.forwardRef(({ className, type, ...props }, ref) => {
 });
 Input.displayName = "Input";
 //#endregion
-//#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-primitive@2.1.4_@types+react-dom@19.2.3_@types+react@19.2.14__@types+re_0243fb2db8a1fb85ca77b8d9e5c2d650/node_modules/@radix-ui/react-primitive/dist/index.mjs
-var Primitive = [
-	"a",
-	"button",
-	"div",
-	"form",
-	"h2",
-	"h3",
-	"img",
-	"input",
-	"label",
-	"li",
-	"nav",
-	"ol",
-	"p",
-	"select",
-	"span",
-	"svg",
-	"ul"
-].reduce((primitive, node) => {
-	const Slot = /* @__PURE__ */ createSlot(`Primitive.${node}`);
-	const Node = import_react.forwardRef((props, forwardedRef) => {
-		const { asChild, ...primitiveProps } = props;
-		const Comp = asChild ? Slot : node;
-		if (typeof window !== "undefined") window[Symbol.for("radix-ui")] = true;
-		return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Comp, {
-			...primitiveProps,
-			ref: forwardedRef
-		});
-	});
-	Node.displayName = `Primitive.${node}`;
-	return {
-		...primitive,
-		[node]: Node
-	};
-}, {});
-//#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-label@2.1.8_@types+react-dom@19.2.3_@types+react@19.2.14__@types+react@_55fa612a976b7bdfbf4dcdd93d861aab/node_modules/@radix-ui/react-label/dist/index.mjs
 var NAME$1 = "Label";
 var Label$2 = import_react.forwardRef((props, forwardedRef) => {
@@ -27526,7 +27804,7 @@ function usePrevious(value) {
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-switch@1.2.6_@types+react-dom@19.2.3_@types+react@19.2.14__@types+react_e3738c514c10df2ef7e24af5ee461853/node_modules/@radix-ui/react-switch/dist/index.mjs
 var SWITCH_NAME = "Switch";
-var [createSwitchContext, createSwitchScope] = createContextScope(SWITCH_NAME);
+var [createSwitchContext, createSwitchScope] = createContextScope$1(SWITCH_NAME);
 var [SwitchProvider, useSwitchContext] = createSwitchContext(SWITCH_NAME);
 var Switch$1 = import_react.forwardRef((props, forwardedRef) => {
 	const { __scopeSwitch, name, checked: checkedProp, defaultChecked, required, disabled, value = "on", onCheckedChange, form, ...switchProps } = props;
@@ -27656,6 +27934,7 @@ function AddClientDialog({ open, onOpenChange }) {
 		name: "",
 		slug: "",
 		adminName: "",
+		logo: "",
 		modules: {
 			terceiros: true,
 			manutencao: false,
@@ -27672,8 +27951,10 @@ function AddClientDialog({ open, onOpenChange }) {
 		if (formData.modules.limpeza) activeModules.push("Limpeza");
 		addClient({
 			name: formData.name,
+			slug: formData.slug,
 			url: `${baseUrl}/${formData.slug}`,
 			adminName: formData.adminName,
+			logo: formData.logo,
 			status: "Ativo",
 			modules: activeModules
 		});
@@ -27687,6 +27968,7 @@ function AddClientDialog({ open, onOpenChange }) {
 			name: "",
 			slug: "",
 			adminName: "",
+			logo: "",
 			modules: {
 				terceiros: true,
 				manutencao: false,
@@ -27695,126 +27977,150 @@ function AddClientDialog({ open, onOpenChange }) {
 		});
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
-		"data-uid": "src/components/AddClientDialog.tsx:70:5",
+		"data-uid": "src/components/AddClientDialog.tsx:74:5",
 		"data-prohibitions": "[editContent]",
 		open,
 		onOpenChange,
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
-			"data-uid": "src/components/AddClientDialog.tsx:71:7",
+			"data-uid": "src/components/AddClientDialog.tsx:75:7",
 			"data-prohibitions": "[editContent]",
 			className: "sm:max-w-[550px] backdrop-blur-md bg-white/95",
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
-				"data-uid": "src/components/AddClientDialog.tsx:72:9",
+				"data-uid": "src/components/AddClientDialog.tsx:76:9",
 				"data-prohibitions": "[]",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
-					"data-uid": "src/components/AddClientDialog.tsx:73:11",
+					"data-uid": "src/components/AddClientDialog.tsx:77:11",
 					"data-prohibitions": "[]",
-					className: "text-xl font-bold text-[#0F4C81]",
+					className: "text-xl font-bold text-brand-blue",
 					children: "Cadastrar Nova Empresa"
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogDescription, {
-					"data-uid": "src/components/AddClientDialog.tsx:76:11",
+					"data-uid": "src/components/AddClientDialog.tsx:80:11",
 					"data-prohibitions": "[]",
 					children: "Configure os dados do novo cliente e provisione os módulos de acesso."
 				})]
 			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
-				"data-uid": "src/components/AddClientDialog.tsx:80:9",
+				"data-uid": "src/components/AddClientDialog.tsx:84:9",
 				"data-prohibitions": "[editContent]",
 				onSubmit: handleSubmit,
 				className: "space-y-6 py-4",
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/AddClientDialog.tsx:81:11",
+						"data-uid": "src/components/AddClientDialog.tsx:85:11",
 						"data-prohibitions": "[editContent]",
 						className: "grid grid-cols-2 gap-4",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							"data-uid": "src/components/AddClientDialog.tsx:82:13",
-							"data-prohibitions": "[]",
-							className: "space-y-2 col-span-2 sm:col-span-1",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-								"data-uid": "src/components/AddClientDialog.tsx:83:15",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:86:13",
 								"data-prohibitions": "[]",
-								htmlFor: "name",
-								children: "Nome da Empresa *"
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-								"data-uid": "src/components/AddClientDialog.tsx:84:15",
-								"data-prohibitions": "[editContent]",
-								id: "name",
-								placeholder: "Ex: Acme Corp",
-								required: true,
-								value: formData.name,
-								onChange: (e) => setFormData({
-									...formData,
-									name: e.target.value
-								})
-							})]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							"data-uid": "src/components/AddClientDialog.tsx:92:13",
-							"data-prohibitions": "[editContent]",
-							className: "space-y-2 col-span-2 sm:col-span-1",
-							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:93:15",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/AddClientDialog.tsx:87:15",
 									"data-prohibitions": "[]",
-									htmlFor: "slug",
-									children: "Identificador (Slug) *"
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:94:15",
+									htmlFor: "name",
+									children: "Nome da Empresa *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/AddClientDialog.tsx:88:15",
 									"data-prohibitions": "[editContent]",
-									id: "slug",
-									placeholder: "ex: acme-corp",
+									id: "name",
+									placeholder: "Ex: Acme Corp",
 									required: true,
-									value: formData.slug,
-									onChange: (e) => {
-										const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-										setFormData({
-											...formData,
-											slug: val
-										});
-									}
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-									"data-uid": "src/components/AddClientDialog.tsx:104:15",
+									value: formData.name,
+									onChange: (e) => setFormData({
+										...formData,
+										name: e.target.value
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:96:13",
+								"data-prohibitions": "[editContent]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/AddClientDialog.tsx:97:15",
+										"data-prohibitions": "[]",
+										htmlFor: "slug",
+										children: "Identificador (Slug) *"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+										"data-uid": "src/components/AddClientDialog.tsx:98:15",
+										"data-prohibitions": "[editContent]",
+										id: "slug",
+										placeholder: "ex: acme-corp",
+										required: true,
+										value: formData.slug,
+										onChange: (e) => {
+											const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+											setFormData({
+												...formData,
+												slug: val
+											});
+										}
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										"data-uid": "src/components/AddClientDialog.tsx:108:15",
+										"data-prohibitions": "[editContent]",
+										className: "text-[11px] text-muted-foreground mt-1 truncate",
+										children: [
+											"Acesso:",
+											" ",
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												"data-uid": "src/components/AddClientDialog.tsx:110:17",
+												"data-prohibitions": "[editContent]",
+												className: "font-medium text-brand-cyan inline-block max-w-full align-bottom truncate",
+												children: previewUrl
+											})
+										]
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:115:13",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/AddClientDialog.tsx:116:15",
+									"data-prohibitions": "[]",
+									htmlFor: "logo",
+									children: "URL do Logotipo (Opcional)"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/AddClientDialog.tsx:117:15",
 									"data-prohibitions": "[editContent]",
-									className: "text-[11px] text-muted-foreground mt-1 truncate",
-									children: [
-										"Acesso:",
-										" ",
-										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-											"data-uid": "src/components/AddClientDialog.tsx:106:17",
-											"data-prohibitions": "[editContent]",
-											className: "font-medium text-[#2B95D6] inline-block max-w-full align-bottom truncate",
-											children: previewUrl
-										})
-									]
-								})
-							]
-						})]
+									id: "logo",
+									placeholder: "https://exemplo.com/logo.png",
+									value: formData.logo,
+									onChange: (e) => setFormData({
+										...formData,
+										logo: e.target.value
+									})
+								})]
+							})
+						]
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/AddClientDialog.tsx:113:11",
+						"data-uid": "src/components/AddClientDialog.tsx:126:11",
 						"data-prohibitions": "[]",
-						className: "space-y-4 border rounded-xl p-4 bg-muted/30",
+						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
-							"data-uid": "src/components/AddClientDialog.tsx:114:13",
+							"data-uid": "src/components/AddClientDialog.tsx:127:13",
 							"data-prohibitions": "[]",
 							className: "text-sm font-semibold text-foreground",
 							children: "Usuário Administrador"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							"data-uid": "src/components/AddClientDialog.tsx:115:13",
+							"data-uid": "src/components/AddClientDialog.tsx:128:13",
 							"data-prohibitions": "[]",
 							className: "grid grid-cols-2 gap-4",
 							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:116:15",
+								"data-uid": "src/components/AddClientDialog.tsx:129:15",
 								"data-prohibitions": "[]",
 								className: "space-y-2 col-span-2 sm:col-span-1",
 								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:117:17",
+									"data-uid": "src/components/AddClientDialog.tsx:130:17",
 									"data-prohibitions": "[]",
 									htmlFor: "adminName",
 									children: "Nome Completo *"
 								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:118:17",
+									"data-uid": "src/components/AddClientDialog.tsx:131:17",
 									"data-prohibitions": "[editContent]",
 									id: "adminName",
 									placeholder: "Nome do responsável",
@@ -27826,16 +28132,16 @@ function AddClientDialog({ open, onOpenChange }) {
 									})
 								})]
 							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:126:15",
+								"data-uid": "src/components/AddClientDialog.tsx:139:15",
 								"data-prohibitions": "[]",
 								className: "space-y-2 col-span-2 sm:col-span-1",
 								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:127:17",
+									"data-uid": "src/components/AddClientDialog.tsx:140:17",
 									"data-prohibitions": "[]",
 									htmlFor: "email",
 									children: "E-mail *"
 								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:128:17",
+									"data-uid": "src/components/AddClientDialog.tsx:141:17",
 									"data-prohibitions": "[editContent]",
 									id: "email",
 									type: "email",
@@ -27846,31 +28152,31 @@ function AddClientDialog({ open, onOpenChange }) {
 						})]
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/AddClientDialog.tsx:133:11",
+						"data-uid": "src/components/AddClientDialog.tsx:146:11",
 						"data-prohibitions": "[]",
-						className: "space-y-4 border rounded-xl p-4 bg-muted/30",
+						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
-							"data-uid": "src/components/AddClientDialog.tsx:134:13",
+							"data-uid": "src/components/AddClientDialog.tsx:147:13",
 							"data-prohibitions": "[]",
 							className: "text-sm font-semibold text-foreground",
 							children: "Provisionamento de Módulos"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							"data-uid": "src/components/AddClientDialog.tsx:135:13",
+							"data-uid": "src/components/AddClientDialog.tsx:148:13",
 							"data-prohibitions": "[]",
 							className: "space-y-3",
 							children: [
 								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									"data-uid": "src/components/AddClientDialog.tsx:136:15",
+									"data-uid": "src/components/AddClientDialog.tsx:149:15",
 									"data-prohibitions": "[]",
 									className: "flex items-center justify-between",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:137:17",
+										"data-uid": "src/components/AddClientDialog.tsx:150:17",
 										"data-prohibitions": "[]",
 										htmlFor: "mod-terceiros",
 										className: "cursor-pointer",
 										children: "Gestão de Terceiros"
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
-										"data-uid": "src/components/AddClientDialog.tsx:140:17",
+										"data-uid": "src/components/AddClientDialog.tsx:153:17",
 										"data-prohibitions": "[editContent]",
 										id: "mod-terceiros",
 										checked: formData.modules.terceiros,
@@ -27884,17 +28190,17 @@ function AddClientDialog({ open, onOpenChange }) {
 									})]
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									"data-uid": "src/components/AddClientDialog.tsx:148:15",
+									"data-uid": "src/components/AddClientDialog.tsx:161:15",
 									"data-prohibitions": "[]",
 									className: "flex items-center justify-between",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:149:17",
+										"data-uid": "src/components/AddClientDialog.tsx:162:17",
 										"data-prohibitions": "[]",
 										htmlFor: "mod-manutencao",
 										className: "cursor-pointer",
 										children: "Manutenção"
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
-										"data-uid": "src/components/AddClientDialog.tsx:152:17",
+										"data-uid": "src/components/AddClientDialog.tsx:165:17",
 										"data-prohibitions": "[editContent]",
 										id: "mod-manutencao",
 										checked: formData.modules.manutencao,
@@ -27908,17 +28214,17 @@ function AddClientDialog({ open, onOpenChange }) {
 									})]
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									"data-uid": "src/components/AddClientDialog.tsx:160:15",
+									"data-uid": "src/components/AddClientDialog.tsx:173:15",
 									"data-prohibitions": "[]",
 									className: "flex items-center justify-between",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:161:17",
+										"data-uid": "src/components/AddClientDialog.tsx:174:17",
 										"data-prohibitions": "[]",
 										htmlFor: "mod-limpeza",
 										className: "cursor-pointer",
 										children: "Limpeza"
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
-										"data-uid": "src/components/AddClientDialog.tsx:164:17",
+										"data-uid": "src/components/AddClientDialog.tsx:177:17",
 										"data-prohibitions": "[editContent]",
 										id: "mod-limpeza",
 										checked: formData.modules.limpeza,
@@ -27935,20 +28241,20 @@ function AddClientDialog({ open, onOpenChange }) {
 						})]
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
-						"data-uid": "src/components/AddClientDialog.tsx:175:11",
+						"data-uid": "src/components/AddClientDialog.tsx:188:11",
 						"data-prohibitions": "[]",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-							"data-uid": "src/components/AddClientDialog.tsx:176:13",
+							"data-uid": "src/components/AddClientDialog.tsx:189:13",
 							"data-prohibitions": "[]",
 							type: "button",
 							variant: "outline",
 							onClick: () => onOpenChange(false),
 							children: "Cancelar"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-							"data-uid": "src/components/AddClientDialog.tsx:179:13",
+							"data-uid": "src/components/AddClientDialog.tsx:192:13",
 							"data-prohibitions": "[]",
 							type: "submit",
-							className: "bg-[#2B95D6] hover:bg-[#2B95D6]/90 text-white font-medium",
+							className: "font-medium",
 							children: "Salvar Empresa"
 						})]
 					})
@@ -27958,18 +28264,428 @@ function AddClientDialog({ open, onOpenChange }) {
 	});
 }
 //#endregion
+//#region src/components/EditClientDialog.tsx
+function EditClientDialog({ client, open, onOpenChange }) {
+	const { updateClient } = useAppStore();
+	const { toast } = useToast();
+	const [formData, setFormData] = (0, import_react.useState)({
+		name: "",
+		slug: "",
+		adminName: "",
+		logo: ""
+	});
+	(0, import_react.useEffect)(() => {
+		if (client) setFormData({
+			name: client.name,
+			slug: client.slug,
+			adminName: client.adminName,
+			logo: client.logo || ""
+		});
+	}, [client]);
+	const baseUrl = window.location.origin;
+	const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`;
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		if (!client) return;
+		updateClient(client.id, {
+			name: formData.name,
+			slug: formData.slug,
+			adminName: formData.adminName,
+			logo: formData.logo,
+			url: `${baseUrl}/${formData.slug}`
+		});
+		toast({
+			title: "Empresa atualizada",
+			description: "Os dados do cliente foram salvos com sucesso.",
+			className: "bg-green-50 text-green-900 border-green-200"
+		});
+		onOpenChange(false);
+	};
+	if (!client) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
+		"data-uid": "src/components/EditClientDialog.tsx:70:5",
+		"data-prohibitions": "[editContent]",
+		open,
+		onOpenChange,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
+			"data-uid": "src/components/EditClientDialog.tsx:71:7",
+			"data-prohibitions": "[editContent]",
+			className: "sm:max-w-[550px] backdrop-blur-md bg-white/95",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
+				"data-uid": "src/components/EditClientDialog.tsx:72:9",
+				"data-prohibitions": "[]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
+					"data-uid": "src/components/EditClientDialog.tsx:73:11",
+					"data-prohibitions": "[]",
+					className: "text-xl font-bold text-brand-blue",
+					children: "Editar Empresa"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogDescription, {
+					"data-uid": "src/components/EditClientDialog.tsx:74:11",
+					"data-prohibitions": "[]",
+					children: "Atualize as informações do perfil do cliente."
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+				"data-uid": "src/components/EditClientDialog.tsx:76:9",
+				"data-prohibitions": "[editContent]",
+				onSubmit: handleSubmit,
+				className: "space-y-6 py-4",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/EditClientDialog.tsx:77:11",
+						"data-prohibitions": "[editContent]",
+						className: "grid grid-cols-2 gap-4",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:78:13",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/EditClientDialog.tsx:79:15",
+									"data-prohibitions": "[]",
+									htmlFor: "edit-name",
+									children: "Nome da Empresa *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/EditClientDialog.tsx:80:15",
+									"data-prohibitions": "[editContent]",
+									id: "edit-name",
+									placeholder: "Ex: Acme Corp",
+									required: true,
+									value: formData.name,
+									onChange: (e) => setFormData({
+										...formData,
+										name: e.target.value
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:88:13",
+								"data-prohibitions": "[editContent]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/EditClientDialog.tsx:89:15",
+										"data-prohibitions": "[]",
+										htmlFor: "edit-slug",
+										children: "Identificador (Slug) *"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+										"data-uid": "src/components/EditClientDialog.tsx:90:15",
+										"data-prohibitions": "[editContent]",
+										id: "edit-slug",
+										placeholder: "ex: acme-corp",
+										required: true,
+										value: formData.slug,
+										onChange: (e) => {
+											const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+											setFormData({
+												...formData,
+												slug: val
+											});
+										}
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										"data-uid": "src/components/EditClientDialog.tsx:100:15",
+										"data-prohibitions": "[editContent]",
+										className: "text-[11px] text-muted-foreground mt-1 truncate",
+										children: [
+											"Acesso:",
+											" ",
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												"data-uid": "src/components/EditClientDialog.tsx:102:17",
+												"data-prohibitions": "[editContent]",
+												className: "font-medium text-brand-cyan inline-block max-w-full align-bottom truncate",
+												children: previewUrl
+											})
+										]
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:107:13",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/EditClientDialog.tsx:108:15",
+									"data-prohibitions": "[]",
+									htmlFor: "edit-logo",
+									children: "URL do Logotipo (Opcional)"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/EditClientDialog.tsx:109:15",
+									"data-prohibitions": "[editContent]",
+									id: "edit-logo",
+									placeholder: "https://exemplo.com/logo.png",
+									value: formData.logo,
+									onChange: (e) => setFormData({
+										...formData,
+										logo: e.target.value
+									})
+								})]
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/EditClientDialog.tsx:118:11",
+						"data-prohibitions": "[]",
+						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+							"data-uid": "src/components/EditClientDialog.tsx:119:13",
+							"data-prohibitions": "[]",
+							className: "text-sm font-semibold text-foreground",
+							children: "Usuário Administrador"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							"data-uid": "src/components/EditClientDialog.tsx:120:13",
+							"data-prohibitions": "[]",
+							className: "grid grid-cols-1 gap-4",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:121:15",
+								"data-prohibitions": "[]",
+								className: "space-y-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/EditClientDialog.tsx:122:17",
+									"data-prohibitions": "[]",
+									htmlFor: "edit-adminName",
+									children: "Nome Completo *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/EditClientDialog.tsx:123:17",
+									"data-prohibitions": "[editContent]",
+									id: "edit-adminName",
+									placeholder: "Nome do responsável",
+									required: true,
+									value: formData.adminName,
+									onChange: (e) => setFormData({
+										...formData,
+										adminName: e.target.value
+									})
+								})]
+							})
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
+						"data-uid": "src/components/EditClientDialog.tsx:134:11",
+						"data-prohibitions": "[]",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							"data-uid": "src/components/EditClientDialog.tsx:135:13",
+							"data-prohibitions": "[]",
+							type: "button",
+							variant: "outline",
+							onClick: () => onOpenChange(false),
+							children: "Cancelar"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							"data-uid": "src/components/EditClientDialog.tsx:138:13",
+							"data-prohibitions": "[]",
+							type: "submit",
+							className: "font-medium",
+							children: "Salvar Alterações"
+						})]
+					})
+				]
+			})]
+		})
+	});
+}
+//#endregion
+//#region src/components/ManageModulesDialog.tsx
+function ManageModulesDialog({ client, open, onOpenChange }) {
+	const { updateClient } = useAppStore();
+	const { toast } = useToast();
+	const [modules, setModules] = (0, import_react.useState)({
+		terceiros: false,
+		manutencao: false,
+		limpeza: false
+	});
+	(0, import_react.useEffect)(() => {
+		if (client) setModules({
+			terceiros: client.modules.includes("Gestão de Terceiros"),
+			manutencao: client.modules.includes("Manutenção"),
+			limpeza: client.modules.includes("Limpeza")
+		});
+	}, [client]);
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		if (!client) return;
+		const activeModules = [];
+		if (modules.terceiros) activeModules.push("Gestão de Terceiros");
+		if (modules.manutencao) activeModules.push("Manutenção");
+		if (modules.limpeza) activeModules.push("Limpeza");
+		updateClient(client.id, { modules: activeModules });
+		toast({
+			title: "Módulos atualizados",
+			description: `As permissões de acesso para ${client.name} foram salvas.`,
+			className: "bg-green-50 text-green-900 border-green-200"
+		});
+		onOpenChange(false);
+	};
+	if (!client) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
+		"data-uid": "src/components/ManageModulesDialog.tsx:64:5",
+		"data-prohibitions": "[editContent]",
+		open,
+		onOpenChange,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
+			"data-uid": "src/components/ManageModulesDialog.tsx:65:7",
+			"data-prohibitions": "[editContent]",
+			className: "sm:max-w-[450px] backdrop-blur-md bg-white/95",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
+				"data-uid": "src/components/ManageModulesDialog.tsx:66:9",
+				"data-prohibitions": "[editContent]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
+					"data-uid": "src/components/ManageModulesDialog.tsx:67:11",
+					"data-prohibitions": "[]",
+					className: "text-xl font-bold text-brand-blue",
+					children: "Gerenciar Módulos"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogDescription, {
+					"data-uid": "src/components/ManageModulesDialog.tsx:68:11",
+					"data-prohibitions": "[editContent]",
+					children: [
+						"Configure quais módulos o cliente ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+							"data-uid": "src/components/ManageModulesDialog.tsx:69:47",
+							"data-prohibitions": "[editContent]",
+							children: client.name
+						}),
+						" poderá acessar."
+					]
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+				"data-uid": "src/components/ManageModulesDialog.tsx:72:9",
+				"data-prohibitions": "[]",
+				onSubmit: handleSubmit,
+				className: "space-y-6 py-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					"data-uid": "src/components/ManageModulesDialog.tsx:73:11",
+					"data-prohibitions": "[]",
+					className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/ManageModulesDialog.tsx:74:13",
+						"data-prohibitions": "[]",
+						className: "space-y-4",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/ManageModulesDialog.tsx:75:15",
+								"data-prohibitions": "[]",
+								className: "flex items-center justify-between",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									"data-uid": "src/components/ManageModulesDialog.tsx:76:17",
+									"data-prohibitions": "[]",
+									className: "space-y-0.5",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/ManageModulesDialog.tsx:77:19",
+										"data-prohibitions": "[]",
+										htmlFor: "mg-mod-terceiros",
+										className: "text-base cursor-pointer",
+										children: "Gestão de Terceiros"
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										"data-uid": "src/components/ManageModulesDialog.tsx:80:19",
+										"data-prohibitions": "[]",
+										className: "text-sm text-muted-foreground",
+										children: "Controle de prestadores e documentos."
+									})]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
+									"data-uid": "src/components/ManageModulesDialog.tsx:84:17",
+									"data-prohibitions": "[editContent]",
+									id: "mg-mod-terceiros",
+									checked: modules.terceiros,
+									onCheckedChange: (c) => setModules({
+										...modules,
+										terceiros: c
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/ManageModulesDialog.tsx:90:15",
+								"data-prohibitions": "[]",
+								className: "flex items-center justify-between",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									"data-uid": "src/components/ManageModulesDialog.tsx:91:17",
+									"data-prohibitions": "[]",
+									className: "space-y-0.5",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/ManageModulesDialog.tsx:92:19",
+										"data-prohibitions": "[]",
+										htmlFor: "mg-mod-manutencao",
+										className: "text-base cursor-pointer",
+										children: "Manutenção"
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										"data-uid": "src/components/ManageModulesDialog.tsx:95:19",
+										"data-prohibitions": "[]",
+										className: "text-sm text-muted-foreground",
+										children: "Gestão de ordens de serviço e ativos."
+									})]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
+									"data-uid": "src/components/ManageModulesDialog.tsx:99:17",
+									"data-prohibitions": "[editContent]",
+									id: "mg-mod-manutencao",
+									checked: modules.manutencao,
+									onCheckedChange: (c) => setModules({
+										...modules,
+										manutencao: c
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/ManageModulesDialog.tsx:105:15",
+								"data-prohibitions": "[]",
+								className: "flex items-center justify-between",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									"data-uid": "src/components/ManageModulesDialog.tsx:106:17",
+									"data-prohibitions": "[]",
+									className: "space-y-0.5",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/ManageModulesDialog.tsx:107:19",
+										"data-prohibitions": "[]",
+										htmlFor: "mg-mod-limpeza",
+										className: "text-base cursor-pointer",
+										children: "Limpeza"
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										"data-uid": "src/components/ManageModulesDialog.tsx:110:19",
+										"data-prohibitions": "[]",
+										className: "text-sm text-muted-foreground",
+										children: "Escalas e vistorias de conservação."
+									})]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
+									"data-uid": "src/components/ManageModulesDialog.tsx:114:17",
+									"data-prohibitions": "[editContent]",
+									id: "mg-mod-limpeza",
+									checked: modules.limpeza,
+									onCheckedChange: (c) => setModules({
+										...modules,
+										limpeza: c
+									})
+								})]
+							})
+						]
+					})
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
+					"data-uid": "src/components/ManageModulesDialog.tsx:123:11",
+					"data-prohibitions": "[]",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+						"data-uid": "src/components/ManageModulesDialog.tsx:124:13",
+						"data-prohibitions": "[]",
+						type: "button",
+						variant: "outline",
+						onClick: () => onOpenChange(false),
+						children: "Cancelar"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+						"data-uid": "src/components/ManageModulesDialog.tsx:127:13",
+						"data-prohibitions": "[]",
+						type: "submit",
+						className: "font-medium",
+						children: "Salvar Permissões"
+					})]
+				})]
+			})]
+		})
+	});
+}
+//#endregion
 //#region src/pages/ClientManagement.tsx
 function ClientManagement() {
 	const { clients, deleteClient } = useAppStore();
-	const [isDialogOpen, setIsDialogOpen] = (0, import_react.useState)(false);
+	const [isAddOpen, setIsAddOpen] = (0, import_react.useState)(false);
+	const [editingClient, setEditingClient] = (0, import_react.useState)(null);
+	const [managingModulesClient, setManagingModulesClient] = (0, import_react.useState)(null);
 	const [clientToDelete, setClientToDelete] = (0, import_react.useState)(null);
 	const { toast } = useToast();
-	const handleAction = (action, clientName) => {
-		toast({
-			title: `Ação: ${action}`,
-			description: `Aplicado em: ${clientName}`
-		});
-	};
 	const handleDelete = () => {
 		if (clientToDelete) {
 			deleteClient(clientToDelete);
@@ -27981,83 +28697,83 @@ function ClientManagement() {
 		}
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		"data-uid": "src/pages/ClientManagement.tsx:60:5",
+		"data-uid": "src/pages/ClientManagement.tsx:58:5",
 		"data-prohibitions": "[editContent]",
 		className: "max-w-7xl mx-auto space-y-6 pb-10",
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				"data-uid": "src/pages/ClientManagement.tsx:61:7",
+				"data-uid": "src/pages/ClientManagement.tsx:59:7",
 				"data-prohibitions": "[]",
 				className: "flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					"data-uid": "src/pages/ClientManagement.tsx:62:9",
+					"data-uid": "src/pages/ClientManagement.tsx:60:9",
 					"data-prohibitions": "[]",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
-						"data-uid": "src/pages/ClientManagement.tsx:63:11",
+						"data-uid": "src/pages/ClientManagement.tsx:61:11",
 						"data-prohibitions": "[]",
-						className: "text-2xl font-bold tracking-tight text-[#0F4C81]",
+						className: "text-2xl font-bold tracking-tight text-brand-blue",
 						children: "Gestão de Clientes"
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						"data-uid": "src/pages/ClientManagement.tsx:64:11",
+						"data-uid": "src/pages/ClientManagement.tsx:62:11",
 						"data-prohibitions": "[]",
 						className: "text-muted-foreground mt-1",
 						children: "Gerencie as empresas locatárias e seus módulos."
 					})]
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
-					"data-uid": "src/pages/ClientManagement.tsx:68:9",
+					"data-uid": "src/pages/ClientManagement.tsx:66:9",
 					"data-prohibitions": "[]",
-					onClick: () => setIsDialogOpen(true),
-					className: "bg-[#2B95D6] hover:bg-[#2B95D6]/90 text-white shadow-sm hover:scale-[1.02] transition-transform",
+					onClick: () => setIsAddOpen(true),
+					className: "shadow-sm transition-transform",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, {
-						"data-uid": "src/pages/ClientManagement.tsx:72:11",
+						"data-uid": "src/pages/ClientManagement.tsx:67:11",
 						"data-prohibitions": "[editContent]",
 						className: "mr-2 h-4 w-4"
 					}), " Cadastrar Empresa"]
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				"data-uid": "src/pages/ClientManagement.tsx:76:7",
+				"data-uid": "src/pages/ClientManagement.tsx:71:7",
 				"data-prohibitions": "[editContent]",
-				className: "rounded-xl border bg-white shadow-sm overflow-hidden animate-slide-up",
+				className: "rounded-xl border border-brand-light bg-white shadow-sm overflow-hidden animate-slide-up",
 				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Table, {
-					"data-uid": "src/pages/ClientManagement.tsx:77:9",
+					"data-uid": "src/pages/ClientManagement.tsx:72:9",
 					"data-prohibitions": "[editContent]",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHeader, {
-						"data-uid": "src/pages/ClientManagement.tsx:78:11",
+						"data-uid": "src/pages/ClientManagement.tsx:73:11",
 						"data-prohibitions": "[]",
 						className: "bg-muted/50",
 						children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableRow, {
-							"data-uid": "src/pages/ClientManagement.tsx:79:13",
+							"data-uid": "src/pages/ClientManagement.tsx:74:13",
 							"data-prohibitions": "[]",
 							children: [
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ClientManagement.tsx:80:15",
+									"data-uid": "src/pages/ClientManagement.tsx:75:15",
 									"data-prohibitions": "[]",
-									className: "w-[250px]",
+									className: "w-[300px]",
 									children: "Empresa"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ClientManagement.tsx:81:15",
+									"data-uid": "src/pages/ClientManagement.tsx:76:15",
 									"data-prohibitions": "[]",
 									children: "URL de Acesso"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ClientManagement.tsx:82:15",
+									"data-uid": "src/pages/ClientManagement.tsx:77:15",
 									"data-prohibitions": "[]",
 									children: "Administrador"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ClientManagement.tsx:83:15",
+									"data-uid": "src/pages/ClientManagement.tsx:78:15",
 									"data-prohibitions": "[]",
 									children: "Módulos Ativos"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ClientManagement.tsx:84:15",
+									"data-uid": "src/pages/ClientManagement.tsx:79:15",
 									"data-prohibitions": "[]",
 									children: "Status"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ClientManagement.tsx:85:15",
+									"data-uid": "src/pages/ClientManagement.tsx:80:15",
 									"data-prohibitions": "[]",
 									className: "text-right",
 									children: "Ações"
@@ -28065,60 +28781,80 @@ function ClientManagement() {
 							]
 						})
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableBody, {
-						"data-uid": "src/pages/ClientManagement.tsx:88:11",
+						"data-uid": "src/pages/ClientManagement.tsx:83:11",
 						"data-prohibitions": "[editContent]",
 						children: [clients.map((client) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableRow, {
-							"data-uid": "src/pages/ClientManagement.tsx:90:15",
+							"data-uid": "src/pages/ClientManagement.tsx:85:15",
 							"data-prohibitions": "[editContent]",
 							className: "hover:bg-muted/30 transition-colors",
 							children: [
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:91:17",
+									"data-uid": "src/pages/ClientManagement.tsx:86:17",
 									"data-prohibitions": "[editContent]",
 									className: "font-medium text-foreground",
-									children: client.name
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										"data-uid": "src/pages/ClientManagement.tsx:87:19",
+										"data-prohibitions": "[editContent]",
+										className: "flex items-center gap-3",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Avatar, {
+											"data-uid": "src/pages/ClientManagement.tsx:88:21",
+											"data-prohibitions": "[editContent]",
+											className: "h-8 w-8 border border-brand-light",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarImage, {
+												"data-uid": "src/pages/ClientManagement.tsx:89:23",
+												"data-prohibitions": "[editContent]",
+												src: client.logo,
+												alt: client.name
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarFallback, {
+												"data-uid": "src/pages/ClientManagement.tsx:90:23",
+												"data-prohibitions": "[editContent]",
+												className: "bg-brand-blue/10 text-brand-blue text-xs font-semibold",
+												children: client.name.substring(0, 2).toUpperCase()
+											})]
+										}), client.name]
+									})
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:92:17",
+									"data-uid": "src/pages/ClientManagement.tsx:97:17",
 									"data-prohibitions": "[editContent]",
-									className: "text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate",
+									className: "text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-12",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-										"data-uid": "src/pages/ClientManagement.tsx:93:19",
+										"data-uid": "src/pages/ClientManagement.tsx:98:19",
 										"data-prohibitions": "[editContent]",
 										className: "truncate",
 										children: client.url
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExternalLink, {
-										"data-uid": "src/pages/ClientManagement.tsx:94:19",
+										"data-uid": "src/pages/ClientManagement.tsx:99:19",
 										"data-prohibitions": "[editContent]",
 										className: "h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
 									})]
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:96:17",
+									"data-uid": "src/pages/ClientManagement.tsx:101:17",
 									"data-prohibitions": "[editContent]",
 									children: client.adminName
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:97:17",
+									"data-uid": "src/pages/ClientManagement.tsx:102:17",
 									"data-prohibitions": "[editContent]",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-										"data-uid": "src/pages/ClientManagement.tsx:98:19",
+										"data-uid": "src/pages/ClientManagement.tsx:103:19",
 										"data-prohibitions": "[editContent]",
 										className: "flex flex-wrap gap-1",
 										children: client.modules.map((mod) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Badge, {
-											"data-uid": "src/pages/ClientManagement.tsx:100:23",
+											"data-uid": "src/pages/ClientManagement.tsx:105:23",
 											"data-prohibitions": "[editContent]",
 											variant: "secondary",
-											className: "bg-blue-50 text-[#0F4C81] hover:bg-blue-100 text-[10px]",
+											className: "bg-brand-blue/5 text-brand-blue hover:bg-brand-blue/10 text-[10px]",
 											children: mod
 										}, mod))
 									})
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:110:17",
+									"data-uid": "src/pages/ClientManagement.tsx:115:17",
 									"data-prohibitions": "[editContent]",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Badge, {
-										"data-uid": "src/pages/ClientManagement.tsx:111:19",
+										"data-uid": "src/pages/ClientManagement.tsx:116:19",
 										"data-prohibitions": "[editContent]",
 										variant: client.status === "Ativo" ? "default" : "outline",
 										className: client.status === "Ativo" ? "bg-green-100 text-green-800 hover:bg-green-200 border-none" : "text-muted-foreground",
@@ -28126,61 +28862,61 @@ function ClientManagement() {
 									})
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:122:17",
+									"data-uid": "src/pages/ClientManagement.tsx:127:17",
 									"data-prohibitions": "[]",
 									className: "text-right",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownMenu, {
-										"data-uid": "src/pages/ClientManagement.tsx:123:19",
+										"data-uid": "src/pages/ClientManagement.tsx:128:19",
 										"data-prohibitions": "[]",
 										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuTrigger, {
-											"data-uid": "src/pages/ClientManagement.tsx:124:21",
+											"data-uid": "src/pages/ClientManagement.tsx:129:21",
 											"data-prohibitions": "[]",
 											asChild: true,
 											children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
-												"data-uid": "src/pages/ClientManagement.tsx:125:23",
+												"data-uid": "src/pages/ClientManagement.tsx:130:23",
 												"data-prohibitions": "[]",
 												variant: "ghost",
 												className: "h-8 w-8 p-0",
 												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-													"data-uid": "src/pages/ClientManagement.tsx:126:25",
+													"data-uid": "src/pages/ClientManagement.tsx:131:25",
 													"data-prohibitions": "[]",
 													className: "sr-only",
 													children: "Abrir menu"
 												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EllipsisVertical, {
-													"data-uid": "src/pages/ClientManagement.tsx:127:25",
+													"data-uid": "src/pages/ClientManagement.tsx:132:25",
 													"data-prohibitions": "[editContent]",
 													className: "h-4 w-4"
 												})]
 											})
 										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownMenuContent, {
-											"data-uid": "src/pages/ClientManagement.tsx:130:21",
+											"data-uid": "src/pages/ClientManagement.tsx:135:21",
 											"data-prohibitions": "[]",
 											align: "end",
 											className: "w-[160px]",
 											children: [
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuLabel, {
-													"data-uid": "src/pages/ClientManagement.tsx:131:23",
+													"data-uid": "src/pages/ClientManagement.tsx:136:23",
 													"data-prohibitions": "[]",
 													children: "Ações"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ClientManagement.tsx:132:23",
+													"data-uid": "src/pages/ClientManagement.tsx:137:23",
 													"data-prohibitions": "[]",
-													onClick: () => handleAction("Editar Perfil", client.name),
+													onClick: () => setEditingClient(client),
 													children: "Editar Perfil"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ClientManagement.tsx:135:23",
+													"data-uid": "src/pages/ClientManagement.tsx:140:23",
 													"data-prohibitions": "[]",
-													onClick: () => handleAction("Gerenciar Módulos", client.name),
+													onClick: () => setManagingModulesClient(client),
 													children: "Gerenciar Módulos"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuSeparator, {
-													"data-uid": "src/pages/ClientManagement.tsx:140:23",
+													"data-uid": "src/pages/ClientManagement.tsx:143:23",
 													"data-prohibitions": "[editContent]"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ClientManagement.tsx:141:23",
+													"data-uid": "src/pages/ClientManagement.tsx:144:23",
 													"data-prohibitions": "[]",
 													className: "text-destructive focus:text-destructive cursor-pointer",
 													onClick: () => setClientToDelete(client.id),
@@ -28192,10 +28928,10 @@ function ClientManagement() {
 								})
 							]
 						}, client.id)), clients.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableRow, {
-							"data-uid": "src/pages/ClientManagement.tsx:153:15",
+							"data-uid": "src/pages/ClientManagement.tsx:156:15",
 							"data-prohibitions": "[]",
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-								"data-uid": "src/pages/ClientManagement.tsx:154:17",
+								"data-uid": "src/pages/ClientManagement.tsx:157:17",
 								"data-prohibitions": "[]",
 								colSpan: 6,
 								className: "h-24 text-center text-muted-foreground",
@@ -28206,40 +28942,54 @@ function ClientManagement() {
 				})
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AddClientDialog, {
-				"data-uid": "src/pages/ClientManagement.tsx:163:7",
+				"data-uid": "src/pages/ClientManagement.tsx:166:7",
 				"data-prohibitions": "[editContent]",
-				open: isDialogOpen,
-				onOpenChange: setIsDialogOpen
+				open: isAddOpen,
+				onOpenChange: setIsAddOpen
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(EditClientDialog, {
+				"data-uid": "src/pages/ClientManagement.tsx:168:7",
+				"data-prohibitions": "[editContent]",
+				client: editingClient,
+				open: !!editingClient,
+				onOpenChange: (open) => !open && setEditingClient(null)
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ManageModulesDialog, {
+				"data-uid": "src/pages/ClientManagement.tsx:174:7",
+				"data-prohibitions": "[editContent]",
+				client: managingModulesClient,
+				open: !!managingModulesClient,
+				onOpenChange: (open) => !open && setManagingModulesClient(null)
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialog, {
-				"data-uid": "src/pages/ClientManagement.tsx:165:7",
+				"data-uid": "src/pages/ClientManagement.tsx:180:7",
 				"data-prohibitions": "[]",
 				open: !!clientToDelete,
 				onOpenChange: (open) => !open && setClientToDelete(null),
 				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AlertDialogContent, {
-					"data-uid": "src/pages/ClientManagement.tsx:169:9",
+					"data-uid": "src/pages/ClientManagement.tsx:184:9",
 					"data-prohibitions": "[]",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AlertDialogHeader, {
-						"data-uid": "src/pages/ClientManagement.tsx:170:11",
+						"data-uid": "src/pages/ClientManagement.tsx:185:11",
 						"data-prohibitions": "[]",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogTitle, {
-							"data-uid": "src/pages/ClientManagement.tsx:171:13",
+							"data-uid": "src/pages/ClientManagement.tsx:186:13",
 							"data-prohibitions": "[]",
 							children: "Confirmar Exclusão"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogDescription, {
-							"data-uid": "src/pages/ClientManagement.tsx:172:13",
+							"data-uid": "src/pages/ClientManagement.tsx:187:13",
 							"data-prohibitions": "[]",
 							children: "Tem certeza que deseja excluir esta empresa permanentemente? Todos os acessos e registros associados a ela serão perdidos."
 						})]
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AlertDialogFooter, {
-						"data-uid": "src/pages/ClientManagement.tsx:177:11",
+						"data-uid": "src/pages/ClientManagement.tsx:192:11",
 						"data-prohibitions": "[]",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogCancel, {
-							"data-uid": "src/pages/ClientManagement.tsx:178:13",
+							"data-uid": "src/pages/ClientManagement.tsx:193:13",
 							"data-prohibitions": "[]",
 							children: "Cancelar"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogAction, {
-							"data-uid": "src/pages/ClientManagement.tsx:179:13",
+							"data-uid": "src/pages/ClientManagement.tsx:194:13",
 							"data-prohibitions": "[]",
 							className: "bg-destructive hover:bg-destructive/90 text-white",
 							onClick: handleDelete,
@@ -28267,7 +29017,7 @@ var OPEN_KEYS = [
 var SELECTION_KEYS = [" ", "Enter"];
 var SELECT_NAME = "Select";
 var [Collection, useCollection, createCollectionScope] = createCollection(SELECT_NAME);
-var [createSelectContext, createSelectScope] = createContextScope(SELECT_NAME, [createCollectionScope, createPopperScope]);
+var [createSelectContext, createSelectScope] = createContextScope$1(SELECT_NAME, [createCollectionScope, createPopperScope]);
 var usePopperScope = createPopperScope();
 var [SelectProvider, useSelectContext] = createSelectContext(SELECT_NAME);
 var [SelectNativeOptionsProvider, useSelectNativeOptionsContext] = createSelectContext(SELECT_NAME);
@@ -29640,7 +30390,7 @@ function ThirdPartyManagement() {
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
 						"data-uid": "src/pages/ThirdPartyManagement.tsx:71:11",
 						"data-prohibitions": "[]",
-						className: "text-2xl font-bold tracking-tight text-[#0F4C81]",
+						className: "text-2xl font-bold tracking-tight text-brand-blue",
 						children: "Gestão de Terceiros"
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 						"data-uid": "src/pages/ThirdPartyManagement.tsx:72:11",
@@ -29652,24 +30402,24 @@ function ThirdPartyManagement() {
 					"data-uid": "src/pages/ThirdPartyManagement.tsx:76:9",
 					"data-prohibitions": "[]",
 					onClick: () => setIsDialogOpen(true),
-					className: "bg-[#2B95D6] hover:bg-[#2B95D6]/90 text-white shadow-sm hover:scale-[1.02] transition-transform",
+					className: "shadow-sm transition-transform",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, {
-						"data-uid": "src/pages/ThirdPartyManagement.tsx:80:11",
+						"data-uid": "src/pages/ThirdPartyManagement.tsx:77:11",
 						"data-prohibitions": "[editContent]",
 						className: "mr-2 h-4 w-4"
 					}), " Adicionar Terceiro"]
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				"data-uid": "src/pages/ThirdPartyManagement.tsx:84:7",
+				"data-uid": "src/pages/ThirdPartyManagement.tsx:81:7",
 				"data-prohibitions": "[]",
-				className: "flex items-center bg-white p-2 rounded-xl shadow-sm border",
+				className: "flex items-center bg-white p-2 rounded-xl shadow-sm border border-brand-light",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Search, {
-					"data-uid": "src/pages/ThirdPartyManagement.tsx:85:9",
+					"data-uid": "src/pages/ThirdPartyManagement.tsx:82:9",
 					"data-prohibitions": "[editContent]",
 					className: "w-5 h-5 text-muted-foreground ml-2"
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-					"data-uid": "src/pages/ThirdPartyManagement.tsx:86:9",
+					"data-uid": "src/pages/ThirdPartyManagement.tsx:83:9",
 					"data-prohibitions": "[editContent]",
 					placeholder: "Buscar por Razão Social ou CNPJ...",
 					className: "border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
@@ -29678,48 +30428,48 @@ function ThirdPartyManagement() {
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				"data-uid": "src/pages/ThirdPartyManagement.tsx:94:7",
+				"data-uid": "src/pages/ThirdPartyManagement.tsx:91:7",
 				"data-prohibitions": "[editContent]",
-				className: "rounded-xl border bg-white shadow-sm overflow-hidden animate-slide-up",
+				className: "rounded-xl border border-brand-light bg-white shadow-sm overflow-hidden animate-slide-up",
 				style: { animationDelay: "0.1s" },
 				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Table, {
-					"data-uid": "src/pages/ThirdPartyManagement.tsx:98:9",
+					"data-uid": "src/pages/ThirdPartyManagement.tsx:95:9",
 					"data-prohibitions": "[editContent]",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHeader, {
-						"data-uid": "src/pages/ThirdPartyManagement.tsx:99:11",
+						"data-uid": "src/pages/ThirdPartyManagement.tsx:96:11",
 						"data-prohibitions": "[]",
 						className: "bg-muted/50",
 						children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableRow, {
-							"data-uid": "src/pages/ThirdPartyManagement.tsx:100:13",
+							"data-uid": "src/pages/ThirdPartyManagement.tsx:97:13",
 							"data-prohibitions": "[]",
 							children: [
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:101:15",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:98:15",
 									"data-prohibitions": "[]",
 									children: "Razão Social"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:102:15",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:99:15",
 									"data-prohibitions": "[]",
 									children: "CNPJ"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:103:15",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:100:15",
 									"data-prohibitions": "[]",
 									children: "Serviços"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:104:15",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:101:15",
 									"data-prohibitions": "[]",
 									children: "Fim do Contrato"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:105:15",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:102:15",
 									"data-prohibitions": "[]",
 									children: "Status"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableHead, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:106:15",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:103:15",
 									"data-prohibitions": "[]",
 									className: "text-right",
 									children: "Ações"
@@ -29727,86 +30477,86 @@ function ThirdPartyManagement() {
 							]
 						})
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableBody, {
-						"data-uid": "src/pages/ThirdPartyManagement.tsx:109:11",
+						"data-uid": "src/pages/ThirdPartyManagement.tsx:106:11",
 						"data-prohibitions": "[editContent]",
 						children: [filteredData.map((tp) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableRow, {
-							"data-uid": "src/pages/ThirdPartyManagement.tsx:111:15",
+							"data-uid": "src/pages/ThirdPartyManagement.tsx:108:15",
 							"data-prohibitions": "[editContent]",
 							className: "hover:bg-muted/30 transition-colors",
 							children: [
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:112:17",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:109:17",
 									"data-prohibitions": "[editContent]",
 									className: "font-medium text-foreground",
 									children: tp.name
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:113:17",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:110:17",
 									"data-prohibitions": "[editContent]",
 									className: "text-muted-foreground",
 									children: tp.cnpj
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:114:17",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:111:17",
 									"data-prohibitions": "[editContent]",
 									children: tp.services
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:115:17",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:112:17",
 									"data-prohibitions": "[editContent]",
 									children: new Date(tp.contractEnd).toLocaleDateString("pt-BR")
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:116:17",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:113:17",
 									"data-prohibitions": "[editContent]",
 									children: getStatusBadge(tp.status)
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ThirdPartyManagement.tsx:117:17",
+									"data-uid": "src/pages/ThirdPartyManagement.tsx:114:17",
 									"data-prohibitions": "[]",
 									className: "text-right",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownMenu, {
-										"data-uid": "src/pages/ThirdPartyManagement.tsx:118:19",
+										"data-uid": "src/pages/ThirdPartyManagement.tsx:115:19",
 										"data-prohibitions": "[]",
 										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuTrigger, {
-											"data-uid": "src/pages/ThirdPartyManagement.tsx:119:21",
+											"data-uid": "src/pages/ThirdPartyManagement.tsx:116:21",
 											"data-prohibitions": "[]",
 											asChild: true,
 											children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
-												"data-uid": "src/pages/ThirdPartyManagement.tsx:120:23",
+												"data-uid": "src/pages/ThirdPartyManagement.tsx:117:23",
 												"data-prohibitions": "[]",
 												variant: "ghost",
 												className: "h-8 w-8 p-0",
 												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-													"data-uid": "src/pages/ThirdPartyManagement.tsx:121:25",
+													"data-uid": "src/pages/ThirdPartyManagement.tsx:118:25",
 													"data-prohibitions": "[]",
 													className: "sr-only",
 													children: "Abrir menu"
 												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EllipsisVertical, {
-													"data-uid": "src/pages/ThirdPartyManagement.tsx:122:25",
+													"data-uid": "src/pages/ThirdPartyManagement.tsx:119:25",
 													"data-prohibitions": "[editContent]",
 													className: "h-4 w-4"
 												})]
 											})
 										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownMenuContent, {
-											"data-uid": "src/pages/ThirdPartyManagement.tsx:125:21",
+											"data-uid": "src/pages/ThirdPartyManagement.tsx:122:21",
 											"data-prohibitions": "[]",
 											align: "end",
 											children: [
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ThirdPartyManagement.tsx:126:23",
+													"data-uid": "src/pages/ThirdPartyManagement.tsx:123:23",
 													"data-prohibitions": "[]",
 													onClick: () => handleAction("Visualizar Documentos"),
 													children: "Visualizar Documentos"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ThirdPartyManagement.tsx:129:23",
+													"data-uid": "src/pages/ThirdPartyManagement.tsx:126:23",
 													"data-prohibitions": "[]",
 													onClick: () => handleAction("Editar Contrato"),
 													children: "Editar Contrato"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ThirdPartyManagement.tsx:132:23",
+													"data-uid": "src/pages/ThirdPartyManagement.tsx:129:23",
 													"data-prohibitions": "[]",
 													onClick: () => handleAction("Alterar Status"),
 													children: "Alterar Status"
@@ -29817,10 +30567,10 @@ function ThirdPartyManagement() {
 								})
 							]
 						}, tp.id)), filteredData.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableRow, {
-							"data-uid": "src/pages/ThirdPartyManagement.tsx:141:15",
+							"data-uid": "src/pages/ThirdPartyManagement.tsx:138:15",
 							"data-prohibitions": "[]",
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-								"data-uid": "src/pages/ThirdPartyManagement.tsx:142:17",
+								"data-uid": "src/pages/ThirdPartyManagement.tsx:139:17",
 								"data-prohibitions": "[]",
 								colSpan: 6,
 								className: "h-32 text-center text-muted-foreground",
@@ -29831,7 +30581,7 @@ function ThirdPartyManagement() {
 				})
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AddThirdPartyDialog, {
-				"data-uid": "src/pages/ThirdPartyManagement.tsx:151:7",
+				"data-uid": "src/pages/ThirdPartyManagement.tsx:148:7",
 				"data-prohibitions": "[editContent]",
 				open: isDialogOpen,
 				onOpenChange: setIsDialogOpen
@@ -29933,7 +30683,7 @@ var Separator = import_react.forwardRef(({ className, orientation = "horizontal"
 Separator.displayName = Root.displayName;
 //#endregion
 //#region src/components/ui/sheet.tsx
-var Sheet = Root$3;
+var Sheet = Root$4;
 var SheetPortal = Portal$1;
 var SheetOverlay = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Overlay, {
 	"data-uid": "src/components/ui/sheet.tsx:21:3",
@@ -30494,7 +31244,7 @@ function AppSidebar() {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Sidebar, {
 		"data-uid": "src/components/AppSidebar.tsx:19:5",
 		"data-prohibitions": "[editContent]",
-		className: "border-none bg-[#0F4C81] text-white",
+		className: "border-none bg-brand-blue text-white",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SidebarHeader, {
 			"data-uid": "src/components/AppSidebar.tsx:20:7",
 			"data-prohibitions": "[]",
@@ -30510,7 +31260,7 @@ function AppSidebar() {
 					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Triangle, {
 						"data-uid": "src/components/AppSidebar.tsx:23:13",
 						"data-prohibitions": "[editContent]",
-						className: "h-6 w-6 text-[#2B95D6] fill-current -rotate-90"
+						className: "h-6 w-6 text-brand-cyan fill-current -rotate-90"
 					})
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					"data-uid": "src/components/AppSidebar.tsx:25:11",
@@ -30546,7 +31296,7 @@ function AppSidebar() {
 							"data-prohibitions": "[editContent]",
 							asChild: true,
 							isActive,
-							className: cn$1("w-full mb-1 transition-all duration-200 py-5", isActive ? "bg-[#2B95D6] text-white hover:bg-[#2B95D6]/90 hover:text-white shadow-sm" : "text-white/70 hover:bg-white/10 hover:text-white"),
+							className: cn$1("w-full mb-1 transition-all duration-200 py-5", isActive ? "bg-brand-cyan text-white hover:bg-brand-cyan/90 hover:text-white shadow-sm" : "text-white/70 hover:bg-white/10 hover:text-white"),
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
 								"data-uid": "src/components/AppSidebar.tsx:49:19",
 								"data-prohibitions": "[editContent]",
@@ -30585,7 +31335,7 @@ function AppHeader() {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
 		"data-uid": "src/components/AppHeader.tsx:23:5",
 		"data-prohibitions": "[editContent]",
-		className: "sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b bg-[#0F4C81] px-4 sm:px-6 shadow-sm text-white",
+		className: "sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-brand-light bg-brand-blue px-4 sm:px-6 shadow-sm text-white",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			"data-uid": "src/components/AppHeader.tsx:24:7",
 			"data-prohibitions": "[editContent]",
@@ -30618,7 +31368,7 @@ function AppHeader() {
 						"data-prohibitions": "[editContent]",
 						type: "search",
 						placeholder: "Buscar no sistema...",
-						className: "w-full bg-white/10 border-none text-white placeholder:text-white/50 pl-9 focus-visible:ring-1 focus-visible:ring-[#2B95D6] focus-visible:bg-white/20 transition-all rounded-full h-9"
+						className: "w-full bg-white/10 border-none text-white placeholder:text-white/50 pl-9 focus-visible:ring-1 focus-visible:ring-brand-cyan focus-visible:bg-white/20 transition-all rounded-full h-9"
 					})]
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
@@ -30626,7 +31376,7 @@ function AppHeader() {
 					"data-prohibitions": "[]",
 					variant: "ghost",
 					size: "icon",
-					className: "text-white hover:bg-white/20 rounded-full h-9 w-9",
+					className: "text-white hover:bg-white/20 rounded-full h-9 w-9 relative",
 					children: [
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Bell, {
 							"data-uid": "src/components/AppHeader.tsx:43:11",
@@ -30642,7 +31392,7 @@ function AppHeader() {
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 							"data-uid": "src/components/AppHeader.tsx:45:11",
 							"data-prohibitions": "[]",
-							className: "absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-[#0F4C81]"
+							className: "absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-brand-blue"
 						})
 					]
 				}),
@@ -30716,11 +31466,11 @@ function Layout() {
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("footer", {
 						"data-uid": "src/components/Layout.tsx:16:11",
 						"data-prohibitions": "[]",
-						className: "absolute bottom-0 left-0 right-0 h-12 flex items-center justify-center border-t bg-white/50 backdrop-blur-sm z-10",
+						className: "absolute bottom-0 left-0 right-0 h-12 flex items-center justify-center border-t border-brand-light bg-white/80 backdrop-blur-sm z-10",
 						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 							"data-uid": "src/components/Layout.tsx:17:13",
 							"data-prohibitions": "[]",
-							className: "text-xs text-muted-foreground",
+							className: "text-xs text-brand-graphite/70 font-medium",
 							children: "Módulo do Sistema Áurea – Desenvolvido por Tiago Tamborini"
 						})
 					})
@@ -30816,4 +31566,4 @@ var App = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppProvider, {
 }));
 //#endregion
 
-//# sourceMappingURL=index-ChMzL_jE.js.map
+//# sourceMappingURL=index-Dq9mto0Z.js.map

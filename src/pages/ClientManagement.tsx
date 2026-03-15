@@ -28,22 +28,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useAppStore } from '@/store/AppContext'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useAppStore, Client } from '@/store/AppContext'
 import { AddClientDialog } from '@/components/AddClientDialog'
+import { EditClientDialog } from '@/components/EditClientDialog'
+import { ManageModulesDialog } from '@/components/ManageModulesDialog'
 import { useToast } from '@/hooks/use-toast'
 
 export default function ClientManagement() {
   const { clients, deleteClient } = useAppStore()
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
+  const [managingModulesClient, setManagingModulesClient] = useState<Client | null>(null)
   const [clientToDelete, setClientToDelete] = useState<string | null>(null)
   const { toast } = useToast()
-
-  const handleAction = (action: string, clientName: string) => {
-    toast({
-      title: `Ação: ${action}`,
-      description: `Aplicado em: ${clientName}`,
-    })
-  }
 
   const handleDelete = () => {
     if (clientToDelete) {
@@ -60,24 +58,21 @@ export default function ClientManagement() {
     <div className="max-w-7xl mx-auto space-y-6 pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#0F4C81]">Gestão de Clientes</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-brand-blue">Gestão de Clientes</h2>
           <p className="text-muted-foreground mt-1">
             Gerencie as empresas locatárias e seus módulos.
           </p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          className="bg-[#2B95D6] hover:bg-[#2B95D6]/90 text-white shadow-sm hover:scale-[1.02] transition-transform"
-        >
+        <Button onClick={() => setIsAddOpen(true)} className="shadow-sm transition-transform">
           <Plus className="mr-2 h-4 w-4" /> Cadastrar Empresa
         </Button>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden animate-slide-up">
+      <div className="rounded-xl border border-brand-light bg-white shadow-sm overflow-hidden animate-slide-up">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="w-[250px]">Empresa</TableHead>
+              <TableHead className="w-[300px]">Empresa</TableHead>
               <TableHead>URL de Acesso</TableHead>
               <TableHead>Administrador</TableHead>
               <TableHead>Módulos Ativos</TableHead>
@@ -88,8 +83,18 @@ export default function ClientManagement() {
           <TableBody>
             {clients.map((client) => (
               <TableRow key={client.id} className="hover:bg-muted/30 transition-colors">
-                <TableCell className="font-medium text-foreground">{client.name}</TableCell>
-                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate">
+                <TableCell className="font-medium text-foreground">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8 border border-brand-light">
+                      <AvatarImage src={client.logo} alt={client.name} />
+                      <AvatarFallback className="bg-brand-blue/10 text-brand-blue text-xs font-semibold">
+                        {client.name.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {client.name}
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-12">
                   <span className="truncate">{client.url}</span>
                   <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </TableCell>
@@ -100,7 +105,7 @@ export default function ClientManagement() {
                       <Badge
                         key={mod}
                         variant="secondary"
-                        className="bg-blue-50 text-[#0F4C81] hover:bg-blue-100 text-[10px]"
+                        className="bg-brand-blue/5 text-brand-blue hover:bg-brand-blue/10 text-[10px]"
                       >
                         {mod}
                       </Badge>
@@ -129,12 +134,10 @@ export default function ClientManagement() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[160px]">
                       <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleAction('Editar Perfil', client.name)}>
+                      <DropdownMenuItem onClick={() => setEditingClient(client)}>
                         Editar Perfil
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleAction('Gerenciar Módulos', client.name)}
-                      >
+                      <DropdownMenuItem onClick={() => setManagingModulesClient(client)}>
                         Gerenciar Módulos
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -160,7 +163,19 @@ export default function ClientManagement() {
         </Table>
       </div>
 
-      <AddClientDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <AddClientDialog open={isAddOpen} onOpenChange={setIsAddOpen} />
+
+      <EditClientDialog
+        client={editingClient}
+        open={!!editingClient}
+        onOpenChange={(open) => !open && setEditingClient(null)}
+      />
+
+      <ManageModulesDialog
+        client={managingModulesClient}
+        open={!!managingModulesClient}
+        onOpenChange={(open) => !open && setManagingModulesClient(null)}
+      />
 
       <AlertDialog
         open={!!clientToDelete}
