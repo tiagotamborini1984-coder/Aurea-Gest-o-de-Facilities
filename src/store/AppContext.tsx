@@ -29,6 +29,9 @@ interface AppContextType {
   deleteClient: (id: string) => void
   thirdParties: ThirdParty[]
   addThirdParty: (tp: Omit<ThirdParty, 'id'>) => void
+  isAuthenticated: boolean
+  login: (u: string, p: string) => Promise<boolean>
+  logout: () => void
 }
 
 const baseUrl = window.location.origin
@@ -58,18 +61,6 @@ const defaultClients: Client[] = [
     status: 'Ativo',
     modules: ['Gestão de Terceiros'],
   },
-  {
-    id: '3',
-    name: 'InnovateX LTDA',
-    slug: 'innovatex',
-    url: `${baseUrl}/innovatex`,
-    adminName: 'Roberto Alves',
-    logo: 'https://img.usecurling.com/i?q=innovation&color=gray',
-    primaryColor: '#475569',
-    secondaryColor: '#94a3b8',
-    status: 'Inativo',
-    modules: ['Limpeza', 'Manutenção'],
-  },
 ]
 
 const defaultThirdParties: ThirdParty[] = [
@@ -81,30 +72,6 @@ const defaultThirdParties: ThirdParty[] = [
     contractEnd: '2027-12-31',
     services: 'Limpeza Predial',
   },
-  {
-    id: '2',
-    name: 'SecurGuard Vigilância',
-    cnpj: '98.765.432/0001-10',
-    status: 'Pendente',
-    contractEnd: '2026-06-30',
-    services: 'Segurança Patrimonial',
-  },
-  {
-    id: '3',
-    name: 'FixIt Manutenção',
-    cnpj: '45.678.901/0001-23',
-    status: 'Regularizado',
-    contractEnd: '2028-01-15',
-    services: 'Manutenção Elétrica',
-  },
-  {
-    id: '4',
-    name: 'GreenSpace Paisagismo',
-    cnpj: '11.222.333/0001-44',
-    status: 'Inativo',
-    contractEnd: '2024-05-20',
-    services: 'Jardinagem',
-  },
 ]
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -112,6 +79,9 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [clients, setClients] = useState<Client[]>(defaultClients)
   const [thirdParties, setThirdParties] = useState<ThirdParty[]>(defaultThirdParties)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('auth') === 'true'
+  })
 
   const addClient = (client: Omit<Client, 'id'>) => {
     setClients((prev) => [{ ...client, id: Math.random().toString(36).substr(2, 9) }, ...prev])
@@ -129,9 +99,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setThirdParties((prev) => [{ ...tp, id: Math.random().toString(36).substr(2, 9) }, ...prev])
   }
 
+  const login = async (u: string, p: string) => {
+    return new Promise<boolean>((resolve) => {
+      setTimeout(() => {
+        if (u && p.length >= 4) {
+          setIsAuthenticated(true)
+          localStorage.setItem('auth', 'true')
+          resolve(true)
+        } else {
+          resolve(false)
+        }
+      }, 800)
+    })
+  }
+
+  const logout = () => {
+    setIsAuthenticated(false)
+    localStorage.removeItem('auth')
+  }
+
   return (
     <AppContext.Provider
-      value={{ clients, addClient, updateClient, deleteClient, thirdParties, addThirdParty }}
+      value={{
+        clients,
+        addClient,
+        updateClient,
+        deleteClient,
+        thirdParties,
+        addThirdParty,
+        isAuthenticated,
+        login,
+        logout,
+      }}
     >
       {children}
     </AppContext.Provider>

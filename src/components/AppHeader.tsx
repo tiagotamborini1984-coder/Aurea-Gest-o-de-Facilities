@@ -1,12 +1,23 @@
-import { Bell, Search, UserCircle } from 'lucide-react'
+import { Bell, Search, UserCircle, LogOut, Settings } from 'lucide-react'
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useLocation } from 'react-router-dom'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAppStore } from '@/store/AppContext'
 
 export function AppHeader() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { isMobile } = useSidebar()
+  const { logout } = useAppStore()
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -17,6 +28,11 @@ export function AppHeader() {
       default:
         return 'Áurea Facility Management'
     }
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
   }
 
   return (
@@ -44,18 +60,44 @@ export function AppHeader() {
           <span className="sr-only">Notificações</span>
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-brand-blue"></span>
         </Button>
+
         <div className="flex items-center gap-2 pl-2 border-l border-white/20">
           <div className="hidden sm:flex flex-col text-right">
             <span className="text-sm font-medium leading-none">Master User</span>
             <span className="text-xs text-white/70">Admin Global</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full h-9 w-9 text-white hover:bg-white/20"
-          >
-            <UserCircle className="h-6 w-6" />
-          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full h-9 w-9 text-white hover:bg-white/20"
+              >
+                <UserCircle className="h-6 w-6" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 mt-2">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">Master User</p>
+                  <p className="text-xs leading-none text-muted-foreground">admin@aurea.com</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Configurações da Conta</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sair do Sistema</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
