@@ -35,6 +35,8 @@ export default function Lancamentos() {
   const [presences, setPresences] = useState<Record<string, boolean>>({})
   const [goalValues, setGoalValues] = useState<Record<string, number>>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const [equipmentFilter, setEquipmentFilter] = useState('all')
+  const [goalFilter, setGoalFilter] = useState('all')
   const [isSaving, setIsSaving] = useState(false)
 
   const { toast } = useToast()
@@ -144,8 +146,12 @@ export default function Lancamentos() {
   }
 
   // Data processing for rendering
-  const { filteredData, groupedData, summary } = useMemo(() => {
+  const { filteredData, groupedData, summary, equipmentTypes } = useMemo(() => {
     const searchLower = searchTerm.toLowerCase()
+
+    // Dynamic equipment types based on current plant
+    const currentPlantEq = equipment.filter((e) => e.plant_id === plantId)
+    const eqTypes = Array.from(new Set(currentPlantEq.map((e) => e.type).filter(Boolean)))
 
     if (activeTab === 'staff') {
       const filtered = employees.filter(
@@ -165,6 +171,7 @@ export default function Lancamentos() {
       return {
         filteredData: filtered,
         groupedData: grouped,
+        equipmentTypes: eqTypes,
         summary: {
           total: filtered.length,
           present: presentCount,
@@ -173,9 +180,12 @@ export default function Lancamentos() {
         },
       }
     } else if (activeTab === 'equipment') {
-      const filtered = equipment.filter(
-        (e) => e.plant_id === plantId && e.name.toLowerCase().includes(searchLower),
-      )
+      let filtered = currentPlantEq.filter((e) => e.name.toLowerCase().includes(searchLower))
+
+      if (equipmentFilter !== 'all') {
+        filtered = filtered.filter((e) => e.type === equipmentFilter)
+      }
+
       const grouped = filtered.reduce(
         (acc, eq) => {
           const groupName = eq.name || 'Outros'
@@ -190,6 +200,7 @@ export default function Lancamentos() {
       return {
         filteredData: filtered,
         groupedData: grouped,
+        equipmentTypes: eqTypes,
         summary: {
           total: filtered.length,
           present: availableCount,
@@ -198,16 +209,31 @@ export default function Lancamentos() {
         },
       }
     } else {
-      const filtered = goals.filter(
-        (g) => g.is_active && g.name.toLowerCase().includes(searchLower),
-      )
+      let filtered = goals.filter((g) => g.is_active && g.name.toLowerCase().includes(searchLower))
+
+      if (goalFilter !== 'all') {
+        filtered = filtered.filter((g) => g.id === goalFilter)
+      }
+
       return {
         filteredData: filtered,
         groupedData: { Metas: filtered },
+        equipmentTypes: eqTypes,
         summary: null,
       }
     }
-  }, [activeTab, employees, equipment, goals, functions, plantId, searchTerm, presences])
+  }, [
+    activeTab,
+    employees,
+    equipment,
+    goals,
+    functions,
+    plantId,
+    searchTerm,
+    presences,
+    equipmentFilter,
+    goalFilter,
+  ])
 
   const CustomCheckbox = ({
     checked,
@@ -242,9 +268,9 @@ export default function Lancamentos() {
 
       {/* Top Filters */}
       <Card className="shadow-sm border-slate-200">
-        <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-6">
+        <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 sm:gap-6 flex-wrap">
           {activeTab !== 'metas' ? (
-            <div className="space-y-1.5 flex-1 max-w-[400px]">
+            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px]">
               <label className="text-xs font-medium text-slate-500">Data</label>
               <div className="relative">
                 <Input
@@ -257,7 +283,7 @@ export default function Lancamentos() {
               </div>
             </div>
           ) : (
-            <div className="space-y-1.5 flex-1 max-w-[400px]">
+            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px]">
               <label className="text-xs font-medium text-slate-500">Mês de Referência</label>
               <div className="relative">
                 <Input
@@ -271,7 +297,7 @@ export default function Lancamentos() {
             </div>
           )}
 
-          <div className="space-y-1.5 flex-1 max-w-[400px]">
+          <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px]">
             <label className="text-xs font-medium text-slate-500">Planta</label>
             <Select value={plantId} onValueChange={setPlantId}>
               <SelectTrigger className="h-11 bg-white">
@@ -286,13 +312,57 @@ export default function Lancamentos() {
               </SelectContent>
             </Select>
           </div>
+
+          {activeTab === 'equipment' && (
+            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
+              <label className="text-xs font-medium text-slate-500">Tipo de Equipamento</label>
+              <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
+                <SelectTrigger className="h-11 bg-white">
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  {equipmentTypes.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {activeTab === 'metas' && (
+            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
+              <label className="text-xs font-medium text-slate-500">Filtrar Meta</label>
+              <Select value={goalFilter} onValueChange={setGoalFilter}>
+                <SelectTrigger className="h-11 bg-white">
+                  <SelectValue placeholder="Todas as metas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as metas</SelectItem>
+                  {goals
+                    .filter((g) => g.is_active)
+                    .map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Tabs */}
       <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 custom-scrollbar">
         <button
-          onClick={() => setActiveTab('staff')}
+          onClick={() => {
+            setActiveTab('staff')
+            setEquipmentFilter('all')
+            setGoalFilter('all')
+          }}
           className={cn(
             'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
             activeTab === 'staff'
@@ -304,7 +374,10 @@ export default function Lancamentos() {
           <Users className="h-4 w-4" /> Colaboradores
         </button>
         <button
-          onClick={() => setActiveTab('equipment')}
+          onClick={() => {
+            setActiveTab('equipment')
+            setGoalFilter('all')
+          }}
           className={cn(
             'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
             activeTab === 'equipment'
@@ -316,7 +389,10 @@ export default function Lancamentos() {
           <Wrench className="h-4 w-4" /> Equipamentos
         </button>
         <button
-          onClick={() => setActiveTab('metas')}
+          onClick={() => {
+            setActiveTab('metas')
+            setEquipmentFilter('all')
+          }}
           className={cn(
             'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
             activeTab === 'metas'
@@ -358,7 +434,7 @@ export default function Lancamentos() {
               onClick={handleSave}
               disabled={isSaving}
               className="w-full sm:w-auto shadow-md"
-              style={{ backgroundColor: '#65a34e' }} // Match green save button in mock
+              style={{ backgroundColor: themeColor }}
             >
               <Save className="mr-2 h-4 w-4" />
               {isSaving ? 'Salvando...' : 'Salvar Lançamento'}
@@ -391,9 +467,12 @@ export default function Lancamentos() {
                   filteredData.map((goal: any) => (
                     <div
                       key={goal.id}
-                      className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex items-center p-4 pl-0"
+                      className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex items-center p-4 pl-0 transition-all hover:border-slate-300"
                     >
-                      <div className="w-1.5 self-stretch bg-[#65a34e] mr-4 rounded-r-full" />
+                      <div
+                        className="w-1.5 self-stretch mr-4 rounded-r-full"
+                        style={{ backgroundColor: themeColor }}
+                      />
                       <div className="flex-1 pr-4">
                         <h4 className="text-base font-semibold text-slate-800">{goal.name}</h4>
                         {goal.description && (
@@ -405,7 +484,7 @@ export default function Lancamentos() {
                           type="number"
                           min="0"
                           max="100"
-                          className="w-20 text-center font-medium"
+                          className="w-20 text-center font-medium shadow-sm focus-visible:ring-1"
                           value={goalValues[goal.id] === undefined ? '' : goalValues[goal.id]}
                           onChange={(e) =>
                             setGoalValues((prev) => ({

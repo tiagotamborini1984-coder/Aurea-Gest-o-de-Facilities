@@ -1,325 +1,157 @@
-import { useParams, Navigate } from 'react-router-dom'
-import { CrudGeneric, FieldDef } from '@/components/gestao-terceiros/CrudGeneric'
+import { useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Edit2, Trash2, Wrench, Users, Plus } from 'lucide-react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'
-import { useAuth } from '@/hooks/use-auth'
-import { supabase } from '@/lib/supabase/client'
-import { logAudit } from '@/services/audit'
-import {
-  Loader2,
-  Building2,
-  MapPin,
-  Briefcase,
-  Users,
-  Wrench,
-  FileText,
-  Target,
-} from 'lucide-react'
 
 export default function Cadastros() {
   const { type } = useParams()
-  const { profile } = useAppStore()
-  const { user } = useAuth()
-  const { plants, locations, functions, equipment, loading, refetch } = useMasterData()
+  const { contracted, plants, equipment, functions, locations } = useMasterData()
+  const { activeClient } = useAppStore()
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-[calc(100vh-200px)]">
-        <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
-      </div>
-    )
-  }
-  if (!profile) return null
+  const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  const [selectedType, setSelectedType] = useState<string>('all')
 
-  const getCrudConfig = () => {
-    switch (type) {
-      case 'plantas':
-        return {
-          title: 'Plantas',
-          subtitle: 'Cadastro e gestão das plantas de operação',
-          tableName: 'plants',
-          icon: Building2,
-          plantField: 'id',
-          searchFields: ['name', 'code', 'city'],
-          fields: [
-            { name: 'name', label: 'Nome da Planta', type: 'text', required: true },
-            { name: 'code', label: 'Código', type: 'text', required: true },
-            { name: 'city', label: 'Cidade', type: 'text', required: true },
-          ] as FieldDef[],
-        }
-      case 'locais':
-        return {
-          title: 'Locais',
-          subtitle: 'Cadastro e gestão de locais por planta',
-          tableName: 'locations',
-          icon: MapPin,
-          plantField: 'plant_id',
-          searchFields: ['name', 'description'],
-          groupBy: (item: any) => plants.find((p) => p.id === item.plant_id)?.name || 'Sem Planta',
-          fields: [
-            { name: 'name', label: 'Nome do Local', type: 'text', required: true },
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              options: plants.map((p) => ({ value: p.id, label: p.name })),
-              required: true,
-            },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
-          ] as FieldDef[],
-        }
-      case 'funcoes':
-        return {
-          title: 'Funções',
-          subtitle: 'Cadastro e gestão de funções',
-          tableName: 'functions',
-          icon: Briefcase,
-          plantField: '',
-          searchFields: ['name', 'description'],
-          fields: [
-            { name: 'name', label: 'Nome da Função', type: 'text', required: true },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
-          ] as FieldDef[],
-        }
-      case 'colaboradores':
-        return {
-          title: 'Colaboradores',
-          subtitle: 'Cadastro e gestão de colaboradores e empresas terceiras',
-          tableName: 'employees',
-          icon: Users,
-          plantField: 'plant_id',
-          searchFields: ['name', 'company_name'],
-          groupBy: (item: any) =>
-            functions.find((f) => f.id === item.function_id)?.name || 'Sem Função',
-          fields: [
-            { name: 'name', label: 'Nome', type: 'text', required: true },
-            { name: 'company_name', label: 'Empresa Terceira', type: 'text', required: true },
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              options: plants.map((p) => ({ value: p.id, label: p.name })),
-              required: true,
-            },
-            {
-              name: 'location_id',
-              label: 'Local',
-              type: 'select',
-              options: locations.map((l) => ({
-                value: l.id,
-                label: `${l.name} (${plants.find((p) => p.id === l.plant_id)?.name})`,
-              })),
-              required: false,
-            },
-            {
-              name: 'function_id',
-              label: 'Função',
-              type: 'select',
-              options: functions.map((f) => ({ value: f.id, label: f.name })),
-              required: false,
-            },
-          ] as FieldDef[],
-        }
-      case 'equipamentos':
-        return {
-          title: 'Equipamentos',
-          subtitle: 'Cadastro e gestão de equipamentos por planta',
-          tableName: 'equipment',
-          icon: Wrench,
-          plantField: 'plant_id',
-          searchFields: ['name', 'type'],
-          groupBy: (item: any) => item.type || 'Sem Categoria',
-          fields: [
-            { name: 'name', label: 'Equipamento', type: 'text', required: true },
-            { name: 'type', label: 'Tipo/Categoria', type: 'text', required: true },
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              options: plants.map((p) => ({ value: p.id, label: p.name })),
-              required: true,
-            },
-            { name: 'quantity', label: 'Quantidade', type: 'number', required: true },
-          ] as FieldDef[],
-        }
-      case 'quadro-contratado':
-        return {
-          title: 'Quadro Contratado',
-          subtitle: 'Gestão de previsão de quadro e equipamentos',
-          tableName: 'contracted_headcount',
-          icon: FileText,
-          plantField: 'plant_id',
-          searchFields: ['type', 'quantity'],
-          groupBy: (item: any) => (item.type === 'colaborador' ? 'Colaboradores' : 'Equipamentos'),
-          fields: [
-            {
-              name: 'type',
-              label: 'Tipo',
-              type: 'select',
-              options: [
-                { value: 'colaborador', label: 'Colaborador' },
-                { value: 'equipamento', label: 'Equipamento' },
-              ],
-              required: true,
-            },
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              options: plants.map((p) => ({ value: p.id, label: p.name })),
-              required: true,
-            },
-            {
-              name: 'location_id',
-              label: 'Local (Se Colaborador)',
-              type: 'select',
-              options: locations.map((l) => ({
-                value: l.id,
-                label: `${l.name} (${plants.find((p) => p.id === l.plant_id)?.name})`,
-              })),
-              required: false,
-            },
-            {
-              name: 'function_id',
-              label: 'Função (Se Colaborador)',
-              type: 'select',
-              options: functions.map((f) => ({ value: f.id, label: f.name })),
-              required: false,
-            },
-            {
-              name: 'equipment_id',
-              label: 'Equipamento (Se Equipamento)',
-              type: 'select',
-              options: equipment.map((e) => ({
-                value: e.id,
-                label: `${e.name} (${plants.find((p) => p.id === e.plant_id)?.name})`,
-              })),
-              required: false,
-            },
-            { name: 'quantity', label: 'Quantidade Prevista', type: 'number', required: true },
-          ] as FieldDef[],
-        }
-      case 'book-metas':
-        return {
-          title: 'Book de Metas',
-          subtitle: 'Cadastro de metas e indicadores',
-          tableName: 'goals_book',
-          icon: Target,
-          plantField: '',
-          searchFields: ['name', 'description'],
-          fields: [
-            { name: 'name', label: 'Nome da Meta', type: 'text', required: true },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
-            { name: 'is_active', label: 'Ativo?', type: 'toggle', required: false },
-          ] as FieldDef[],
-        }
-      default:
-        return null
-    }
-  }
+  const brandPrimary = activeClient?.primaryColor || 'hsl(var(--primary))'
 
-  const config = getCrudConfig()
-  if (!config) return <Navigate to="/gestao-terceiros" replace />
-
-  const fetchQuery = async () => {
-    let q = supabase.from(config.tableName).select('*')
-    if (config.tableName !== 'locations') {
-      q = q.eq('client_id', profile.client_id)
-    } else {
-      if (plants.length > 0) {
-        q = q.in(
-          'plant_id',
-          plants.map((p) => p.id),
-        )
-      } else {
-        return []
-      }
-    }
-    const { data } = await q.order('created_at', { ascending: false })
-    return data || []
-  }
-
-  const cleanPayloadRelations = (payload: any) => {
-    const relationKeys = ['location_id', 'function_id', 'equipment_id', 'plant_id']
-    relationKeys.forEach((k) => {
-      if (payload[k] === '' || payload[k] === 'none') payload[k] = null
-    })
-
-    if (config.tableName === 'contracted_headcount') {
-      if (!payload.function_id) payload.function_id = null
-      if (!payload.location_id) payload.location_id = null
-      if (!payload.equipment_id) payload.equipment_id = null
-    }
-  }
-
-  const handleAdd = async (data: any) => {
-    const payload = { ...data }
-    if (config.tableName !== 'locations') payload.client_id = profile.client_id
-    cleanPayloadRelations(payload)
-
-    const { error } = await supabase.from(config.tableName).insert([payload])
-    if (!error) {
-      refetch()
-      if (user)
-        logAudit(
-          profile.client_id as string,
-          user.id,
-          `Cadastro de ${config.title}`,
-          JSON.stringify(payload),
-        )
-    } else {
-      console.error('Insert error:', error)
-    }
-    return !error
-  }
-
-  const handleUpdate = async (id: string, data: any) => {
-    const payload = { ...data }
-    delete payload.id
-    delete payload.created_at
-    delete payload.client_id
-    cleanPayloadRelations(payload)
-
-    const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
-    if (!error) {
-      refetch()
-      if (user)
-        logAudit(
-          profile.client_id as string,
-          user.id,
-          `Edição de ${config.title}`,
-          JSON.stringify(payload),
-        )
-    } else {
-      console.error('Update error:', error)
-    }
-    return !error
-  }
-
-  const handleRemove = (id: string) => {
-    if (user && profile.client_id)
-      logAudit(profile.client_id, user.id, `Exclusão em ${config.title}`, `Registro ID: ${id}`)
-    refetch()
-  }
+  const filteredData = contracted.filter((c) => {
+    if (selectedPlant !== 'all' && c.plant_id !== selectedPlant) return false
+    if (selectedType !== 'all' && c.type !== selectedType) return false
+    return true
+  })
 
   return (
-    <div className="max-w-6xl mx-auto pb-12 pt-6 px-4 sm:px-6 lg:px-8">
-      <CrudGeneric
-        key={type}
-        title={config.title}
-        subtitle={config.subtitle}
-        tableName={config.tableName}
-        icon={config.icon}
-        fields={config.fields}
-        plantField={config.plantField}
-        searchFields={config.searchFields}
-        groupBy={config.groupBy}
-        plants={plants}
-        fetchQuery={fetchQuery}
-        onAdd={handleAdd}
-        onUpdate={handleUpdate}
-        onRemove={handleRemove}
-      />
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-800">Quadro Contratado</h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Quantidade contratada por função/equipamento, local e planta
+          </p>
+        </div>
+        <Button
+          className="shadow-sm gap-2"
+          style={{ backgroundColor: brandPrimary, color: '#fff' }}
+        >
+          <Plus className="h-4 w-4" /> Novo Registro
+        </Button>
+      </div>
+
+      <div className="flex gap-4 mb-6">
+        <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+          <SelectTrigger className="w-[220px] bg-white border-slate-200">
+            <SelectValue placeholder="Todas as plantas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as plantas</SelectItem>
+            {plants.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedType} onValueChange={setSelectedType}>
+          <SelectTrigger className="w-[200px] bg-white border-slate-200">
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="colaborador">Colaborador</SelectItem>
+            <SelectItem value="equipamento">Equipamento</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card className="border-slate-200 shadow-sm overflow-hidden bg-white">
+        <Table>
+          <TableHeader className="bg-slate-50/80 border-b border-slate-200">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
+              <TableHead className="font-semibold text-slate-600">Planta</TableHead>
+              <TableHead className="font-semibold text-slate-600">Local / Equipamento</TableHead>
+              <TableHead className="font-semibold text-slate-600">Função / Tipo Equip.</TableHead>
+              <TableHead className="font-semibold text-center text-slate-600">
+                Qtd. Contratada
+              </TableHead>
+              <TableHead className="font-semibold text-right pr-6 text-slate-600">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredData.map((c) => {
+              const plantName = plants.find((p) => p.id === c.plant_id)?.name
+              const locName = locations.find((l) => l.id === c.location_id)?.name
+              const eqName = equipment.find((e) => e.id === c.equipment_id)?.name
+              const funcName = functions.find((f) => f.id === c.function_id)?.name
+              const eqType = equipment.find((e) => e.id === c.equipment_id)?.type
+
+              const isEq = c.type === 'equipamento'
+
+              return (
+                <TableRow key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="py-3">
+                    <Badge
+                      variant="outline"
+                      className={`gap-1.5 font-bold border-0 px-2.5 py-1 ${isEq ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}
+                    >
+                      {isEq ? <Wrench className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                      <span className="capitalize">{c.type}</span>
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-semibold text-slate-700">{plantName}</TableCell>
+                  <TableCell className="text-slate-600 uppercase text-xs font-semibold">
+                    {isEq ? eqName : locName}
+                  </TableCell>
+                  <TableCell className="text-slate-600 uppercase text-xs font-semibold">
+                    {isEq ? eqType : funcName}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="inline-flex items-center justify-center min-w-[32px] h-8 rounded-full bg-amber-100 text-amber-800 font-bold text-sm px-2.5 shadow-sm">
+                      {c.quantity}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right pr-6">
+                    <div className="flex items-center justify-end gap-3">
+                      <button className="text-slate-400 hover:text-slate-700 transition-colors p-1">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button className="text-slate-400 hover:text-red-600 transition-colors p-1">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+            {filteredData.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center text-slate-500">
+                  Nenhum registro encontrado.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   )
 }

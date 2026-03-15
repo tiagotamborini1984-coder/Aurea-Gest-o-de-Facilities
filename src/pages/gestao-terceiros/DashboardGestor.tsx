@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
+import { Badge } from '@/components/ui/badge'
 import {
   Users,
   Wrench,
@@ -11,12 +13,13 @@ import {
   MapPin,
   XCircle,
   TrendingDown,
+  ChevronRight,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
-import { format, subDays } from 'date-fns'
+import { format, subDays, eachDayOfInterval } from 'date-fns'
 import { useAppStore } from '@/store/AppContext'
 import { cn } from '@/lib/utils'
 
@@ -32,7 +35,7 @@ export default function DashboardGestor() {
     'colaboradores',
   )
 
-  const { plants, contracted, locations, goals, employees } = useMasterData()
+  const { plants, contracted, locations, goals, employees, equipment } = useMasterData()
   const [logs, setLogs] = useState<any[]>([])
   const [monthlyGoals, setMonthlyGoals] = useState<any[]>([])
 
@@ -53,7 +56,6 @@ export default function DashboardGestor() {
     const fetchGoals = async () => {
       if (plants.length === 0) return
       const mFrom = `${referenceMonth}-01`
-      // Basic approach to get end of month
       const y = parseInt(referenceMonth.split('-')[0])
       const m = parseInt(referenceMonth.split('-')[1])
       const lastDay = new Date(y, m, 0).getDate()
@@ -82,8 +84,8 @@ export default function DashboardGestor() {
   }
 
   // Calculate Metrics
-  const { metrics, plantStats, locationStats } = useMemo(() => {
-    const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
+  const { metrics, plantStats, locationStats, equipmentStats } = useMemo(() => {
+    const validPlants = selectedPlants
     const filteredLogs = logs.filter(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
     )
@@ -127,7 +129,7 @@ export default function DashboardGestor() {
         }
       })
 
-    // Location Breakdowns (Mostly for Colaboradores as Equipments usually don't have locations in this schema)
+    // Location Breakdowns (Mostly for Colaboradores)
     const lStats = locations
       .filter((loc) => validPlants.includes(loc.plant_id))
       .map((loc) => {
@@ -150,28 +152,85 @@ export default function DashboardGestor() {
           absenteismo: Math.max(0, lRate),
         }
       })
-      .filter((l) => l.contratado > 0 || l.presentes > 0) // only show relevant locations
+      .filter((l) => l.contratado > 0 || l.presentes > 0)
+
+    // Equipment Specific Stats (Média de disponibilidade, histórico diário)
+    let eqStats: any[] = []
+    if (activeTab === 'equipamentos') {
+      const eqList = equipment.filter((e) => validPlants.includes(e.plant_id))
+
+      eqStats = eqList.map((eq) => {
+        const dFrom = new Date(dateFrom)
+        const dTo = new Date(dateTo)
+        // ensure valid range
+        const days =
+          dFrom <= dTo
+            ? eachDayOfInterval({ start: dFrom, end: dTo }).map((d) => format(d, 'yyyy-MM-dd'))
+            : []
+        const eqTotalDays = days.length || 1
+
+        const eqContratado =
+          contracted
+            .filter((c) => c.equipment_id === eq.id && c.type === 'equipamento')
+            .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
+
+        const eqLogs = logs.filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
+
+        let presCount = 0
+        let absCount = 0
+        const history = days.map((d) => {
+          const log = eqLogs.find((l) => l.date === d)
+          const status = log ? log.status : false
+          if (status) presCount++
+          else absCount++
+          return { date: d, status }
+        })
+
+        const mediaPresenca = (presCount / eqTotalDays) * eqContratado
+        const mediaFalta = (absCount / eqTotalDays) * eqContratado
+        const taxaDisp = eqContratado > 0 ? (mediaPresenca / eqContratado) * 100 : 0
+
+        return {
+          id: eq.id,
+          name: eq.name,
+          contratado: eqContratado,
+          mediaPresenca,
+          mediaFalta,
+          taxaDisp,
+          history,
+        }
+      })
+    }
 
     return {
       metrics: { lancado, presente, ausente, contratado, absenteismo },
       plantStats: pStats,
       locationStats: lStats,
+      equipmentStats: eqStats,
     }
-  }, [logs, contracted, selectedPlants, plants, activeTab, dateFrom, dateTo, employees, locations])
+  }, [
+    logs,
+    contracted,
+    selectedPlants,
+    plants,
+    activeTab,
+    dateFrom,
+    dateTo,
+    employees,
+    locations,
+    equipment,
+  ])
 
-  // Equipment specific (mock availability based on inverse of absenteeism for goals)
   const equipDisp = Math.max(0, 100 - metrics.absenteismo)
 
   const getGoalsData = () => {
     let sum = 0
     let count = 0
 
-    // Auto Goal 1: Absenteísmo (<4% = 100%)
     const absAchieved = metrics.absenteismo < 4 ? 100 : 0
     sum += absAchieved
     count++
 
-    // Auto Goal 2: Disponibilidade
     sum += equipDisp
     count++
 
@@ -250,7 +309,7 @@ export default function DashboardGestor() {
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="all-plants"
-                  checked={selectedPlants.length === 0 || selectedPlants.length === plants.length}
+                  checked={selectedPlants.length > 0 && selectedPlants.length === plants.length}
                   onCheckedChange={toggleAllPlants}
                 />
                 <label
@@ -264,9 +323,7 @@ export default function DashboardGestor() {
                 <div key={p.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`plant-${p.id}`}
-                    checked={
-                      selectedPlants.includes(p.id) || (selectedPlants.length === 0 && true) // visual only
-                    }
+                    checked={selectedPlants.includes(p.id)}
                     onCheckedChange={() => togglePlant(p.id)}
                   />
                   <label
@@ -287,9 +344,10 @@ export default function DashboardGestor() {
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
                 activeTab === 'colaboradores'
-                  ? 'bg-[#65a34e] text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'bg-white text-muted-foreground border hover:bg-slate-50',
               )}
+              style={activeTab === 'colaboradores' ? { backgroundColor: brandPrimary } : {}}
             >
               <Users className="h-4 w-4" /> Colaboradores
             </button>
@@ -298,9 +356,10 @@ export default function DashboardGestor() {
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
                 activeTab === 'equipamentos'
-                  ? 'bg-brand-blue text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'bg-white text-muted-foreground border hover:bg-slate-50',
               )}
+              style={activeTab === 'equipamentos' ? { backgroundColor: brandPrimary } : {}}
             >
               <Wrench className="h-4 w-4" /> Equipamentos
             </button>
@@ -320,9 +379,18 @@ export default function DashboardGestor() {
         </CardContent>
       </Card>
 
-      {/* Main Content Area */}
-      {activeTab !== 'metas' ? (
-        <div className="space-y-6">
+      {/* Empty State vs Main Content */}
+      {selectedPlants.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-16 mt-6 bg-white rounded-xl border border-slate-200 shadow-sm animate-in fade-in">
+          <Building2 className="w-16 h-16 text-slate-300 mb-4" />
+          <h3 className="text-xl font-bold text-slate-700">Nenhuma planta selecionada</h3>
+          <p className="text-slate-500 mt-2 text-center max-w-md">
+            Por favor, selecione uma ou mais plantas no filtro acima para visualizar os indicadores
+            e relatórios do dashboard.
+          </p>
+        </div>
+      ) : activeTab !== 'metas' ? (
+        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
           {/* Top Metrics Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 lg:gap-6">
             <Card className="shadow-subtle border-slate-200">
@@ -398,24 +466,23 @@ export default function DashboardGestor() {
             </Card>
           </div>
 
-          {/* Two Column Tables */}
+          {/* Por Planta & Por Local */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Por Planta */}
-            <Card className="shadow-subtle border-slate-200">
-              <CardHeader className="pb-3 border-b border-slate-100 px-6">
+            <Card className="shadow-subtle border-slate-200 flex flex-col h-full">
+              <CardHeader className="pb-3 border-b border-slate-100 px-6 shrink-0">
                 <CardTitle className="text-base font-semibold flex items-center gap-2 text-brand-graphite">
-                  <Building2 className="h-5 w-5 text-slate-400" /> Por Planta
+                  <Building2 className="h-5 w-5 text-slate-400" /> Resumo por Planta
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50">
+              <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
+                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50 shrink-0">
                   <div className="col-span-4">Planta</div>
                   <div className="col-span-2 text-center">Presença</div>
                   <div className="col-span-2 text-center">Falta</div>
                   <div className="col-span-2 text-center">Contratado</div>
                   <div className="col-span-2 text-right">Taxa / Abs.</div>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 overflow-y-auto custom-scrollbar flex-1 min-h-[250px] max-h-[400px]">
                   {plantStats.map((p) => (
                     <div
                       key={p.id}
@@ -456,22 +523,21 @@ export default function DashboardGestor() {
               </CardContent>
             </Card>
 
-            {/* Por Local */}
-            <Card className="shadow-subtle border-slate-200">
-              <CardHeader className="pb-3 border-b border-slate-100 px-6">
+            <Card className="shadow-subtle border-slate-200 flex flex-col h-full">
+              <CardHeader className="pb-3 border-b border-slate-100 px-6 shrink-0">
                 <CardTitle className="text-base font-semibold flex items-center gap-2 text-brand-graphite">
-                  <MapPin className="h-5 w-5 text-slate-400" /> Por Local
+                  <MapPin className="h-5 w-5 text-slate-400" /> Resumo por Local
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50">
+              <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
+                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50 shrink-0">
                   <div className="col-span-4">Local / Planta</div>
                   <div className="col-span-2 text-center">Presença</div>
                   <div className="col-span-2 text-center">Falta</div>
                   <div className="col-span-2 text-center">Contratado</div>
                   <div className="col-span-2 text-right">Taxa / Abs.</div>
                 </div>
-                <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto custom-scrollbar">
+                <div className="divide-y divide-slate-100 overflow-y-auto custom-scrollbar flex-1 min-h-[250px] max-h-[400px]">
                   {locationStats.map((l) => (
                     <div
                       key={l.id}
@@ -514,10 +580,103 @@ export default function DashboardGestor() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Por Equipamento Details */}
+          {activeTab === 'equipamentos' && (
+            <Card className="shadow-subtle border-slate-200 animate-in fade-in slide-in-from-bottom-4">
+              <CardHeader className="pb-3 border-b border-slate-100 px-6">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-brand-graphite">
+                  <Wrench className="h-5 w-5 text-slate-400" /> Por Equipamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100 bg-slate-50/50">
+                  <div className="col-span-4">Equipamento</div>
+                  <div className="col-span-2 text-center">Contratado</div>
+                  <div className="col-span-2 text-center">Média Presença</div>
+                  <div className="col-span-2 text-center">Média Falta</div>
+                  <div className="col-span-2 text-right">Taxa Disp.</div>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {equipmentStats.map((eq) => (
+                    <Collapsible key={eq.id}>
+                      <CollapsibleTrigger className="w-full group focus-visible:outline-none">
+                        <div className="px-6 py-4 grid grid-cols-12 gap-4 items-center group-hover:bg-slate-50/50 transition-colors cursor-pointer text-left">
+                          <div className="col-span-4 font-semibold text-brand-graphite flex items-center gap-2">
+                            <ChevronRight className="w-4 h-4 text-slate-400 group-data-[state=open]:rotate-90 transition-transform" />
+                            {eq.name}
+                          </div>
+                          <div className="col-span-2 text-center">
+                            <Badge
+                              variant="outline"
+                              className="bg-amber-100 text-amber-800 border-0 font-bold px-3"
+                            >
+                              {eq.contratado}
+                            </Badge>
+                          </div>
+                          <div className="col-span-2 text-center">
+                            <span className="text-green-600 font-bold text-sm">
+                              {eq.mediaPresenca.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="col-span-2 text-center">
+                            <span className="text-red-500 font-bold text-sm">
+                              {eq.mediaFalta.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="col-span-2 text-right">
+                            <span className="font-bold text-sm text-brand-graphite">
+                              {eq.taxaDisp.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-6 py-5 bg-slate-50/80 border-t border-slate-100 shadow-inner">
+                          <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                            <TrendingDown className="w-4 h-4 text-slate-400" />
+                            Histórico de Disponibilidade
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {eq.history.map((day: any) => (
+                              <div
+                                key={day.date}
+                                className="flex flex-col items-center justify-center bg-white py-1.5 px-3 border border-slate-200 rounded-lg shadow-sm min-w-[70px]"
+                              >
+                                <span className="text-[10px] text-slate-400 font-medium mb-0.5">
+                                  {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
+                                </span>
+                                {day.status ? (
+                                  <div
+                                    className="w-2.5 h-2.5 rounded-full bg-green-500"
+                                    title="Disponível"
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-2.5 h-2.5 rounded-full bg-red-500"
+                                    title="Indisponível"
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                  {equipmentStats.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-sm">
+                      Nenhum equipamento vinculado às plantas selecionadas.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         /* Book de Metas View */
-        <div className="space-y-4 max-w-5xl">
+        <div className="space-y-4 max-w-5xl animate-in slide-in-from-bottom-4 duration-500">
           {/* Automated Goal 1 */}
           <div
             className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-5 shadow-sm border-l-4"
