@@ -30,9 +30,9 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background/95 backdrop-blur-md px-4 sm:px-6 shadow-sm text-foreground transition-colors duration-500 print:hidden">
       <div className="flex items-center gap-2">
         {isMobile && (
-          <SidebarTrigger className="text-muted-foreground hover:text-brand-cyan hover:bg-brand-cyan/10" />
+          <SidebarTrigger className="text-muted-foreground hover:text-white hover:bg-brand-deepBlue/50" />
         )}
-        <h1 className="text-lg font-semibold tracking-tight hidden sm:block text-brand-cyan drop-shadow-[0_0_8px_rgba(0,255,255,0.4)]">
+        <h1 className="text-lg font-semibold tracking-tight hidden sm:block text-white drop-shadow-sm">
           Gestão de Facilities
         </h1>
       </div>
@@ -43,21 +43,21 @@ export function AppHeader() {
           <Input
             type="search"
             placeholder="Buscar no sistema..."
-            className="w-full bg-muted/50 border-border text-foreground placeholder:text-muted-foreground pl-9 focus-visible:ring-1 focus-visible:ring-brand-cyan focus-visible:bg-muted transition-all rounded-full h-9"
+            className="w-full bg-muted/50 border-border text-foreground placeholder:text-muted-foreground pl-9 focus-visible:ring-1 focus-visible:ring-brand-deepBlue focus-visible:bg-muted transition-all rounded-full h-9"
           />
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-brand-cyan hover:bg-brand-cyan/10 rounded-full h-9 w-9 relative"
+          className="text-muted-foreground hover:text-white hover:bg-brand-deepBlue/50 rounded-full h-9 w-9 relative"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-brand-cyan border-2 border-background shadow-[0_0_5px_rgba(0,255,255,0.8)]"></span>
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-400 border-2 border-background shadow-[0_0_5px_rgba(96,165,250,0.8)]"></span>
         </Button>
 
         <div className="flex items-center gap-3 pl-3 border-l border-border">
           <div className="hidden sm:flex flex-col text-right">
-            <span className="text-sm font-semibold leading-none text-brand-cyan uppercase tracking-wider text-[10px]">
+            <span className="text-sm font-semibold leading-none text-blue-400 uppercase tracking-wider text-[10px]">
               {profile?.role || 'User'}
             </span>
             <span className="text-xs text-muted-foreground truncate max-w-[150px] mt-1">
@@ -70,7 +70,7 @@ export function AppHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full h-9 w-9 text-muted-foreground hover:text-brand-cyan hover:bg-brand-cyan/10"
+                className="rounded-full h-9 w-9 text-muted-foreground hover:text-white hover:bg-brand-deepBlue/50"
               >
                 <UserCircle className="h-6 w-6" />
               </Button>
@@ -88,7 +88,7 @@ export function AppHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem className="cursor-pointer hover:text-brand-cyan">
+              <DropdownMenuItem className="cursor-pointer focus:bg-brand-deepBlue focus:text-white">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configurações da Conta</span>
               </DropdownMenuItem>

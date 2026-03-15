@@ -909,10 +909,67 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION log_audit_action()
+//   CREATE OR REPLACE FUNCTION public.log_audit_action()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_user_id uuid;
+//     v_client_id uuid;
+//     v_action text;
+//     v_details text;
+//   BEGIN
+//     -- Attempt to get the user ID making the request
+//     v_user_id := auth.uid();
+//
+//     -- Gather details based on operation
+//     IF TG_OP = 'DELETE' THEN
+//       v_client_id := OLD.client_id;
+//       v_details := 'Registro removido da tabela ' || TG_TABLE_NAME || ' (ID: ' || OLD.id || ')';
+//       v_action := 'Exclusão';
+//     ELSIF TG_OP = 'INSERT' THEN
+//       v_client_id := NEW.client_id;
+//       v_details := 'Novo registro adicionado na tabela ' || TG_TABLE_NAME || ' (ID: ' || NEW.id || ')';
+//       v_action := 'Inclusão';
+//     ELSIF TG_OP = 'UPDATE' THEN
+//       v_client_id := NEW.client_id;
+//       v_details := 'Registro atualizado na tabela ' || TG_TABLE_NAME || ' (ID: ' || NEW.id || ')';
+//       v_action := 'Atualização';
+//     END IF;
+//
+//     -- Only insert if we have context (user ID and client ID)
+//     IF v_user_id IS NOT NULL AND v_client_id IS NOT NULL THEN
+//       INSERT INTO public.audit_logs (client_id, user_id, action_type, details)
+//       VALUES (v_client_id, v_user_id, v_action, v_details);
+//     END IF;
+//
+//     -- Return appropriately
+//     IF TG_OP = 'DELETE' THEN
+//       RETURN OLD;
+//     ELSE
+//       RETURN NEW;
+//     END IF;
+//   END;
+//   $function$
+//
 
 // --- TRIGGERS ---
 // Table: audit_logs
 //   trigger_clean_audit_logs: CREATE TRIGGER trigger_clean_audit_logs AFTER INSERT ON public.audit_logs FOR EACH STATEMENT EXECUTE FUNCTION clean_old_audit_logs()
+// Table: daily_logs
+//   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE OR UPDATE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: employees
+//   audit_employees: CREATE TRIGGER audit_employees AFTER INSERT OR DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: equipment
+//   audit_equipment: CREATE TRIGGER audit_equipment AFTER INSERT OR DELETE ON public.equipment FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: functions
+//   audit_functions: CREATE TRIGGER audit_functions AFTER INSERT OR DELETE ON public.functions FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: locations
+//   audit_locations: CREATE TRIGGER audit_locations AFTER INSERT OR DELETE ON public.locations FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: plants
+//   audit_plants: CREATE TRIGGER audit_plants AFTER INSERT OR DELETE ON public.plants FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 
 // --- INDEXES ---
 // Table: clients

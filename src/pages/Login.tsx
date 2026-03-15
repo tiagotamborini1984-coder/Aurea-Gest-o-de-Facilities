@@ -71,16 +71,16 @@ export default function Login() {
     toast({
       title: 'Acesso Atualizado',
       description: 'Sua credencial foi reconfigurada com sucesso.',
-      className: 'bg-brand-cyan/20 text-brand-cyan border-brand-cyan/50 backdrop-blur-md',
+      className: 'bg-brand-deepBlue text-white border-brand-deepBlue/50 backdrop-blur-md',
     })
     navigate('/gestao-terceiros', { replace: true })
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-background relative overflow-hidden font-sans">
-      {/* High-tech backdrop */}
-      <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-brand-cyan/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-brand-deepBlue/30 rounded-full blur-[120px] pointer-events-none" />
+      {/* High-tech backdrop with Deep Blue and Graphite aesthetics */}
+      <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-brand-deepBlue/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-brand-deepBlue/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none opacity-40"></div>
 
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 z-10 animate-fade-in-up">
@@ -88,16 +88,16 @@ export default function Login() {
           <div className="flex flex-col items-center justify-center text-center space-y-2">
             <h1 className="text-3xl sm:text-4xl font-light tracking-[0.2em] text-foreground drop-shadow-sm uppercase">
               Gestão de <br />
-              <span className="font-bold text-brand-cyan drop-shadow-[0_0_12px_rgba(0,255,255,0.6)]">
+              <span className="font-bold text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
                 Facilities
               </span>
             </h1>
-            <p className="text-brand-cyan/70 text-xs tracking-widest font-medium uppercase mt-4">
+            <p className="text-blue-400/80 text-xs tracking-widest font-medium uppercase mt-4">
               System Authentication
             </p>
           </div>
 
-          <Card className="border-brand-cyan/20 bg-card/80 backdrop-blur-xl shadow-[0_0_40px_-10px_rgba(0,255,255,0.1)]">
+          <Card className="border-border bg-card/80 backdrop-blur-xl shadow-2xl">
             <CardContent className="pt-8">
               {!requirePasswordChange ? (
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -109,12 +109,12 @@ export default function Login() {
                       Identificação (E-mail)
                     </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-brand-cyan/70" />
+                      <User className="absolute left-3 top-3 h-4 w-4 text-blue-400/70" />
                       <Input
                         id="email"
                         type="email"
                         placeholder="admin@aurea.com"
-                        className="pl-9 h-11 bg-background/50 border-brand-cyan/20 focus-visible:ring-brand-cyan text-foreground placeholder:text-muted-foreground/50 transition-all"
+                        className="pl-9 h-11 bg-background/50 border-border focus-visible:ring-brand-deepBlue text-foreground placeholder:text-muted-foreground/50 transition-all"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -131,12 +131,12 @@ export default function Login() {
                       </Label>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-brand-cyan/70" />
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-blue-400/70" />
                       <Input
                         id="password"
                         type="password"
                         placeholder="••••••••"
-                        className="pl-9 h-11 bg-background/50 border-brand-cyan/20 focus-visible:ring-brand-cyan text-foreground placeholder:text-muted-foreground/50 transition-all"
+                        className="pl-9 h-11 bg-background/50 border-border focus-visible:ring-brand-deepBlue text-foreground placeholder:text-muted-foreground/50 transition-all"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -174,12 +174,12 @@ export default function Login() {
                       Nova Credencial Segura
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-brand-cyan/70" />
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-blue-400/70" />
                       <Input
                         id="new-password"
                         type="password"
                         placeholder="••••••••"
-                        className="pl-9 h-11 bg-background/50 border-brand-cyan/20 focus-visible:ring-brand-cyan text-foreground transition-all"
+                        className="pl-9 h-11 bg-background/50 border-border focus-visible:ring-brand-deepBlue text-foreground transition-all"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         required

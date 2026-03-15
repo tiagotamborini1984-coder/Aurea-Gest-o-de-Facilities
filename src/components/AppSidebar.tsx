@@ -80,17 +80,17 @@ export function AppSidebar() {
     })
 
   return (
-    <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground h-full shadow-[4px_0_24px_rgba(0,0,0,0.4)]">
+    <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground h-full shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
       <SidebarHeader className="p-4 pt-6 pb-8 flex items-center justify-center border-b border-sidebar-border">
         <div className="flex items-center gap-3 w-full pl-2">
-          <div className="bg-brand-deepBlue border border-brand-cyan/30 p-2.5 rounded-lg shadow-[0_0_10px_rgba(0,255,255,0.2)]">
-            <Building2 className="h-6 w-6 text-brand-cyan" />
+          <div className="bg-brand-deepBlue border border-brand-deepBlue/50 p-2.5 rounded-lg shadow-[0_0_10px_rgba(30,58,138,0.4)]">
+            <Building2 className="h-6 w-6 text-white" />
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-lg tracking-tight text-sidebar-foreground leading-none">
               Gestão de Facilities
             </span>
-            <span className="text-[0.65rem] text-brand-cyan uppercase tracking-widest font-semibold mt-1.5 opacity-80">
+            <span className="text-[0.65rem] text-blue-400 uppercase tracking-widest font-semibold mt-1.5 opacity-80">
               {activeClient ? activeClient.name : 'SaaS Mode'}
             </span>
           </div>
@@ -109,8 +109,8 @@ export function AppSidebar() {
                 >
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-300 relative group overflow-hidden">
-                        <item.icon className="h-5 w-5 group-hover:text-brand-cyan/70 transition-colors" />
+                      <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden">
+                        <item.icon className="h-5 w-5 group-hover:text-blue-400 transition-colors" />
                         <span className="font-medium tracking-wide">{item.title}</span>
                         <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
@@ -125,9 +125,9 @@ export function AppSidebar() {
                                 asChild
                                 isActive={isActive}
                                 className={cn(
-                                  'py-4 text-sidebar-foreground/60 hover:text-brand-cyan hover:bg-brand-cyan/5 transition-colors my-0.5 rounded-md',
+                                  'py-4 text-sidebar-foreground/60 hover:text-white hover:bg-sidebar-accent transition-colors my-0.5 rounded-md',
                                   isActive &&
-                                    'bg-brand-cyan/10 text-brand-cyan font-medium shadow-[inset_0_0_8px_rgba(0,255,255,0.05)] border-l border-brand-cyan',
+                                    'bg-brand-deepBlue text-white font-medium shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
                                 )}
                               >
                                 <Link to={sub.path}>{sub.title}</Link>
@@ -151,8 +151,8 @@ export function AppSidebar() {
                   className={cn(
                     'w-full mb-1 transition-all duration-300 py-5 rounded-md relative overflow-hidden group',
                     isActive
-                      ? 'bg-brand-cyan/10 text-brand-cyan shadow-[inset_0_0_12px_rgba(0,255,255,0.05)] border-l-2 border-brand-cyan'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                      ? 'bg-brand-deepBlue text-white shadow-[inset_0_0_12px_rgba(0,0,0,0.2)] border-l-4 border-white/20'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white',
                   )}
                 >
                   <Link to={item.path} className="flex items-center gap-3">
@@ -160,8 +160,8 @@ export function AppSidebar() {
                       className={cn(
                         'h-5 w-5 transition-colors',
                         isActive
-                          ? 'text-brand-cyan'
-                          : 'text-sidebar-foreground/70 group-hover:text-brand-cyan/50',
+                          ? 'text-white'
+                          : 'text-sidebar-foreground/70 group-hover:text-white',
                       )}
                     />
                     <span className="font-medium tracking-wide">{item.title}</span>

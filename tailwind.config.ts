@@ -31,10 +31,9 @@ export default {
       },
       colors: {
         brand: {
-          deepBlue: 'hsl(222, 50%, 25%)',
-          cyan: 'hsl(185, 100%, 40%)',
-          graphite: 'hsl(222, 25%, 13%)',
-          light: 'hsl(214 32% 91%)',
+          graphite: '#1f2937',
+          deepBlue: '#1e3a8a',
+          light: '#f3f4f6',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
