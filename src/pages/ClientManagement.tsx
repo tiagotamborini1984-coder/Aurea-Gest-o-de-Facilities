@@ -60,7 +60,7 @@ export default function ClientManagement() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-brand-blue">Gestão de Clientes</h2>
           <p className="text-muted-foreground mt-1">
-            Gerencie as empresas locatárias e seus módulos.
+            Gerencie as empresas locatárias, seus módulos e identidades visuais.
           </p>
         </div>
         <Button onClick={() => setIsAddOpen(true)} className="shadow-sm transition-transform">
@@ -85,16 +85,36 @@ export default function ClientManagement() {
               <TableRow key={client.id} className="hover:bg-muted/30 transition-colors">
                 <TableCell className="font-medium text-foreground">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 border border-brand-light">
-                      <AvatarImage src={client.logo} alt={client.name} />
+                    <Avatar className="h-9 w-9 border shadow-sm">
+                      <AvatarImage src={client.logo} alt={client.name} className="object-cover" />
                       <AvatarFallback className="bg-brand-blue/10 text-brand-blue text-xs font-semibold">
                         {client.name.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    {client.name}
+                    <div className="flex flex-col">
+                      <span>{client.name}</span>
+                      {(client.primaryColor || client.secondaryColor) && (
+                        <div className="flex gap-1.5 mt-1 items-center">
+                          {client.primaryColor && (
+                            <div
+                              className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm"
+                              style={{ backgroundColor: client.primaryColor }}
+                              title="Cor Primária"
+                            />
+                          )}
+                          {client.secondaryColor && (
+                            <div
+                              className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm"
+                              style={{ backgroundColor: client.secondaryColor }}
+                              title="Cor Secundária"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-12">
+                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-14">
                   <span className="truncate">{client.url}</span>
                   <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </TableCell>

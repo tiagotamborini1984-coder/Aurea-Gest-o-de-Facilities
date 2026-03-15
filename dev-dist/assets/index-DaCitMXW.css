@@ -942,6 +942,10 @@ section[aria-label='Notifications alt+T'] {
   height: 3rem;
 }
 
+.h-14{
+  height: 3.5rem;
+}
+
 .h-16{
   height: 4rem;
 }
@@ -1076,6 +1080,10 @@ section[aria-label='Notifications alt+T'] {
 
 .w-11{
   width: 2.75rem;
+}
+
+.w-12{
+  width: 3rem;
 }
 
 .w-2{
@@ -1499,12 +1507,6 @@ section[aria-label='Notifications alt+T'] {
   margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
 }
 
-.space-y-3 > :not([hidden]) ~ :not([hidden]){
-  --tw-space-y-reverse: 0;
-  margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
-  margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
-}
-
 .space-y-4 > :not([hidden]) ~ :not([hidden]){
   --tw-space-y-reverse: 0;
   margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
@@ -1661,6 +1663,10 @@ section[aria-label='Notifications alt+T'] {
 
 .border-\[--color-border\]{
   border-color: var(--color-border);
+}
+
+.border-black\/10{
+  border-color: rgb(0 0 0 / 0.1);
 }
 
 .border-border\/50{
@@ -1905,6 +1911,11 @@ section[aria-label='Notifications alt+T'] {
 
 .fill-current{
   fill: currentColor;
+}
+
+.object-cover{
+  -o-object-fit: cover;
+     object-fit: cover;
 }
 
 .p-0{
@@ -2628,6 +2639,10 @@ section[aria-label='Notifications alt+T'] {
   --cell-size: 2rem;
 }
 
+.file\:cursor-pointer::file-selector-button{
+  cursor: pointer;
+}
+
 .file\:border-0::file-selector-button{
   border-width: 0px;
 }
@@ -2643,6 +2658,11 @@ section[aria-label='Notifications alt+T'] {
 
 .file\:font-medium::file-selector-button{
   font-weight: 500;
+}
+
+.file\:text-brand-blue::file-selector-button{
+  --tw-text-opacity: 1;
+  color: hsl(218 56% 23% / var(--tw-text-opacity, 1));
 }
 
 .file\:text-foreground::file-selector-button{

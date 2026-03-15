@@ -27572,6 +27572,8 @@ var defaultClients = [
 		url: `${baseUrl}/techcorp`,
 		adminName: "Carlos Silva",
 		logo: "https://img.usecurling.com/i?q=technology&color=blue",
+		primaryColor: "#2563eb",
+		secondaryColor: "#0ea5e9",
 		status: "Ativo",
 		modules: ["Gestão de Terceiros", "Manutenção"]
 	},
@@ -27582,6 +27584,8 @@ var defaultClients = [
 		url: `${baseUrl}/globalfac`,
 		adminName: "Marina Costa",
 		logo: "https://img.usecurling.com/i?q=global&color=cyan",
+		primaryColor: "#0891b2",
+		secondaryColor: "#10b981",
 		status: "Ativo",
 		modules: ["Gestão de Terceiros"]
 	},
@@ -27592,6 +27596,8 @@ var defaultClients = [
 		url: `${baseUrl}/innovatex`,
 		adminName: "Roberto Alves",
 		logo: "https://img.usecurling.com/i?q=innovation&color=gray",
+		primaryColor: "#475569",
+		secondaryColor: "#94a3b8",
 		status: "Inativo",
 		modules: ["Limpeza", "Manutenção"]
 	}
@@ -27656,7 +27662,7 @@ var AppProvider = ({ children }) => {
 		}, ...prev]);
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppContext.Provider, {
-		"data-uid": "src/store/AppContext.tsx:125:5",
+		"data-uid": "src/store/AppContext.tsx:133:5",
 		"data-prohibitions": "[editContent]",
 		value: {
 			clients,
@@ -27786,6 +27792,718 @@ var Label$1 = import_react.forwardRef(({ className, ...props }, ref) => /* @__PU
 	...props
 }));
 Label$1.displayName = Root$2.displayName;
+//#endregion
+//#region src/components/AddClientDialog.tsx
+function AddClientDialog({ open, onOpenChange }) {
+	const { addClient } = useAppStore();
+	const { toast } = useToast();
+	const initialData = {
+		name: "",
+		slug: "",
+		adminName: "",
+		logo: "",
+		primaryColor: "#1e293b",
+		secondaryColor: "#0ea5e9",
+		modules: {
+			terceiros: true,
+			manutencao: false,
+			limpeza: false
+		}
+	};
+	const [formData, setFormData] = (0, import_react.useState)(initialData);
+	const baseUrl = window.location.origin;
+	const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`;
+	const handleFileChange = (e) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				setFormData((prev) => ({
+					...prev,
+					logo: reader.result
+				}));
+			};
+			reader.readAsDataURL(file);
+		}
+	};
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		const activeModules = [];
+		if (formData.modules.terceiros) activeModules.push("Gestão de Terceiros");
+		if (formData.modules.manutencao) activeModules.push("Manutenção");
+		if (formData.modules.limpeza) activeModules.push("Limpeza");
+		addClient({
+			name: formData.name,
+			slug: formData.slug,
+			url: `${baseUrl}/${formData.slug}`,
+			adminName: formData.adminName,
+			logo: formData.logo,
+			primaryColor: formData.primaryColor,
+			secondaryColor: formData.secondaryColor,
+			status: "Ativo",
+			modules: activeModules
+		});
+		toast({
+			title: "Sucesso!",
+			description: "Empresa cadastrada com sucesso.",
+			className: "bg-green-50 text-green-900 border-green-200"
+		});
+		onOpenChange(false);
+		setFormData(initialData);
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
+		"data-uid": "src/components/AddClientDialog.tsx:87:5",
+		"data-prohibitions": "[editContent]",
+		open,
+		onOpenChange,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
+			"data-uid": "src/components/AddClientDialog.tsx:88:7",
+			"data-prohibitions": "[editContent]",
+			className: "sm:max-w-[550px] backdrop-blur-md bg-white/95",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
+				"data-uid": "src/components/AddClientDialog.tsx:89:9",
+				"data-prohibitions": "[]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
+					"data-uid": "src/components/AddClientDialog.tsx:90:11",
+					"data-prohibitions": "[]",
+					className: "text-xl font-bold text-brand-blue",
+					children: "Cadastrar Nova Empresa"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogDescription, {
+					"data-uid": "src/components/AddClientDialog.tsx:93:11",
+					"data-prohibitions": "[]",
+					children: "Configure os dados do novo cliente e identidade visual."
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+				"data-uid": "src/components/AddClientDialog.tsx:97:9",
+				"data-prohibitions": "[editContent]",
+				onSubmit: handleSubmit,
+				className: "space-y-6 py-4",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/AddClientDialog.tsx:98:11",
+						"data-prohibitions": "[editContent]",
+						className: "grid grid-cols-2 gap-4",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:99:13",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/AddClientDialog.tsx:100:15",
+									"data-prohibitions": "[]",
+									htmlFor: "name",
+									children: "Nome da Empresa *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/AddClientDialog.tsx:101:15",
+									"data-prohibitions": "[editContent]",
+									id: "name",
+									placeholder: "Ex: Acme Corp",
+									required: true,
+									value: formData.name,
+									onChange: (e) => setFormData({
+										...formData,
+										name: e.target.value
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:109:13",
+								"data-prohibitions": "[editContent]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/AddClientDialog.tsx:110:15",
+										"data-prohibitions": "[]",
+										htmlFor: "slug",
+										children: "Identificador (Slug) *"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+										"data-uid": "src/components/AddClientDialog.tsx:111:15",
+										"data-prohibitions": "[editContent]",
+										id: "slug",
+										placeholder: "ex: acme-corp",
+										required: true,
+										value: formData.slug,
+										onChange: (e) => {
+											const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+											setFormData({
+												...formData,
+												slug: val
+											});
+										}
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										"data-uid": "src/components/AddClientDialog.tsx:121:15",
+										"data-prohibitions": "[editContent]",
+										className: "text-[11px] text-muted-foreground mt-1 truncate",
+										children: [
+											"Acesso:",
+											" ",
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												"data-uid": "src/components/AddClientDialog.tsx:123:17",
+												"data-prohibitions": "[editContent]",
+												className: "font-medium text-brand-cyan inline-block max-w-full align-bottom truncate",
+												children: previewUrl
+											})
+										]
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:130:13",
+								"data-prohibitions": "[editContent]",
+								className: "col-span-2 space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+										"data-uid": "src/components/AddClientDialog.tsx:131:15",
+										"data-prohibitions": "[]",
+										className: "text-sm font-semibold text-foreground",
+										children: "Identidade Visual"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										"data-uid": "src/components/AddClientDialog.tsx:133:15",
+										"data-prohibitions": "[editContent]",
+										className: "space-y-2",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+											"data-uid": "src/components/AddClientDialog.tsx:134:17",
+											"data-prohibitions": "[]",
+											htmlFor: "logo",
+											children: "Logotipo da Empresa"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/components/AddClientDialog.tsx:135:17",
+											"data-prohibitions": "[editContent]",
+											className: "flex items-center gap-4",
+											children: [formData.logo && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Avatar, {
+												"data-uid": "src/components/AddClientDialog.tsx:137:21",
+												"data-prohibitions": "[]",
+												className: "h-12 w-12 border shadow-sm",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarImage, {
+													"data-uid": "src/components/AddClientDialog.tsx:138:23",
+													"data-prohibitions": "[editContent]",
+													src: formData.logo,
+													className: "object-cover"
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarFallback, {
+													"data-uid": "src/components/AddClientDialog.tsx:139:23",
+													"data-prohibitions": "[]",
+													children: "LG"
+												})]
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+												"data-uid": "src/components/AddClientDialog.tsx:142:19",
+												"data-prohibitions": "[editContent]",
+												id: "logo",
+												type: "file",
+												accept: "image/png, image/jpeg, image/svg+xml",
+												onChange: handleFileChange,
+												className: "cursor-pointer file:cursor-pointer file:text-brand-blue"
+											})]
+										})]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										"data-uid": "src/components/AddClientDialog.tsx:152:15",
+										"data-prohibitions": "[]",
+										className: "grid grid-cols-2 gap-4",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/components/AddClientDialog.tsx:153:17",
+											"data-prohibitions": "[]",
+											className: "space-y-2",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+												"data-uid": "src/components/AddClientDialog.tsx:154:19",
+												"data-prohibitions": "[]",
+												htmlFor: "primaryColor",
+												children: "Cor Primária"
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												"data-uid": "src/components/AddClientDialog.tsx:155:19",
+												"data-prohibitions": "[]",
+												className: "flex gap-2",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/AddClientDialog.tsx:156:21",
+													"data-prohibitions": "[editContent]",
+													id: "primaryColor",
+													type: "color",
+													className: "w-12 h-10 p-1 cursor-pointer",
+													value: formData.primaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														primaryColor: e.target.value
+													})
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/AddClientDialog.tsx:163:21",
+													"data-prohibitions": "[editContent]",
+													type: "text",
+													className: "flex-1",
+													value: formData.primaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														primaryColor: e.target.value
+													})
+												})]
+											})]
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/components/AddClientDialog.tsx:171:17",
+											"data-prohibitions": "[]",
+											className: "space-y-2",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+												"data-uid": "src/components/AddClientDialog.tsx:172:19",
+												"data-prohibitions": "[]",
+												htmlFor: "secondaryColor",
+												children: "Cor Secundária"
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												"data-uid": "src/components/AddClientDialog.tsx:173:19",
+												"data-prohibitions": "[]",
+												className: "flex gap-2",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/AddClientDialog.tsx:174:21",
+													"data-prohibitions": "[editContent]",
+													id: "secondaryColor",
+													type: "color",
+													className: "w-12 h-10 p-1 cursor-pointer",
+													value: formData.secondaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														secondaryColor: e.target.value
+													})
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/AddClientDialog.tsx:181:21",
+													"data-prohibitions": "[editContent]",
+													type: "text",
+													className: "flex-1",
+													value: formData.secondaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														secondaryColor: e.target.value
+													})
+												})]
+											})]
+										})]
+									})
+								]
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/AddClientDialog.tsx:193:11",
+						"data-prohibitions": "[]",
+						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+							"data-uid": "src/components/AddClientDialog.tsx:194:13",
+							"data-prohibitions": "[]",
+							className: "text-sm font-semibold text-foreground",
+							children: "Usuário Administrador"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							"data-uid": "src/components/AddClientDialog.tsx:195:13",
+							"data-prohibitions": "[]",
+							className: "grid grid-cols-2 gap-4",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:196:15",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/AddClientDialog.tsx:197:17",
+									"data-prohibitions": "[]",
+									htmlFor: "adminName",
+									children: "Nome Completo *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/AddClientDialog.tsx:198:17",
+									"data-prohibitions": "[editContent]",
+									id: "adminName",
+									placeholder: "Nome do responsável",
+									required: true,
+									value: formData.adminName,
+									onChange: (e) => setFormData({
+										...formData,
+										adminName: e.target.value
+									})
+								})]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/AddClientDialog.tsx:206:15",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/AddClientDialog.tsx:207:17",
+									"data-prohibitions": "[]",
+									htmlFor: "email",
+									children: "E-mail *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/AddClientDialog.tsx:208:17",
+									"data-prohibitions": "[editContent]",
+									id: "email",
+									type: "email",
+									placeholder: "admin@empresa.com",
+									required: true
+								})]
+							})]
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
+						"data-uid": "src/components/AddClientDialog.tsx:213:11",
+						"data-prohibitions": "[]",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							"data-uid": "src/components/AddClientDialog.tsx:214:13",
+							"data-prohibitions": "[]",
+							type: "button",
+							variant: "outline",
+							onClick: () => onOpenChange(false),
+							children: "Cancelar"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							"data-uid": "src/components/AddClientDialog.tsx:217:13",
+							"data-prohibitions": "[]",
+							type: "submit",
+							className: "font-medium",
+							children: "Salvar Empresa"
+						})]
+					})
+				]
+			})]
+		})
+	});
+}
+//#endregion
+//#region src/components/EditClientDialog.tsx
+function EditClientDialog({ client, open, onOpenChange }) {
+	const { updateClient } = useAppStore();
+	const { toast } = useToast();
+	const [formData, setFormData] = (0, import_react.useState)({
+		name: "",
+		slug: "",
+		adminName: "",
+		logo: "",
+		primaryColor: "#1e293b",
+		secondaryColor: "#0ea5e9"
+	});
+	(0, import_react.useEffect)(() => {
+		if (client) setFormData({
+			name: client.name,
+			slug: client.slug,
+			adminName: client.adminName,
+			logo: client.logo || "",
+			primaryColor: client.primaryColor || "#1e293b",
+			secondaryColor: client.secondaryColor || "#0ea5e9"
+		});
+	}, [client]);
+	const baseUrl = window.location.origin;
+	const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`;
+	const handleFileChange = (e) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				setFormData((prev) => ({
+					...prev,
+					logo: reader.result
+				}));
+			};
+			reader.readAsDataURL(file);
+		}
+	};
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		if (!client) return;
+		updateClient(client.id, {
+			name: formData.name,
+			slug: formData.slug,
+			adminName: formData.adminName,
+			logo: formData.logo,
+			primaryColor: formData.primaryColor,
+			secondaryColor: formData.secondaryColor,
+			url: `${baseUrl}/${formData.slug}`
+		});
+		toast({
+			title: "Empresa atualizada",
+			description: "Os dados do cliente foram salvos com sucesso.",
+			className: "bg-green-50 text-green-900 border-green-200"
+		});
+		onOpenChange(false);
+	};
+	if (!client) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
+		"data-uid": "src/components/EditClientDialog.tsx:88:5",
+		"data-prohibitions": "[editContent]",
+		open,
+		onOpenChange,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
+			"data-uid": "src/components/EditClientDialog.tsx:89:7",
+			"data-prohibitions": "[editContent]",
+			className: "sm:max-w-[550px] backdrop-blur-md bg-white/95",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
+				"data-uid": "src/components/EditClientDialog.tsx:90:9",
+				"data-prohibitions": "[]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
+					"data-uid": "src/components/EditClientDialog.tsx:91:11",
+					"data-prohibitions": "[]",
+					className: "text-xl font-bold text-brand-blue",
+					children: "Editar Empresa"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogDescription, {
+					"data-uid": "src/components/EditClientDialog.tsx:92:11",
+					"data-prohibitions": "[]",
+					children: "Atualize as informações e identidade visual do cliente."
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+				"data-uid": "src/components/EditClientDialog.tsx:96:9",
+				"data-prohibitions": "[editContent]",
+				onSubmit: handleSubmit,
+				className: "space-y-6 py-4",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/EditClientDialog.tsx:97:11",
+						"data-prohibitions": "[editContent]",
+						className: "grid grid-cols-2 gap-4",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:98:13",
+								"data-prohibitions": "[]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/EditClientDialog.tsx:99:15",
+									"data-prohibitions": "[]",
+									htmlFor: "edit-name",
+									children: "Nome da Empresa *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/EditClientDialog.tsx:100:15",
+									"data-prohibitions": "[editContent]",
+									id: "edit-name",
+									placeholder: "Ex: Acme Corp",
+									required: true,
+									value: formData.name,
+									onChange: (e) => setFormData({
+										...formData,
+										name: e.target.value
+									})
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:108:13",
+								"data-prohibitions": "[editContent]",
+								className: "space-y-2 col-span-2 sm:col-span-1",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+										"data-uid": "src/components/EditClientDialog.tsx:109:15",
+										"data-prohibitions": "[]",
+										htmlFor: "edit-slug",
+										children: "Identificador (Slug) *"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+										"data-uid": "src/components/EditClientDialog.tsx:110:15",
+										"data-prohibitions": "[editContent]",
+										id: "edit-slug",
+										placeholder: "ex: acme-corp",
+										required: true,
+										value: formData.slug,
+										onChange: (e) => {
+											const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+											setFormData({
+												...formData,
+												slug: val
+											});
+										}
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										"data-uid": "src/components/EditClientDialog.tsx:120:15",
+										"data-prohibitions": "[editContent]",
+										className: "text-[11px] text-muted-foreground mt-1 truncate",
+										children: [
+											"Acesso:",
+											" ",
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												"data-uid": "src/components/EditClientDialog.tsx:122:17",
+												"data-prohibitions": "[editContent]",
+												className: "font-medium text-brand-cyan inline-block max-w-full align-bottom truncate",
+												children: previewUrl
+											})
+										]
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:129:13",
+								"data-prohibitions": "[editContent]",
+								className: "col-span-2 space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+										"data-uid": "src/components/EditClientDialog.tsx:130:15",
+										"data-prohibitions": "[]",
+										className: "text-sm font-semibold text-foreground",
+										children: "Identidade Visual"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										"data-uid": "src/components/EditClientDialog.tsx:132:15",
+										"data-prohibitions": "[editContent]",
+										className: "space-y-2",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+											"data-uid": "src/components/EditClientDialog.tsx:133:17",
+											"data-prohibitions": "[]",
+											htmlFor: "edit-logo",
+											children: "Logotipo da Empresa"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/components/EditClientDialog.tsx:134:17",
+											"data-prohibitions": "[editContent]",
+											className: "flex items-center gap-4",
+											children: [formData.logo && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Avatar, {
+												"data-uid": "src/components/EditClientDialog.tsx:136:21",
+												"data-prohibitions": "[]",
+												className: "h-12 w-12 border shadow-sm",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarImage, {
+													"data-uid": "src/components/EditClientDialog.tsx:137:23",
+													"data-prohibitions": "[editContent]",
+													src: formData.logo,
+													className: "object-cover"
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarFallback, {
+													"data-uid": "src/components/EditClientDialog.tsx:138:23",
+													"data-prohibitions": "[]",
+													children: "LG"
+												})]
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+												"data-uid": "src/components/EditClientDialog.tsx:141:19",
+												"data-prohibitions": "[editContent]",
+												id: "edit-logo",
+												type: "file",
+												accept: "image/png, image/jpeg, image/svg+xml",
+												onChange: handleFileChange,
+												className: "cursor-pointer file:cursor-pointer file:text-brand-blue"
+											})]
+										})]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										"data-uid": "src/components/EditClientDialog.tsx:151:15",
+										"data-prohibitions": "[]",
+										className: "grid grid-cols-2 gap-4",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/components/EditClientDialog.tsx:152:17",
+											"data-prohibitions": "[]",
+											className: "space-y-2",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+												"data-uid": "src/components/EditClientDialog.tsx:153:19",
+												"data-prohibitions": "[]",
+												htmlFor: "edit-primaryColor",
+												children: "Cor Primária"
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												"data-uid": "src/components/EditClientDialog.tsx:154:19",
+												"data-prohibitions": "[]",
+												className: "flex gap-2",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/EditClientDialog.tsx:155:21",
+													"data-prohibitions": "[editContent]",
+													id: "edit-primaryColor",
+													type: "color",
+													className: "w-12 h-10 p-1 cursor-pointer",
+													value: formData.primaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														primaryColor: e.target.value
+													})
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/EditClientDialog.tsx:162:21",
+													"data-prohibitions": "[editContent]",
+													type: "text",
+													className: "flex-1",
+													value: formData.primaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														primaryColor: e.target.value
+													})
+												})]
+											})]
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/components/EditClientDialog.tsx:170:17",
+											"data-prohibitions": "[]",
+											className: "space-y-2",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+												"data-uid": "src/components/EditClientDialog.tsx:171:19",
+												"data-prohibitions": "[]",
+												htmlFor: "edit-secondaryColor",
+												children: "Cor Secundária"
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												"data-uid": "src/components/EditClientDialog.tsx:172:19",
+												"data-prohibitions": "[]",
+												className: "flex gap-2",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/EditClientDialog.tsx:173:21",
+													"data-prohibitions": "[editContent]",
+													id: "edit-secondaryColor",
+													type: "color",
+													className: "w-12 h-10 p-1 cursor-pointer",
+													value: formData.secondaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														secondaryColor: e.target.value
+													})
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+													"data-uid": "src/components/EditClientDialog.tsx:180:21",
+													"data-prohibitions": "[editContent]",
+													type: "text",
+													className: "flex-1",
+													value: formData.secondaryColor,
+													onChange: (e) => setFormData({
+														...formData,
+														secondaryColor: e.target.value
+													})
+												})]
+											})]
+										})]
+									})
+								]
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						"data-uid": "src/components/EditClientDialog.tsx:192:11",
+						"data-prohibitions": "[]",
+						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+							"data-uid": "src/components/EditClientDialog.tsx:193:13",
+							"data-prohibitions": "[]",
+							className: "text-sm font-semibold text-foreground",
+							children: "Usuário Administrador"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							"data-uid": "src/components/EditClientDialog.tsx:194:13",
+							"data-prohibitions": "[]",
+							className: "grid grid-cols-1 gap-4",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								"data-uid": "src/components/EditClientDialog.tsx:195:15",
+								"data-prohibitions": "[]",
+								className: "space-y-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
+									"data-uid": "src/components/EditClientDialog.tsx:196:17",
+									"data-prohibitions": "[]",
+									htmlFor: "edit-adminName",
+									children: "Nome Completo *"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+									"data-uid": "src/components/EditClientDialog.tsx:197:17",
+									"data-prohibitions": "[editContent]",
+									id: "edit-adminName",
+									placeholder: "Nome do responsável",
+									required: true,
+									value: formData.adminName,
+									onChange: (e) => setFormData({
+										...formData,
+										adminName: e.target.value
+									})
+								})]
+							})
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
+						"data-uid": "src/components/EditClientDialog.tsx:208:11",
+						"data-prohibitions": "[]",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							"data-uid": "src/components/EditClientDialog.tsx:209:13",
+							"data-prohibitions": "[]",
+							type: "button",
+							variant: "outline",
+							onClick: () => onOpenChange(false),
+							children: "Cancelar"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
+							"data-uid": "src/components/EditClientDialog.tsx:212:13",
+							"data-prohibitions": "[]",
+							type: "submit",
+							className: "font-medium",
+							children: "Salvar Alterações"
+						})]
+					})
+				]
+			})]
+		})
+	});
+}
 //#endregion
 //#region ../../cache/modules/aurea-facility-management-db19d/node_modules/.pnpm/@radix-ui+react-use-previous@1.1.1_@types+react@19.2.14_react@19.2.4/node_modules/@radix-ui/react-use-previous/dist/index.mjs
 function usePrevious(value) {
@@ -27925,564 +28643,6 @@ var Switch = import_react.forwardRef(({ className, ...props }, ref) => /* @__PUR
 	})
 }));
 Switch.displayName = Root$1.displayName;
-//#endregion
-//#region src/components/AddClientDialog.tsx
-function AddClientDialog({ open, onOpenChange }) {
-	const { addClient } = useAppStore();
-	const { toast } = useToast();
-	const [formData, setFormData] = (0, import_react.useState)({
-		name: "",
-		slug: "",
-		adminName: "",
-		logo: "",
-		modules: {
-			terceiros: true,
-			manutencao: false,
-			limpeza: false
-		}
-	});
-	const baseUrl = window.location.origin;
-	const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`;
-	const handleSubmit = (e) => {
-		e.preventDefault();
-		const activeModules = [];
-		if (formData.modules.terceiros) activeModules.push("Gestão de Terceiros");
-		if (formData.modules.manutencao) activeModules.push("Manutenção");
-		if (formData.modules.limpeza) activeModules.push("Limpeza");
-		addClient({
-			name: formData.name,
-			slug: formData.slug,
-			url: `${baseUrl}/${formData.slug}`,
-			adminName: formData.adminName,
-			logo: formData.logo,
-			status: "Ativo",
-			modules: activeModules
-		});
-		toast({
-			title: "Sucesso!",
-			description: "Empresa cadastrada com sucesso.",
-			className: "bg-green-50 text-green-900 border-green-200"
-		});
-		onOpenChange(false);
-		setFormData({
-			name: "",
-			slug: "",
-			adminName: "",
-			logo: "",
-			modules: {
-				terceiros: true,
-				manutencao: false,
-				limpeza: false
-			}
-		});
-	};
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
-		"data-uid": "src/components/AddClientDialog.tsx:74:5",
-		"data-prohibitions": "[editContent]",
-		open,
-		onOpenChange,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
-			"data-uid": "src/components/AddClientDialog.tsx:75:7",
-			"data-prohibitions": "[editContent]",
-			className: "sm:max-w-[550px] backdrop-blur-md bg-white/95",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
-				"data-uid": "src/components/AddClientDialog.tsx:76:9",
-				"data-prohibitions": "[]",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
-					"data-uid": "src/components/AddClientDialog.tsx:77:11",
-					"data-prohibitions": "[]",
-					className: "text-xl font-bold text-brand-blue",
-					children: "Cadastrar Nova Empresa"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogDescription, {
-					"data-uid": "src/components/AddClientDialog.tsx:80:11",
-					"data-prohibitions": "[]",
-					children: "Configure os dados do novo cliente e provisione os módulos de acesso."
-				})]
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
-				"data-uid": "src/components/AddClientDialog.tsx:84:9",
-				"data-prohibitions": "[editContent]",
-				onSubmit: handleSubmit,
-				className: "space-y-6 py-4",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/AddClientDialog.tsx:85:11",
-						"data-prohibitions": "[editContent]",
-						className: "grid grid-cols-2 gap-4",
-						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:86:13",
-								"data-prohibitions": "[]",
-								className: "space-y-2 col-span-2 sm:col-span-1",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:87:15",
-									"data-prohibitions": "[]",
-									htmlFor: "name",
-									children: "Nome da Empresa *"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:88:15",
-									"data-prohibitions": "[editContent]",
-									id: "name",
-									placeholder: "Ex: Acme Corp",
-									required: true,
-									value: formData.name,
-									onChange: (e) => setFormData({
-										...formData,
-										name: e.target.value
-									})
-								})]
-							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:96:13",
-								"data-prohibitions": "[editContent]",
-								className: "space-y-2 col-span-2 sm:col-span-1",
-								children: [
-									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:97:15",
-										"data-prohibitions": "[]",
-										htmlFor: "slug",
-										children: "Identificador (Slug) *"
-									}),
-									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-										"data-uid": "src/components/AddClientDialog.tsx:98:15",
-										"data-prohibitions": "[editContent]",
-										id: "slug",
-										placeholder: "ex: acme-corp",
-										required: true,
-										value: formData.slug,
-										onChange: (e) => {
-											const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-											setFormData({
-												...formData,
-												slug: val
-											});
-										}
-									}),
-									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-										"data-uid": "src/components/AddClientDialog.tsx:108:15",
-										"data-prohibitions": "[editContent]",
-										className: "text-[11px] text-muted-foreground mt-1 truncate",
-										children: [
-											"Acesso:",
-											" ",
-											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-												"data-uid": "src/components/AddClientDialog.tsx:110:17",
-												"data-prohibitions": "[editContent]",
-												className: "font-medium text-brand-cyan inline-block max-w-full align-bottom truncate",
-												children: previewUrl
-											})
-										]
-									})
-								]
-							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:115:13",
-								"data-prohibitions": "[]",
-								className: "space-y-2 col-span-2",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:116:15",
-									"data-prohibitions": "[]",
-									htmlFor: "logo",
-									children: "URL do Logotipo (Opcional)"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:117:15",
-									"data-prohibitions": "[editContent]",
-									id: "logo",
-									placeholder: "https://exemplo.com/logo.png",
-									value: formData.logo,
-									onChange: (e) => setFormData({
-										...formData,
-										logo: e.target.value
-									})
-								})]
-							})
-						]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/AddClientDialog.tsx:126:11",
-						"data-prohibitions": "[]",
-						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
-							"data-uid": "src/components/AddClientDialog.tsx:127:13",
-							"data-prohibitions": "[]",
-							className: "text-sm font-semibold text-foreground",
-							children: "Usuário Administrador"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							"data-uid": "src/components/AddClientDialog.tsx:128:13",
-							"data-prohibitions": "[]",
-							className: "grid grid-cols-2 gap-4",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:129:15",
-								"data-prohibitions": "[]",
-								className: "space-y-2 col-span-2 sm:col-span-1",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:130:17",
-									"data-prohibitions": "[]",
-									htmlFor: "adminName",
-									children: "Nome Completo *"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:131:17",
-									"data-prohibitions": "[editContent]",
-									id: "adminName",
-									placeholder: "Nome do responsável",
-									required: true,
-									value: formData.adminName,
-									onChange: (e) => setFormData({
-										...formData,
-										adminName: e.target.value
-									})
-								})]
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/AddClientDialog.tsx:139:15",
-								"data-prohibitions": "[]",
-								className: "space-y-2 col-span-2 sm:col-span-1",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/AddClientDialog.tsx:140:17",
-									"data-prohibitions": "[]",
-									htmlFor: "email",
-									children: "E-mail *"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/AddClientDialog.tsx:141:17",
-									"data-prohibitions": "[editContent]",
-									id: "email",
-									type: "email",
-									placeholder: "admin@empresa.com",
-									required: true
-								})]
-							})]
-						})]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/AddClientDialog.tsx:146:11",
-						"data-prohibitions": "[]",
-						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
-							"data-uid": "src/components/AddClientDialog.tsx:147:13",
-							"data-prohibitions": "[]",
-							className: "text-sm font-semibold text-foreground",
-							children: "Provisionamento de Módulos"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							"data-uid": "src/components/AddClientDialog.tsx:148:13",
-							"data-prohibitions": "[]",
-							className: "space-y-3",
-							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									"data-uid": "src/components/AddClientDialog.tsx:149:15",
-									"data-prohibitions": "[]",
-									className: "flex items-center justify-between",
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:150:17",
-										"data-prohibitions": "[]",
-										htmlFor: "mod-terceiros",
-										className: "cursor-pointer",
-										children: "Gestão de Terceiros"
-									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
-										"data-uid": "src/components/AddClientDialog.tsx:153:17",
-										"data-prohibitions": "[editContent]",
-										id: "mod-terceiros",
-										checked: formData.modules.terceiros,
-										onCheckedChange: (c) => setFormData({
-											...formData,
-											modules: {
-												...formData.modules,
-												terceiros: c
-											}
-										})
-									})]
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									"data-uid": "src/components/AddClientDialog.tsx:161:15",
-									"data-prohibitions": "[]",
-									className: "flex items-center justify-between",
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:162:17",
-										"data-prohibitions": "[]",
-										htmlFor: "mod-manutencao",
-										className: "cursor-pointer",
-										children: "Manutenção"
-									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
-										"data-uid": "src/components/AddClientDialog.tsx:165:17",
-										"data-prohibitions": "[editContent]",
-										id: "mod-manutencao",
-										checked: formData.modules.manutencao,
-										onCheckedChange: (c) => setFormData({
-											...formData,
-											modules: {
-												...formData.modules,
-												manutencao: c
-											}
-										})
-									})]
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									"data-uid": "src/components/AddClientDialog.tsx:173:15",
-									"data-prohibitions": "[]",
-									className: "flex items-center justify-between",
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/AddClientDialog.tsx:174:17",
-										"data-prohibitions": "[]",
-										htmlFor: "mod-limpeza",
-										className: "cursor-pointer",
-										children: "Limpeza"
-									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
-										"data-uid": "src/components/AddClientDialog.tsx:177:17",
-										"data-prohibitions": "[editContent]",
-										id: "mod-limpeza",
-										checked: formData.modules.limpeza,
-										onCheckedChange: (c) => setFormData({
-											...formData,
-											modules: {
-												...formData.modules,
-												limpeza: c
-											}
-										})
-									})]
-								})
-							]
-						})]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
-						"data-uid": "src/components/AddClientDialog.tsx:188:11",
-						"data-prohibitions": "[]",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-							"data-uid": "src/components/AddClientDialog.tsx:189:13",
-							"data-prohibitions": "[]",
-							type: "button",
-							variant: "outline",
-							onClick: () => onOpenChange(false),
-							children: "Cancelar"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-							"data-uid": "src/components/AddClientDialog.tsx:192:13",
-							"data-prohibitions": "[]",
-							type: "submit",
-							className: "font-medium",
-							children: "Salvar Empresa"
-						})]
-					})
-				]
-			})]
-		})
-	});
-}
-//#endregion
-//#region src/components/EditClientDialog.tsx
-function EditClientDialog({ client, open, onOpenChange }) {
-	const { updateClient } = useAppStore();
-	const { toast } = useToast();
-	const [formData, setFormData] = (0, import_react.useState)({
-		name: "",
-		slug: "",
-		adminName: "",
-		logo: ""
-	});
-	(0, import_react.useEffect)(() => {
-		if (client) setFormData({
-			name: client.name,
-			slug: client.slug,
-			adminName: client.adminName,
-			logo: client.logo || ""
-		});
-	}, [client]);
-	const baseUrl = window.location.origin;
-	const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`;
-	const handleSubmit = (e) => {
-		e.preventDefault();
-		if (!client) return;
-		updateClient(client.id, {
-			name: formData.name,
-			slug: formData.slug,
-			adminName: formData.adminName,
-			logo: formData.logo,
-			url: `${baseUrl}/${formData.slug}`
-		});
-		toast({
-			title: "Empresa atualizada",
-			description: "Os dados do cliente foram salvos com sucesso.",
-			className: "bg-green-50 text-green-900 border-green-200"
-		});
-		onOpenChange(false);
-	};
-	if (!client) return null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialog, {
-		"data-uid": "src/components/EditClientDialog.tsx:70:5",
-		"data-prohibitions": "[editContent]",
-		open,
-		onOpenChange,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogContent, {
-			"data-uid": "src/components/EditClientDialog.tsx:71:7",
-			"data-prohibitions": "[editContent]",
-			className: "sm:max-w-[550px] backdrop-blur-md bg-white/95",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogHeader, {
-				"data-uid": "src/components/EditClientDialog.tsx:72:9",
-				"data-prohibitions": "[]",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogTitle, {
-					"data-uid": "src/components/EditClientDialog.tsx:73:11",
-					"data-prohibitions": "[]",
-					className: "text-xl font-bold text-brand-blue",
-					children: "Editar Empresa"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DialogDescription, {
-					"data-uid": "src/components/EditClientDialog.tsx:74:11",
-					"data-prohibitions": "[]",
-					children: "Atualize as informações do perfil do cliente."
-				})]
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
-				"data-uid": "src/components/EditClientDialog.tsx:76:9",
-				"data-prohibitions": "[editContent]",
-				onSubmit: handleSubmit,
-				className: "space-y-6 py-4",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/EditClientDialog.tsx:77:11",
-						"data-prohibitions": "[editContent]",
-						className: "grid grid-cols-2 gap-4",
-						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/EditClientDialog.tsx:78:13",
-								"data-prohibitions": "[]",
-								className: "space-y-2 col-span-2 sm:col-span-1",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/EditClientDialog.tsx:79:15",
-									"data-prohibitions": "[]",
-									htmlFor: "edit-name",
-									children: "Nome da Empresa *"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/EditClientDialog.tsx:80:15",
-									"data-prohibitions": "[editContent]",
-									id: "edit-name",
-									placeholder: "Ex: Acme Corp",
-									required: true,
-									value: formData.name,
-									onChange: (e) => setFormData({
-										...formData,
-										name: e.target.value
-									})
-								})]
-							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/EditClientDialog.tsx:88:13",
-								"data-prohibitions": "[editContent]",
-								className: "space-y-2 col-span-2 sm:col-span-1",
-								children: [
-									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-										"data-uid": "src/components/EditClientDialog.tsx:89:15",
-										"data-prohibitions": "[]",
-										htmlFor: "edit-slug",
-										children: "Identificador (Slug) *"
-									}),
-									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-										"data-uid": "src/components/EditClientDialog.tsx:90:15",
-										"data-prohibitions": "[editContent]",
-										id: "edit-slug",
-										placeholder: "ex: acme-corp",
-										required: true,
-										value: formData.slug,
-										onChange: (e) => {
-											const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-											setFormData({
-												...formData,
-												slug: val
-											});
-										}
-									}),
-									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-										"data-uid": "src/components/EditClientDialog.tsx:100:15",
-										"data-prohibitions": "[editContent]",
-										className: "text-[11px] text-muted-foreground mt-1 truncate",
-										children: [
-											"Acesso:",
-											" ",
-											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-												"data-uid": "src/components/EditClientDialog.tsx:102:17",
-												"data-prohibitions": "[editContent]",
-												className: "font-medium text-brand-cyan inline-block max-w-full align-bottom truncate",
-												children: previewUrl
-											})
-										]
-									})
-								]
-							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/EditClientDialog.tsx:107:13",
-								"data-prohibitions": "[]",
-								className: "space-y-2 col-span-2",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/EditClientDialog.tsx:108:15",
-									"data-prohibitions": "[]",
-									htmlFor: "edit-logo",
-									children: "URL do Logotipo (Opcional)"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/EditClientDialog.tsx:109:15",
-									"data-prohibitions": "[editContent]",
-									id: "edit-logo",
-									placeholder: "https://exemplo.com/logo.png",
-									value: formData.logo,
-									onChange: (e) => setFormData({
-										...formData,
-										logo: e.target.value
-									})
-								})]
-							})
-						]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						"data-uid": "src/components/EditClientDialog.tsx:118:11",
-						"data-prohibitions": "[]",
-						className: "space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
-							"data-uid": "src/components/EditClientDialog.tsx:119:13",
-							"data-prohibitions": "[]",
-							className: "text-sm font-semibold text-foreground",
-							children: "Usuário Administrador"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							"data-uid": "src/components/EditClientDialog.tsx:120:13",
-							"data-prohibitions": "[]",
-							className: "grid grid-cols-1 gap-4",
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								"data-uid": "src/components/EditClientDialog.tsx:121:15",
-								"data-prohibitions": "[]",
-								className: "space-y-2",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label$1, {
-									"data-uid": "src/components/EditClientDialog.tsx:122:17",
-									"data-prohibitions": "[]",
-									htmlFor: "edit-adminName",
-									children: "Nome Completo *"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-									"data-uid": "src/components/EditClientDialog.tsx:123:17",
-									"data-prohibitions": "[editContent]",
-									id: "edit-adminName",
-									placeholder: "Nome do responsável",
-									required: true,
-									value: formData.adminName,
-									onChange: (e) => setFormData({
-										...formData,
-										adminName: e.target.value
-									})
-								})]
-							})
-						})]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DialogFooter, {
-						"data-uid": "src/components/EditClientDialog.tsx:134:11",
-						"data-prohibitions": "[]",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-							"data-uid": "src/components/EditClientDialog.tsx:135:13",
-							"data-prohibitions": "[]",
-							type: "button",
-							variant: "outline",
-							onClick: () => onOpenChange(false),
-							children: "Cancelar"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
-							"data-uid": "src/components/EditClientDialog.tsx:138:13",
-							"data-prohibitions": "[]",
-							type: "submit",
-							className: "font-medium",
-							children: "Salvar Alterações"
-						})]
-					})
-				]
-			})]
-		})
-	});
-}
 //#endregion
 //#region src/components/ManageModulesDialog.tsx
 function ManageModulesDialog({ client, open, onOpenChange }) {
@@ -28717,7 +28877,7 @@ function ClientManagement() {
 						"data-uid": "src/pages/ClientManagement.tsx:62:11",
 						"data-prohibitions": "[]",
 						className: "text-muted-foreground mt-1",
-						children: "Gerencie as empresas locatárias e seus módulos."
+						children: "Gerencie as empresas locatárias, seus módulos e identidades visuais."
 					})]
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
 					"data-uid": "src/pages/ClientManagement.tsx:66:9",
@@ -28799,50 +28959,77 @@ function ClientManagement() {
 										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Avatar, {
 											"data-uid": "src/pages/ClientManagement.tsx:88:21",
 											"data-prohibitions": "[editContent]",
-											className: "h-8 w-8 border border-brand-light",
+											className: "h-9 w-9 border shadow-sm",
 											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarImage, {
 												"data-uid": "src/pages/ClientManagement.tsx:89:23",
 												"data-prohibitions": "[editContent]",
 												src: client.logo,
-												alt: client.name
+												alt: client.name,
+												className: "object-cover"
 											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AvatarFallback, {
 												"data-uid": "src/pages/ClientManagement.tsx:90:23",
 												"data-prohibitions": "[editContent]",
 												className: "bg-brand-blue/10 text-brand-blue text-xs font-semibold",
 												children: client.name.substring(0, 2).toUpperCase()
 											})]
-										}), client.name]
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											"data-uid": "src/pages/ClientManagement.tsx:94:21",
+											"data-prohibitions": "[editContent]",
+											className: "flex flex-col",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												"data-uid": "src/pages/ClientManagement.tsx:95:23",
+												"data-prohibitions": "[editContent]",
+												children: client.name
+											}), (client.primaryColor || client.secondaryColor) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												"data-uid": "src/pages/ClientManagement.tsx:97:25",
+												"data-prohibitions": "[editContent]",
+												className: "flex gap-1.5 mt-1 items-center",
+												children: [client.primaryColor && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+													"data-uid": "src/pages/ClientManagement.tsx:99:29",
+													"data-prohibitions": "[editContent]",
+													className: "w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm",
+													style: { backgroundColor: client.primaryColor },
+													title: "Cor Primária"
+												}), client.secondaryColor && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+													"data-uid": "src/pages/ClientManagement.tsx:106:29",
+													"data-prohibitions": "[editContent]",
+													className: "w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm",
+													style: { backgroundColor: client.secondaryColor },
+													title: "Cor Secundária"
+												})]
+											})]
+										})]
 									})
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:97:17",
+									"data-uid": "src/pages/ClientManagement.tsx:117:17",
 									"data-prohibitions": "[editContent]",
-									className: "text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-12",
+									className: "text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-14",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-										"data-uid": "src/pages/ClientManagement.tsx:98:19",
+										"data-uid": "src/pages/ClientManagement.tsx:118:19",
 										"data-prohibitions": "[editContent]",
 										className: "truncate",
 										children: client.url
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExternalLink, {
-										"data-uid": "src/pages/ClientManagement.tsx:99:19",
+										"data-uid": "src/pages/ClientManagement.tsx:119:19",
 										"data-prohibitions": "[editContent]",
 										className: "h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
 									})]
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:101:17",
+									"data-uid": "src/pages/ClientManagement.tsx:121:17",
 									"data-prohibitions": "[editContent]",
 									children: client.adminName
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:102:17",
+									"data-uid": "src/pages/ClientManagement.tsx:122:17",
 									"data-prohibitions": "[editContent]",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-										"data-uid": "src/pages/ClientManagement.tsx:103:19",
+										"data-uid": "src/pages/ClientManagement.tsx:123:19",
 										"data-prohibitions": "[editContent]",
 										className: "flex flex-wrap gap-1",
 										children: client.modules.map((mod) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Badge, {
-											"data-uid": "src/pages/ClientManagement.tsx:105:23",
+											"data-uid": "src/pages/ClientManagement.tsx:125:23",
 											"data-prohibitions": "[editContent]",
 											variant: "secondary",
 											className: "bg-brand-blue/5 text-brand-blue hover:bg-brand-blue/10 text-[10px]",
@@ -28851,10 +29038,10 @@ function ClientManagement() {
 									})
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:115:17",
+									"data-uid": "src/pages/ClientManagement.tsx:135:17",
 									"data-prohibitions": "[editContent]",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Badge, {
-										"data-uid": "src/pages/ClientManagement.tsx:116:19",
+										"data-uid": "src/pages/ClientManagement.tsx:136:19",
 										"data-prohibitions": "[editContent]",
 										variant: client.status === "Ativo" ? "default" : "outline",
 										className: client.status === "Ativo" ? "bg-green-100 text-green-800 hover:bg-green-200 border-none" : "text-muted-foreground",
@@ -28862,61 +29049,61 @@ function ClientManagement() {
 									})
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-									"data-uid": "src/pages/ClientManagement.tsx:127:17",
+									"data-uid": "src/pages/ClientManagement.tsx:147:17",
 									"data-prohibitions": "[]",
 									className: "text-right",
 									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownMenu, {
-										"data-uid": "src/pages/ClientManagement.tsx:128:19",
+										"data-uid": "src/pages/ClientManagement.tsx:148:19",
 										"data-prohibitions": "[]",
 										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuTrigger, {
-											"data-uid": "src/pages/ClientManagement.tsx:129:21",
+											"data-uid": "src/pages/ClientManagement.tsx:149:21",
 											"data-prohibitions": "[]",
 											asChild: true,
 											children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
-												"data-uid": "src/pages/ClientManagement.tsx:130:23",
+												"data-uid": "src/pages/ClientManagement.tsx:150:23",
 												"data-prohibitions": "[]",
 												variant: "ghost",
 												className: "h-8 w-8 p-0",
 												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-													"data-uid": "src/pages/ClientManagement.tsx:131:25",
+													"data-uid": "src/pages/ClientManagement.tsx:151:25",
 													"data-prohibitions": "[]",
 													className: "sr-only",
 													children: "Abrir menu"
 												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EllipsisVertical, {
-													"data-uid": "src/pages/ClientManagement.tsx:132:25",
+													"data-uid": "src/pages/ClientManagement.tsx:152:25",
 													"data-prohibitions": "[editContent]",
 													className: "h-4 w-4"
 												})]
 											})
 										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownMenuContent, {
-											"data-uid": "src/pages/ClientManagement.tsx:135:21",
+											"data-uid": "src/pages/ClientManagement.tsx:155:21",
 											"data-prohibitions": "[]",
 											align: "end",
 											className: "w-[160px]",
 											children: [
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuLabel, {
-													"data-uid": "src/pages/ClientManagement.tsx:136:23",
+													"data-uid": "src/pages/ClientManagement.tsx:156:23",
 													"data-prohibitions": "[]",
 													children: "Ações"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ClientManagement.tsx:137:23",
+													"data-uid": "src/pages/ClientManagement.tsx:157:23",
 													"data-prohibitions": "[]",
 													onClick: () => setEditingClient(client),
 													children: "Editar Perfil"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ClientManagement.tsx:140:23",
+													"data-uid": "src/pages/ClientManagement.tsx:160:23",
 													"data-prohibitions": "[]",
 													onClick: () => setManagingModulesClient(client),
 													children: "Gerenciar Módulos"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuSeparator, {
-													"data-uid": "src/pages/ClientManagement.tsx:143:23",
+													"data-uid": "src/pages/ClientManagement.tsx:163:23",
 													"data-prohibitions": "[editContent]"
 												}),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownMenuItem, {
-													"data-uid": "src/pages/ClientManagement.tsx:144:23",
+													"data-uid": "src/pages/ClientManagement.tsx:164:23",
 													"data-prohibitions": "[]",
 													className: "text-destructive focus:text-destructive cursor-pointer",
 													onClick: () => setClientToDelete(client.id),
@@ -28928,10 +29115,10 @@ function ClientManagement() {
 								})
 							]
 						}, client.id)), clients.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableRow, {
-							"data-uid": "src/pages/ClientManagement.tsx:156:15",
+							"data-uid": "src/pages/ClientManagement.tsx:176:15",
 							"data-prohibitions": "[]",
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableCell, {
-								"data-uid": "src/pages/ClientManagement.tsx:157:17",
+								"data-uid": "src/pages/ClientManagement.tsx:177:17",
 								"data-prohibitions": "[]",
 								colSpan: 6,
 								className: "h-24 text-center text-muted-foreground",
@@ -28942,54 +29129,54 @@ function ClientManagement() {
 				})
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AddClientDialog, {
-				"data-uid": "src/pages/ClientManagement.tsx:166:7",
+				"data-uid": "src/pages/ClientManagement.tsx:186:7",
 				"data-prohibitions": "[editContent]",
 				open: isAddOpen,
 				onOpenChange: setIsAddOpen
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(EditClientDialog, {
-				"data-uid": "src/pages/ClientManagement.tsx:168:7",
+				"data-uid": "src/pages/ClientManagement.tsx:188:7",
 				"data-prohibitions": "[editContent]",
 				client: editingClient,
 				open: !!editingClient,
 				onOpenChange: (open) => !open && setEditingClient(null)
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ManageModulesDialog, {
-				"data-uid": "src/pages/ClientManagement.tsx:174:7",
+				"data-uid": "src/pages/ClientManagement.tsx:194:7",
 				"data-prohibitions": "[editContent]",
 				client: managingModulesClient,
 				open: !!managingModulesClient,
 				onOpenChange: (open) => !open && setManagingModulesClient(null)
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialog, {
-				"data-uid": "src/pages/ClientManagement.tsx:180:7",
+				"data-uid": "src/pages/ClientManagement.tsx:200:7",
 				"data-prohibitions": "[]",
 				open: !!clientToDelete,
 				onOpenChange: (open) => !open && setClientToDelete(null),
 				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AlertDialogContent, {
-					"data-uid": "src/pages/ClientManagement.tsx:184:9",
+					"data-uid": "src/pages/ClientManagement.tsx:204:9",
 					"data-prohibitions": "[]",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AlertDialogHeader, {
-						"data-uid": "src/pages/ClientManagement.tsx:185:11",
+						"data-uid": "src/pages/ClientManagement.tsx:205:11",
 						"data-prohibitions": "[]",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogTitle, {
-							"data-uid": "src/pages/ClientManagement.tsx:186:13",
+							"data-uid": "src/pages/ClientManagement.tsx:206:13",
 							"data-prohibitions": "[]",
 							children: "Confirmar Exclusão"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogDescription, {
-							"data-uid": "src/pages/ClientManagement.tsx:187:13",
+							"data-uid": "src/pages/ClientManagement.tsx:207:13",
 							"data-prohibitions": "[]",
 							children: "Tem certeza que deseja excluir esta empresa permanentemente? Todos os acessos e registros associados a ela serão perdidos."
 						})]
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AlertDialogFooter, {
-						"data-uid": "src/pages/ClientManagement.tsx:192:11",
+						"data-uid": "src/pages/ClientManagement.tsx:212:11",
 						"data-prohibitions": "[]",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogCancel, {
-							"data-uid": "src/pages/ClientManagement.tsx:193:13",
+							"data-uid": "src/pages/ClientManagement.tsx:213:13",
 							"data-prohibitions": "[]",
 							children: "Cancelar"
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDialogAction, {
-							"data-uid": "src/pages/ClientManagement.tsx:194:13",
+							"data-uid": "src/pages/ClientManagement.tsx:214:13",
 							"data-prohibitions": "[]",
 							className: "bg-destructive hover:bg-destructive/90 text-white",
 							onClick: handleDelete,
@@ -31566,4 +31753,4 @@ var App = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppProvider, {
 }));
 //#endregion
 
-//# sourceMappingURL=index-Dq9mto0Z.js.map
+//# sourceMappingURL=index-B1pE-Qbx.js.map

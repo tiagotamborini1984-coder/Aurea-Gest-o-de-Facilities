@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store/AppContext'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface AddClientDialogProps {
   open: boolean
@@ -22,20 +23,36 @@ interface AddClientDialogProps {
 export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
   const { addClient } = useAppStore()
   const { toast } = useToast()
-  const [formData, setFormData] = useState({
+
+  const initialData = {
     name: '',
     slug: '',
     adminName: '',
     logo: '',
+    primaryColor: '#1e293b', // Graphite
+    secondaryColor: '#0ea5e9', // Tech Cyan
     modules: {
       terceiros: true,
       manutencao: false,
       limpeza: false,
     },
-  })
+  }
+
+  const [formData, setFormData] = useState(initialData)
 
   const baseUrl = window.location.origin
   const previewUrl = formData.slug ? `${baseUrl}/${formData.slug}` : `${baseUrl}/[slug-da-empresa]`
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFormData((prev) => ({ ...prev, logo: reader.result as string }))
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,6 +67,8 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
       url: `${baseUrl}/${formData.slug}`,
       adminName: formData.adminName,
       logo: formData.logo,
+      primaryColor: formData.primaryColor,
+      secondaryColor: formData.secondaryColor,
       status: 'Ativo',
       modules: activeModules,
     })
@@ -61,13 +80,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
     })
 
     onOpenChange(false)
-    setFormData({
-      name: '',
-      slug: '',
-      adminName: '',
-      logo: '',
-      modules: { terceiros: true, manutencao: false, limpeza: false },
-    })
+    setFormData(initialData)
   }
 
   return (
@@ -78,7 +91,7 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
             Cadastrar Nova Empresa
           </DialogTitle>
           <DialogDescription>
-            Configure os dados do novo cliente e provisione os módulos de acesso.
+            Configure os dados do novo cliente e identidade visual.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
@@ -112,14 +125,68 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
                 </span>
               </p>
             </div>
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="logo">URL do Logotipo (Opcional)</Label>
-              <Input
-                id="logo"
-                placeholder="https://exemplo.com/logo.png"
-                value={formData.logo}
-                onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-              />
+
+            {/* Identidade Visual */}
+            <div className="col-span-2 space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30">
+              <h4 className="text-sm font-semibold text-foreground">Identidade Visual</h4>
+
+              <div className="space-y-2">
+                <Label htmlFor="logo">Logotipo da Empresa</Label>
+                <div className="flex items-center gap-4">
+                  {formData.logo && (
+                    <Avatar className="h-12 w-12 border shadow-sm">
+                      <AvatarImage src={formData.logo} className="object-cover" />
+                      <AvatarFallback>LG</AvatarFallback>
+                    </Avatar>
+                  )}
+                  <Input
+                    id="logo"
+                    type="file"
+                    accept="image/png, image/jpeg, image/svg+xml"
+                    onChange={handleFileChange}
+                    className="cursor-pointer file:cursor-pointer file:text-brand-blue"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="primaryColor">Cor Primária</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="primaryColor"
+                      type="color"
+                      className="w-12 h-10 p-1 cursor-pointer"
+                      value={formData.primaryColor}
+                      onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                    />
+                    <Input
+                      type="text"
+                      className="flex-1"
+                      value={formData.primaryColor}
+                      onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="secondaryColor">Cor Secundária</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="secondaryColor"
+                      type="color"
+                      className="w-12 h-10 p-1 cursor-pointer"
+                      value={formData.secondaryColor}
+                      onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
+                    />
+                    <Input
+                      type="text"
+                      className="flex-1"
+                      value={formData.secondaryColor}
+                      onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -139,48 +206,6 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
               <div className="space-y-2 col-span-2 sm:col-span-1">
                 <Label htmlFor="email">E-mail *</Label>
                 <Input id="email" type="email" placeholder="admin@empresa.com" required />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30">
-            <h4 className="text-sm font-semibold text-foreground">Provisionamento de Módulos</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="mod-terceiros" className="cursor-pointer">
-                  Gestão de Terceiros
-                </Label>
-                <Switch
-                  id="mod-terceiros"
-                  checked={formData.modules.terceiros}
-                  onCheckedChange={(c) =>
-                    setFormData({ ...formData, modules: { ...formData.modules, terceiros: c } })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="mod-manutencao" className="cursor-pointer">
-                  Manutenção
-                </Label>
-                <Switch
-                  id="mod-manutencao"
-                  checked={formData.modules.manutencao}
-                  onCheckedChange={(c) =>
-                    setFormData({ ...formData, modules: { ...formData.modules, manutencao: c } })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="mod-limpeza" className="cursor-pointer">
-                  Limpeza
-                </Label>
-                <Switch
-                  id="mod-limpeza"
-                  checked={formData.modules.limpeza}
-                  onCheckedChange={(c) =>
-                    setFormData({ ...formData, modules: { ...formData.modules, limpeza: c } })
-                  }
-                />
               </div>
             </div>
           </div>

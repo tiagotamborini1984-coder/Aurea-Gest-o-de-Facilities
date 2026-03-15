@@ -7,6 +7,8 @@ export type Client = {
   url: string
   adminName: string
   logo?: string
+  primaryColor?: string
+  secondaryColor?: string
   status: 'Ativo' | 'Inativo'
   modules: string[]
 }
@@ -39,6 +41,8 @@ const defaultClients: Client[] = [
     url: `${baseUrl}/techcorp`,
     adminName: 'Carlos Silva',
     logo: 'https://img.usecurling.com/i?q=technology&color=blue',
+    primaryColor: '#2563eb',
+    secondaryColor: '#0ea5e9',
     status: 'Ativo',
     modules: ['Gestão de Terceiros', 'Manutenção'],
   },
@@ -49,6 +53,8 @@ const defaultClients: Client[] = [
     url: `${baseUrl}/globalfac`,
     adminName: 'Marina Costa',
     logo: 'https://img.usecurling.com/i?q=global&color=cyan',
+    primaryColor: '#0891b2',
+    secondaryColor: '#10b981',
     status: 'Ativo',
     modules: ['Gestão de Terceiros'],
   },
@@ -59,6 +65,8 @@ const defaultClients: Client[] = [
     url: `${baseUrl}/innovatex`,
     adminName: 'Roberto Alves',
     logo: 'https://img.usecurling.com/i?q=innovation&color=gray',
+    primaryColor: '#475569',
+    secondaryColor: '#94a3b8',
     status: 'Inativo',
     modules: ['Limpeza', 'Manutenção'],
   },
