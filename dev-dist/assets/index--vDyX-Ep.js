@@ -45855,7 +45855,7 @@ function Login() {
 											"data-uid": "src/pages/Login.tsx:131:19",
 											"data-prohibitions": "[]",
 											className: "text-xs text-muted-foreground bg-brand-light/50 p-2 rounded-md",
-											children: "Dica: Use admin@aurea.com e admin123"
+											children: "Dica: Use admin@aurea.com e AureaAdmin2024!"
 										})
 									})
 								]
@@ -46014,4 +46014,4 @@ var App = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AuthProvider, {
 }));
 //#endregion
 
-//# sourceMappingURL=index-CdXObOkw.js.map
+//# sourceMappingURL=index--vDyX-Ep.js.map

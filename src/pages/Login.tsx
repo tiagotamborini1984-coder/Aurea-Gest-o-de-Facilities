@@ -129,7 +129,7 @@ export default function Login() {
 
                 <div className="mt-4 text-center">
                   <p className="text-xs text-muted-foreground bg-brand-light/50 p-2 rounded-md">
-                    Dica: Use admin@aurea.com e admin123
+                    Dica: Use admin@aurea.com e AureaAdmin2024!
                   </p>
                 </div>
               </form>
