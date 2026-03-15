@@ -10,10 +10,11 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store/AppContext'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Loader2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 
 interface AddClientDialogProps {
   open: boolean
@@ -23,14 +24,16 @@ interface AddClientDialogProps {
 export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
   const { addClient } = useAppStore()
   const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const initialData = {
     name: '',
     slug: '',
     adminName: '',
-    logo: '',
-    primaryColor: '#1e293b', // Graphite
-    secondaryColor: '#0ea5e9', // Tech Cyan
+    logoPreview: '',
+    primaryColor: '#1e293b',
+    secondaryColor: '#0ea5e9',
     modules: {
       terceiros: true,
       manutencao: false,
@@ -46,45 +49,79 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setSelectedFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
-        setFormData((prev) => ({ ...prev, logo: reader.result as string }))
+        setFormData((prev) => ({ ...prev, logoPreview: reader.result as string }))
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+
+    let finalLogoUrl = ''
+
+    if (selectedFile) {
+      const fileExt = selectedFile.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, selectedFile)
+
+      if (uploadData && !uploadError) {
+        const { data: urlData } = supabase.storage.from('logos').getPublicUrl(uploadData.path)
+        finalLogoUrl = urlData.publicUrl
+      } else {
+        console.error('Upload error:', uploadError)
+        toast({
+          variant: 'destructive',
+          title: 'Erro no upload',
+          description: 'Não foi possível enviar o logotipo.',
+        })
+      }
+    }
+
     const activeModules = []
     if (formData.modules.terceiros) activeModules.push('Gestão de Terceiros')
     if (formData.modules.manutencao) activeModules.push('Manutenção')
     if (formData.modules.limpeza) activeModules.push('Limpeza')
 
-    addClient({
+    const success = await addClient({
       name: formData.name,
       slug: formData.slug,
-      url: `${baseUrl}/${formData.slug}`,
       adminName: formData.adminName,
-      logo: formData.logo,
+      logo: finalLogoUrl || undefined,
       primaryColor: formData.primaryColor,
       secondaryColor: formData.secondaryColor,
       status: 'Ativo',
       modules: activeModules,
     })
 
-    toast({
-      title: 'Sucesso!',
-      description: 'Empresa cadastrada com sucesso.',
-      className: 'bg-green-50 text-green-900 border-green-200',
-    })
-
-    onOpenChange(false)
-    setFormData(initialData)
+    if (success) {
+      toast({
+        title: 'Sucesso!',
+        description: 'Empresa cadastrada com sucesso.',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      onOpenChange(false)
+      setFormData(initialData)
+      setSelectedFile(null)
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Não foi possível cadastrar a empresa. Tente novamente.',
+      })
+    }
+    setIsSubmitting(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(openState) => !isSubmitting && onOpenChange(openState)}>
       <DialogContent className="sm:max-w-[550px] backdrop-blur-md bg-white/95">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-brand-blue">
@@ -126,16 +163,15 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
               </p>
             </div>
 
-            {/* Identidade Visual */}
             <div className="col-span-2 space-y-4 border border-brand-light rounded-xl p-4 bg-muted/30">
               <h4 className="text-sm font-semibold text-foreground">Identidade Visual</h4>
 
               <div className="space-y-2">
                 <Label htmlFor="logo">Logotipo da Empresa</Label>
                 <div className="flex items-center gap-4">
-                  {formData.logo && (
+                  {formData.logoPreview && (
                     <Avatar className="h-12 w-12 border shadow-sm">
-                      <AvatarImage src={formData.logo} className="object-cover" />
+                      <AvatarImage src={formData.logoPreview} className="object-cover" />
                       <AvatarFallback>LG</AvatarFallback>
                     </Avatar>
                   )}
@@ -211,10 +247,16 @@ export function AddClientDialog({ open, onOpenChange }: AddClientDialogProps) {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
               Cancelar
             </Button>
-            <Button type="submit" className="font-medium">
+            <Button type="submit" className="font-medium" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar Empresa
             </Button>
           </DialogFooter>

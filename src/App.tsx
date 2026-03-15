@@ -9,29 +9,32 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppProvider } from './store/AppContext'
+import { AuthProvider } from './hooks/use-auth'
 
 const App = () => (
-  <AppProvider>
-    <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route path="/login" element={<Login />} />
+  <AuthProvider>
+    <AppProvider>
+      <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Navigate to="/clientes" replace />} />
-              <Route path="/clientes" element={<ClientManagement />} />
-              <Route path="/gestao-terceiros" element={<ThirdPartyManagement />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Navigate to="/clientes" replace />} />
+                <Route path="/clientes" element={<ClientManagement />} />
+                <Route path="/gestao-terceiros" element={<ThirdPartyManagement />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
-    </BrowserRouter>
-  </AppProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </BrowserRouter>
+    </AppProvider>
+  </AuthProvider>
 )
 
 export default App

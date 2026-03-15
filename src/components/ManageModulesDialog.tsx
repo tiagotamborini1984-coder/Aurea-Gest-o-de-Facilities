@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore, Client } from '@/store/AppContext'
+import { Loader2 } from 'lucide-react'
 
 interface ManageModulesDialogProps {
   client: Client | null
@@ -22,6 +23,7 @@ interface ManageModulesDialogProps {
 export function ManageModulesDialog({ client, open, onOpenChange }: ManageModulesDialogProps) {
   const { updateClient } = useAppStore()
   const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [modules, setModules] = useState({
     terceiros: false,
     manutencao: false,
@@ -38,30 +40,40 @@ export function ManageModulesDialog({ client, open, onOpenChange }: ManageModule
     }
   }, [client])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!client) return
+
+    setIsSubmitting(true)
 
     const activeModules = []
     if (modules.terceiros) activeModules.push('Gestão de Terceiros')
     if (modules.manutencao) activeModules.push('Manutenção')
     if (modules.limpeza) activeModules.push('Limpeza')
 
-    updateClient(client.id, { modules: activeModules })
+    const success = await updateClient(client.id, { modules: activeModules })
 
-    toast({
-      title: 'Módulos atualizados',
-      description: `As permissões de acesso para ${client.name} foram salvas.`,
-      className: 'bg-green-50 text-green-900 border-green-200',
-    })
-
-    onOpenChange(false)
+    if (success) {
+      toast({
+        title: 'Módulos atualizados',
+        description: `As permissões de acesso para ${client.name} foram salvas.`,
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      onOpenChange(false)
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Não foi possível atualizar os módulos.',
+      })
+    }
+    setIsSubmitting(false)
   }
 
   if (!client) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(openState) => !isSubmitting && onOpenChange(openState)}>
       <DialogContent className="sm:max-w-[450px] backdrop-blur-md bg-white/95">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-brand-blue">Gerenciar Módulos</DialogTitle>
@@ -85,6 +97,7 @@ export function ManageModulesDialog({ client, open, onOpenChange }: ManageModule
                   id="mg-mod-terceiros"
                   checked={modules.terceiros}
                   onCheckedChange={(c) => setModules({ ...modules, terceiros: c })}
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -100,6 +113,7 @@ export function ManageModulesDialog({ client, open, onOpenChange }: ManageModule
                   id="mg-mod-manutencao"
                   checked={modules.manutencao}
                   onCheckedChange={(c) => setModules({ ...modules, manutencao: c })}
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -115,16 +129,23 @@ export function ManageModulesDialog({ client, open, onOpenChange }: ManageModule
                   id="mg-mod-limpeza"
                   checked={modules.limpeza}
                   onCheckedChange={(c) => setModules({ ...modules, limpeza: c })}
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
               Cancelar
             </Button>
-            <Button type="submit" className="font-medium">
+            <Button type="submit" className="font-medium" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar Permissões
             </Button>
           </DialogFooter>

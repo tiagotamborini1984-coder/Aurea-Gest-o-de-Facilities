@@ -11,13 +11,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAppStore } from '@/store/AppContext'
+import { useAuth } from '@/hooks/use-auth'
 
 export function AppHeader() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isMobile } = useSidebar()
-  const { logout } = useAppStore()
+  const { signOut, user } = useAuth()
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -30,8 +30,8 @@ export function AppHeader() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await signOut()
     navigate('/login')
   }
 
@@ -63,8 +63,10 @@ export function AppHeader() {
 
         <div className="flex items-center gap-2 pl-2 border-l border-white/20">
           <div className="hidden sm:flex flex-col text-right">
-            <span className="text-sm font-medium leading-none">Master User</span>
-            <span className="text-xs text-white/70">Admin Global</span>
+            <span className="text-sm font-medium leading-none">Administrador</span>
+            <span className="text-xs text-white/70 truncate max-w-[150px]">
+              {user?.email || 'Admin Global'}
+            </span>
           </div>
 
           <DropdownMenu>
@@ -80,8 +82,8 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-56 mt-2">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">Master User</p>
-                  <p className="text-xs leading-none text-muted-foreground">admin@aurea.com</p>
+                  <p className="text-sm font-medium leading-none">Administrador</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

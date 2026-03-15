@@ -5,30 +5,30 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppStore } from '@/store/AppContext'
+import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Login() {
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const { login, isAuthenticated } = useAppStore()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { signIn, user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (user) {
       navigate('/clientes', { replace: true })
     }
-  }, [isAuthenticated, navigate])
+  }, [user, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setIsSubmitting(true)
 
-    const success = await login(username, password)
+    const { error } = await signIn(email, password)
 
-    if (success) {
+    if (!error) {
       toast({
         title: 'Login bem-sucedido',
         description: 'Bem-vindo ao painel administrativo.',
@@ -39,9 +39,9 @@ export default function Login() {
       toast({
         variant: 'destructive',
         title: 'Credenciais inválidas',
-        description: 'O usuário ou senha fornecidos estão incorretos.',
+        description: 'O e-mail ou senha fornecidos estão incorretos.',
       })
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -77,16 +77,16 @@ export default function Login() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2 relative">
-                  <Label htmlFor="username">Usuário</Label>
+                  <Label htmlFor="email">E-mail</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="username"
-                      type="text"
+                      id="email"
+                      type="email"
                       placeholder="admin@aurea.com"
                       className="pl-9 h-11"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
@@ -115,9 +115,9 @@ export default function Login() {
                 <Button
                   type="submit"
                   className="w-full h-11 bg-brand-blue hover:bg-brand-blue/90 text-white transition-all shadow-md mt-2"
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 >
-                  {isLoading ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Autenticando...
@@ -129,7 +129,7 @@ export default function Login() {
 
                 <div className="mt-4 text-center">
                   <p className="text-xs text-muted-foreground bg-brand-light/50 p-2 rounded-md">
-                    Dica: Qualquer usuário e senha com +4 caracteres para testar.
+                    Dica: Use admin@aurea.com e admin123
                   </p>
                 </div>
               </form>

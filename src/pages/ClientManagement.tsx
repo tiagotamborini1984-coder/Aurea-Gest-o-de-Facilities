@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, MoreVertical, ExternalLink } from 'lucide-react'
+import { Plus, MoreVertical, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -36,20 +36,31 @@ import { ManageModulesDialog } from '@/components/ManageModulesDialog'
 import { useToast } from '@/hooks/use-toast'
 
 export default function ClientManagement() {
-  const { clients, deleteClient } = useAppStore()
+  const { clients, isLoadingClients, deleteClient } = useAppStore()
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [managingModulesClient, setManagingModulesClient] = useState<Client | null>(null)
   const [clientToDelete, setClientToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (clientToDelete) {
-      deleteClient(clientToDelete)
-      toast({
-        title: 'Empresa removida',
-        description: 'Os dados do cliente foram apagados com sucesso.',
-      })
+      setIsDeleting(true)
+      const success = await deleteClient(clientToDelete)
+      if (success) {
+        toast({
+          title: 'Empresa removida',
+          description: 'Os dados do cliente foram apagados com sucesso.',
+        })
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Erro',
+          description: 'Não foi possível excluir o cliente.',
+        })
+      }
+      setIsDeleting(false)
       setClientToDelete(null)
     }
   }
@@ -81,103 +92,113 @@ export default function ClientManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.map((client) => (
-              <TableRow key={client.id} className="hover:bg-muted/30 transition-colors">
-                <TableCell className="font-medium text-foreground">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9 border shadow-sm">
-                      <AvatarImage src={client.logo} alt={client.name} className="object-cover" />
-                      <AvatarFallback className="bg-brand-blue/10 text-brand-blue text-xs font-semibold">
-                        {client.name.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span>{client.name}</span>
-                      {(client.primaryColor || client.secondaryColor) && (
-                        <div className="flex gap-1.5 mt-1 items-center">
-                          {client.primaryColor && (
-                            <div
-                              className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm"
-                              style={{ backgroundColor: client.primaryColor }}
-                              title="Cor Primária"
-                            />
-                          )}
-                          {client.secondaryColor && (
-                            <div
-                              className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm"
-                              style={{ backgroundColor: client.secondaryColor }}
-                              title="Cor Secundária"
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
+            {isLoadingClients ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                    <span>Carregando clientes...</span>
                   </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-14">
-                  <span className="truncate">{client.url}</span>
-                  <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </TableCell>
-                <TableCell>{client.adminName}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {client.modules.map((mod) => (
-                      <Badge
-                        key={mod}
-                        variant="secondary"
-                        className="bg-brand-blue/5 text-brand-blue hover:bg-brand-blue/10 text-[10px]"
-                      >
-                        {mod}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={client.status === 'Ativo' ? 'default' : 'outline'}
-                    className={
-                      client.status === 'Ativo'
-                        ? 'bg-green-100 text-green-800 hover:bg-green-200 border-none'
-                        : 'text-muted-foreground'
-                    }
-                  >
-                    {client.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Abrir menu</span>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[160px]">
-                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => setEditingClient(client)}>
-                        Editar Perfil
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setManagingModulesClient(client)}>
-                        Gerenciar Módulos
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                        onClick={() => setClientToDelete(client.id)}
-                      >
-                        Excluir Empresa
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
-            {clients.length === 0 && (
+            ) : clients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   Nenhuma empresa cadastrada.
                 </TableCell>
               </TableRow>
+            ) : (
+              clients.map((client) => (
+                <TableRow key={client.id} className="hover:bg-muted/30 transition-colors">
+                  <TableCell className="font-medium text-foreground">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9 border shadow-sm">
+                        <AvatarImage src={client.logo} alt={client.name} className="object-cover" />
+                        <AvatarFallback className="bg-brand-blue/10 text-brand-blue text-xs font-semibold">
+                          {client.name.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span>{client.name}</span>
+                        {(client.primaryColor || client.secondaryColor) && (
+                          <div className="flex gap-1.5 mt-1 items-center">
+                            {client.primaryColor && (
+                              <div
+                                className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm"
+                                style={{ backgroundColor: client.primaryColor }}
+                                title="Cor Primária"
+                              />
+                            )}
+                            {client.secondaryColor && (
+                              <div
+                                className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-sm"
+                                style={{ backgroundColor: client.secondaryColor }}
+                                title="Cor Secundária"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground flex items-center gap-1 group cursor-pointer max-w-[200px] truncate h-14">
+                    <span className="truncate">{client.url}</span>
+                    <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </TableCell>
+                  <TableCell>{client.adminName}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {client.modules.map((mod) => (
+                        <Badge
+                          key={mod}
+                          variant="secondary"
+                          className="bg-brand-blue/5 text-brand-blue hover:bg-brand-blue/10 text-[10px]"
+                        >
+                          {mod}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={client.status === 'Ativo' ? 'default' : 'outline'}
+                      className={
+                        client.status === 'Ativo'
+                          ? 'bg-green-100 text-green-800 hover:bg-green-200 border-none'
+                          : 'text-muted-foreground'
+                      }
+                    >
+                      {client.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Abrir menu</span>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[160px]">
+                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setEditingClient(client)}>
+                          Editar Perfil
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setManagingModulesClient(client)}>
+                          Gerenciar Módulos
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive cursor-pointer"
+                          onClick={() => setClientToDelete(client.id)}
+                        >
+                          Excluir Empresa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -199,7 +220,7 @@ export default function ClientManagement() {
 
       <AlertDialog
         open={!!clientToDelete}
-        onOpenChange={(open) => !open && setClientToDelete(null)}
+        onOpenChange={(open) => !open && !isDeleting && setClientToDelete(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -210,12 +231,13 @@ export default function ClientManagement() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90 text-white"
               onClick={handleDelete}
+              disabled={isDeleting}
             >
-              Excluir
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
