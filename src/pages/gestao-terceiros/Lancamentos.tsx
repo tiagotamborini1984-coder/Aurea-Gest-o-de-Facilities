@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -11,24 +9,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
+import {
+  Search,
+  Users,
+  Wrench,
+  Target,
+  Save,
+  CheckCircle2,
+  XCircle,
+  Check,
+  Calendar as CalendarIcon,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function Lancamentos() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [plantId, setPlantId] = useState<string>('')
-  const [activeTab, setActiveTab] = useState('staff')
+  const [activeTab, setActiveTab] = useState<'staff' | 'equipment' | 'metas'>('staff')
   const [presences, setPresences] = useState<Record<string, boolean>>({})
   const [goalValues, setGoalValues] = useState<Record<string, number>>({})
+  const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
   const { toast } = useToast()
   const { plants, employees, equipment, functions, locations, goals } = useMasterData()
-  const { profile } = useAppStore()
+  const { profile, activeClient } = useAppStore()
+
+  // Default plant selection if none selected
+  useEffect(() => {
+    if (plants.length > 0 && !plantId) {
+      setPlantId(plants[0].id)
+    }
+  }, [plants, plantId])
 
   useEffect(() => {
     if (!plantId || !profile) return
@@ -70,96 +88,193 @@ export default function Lancamentos() {
     if (!profile || !plantId) return
     setIsSaving(true)
 
-    if (activeTab === 'metas') {
-      const activeGoals = goals.filter((g) => g.is_active)
-      const payload = activeGoals.map((g) => ({
-        client_id: profile.client_id,
-        plant_id: plantId,
-        goal_id: g.id,
-        reference_month: `${month}-01`,
-        value: goalValues[g.id] || 0,
-      }))
+    try {
+      if (activeTab === 'metas') {
+        const activeGoals = goals.filter((g) => g.is_active)
+        const payload = activeGoals.map((g) => ({
+          client_id: profile.client_id,
+          plant_id: plantId,
+          goal_id: g.id,
+          reference_month: `${month}-01`,
+          value: goalValues[g.id] || 0,
+        }))
 
-      if (payload.length > 0) {
-        const { error } = await supabase
-          .from('monthly_goals_data')
-          .upsert(payload, { onConflict: 'plant_id,goal_id,reference_month' })
-        if (!error) toast({ title: 'Metas salvas com sucesso' })
-        else toast({ variant: 'destructive', title: 'Erro ao salvar metas' })
+        if (payload.length > 0) {
+          const { error } = await supabase
+            .from('monthly_goals_data')
+            .upsert(payload, { onConflict: 'plant_id,goal_id,reference_month' })
+          if (error) throw error
+          toast({
+            title: 'Metas salvas com sucesso',
+            className: 'bg-green-50 text-green-900 border-green-200',
+          })
+        }
+      } else {
+        const list =
+          activeTab === 'staff'
+            ? employees.filter((e) => e.plant_id === plantId)
+            : equipment.filter((e) => e.plant_id === plantId)
+
+        const payload = list.map((item) => ({
+          client_id: profile.client_id,
+          plant_id: plantId,
+          date,
+          type: activeTab,
+          reference_id: item.id,
+          status: presences[item.id] ?? false,
+        }))
+
+        if (payload.length > 0) {
+          const { error } = await supabase
+            .from('daily_logs')
+            .upsert(payload, { onConflict: 'date,type,reference_id' })
+          if (error) throw error
+          toast({
+            title: 'Lançamentos salvos com sucesso',
+            className: 'bg-green-50 text-green-900 border-green-200',
+          })
+        }
       }
-    } else {
-      const list =
-        activeTab === 'staff'
-          ? employees.filter((e) => e.plant_id === plantId)
-          : equipment.filter((e) => e.plant_id === plantId)
-
-      const payload = list.map((item) => ({
-        client_id: profile.client_id,
-        plant_id: plantId,
-        date,
-        type: activeTab,
-        reference_id: item.id,
-        status: presences[item.id] ?? false,
-      }))
-
-      if (payload.length > 0) {
-        const { error } = await supabase
-          .from('daily_logs')
-          .upsert(payload, { onConflict: 'date,type,reference_id' })
-        if (!error) toast({ title: 'Lançamentos salvos com sucesso' })
-        else toast({ variant: 'destructive', title: 'Erro ao salvar lançamentos' })
-      }
+    } catch (error) {
+      console.error(error)
+      toast({ variant: 'destructive', title: 'Erro ao salvar lançamentos' })
+    } finally {
+      setIsSaving(false)
     }
-    setIsSaving(false)
   }
 
-  const listToRender =
-    activeTab === 'staff'
-      ? employees.filter((e) => e.plant_id === plantId)
-      : activeTab === 'equipment'
-        ? equipment.filter((e) => e.plant_id === plantId)
-        : goals.filter((g) => g.is_active)
+  // Data processing for rendering
+  const { filteredData, groupedData, summary } = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase()
+
+    if (activeTab === 'staff') {
+      const filtered = employees.filter(
+        (e) => e.plant_id === plantId && e.name.toLowerCase().includes(searchLower),
+      )
+      const grouped = filtered.reduce(
+        (acc, emp) => {
+          const funcName = functions.find((f) => f.id === emp.function_id)?.name || 'Outros'
+          if (!acc[funcName]) acc[funcName] = []
+          acc[funcName].push(emp)
+          return acc
+        },
+        {} as Record<string, typeof employees>,
+      )
+
+      const presentCount = filtered.filter((e) => presences[e.id]).length
+      return {
+        filteredData: filtered,
+        groupedData: grouped,
+        summary: {
+          total: filtered.length,
+          present: presentCount,
+          absent: filtered.length - presentCount,
+          labels: ['total', 'presentes', 'ausentes'],
+        },
+      }
+    } else if (activeTab === 'equipment') {
+      const filtered = equipment.filter(
+        (e) => e.plant_id === plantId && e.name.toLowerCase().includes(searchLower),
+      )
+      const grouped = filtered.reduce(
+        (acc, eq) => {
+          const groupName = eq.name || 'Outros'
+          if (!acc[groupName]) acc[groupName] = []
+          acc[groupName].push(eq)
+          return acc
+        },
+        {} as Record<string, typeof equipment>,
+      )
+
+      const availableCount = filtered.filter((e) => presences[e.id]).length
+      return {
+        filteredData: filtered,
+        groupedData: grouped,
+        summary: {
+          total: filtered.length,
+          present: availableCount,
+          absent: filtered.length - availableCount,
+          labels: ['total', 'disponíveis', 'indisponíveis'],
+        },
+      }
+    } else {
+      const filtered = goals.filter(
+        (g) => g.is_active && g.name.toLowerCase().includes(searchLower),
+      )
+      return {
+        filteredData: filtered,
+        groupedData: { Metas: filtered },
+        summary: null,
+      }
+    }
+  }, [activeTab, employees, equipment, goals, functions, plantId, searchTerm, presences])
+
+  const CustomCheckbox = ({
+    checked,
+    onChange,
+  }: {
+    checked: boolean
+    onChange: (v: boolean) => void
+  }) => (
+    <div
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-colors border shadow-sm shrink-0',
+        checked
+          ? 'bg-[#65a34e] border-[#65a34e]'
+          : 'bg-white border-slate-300 hover:border-[#65a34e]',
+      )}
+    >
+      {checked && <Check className="w-3.5 h-3.5 text-white" />}
+    </div>
+  )
+
+  const themeColor = activeClient?.primaryColor || 'hsl(var(--primary))'
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-fade-in">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">
-          Lançamentos Diários & Metas
-        </h2>
+        <h2 className="text-3xl font-bold tracking-tight text-slate-800">Lançamento de Presença</h2>
         <p className="text-muted-foreground mt-1">
-          Registre a presença operacional da planta e dados de metas.
+          Registre a presença diária de colaboradores e equipamentos
         </p>
       </div>
 
-      <Card className="shadow-sm border-brand-light">
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
+      {/* Top Filters */}
+      <Card className="shadow-sm border-slate-200">
+        <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-6">
           {activeTab !== 'metas' ? (
-            <div className="space-y-1">
-              <Label htmlFor="date">Data Referência</Label>
-              <Input
-                type="date"
-                id="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-[160px]"
-              />
+            <div className="space-y-1.5 flex-1 max-w-[400px]">
+              <label className="text-xs font-medium text-slate-500">Data</label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="pl-10 h-11"
+                />
+                <CalendarIcon className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+              </div>
             </div>
           ) : (
-            <div className="space-y-1">
-              <Label htmlFor="month">Mês Referência</Label>
-              <Input
-                type="month"
-                id="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="w-[160px]"
-              />
+            <div className="space-y-1.5 flex-1 max-w-[400px]">
+              <label className="text-xs font-medium text-slate-500">Mês de Referência</label>
+              <div className="relative">
+                <Input
+                  type="month"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="pl-10 h-11"
+                />
+                <CalendarIcon className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+              </div>
             </div>
           )}
-          <div className="space-y-1 flex-1 max-w-[300px]">
-            <Label>Planta</Label>
+
+          <div className="space-y-1.5 flex-1 max-w-[400px]">
+            <label className="text-xs font-medium text-slate-500">Planta</label>
             <Select value={plantId} onValueChange={setPlantId}>
-              <SelectTrigger className="bg-white">
+              <SelectTrigger className="h-11 bg-white">
                 <SelectValue placeholder="Selecione a planta" />
               </SelectTrigger>
               <SelectContent>
@@ -174,115 +289,207 @@ export default function Lancamentos() {
         </CardContent>
       </Card>
 
-      {plantId && (
-        <div className="space-y-4">
-          <ToggleGroup
-            type="single"
-            value={activeTab}
-            onValueChange={(v) => v && setActiveTab(v)}
-            className="justify-start"
-          >
-            <ToggleGroupItem
-              value="staff"
-              className="data-[state=on]:bg-brand-blue data-[state=on]:text-white"
-            >
-              Colaboradores
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="equipment"
-              className="data-[state=on]:bg-brand-blue data-[state=on]:text-white"
-            >
-              Equipamentos
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="metas"
-              className="data-[state=on]:bg-brand-graphite data-[state=on]:text-white"
-            >
-              Metas Mensais
-            </ToggleGroupItem>
-          </ToggleGroup>
+      {/* Tabs */}
+      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 custom-scrollbar">
+        <button
+          onClick={() => setActiveTab('staff')}
+          className={cn(
+            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
+            activeTab === 'staff'
+              ? 'text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
+          )}
+          style={activeTab === 'staff' ? { backgroundColor: themeColor } : {}}
+        >
+          <Users className="h-4 w-4" /> Colaboradores
+        </button>
+        <button
+          onClick={() => setActiveTab('equipment')}
+          className={cn(
+            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
+            activeTab === 'equipment'
+              ? 'text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
+          )}
+          style={activeTab === 'equipment' ? { backgroundColor: themeColor } : {}}
+        >
+          <Wrench className="h-4 w-4" /> Equipamentos
+        </button>
+        <button
+          onClick={() => setActiveTab('metas')}
+          className={cn(
+            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
+            activeTab === 'metas'
+              ? 'text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
+          )}
+          style={activeTab === 'metas' ? { backgroundColor: themeColor } : {}}
+        >
+          <Target className="h-4 w-4" /> Book de Metas
+        </button>
+      </div>
 
-          <Card className="shadow-sm border-brand-light overflow-hidden">
-            <CardContent className="p-0">
-              <div className="divide-y max-h-[500px] overflow-y-auto">
-                {listToRender.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    Nenhum registro encontrado para esta planta.
+      {plantId && (
+        <div className="space-y-4 animate-slide-up">
+          {/* Action Row: Summaries & Save Button */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+            {summary ? (
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-medium text-sm">
+                  <Users className="h-4 w-4 text-slate-500" />
+                  {summary.total} {summary.labels[0]}
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-green-200 bg-green-50 text-green-700 font-medium text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  {summary.present} {summary.labels[1]}
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 font-medium text-sm">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  {summary.absent} {summary.labels[2]}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm font-medium text-slate-500 px-2">
+                Preencha os valores do mês de referência
+              </div>
+            )}
+
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full sm:w-auto shadow-md"
+              style={{ backgroundColor: '#65a34e' }} // Match green save button in mock
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {isSaving ? 'Salvando...' : 'Salvar Lançamento'}
+            </Button>
+          </div>
+
+          {/* Search Bar */}
+          {activeTab !== 'metas' && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <Input
+                placeholder={`Buscar ${activeTab === 'staff' ? 'colaborador' : 'equipamento'}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-12 bg-white border-slate-200 rounded-xl shadow-sm text-base"
+              />
+            </div>
+          )}
+
+          {/* List Content */}
+          <div className="space-y-6 pb-10">
+            {activeTab === 'metas' ? (
+              // Book de Metas Layout
+              <div className="space-y-3">
+                {filteredData.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">
+                    Nenhuma meta encontrada.
                   </div>
                 ) : (
-                  listToRender.map((item: any) => (
+                  filteredData.map((goal: any) => (
                     <div
-                      key={item.id}
-                      className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+                      key={goal.id}
+                      className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex items-center p-4 pl-0"
                     >
-                      <div>
-                        <p className="font-medium text-brand-graphite">{item.name}</p>
-                        {activeTab !== 'metas' && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {activeTab === 'staff'
-                              ? functions.find((f) => f.id === item.function_id)?.name
-                              : item.type}
-                            {activeTab === 'staff' &&
-                              item.location_id &&
-                              ` • ${locations.find((l) => l.id === item.location_id)?.name}`}
-                          </p>
-                        )}
-                        {activeTab === 'metas' && item.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                      <div className="w-1.5 self-stretch bg-[#65a34e] mr-4 rounded-r-full" />
+                      <div className="flex-1 pr-4">
+                        <h4 className="text-base font-semibold text-slate-800">{goal.name}</h4>
+                        {goal.description && (
+                          <p className="text-sm text-slate-500 mt-0.5">{goal.description}</p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        {activeTab === 'metas' ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground">Valor %:</span>
-                            <Input
-                              type="number"
-                              className="w-24 h-9"
-                              value={goalValues[item.id] || ''}
-                              onChange={(e) =>
-                                setGoalValues((prev) => ({
-                                  ...prev,
-                                  [item.id]: Number(e.target.value),
-                                }))
-                              }
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <span
-                              className={`text-sm font-medium w-20 text-right ${presences[item.id] ? 'text-green-600' : 'text-red-500'}`}
-                            >
-                              {presences[item.id]
-                                ? activeTab === 'staff'
-                                  ? 'Presente'
-                                  : 'Disponível'
-                                : activeTab === 'staff'
-                                  ? 'Ausente'
-                                  : 'Indisponível'}
-                            </span>
-                            <Switch
-                              checked={presences[item.id] || false}
-                              onCheckedChange={(v) =>
-                                setPresences((prev) => ({ ...prev, [item.id]: v }))
-                              }
-                              className="data-[state=checked]:bg-green-600"
-                            />
-                          </>
-                        )}
+                      <div className="flex items-center gap-2 shrink-0 pr-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          className="w-20 text-center font-medium"
+                          value={goalValues[goal.id] === undefined ? '' : goalValues[goal.id]}
+                          onChange={(e) =>
+                            setGoalValues((prev) => ({
+                              ...prev,
+                              [goal.id]: e.target.value === '' ? 0 : Number(e.target.value),
+                            }))
+                          }
+                        />
+                        <span className="text-slate-500 font-medium">%</span>
                       </div>
                     </div>
                   ))
                 )}
               </div>
-              {listToRender.length > 0 && (
-                <div className="p-4 bg-muted/30 border-t flex justify-end">
-                  <Button onClick={handleSave} disabled={isSaving} className="min-w-[150px]">
-                    {isSaving ? 'Salvando...' : 'Salvar'}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            ) : (
+              // Colaboradores & Equipamentos Layout
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                {Object.keys(groupedData).length === 0 ? (
+                  <div className="p-12 text-center text-slate-500">
+                    Nenhum registro encontrado para esta busca/planta.
+                  </div>
+                ) : (
+                  Object.entries(groupedData).map(([groupName, items]: [string, any[]]) => (
+                    <div key={groupName} className="border-b border-slate-100 last:border-0">
+                      {/* Group Header */}
+                      <div className="bg-slate-50/80 px-4 py-3 flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                        <h3 className="font-semibold text-slate-800 text-sm">{groupName}</h3>
+                        <span className="bg-white border border-slate-200 text-slate-500 text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
+                          {items.length}
+                        </span>
+                      </div>
+
+                      {/* Items List */}
+                      <div className="divide-y divide-slate-100">
+                        {items.map((item) => {
+                          const isPresent = presences[item.id] || false
+                          const locName = locations.find((l) => l.id === item.location_id)?.name
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="px-4 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                            >
+                              <div className="flex items-start gap-4">
+                                <div className="mt-1">
+                                  <CustomCheckbox
+                                    checked={isPresent}
+                                    onChange={(v) =>
+                                      setPresences((prev) => ({ ...prev, [item.id]: v }))
+                                    }
+                                  />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-slate-800">{item.name}</p>
+                                  {activeTab === 'staff' && (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                      {plants.find((p) => p.id === plantId)?.code}
+                                      {locName ? ` - ${locName}` : ''}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="shrink-0">
+                                {isPresent ? (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#65a34e] text-white shadow-sm">
+                                    {activeTab === 'staff' ? 'Presente' : 'Disponível'}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-white border border-slate-200 text-slate-400">
+                                    {activeTab === 'staff' ? 'Ausente' : 'Indisponível'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
