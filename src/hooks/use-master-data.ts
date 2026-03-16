@@ -18,30 +18,24 @@ export function useMasterData() {
     setLoading(true)
     const cid = profile.client_id
 
-    const [pRes, fRes, eRes, gRes, empRes, cRes] = await Promise.all([
+    const [pRes, fRes, eRes, gRes, empRes, cRes, lRes] = await Promise.all([
       supabase.from('plants').select('*').eq('client_id', cid),
       supabase.from('functions').select('*').eq('client_id', cid),
       supabase.from('equipment').select('*').eq('client_id', cid),
       supabase.from('goals_book').select('*').eq('client_id', cid),
       supabase.from('employees').select('*').eq('client_id', cid),
       supabase.from('contracted_headcount').select('*').eq('client_id', cid),
+      supabase.from('locations').select('*').eq('client_id', cid),
     ])
 
-    const pData = pRes.data || []
-    setPlants(pData)
+    setPlants(pRes.data || [])
     setFunctions(fRes.data || [])
     setEquipment(eRes.data || [])
     setGoals(gRes.data || [])
     setEmployees(empRes.data || [])
     setContracted(cRes.data || [])
+    setLocations(lRes.data || [])
 
-    if (pData.length > 0) {
-      const pIds = pData.map((p) => p.id)
-      const lRes = await supabase.from('locations').select('*').in('plant_id', pIds)
-      setLocations(lRes.data || [])
-    } else {
-      setLocations([])
-    }
     setLoading(false)
   }, [profile?.client_id])
 

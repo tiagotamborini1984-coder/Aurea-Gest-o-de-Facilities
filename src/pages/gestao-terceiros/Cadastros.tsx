@@ -36,17 +36,6 @@ export default function Cadastros() {
         plantField={config.plantField}
         plants={plants}
         fetchQuery={async () => {
-          if (config.tableName === 'locations') {
-            const pIds = plants.map((p) => p.id)
-            if (pIds.length === 0) return []
-            const { data } = await supabase
-              .from('locations')
-              .select('*')
-              .in('plant_id', pIds)
-              .order('created_at', { ascending: false })
-            return data
-          }
-
           const { data } = await supabase
             .from(config.tableName)
             .select('*')
@@ -55,13 +44,12 @@ export default function Cadastros() {
           return data
         }}
         onAdd={async (record: any) => {
-          const payload = { ...record }
-          if (config.tableName !== 'locations') {
-            payload.client_id = profile.client_id
-          }
+          const payload = { ...record, client_id: profile.client_id }
+
           if (payload.is_active === undefined && config.tableName === 'goals_book') {
             payload.is_active = false
           }
+
           const { error } = await supabase.from(config.tableName).insert(payload)
           if (!error) {
             refetch()
@@ -70,7 +58,7 @@ export default function Cadastros() {
           return { success: false, error }
         }}
         onUpdate={async (id: string, record: any) => {
-          const payload = { ...record }
+          const payload = { ...record, client_id: profile.client_id }
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
             refetch()
