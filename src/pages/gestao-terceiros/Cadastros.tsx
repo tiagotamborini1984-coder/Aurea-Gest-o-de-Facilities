@@ -26,6 +26,7 @@ export default function Cadastros() {
       <CrudGeneric
         key={type}
         title={config.title}
+        singularName={config.singularName}
         subtitle={config.subtitle}
         tableName={config.tableName}
         icon={config.icon}
@@ -35,6 +36,17 @@ export default function Cadastros() {
         plantField={config.plantField}
         plants={plants}
         fetchQuery={async () => {
+          if (config.tableName === 'locations') {
+            const pIds = plants.map((p) => p.id)
+            if (pIds.length === 0) return []
+            const { data } = await supabase
+              .from('locations')
+              .select('*')
+              .in('plant_id', pIds)
+              .order('created_at', { ascending: false })
+            return data
+          }
+
           const { data } = await supabase
             .from(config.tableName)
             .select('*')
@@ -43,7 +55,10 @@ export default function Cadastros() {
           return data
         }}
         onAdd={async (record: any) => {
-          const payload = { ...record, client_id: profile.client_id }
+          const payload = { ...record }
+          if (config.tableName !== 'locations') {
+            payload.client_id = profile.client_id
+          }
           if (payload.is_active === undefined && config.tableName === 'goals_book') {
             payload.is_active = false
           }
@@ -52,14 +67,17 @@ export default function Cadastros() {
             refetch()
             return true
           }
+          console.error(`Erro ao salvar em ${config.tableName}:`, error)
           return false
         }}
         onUpdate={async (id: string, record: any) => {
-          const { error } = await supabase.from(config.tableName).update(record).eq('id', id)
+          const payload = { ...record }
+          const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
             refetch()
             return true
           }
+          console.error(`Erro ao atualizar em ${config.tableName}:`, error)
           return false
         }}
         onRemove={async () => {

@@ -20,6 +20,7 @@ export function useCadastrosConfig(
       case 'plantas':
         return {
           title: 'Plantas',
+          singularName: 'Planta',
           subtitle: 'Unidades de operação e fábricas',
           icon: Building2,
           tableName: 'plants',
@@ -38,6 +39,7 @@ export function useCadastrosConfig(
       case 'locais':
         return {
           title: 'Locais',
+          singularName: 'Local',
           subtitle: 'Setores ou áreas dentro das plantas',
           icon: MapPin,
           tableName: 'locations',
@@ -57,14 +59,15 @@ export function useCadastrosConfig(
             },
           ],
           fields: [
-            { name: 'plant_id', label: 'Planta', type: 'select', options: plantOptions },
             { name: 'name', label: 'Nome do Local', type: 'text' },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
+            { name: 'plant_id', label: 'Planta', type: 'select', options: plantOptions },
+            { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
         }
       case 'funcoes':
         return {
           title: 'Funções',
+          singularName: 'Função',
           subtitle: 'Cargos e funções dos colaboradores',
           icon: Briefcase,
           tableName: 'functions',
@@ -79,12 +82,13 @@ export function useCadastrosConfig(
           ],
           fields: [
             { name: 'name', label: 'Nome da Função', type: 'text' },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
+            { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
         }
       case 'colaboradores':
         return {
           title: 'Colaboradores',
+          singularName: 'Colaborador',
           subtitle: 'Quadro de funcionários terceirizados',
           icon: Users,
           tableName: 'employees',
@@ -132,6 +136,7 @@ export function useCadastrosConfig(
       case 'equipamentos':
         return {
           title: 'Equipamentos',
+          singularName: 'Equipamento',
           subtitle: 'Maquinário e equipamentos alocados',
           icon: Wrench,
           tableName: 'equipment',
@@ -157,6 +162,7 @@ export function useCadastrosConfig(
       case 'quadro-contratado':
         return {
           title: 'Quadro Contratado',
+          singularName: 'Registro de Quadro',
           subtitle: 'Dimensionamento do contrato (Headcount e Equipamentos)',
           icon: ClipboardList,
           tableName: 'contracted_headcount',
@@ -217,7 +223,7 @@ export function useCadastrosConfig(
               type: 'select',
               options: locationOptions,
               required: false,
-              hidden: (form: any) => form.type === 'colaborador', // Hidden for colaborador as per requirement
+              hidden: (form: any) => form.type === 'colaborador',
             },
             {
               name: 'function_id',
@@ -241,6 +247,7 @@ export function useCadastrosConfig(
       case 'book-metas':
         return {
           title: 'Book de Metas',
+          singularName: 'Meta',
           subtitle: 'Indicadores e metas mensais',
           icon: Target,
           tableName: 'goals_book',
@@ -266,7 +273,7 @@ export function useCadastrosConfig(
           ],
           fields: [
             { name: 'name', label: 'Nome da Meta', type: 'text' },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
+            { name: 'description', label: 'Descrição', type: 'textarea', required: false },
             { name: 'is_active', label: 'Ativo', type: 'toggle', required: false },
           ],
         }

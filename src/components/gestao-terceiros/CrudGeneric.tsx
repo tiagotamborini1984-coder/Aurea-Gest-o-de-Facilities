@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -38,7 +39,7 @@ import { cn } from '@/lib/utils'
 export type FieldDef = {
   name: string
   label: string
-  type: 'text' | 'number' | 'select' | 'toggle'
+  type: 'text' | 'textarea' | 'number' | 'select' | 'toggle'
   options?: { value: string; label: string }[]
   required?: boolean
   hidden?: (form: any) => boolean
@@ -52,6 +53,7 @@ export type ColumnDef = {
 
 export function CrudGeneric({
   title,
+  singularName,
   subtitle,
   tableName,
   icon: Icon,
@@ -70,6 +72,7 @@ export function CrudGeneric({
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<any>({})
+  const [formErrors, setFormErrors] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
@@ -93,27 +96,46 @@ export function CrudGeneric({
   const openAdd = () => {
     setForm({})
     setEditingItem(null)
+    setFormErrors({})
     setIsModalOpen(true)
   }
   const openEdit = (item: any) => {
     setForm({ ...item })
     setEditingItem(item)
+    setFormErrors({})
     setIsModalOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const errors: Record<string, boolean> = {}
+    let hasError = false
+
     for (const field of fields) {
       if (field.hidden && field.hidden(form)) continue
       if (field.required !== false && field.type !== 'toggle') {
         const val = form[field.name]
         if (val === undefined || val === null || val === '') {
-          toast({ title: `O campo ${field.label} é obrigatório`, variant: 'destructive' })
-          return
+          errors[field.name] = true
+          hasError = true
         }
       }
     }
+
+    if (hasError) {
+      setFormErrors(errors)
+      toast({
+        title: 'Campos obrigatórios ausentes',
+        description: 'Por favor, preencha todos os campos destacados.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setFormErrors({})
     setIsSubmitting(true)
+
     const payload = { ...form }
     // Clean up hidden fields before sending
     for (const field of fields) {
@@ -123,15 +145,22 @@ export function CrudGeneric({
     }
 
     const success = editingItem ? await onUpdate(editingItem.id, payload) : await onAdd(payload)
+
+    const itemName = singularName || title
+    const itemNameLower = singularName ? singularName.toLowerCase() : title.toLowerCase()
+
     if (success) {
       toast({
-        title: `${title} salvo com sucesso`,
+        title: `${itemName} ${editingItem ? 'atualizado' : 'cadastrado'} com sucesso!`,
         className: 'bg-green-50 text-green-900 border-green-200',
       })
       setIsModalOpen(false)
       load()
     } else {
-      toast({ title: 'Erro ao salvar', variant: 'destructive' })
+      toast({
+        title: `Erro ao salvar o ${itemNameLower}. Por favor, tente novamente.`,
+        variant: 'destructive',
+      })
     }
     setIsSubmitting(false)
   }
@@ -337,11 +366,15 @@ export function CrudGeneric({
                       'space-y-2',
                       f.type === 'toggle'
                         ? 'col-span-1 sm:col-span-2 flex items-center justify-between border border-gray-200 p-3 rounded-lg'
-                        : '',
+                        : f.type === 'textarea'
+                          ? 'col-span-1 sm:col-span-2'
+                          : '',
                     )}
                   >
                     {f.type !== 'toggle' && (
-                      <label className="text-sm font-medium">
+                      <label
+                        className={cn('text-sm font-medium', formErrors[f.name] && 'text-red-500')}
+                      >
                         {f.label} {f.required !== false && <span className="text-red-500">*</span>}
                       </label>
                     )}
@@ -349,22 +382,46 @@ export function CrudGeneric({
                       <Input
                         type={f.type}
                         value={form[f.name] ?? ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setForm({
                             ...form,
                             [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value,
                           })
-                        }
+                          if (formErrors[f.name]) setFormErrors({ ...formErrors, [f.name]: false })
+                        }}
+                        className={cn(
+                          formErrors[f.name] && 'border-red-500 focus-visible:ring-red-500',
+                        )}
+                      />
+                    )}
+                    {f.type === 'textarea' && (
+                      <Textarea
+                        value={form[f.name] ?? ''}
+                        onChange={(e) => {
+                          setForm({ ...form, [f.name]: e.target.value })
+                          if (formErrors[f.name]) setFormErrors({ ...formErrors, [f.name]: false })
+                        }}
+                        className={cn(
+                          'resize-none',
+                          formErrors[f.name] && 'border-red-500 focus-visible:ring-red-500',
+                        )}
+                        rows={3}
                       />
                     )}
                     {f.type === 'select' && (
                       <Select
                         value={form[f.name] === null ? 'none' : form[f.name]?.toString() || 'none'}
-                        onValueChange={(v) =>
+                        onValueChange={(v) => {
                           setForm({ ...form, [f.name]: v === 'none' ? null : v })
-                        }
+                          if (formErrors[f.name]) setFormErrors({ ...formErrors, [f.name]: false })
+                        }}
                       >
-                        <SelectTrigger className="w-full bg-white h-10">
+                        <SelectTrigger
+                          className={cn(
+                            'w-full bg-white h-10',
+                            formErrors[f.name] && 'border-red-500 focus:ring-red-500',
+                          )}
+                        >
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
