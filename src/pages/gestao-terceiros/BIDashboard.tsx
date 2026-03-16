@@ -65,6 +65,7 @@ export default function BIDashboard() {
       const arr = [...prev]
       const sIdx = arr.findIndex((w) => w.id === sourceId)
       const tIdx = arr.findIndex((w) => w.id === targetId)
+      if (sIdx < 0 || tIdx < 0) return arr
       const [item] = arr.splice(sIdx, 1)
       arr.splice(tIdx, 0, item)
       return arr
@@ -81,13 +82,15 @@ export default function BIDashboard() {
   const renderWidgetContent = (id: string) => {
     switch (id) {
       case 'chart-plants':
-        return <ChartPlants data={biData.pData} colors={biData.colors} />
+        return <ChartPlants data={biData.pData || []} colors={biData.colors} />
       case 'chart-local-abs':
-        return <ChartLocalAbs data={biData.lData} colors={biData.colors} />
+        return <ChartLocalAbs data={biData.lData || []} colors={biData.colors} />
       case 'chart-eq-disp':
-        return <ChartEqDisp data={biData.eData} colors={biData.colors} />
+        return <ChartEqDisp data={biData.eData || []} colors={biData.colors} />
       case 'chart-comp-abs': {
-        const compLocs = locations.filter((l) => biData.compSelectedLocs.includes(l.id))
+        const compLocs = (locations || []).filter(
+          (l) => l?.id && (biData.compSelectedLocs || []).includes(l.id),
+        )
         return (
           <div className="flex flex-col h-full">
             <div className="flex justify-end mb-1">
@@ -98,37 +101,53 @@ export default function BIDashboard() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 max-h-64 overflow-y-auto">
-                  {locations
-                    .filter((l) => biData.activePlantIds.includes(l.plant_id))
+                  {(locations || [])
+                    .filter(
+                      (l) => l?.plant_id && (biData.activePlantIds || []).includes(l.plant_id),
+                    )
                     .map((loc) => (
                       <DropdownMenuCheckboxItem
                         key={loc.id}
-                        checked={biData.compSelectedLocs.includes(loc.id)}
+                        checked={(biData.compSelectedLocs || []).includes(loc.id)}
                         onCheckedChange={(c) =>
                           biData.setCompSelectedLocs((prev) =>
-                            c ? [...prev, loc.id] : prev.filter((id) => id !== loc.id),
+                            c
+                              ? [...(prev || []), loc.id]
+                              : (prev || []).filter((id) => id !== loc.id),
                           )
                         }
                       >
-                        {loc.name}
+                        {loc.name || 'Sem nome'}
                       </DropdownMenuCheckboxItem>
                     ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <ChartComparativeAbs data={biData.cData} locations={compLocs} colors={biData.colors} />
+            <ChartComparativeAbs
+              data={biData.cData || []}
+              locations={compLocs}
+              colors={biData.colors}
+            />
           </div>
         )
       }
       case 'chart-goals':
-        return <ChartGoals data={biData.gData} colors={biData.colors} />
+        return <ChartGoals data={biData.gData || []} colors={biData.colors} />
       case 'rank-plants':
-        return <RankingList items={biData.rankPlants} valueSuffix="%" colors={biData.colors} />
+        return (
+          <RankingList items={biData.rankPlants || []} valueSuffix="%" colors={biData.colors} />
+        )
       case 'rank-employees':
-        return <RankingList items={biData.rankEmp} valueSuffix=" faltas" colors={biData.colors} />
+        return (
+          <RankingList items={biData.rankEmp || []} valueSuffix=" faltas" colors={biData.colors} />
+        )
       case 'rank-equipments':
         return (
-          <RankingList items={biData.rankEq} valueSuffix=" instâncias" colors={biData.colors} />
+          <RankingList
+            items={biData.rankEq || []}
+            valueSuffix=" instâncias"
+            colors={biData.colors}
+          />
         )
       default:
         return null
@@ -150,7 +169,7 @@ export default function BIDashboard() {
             setDateRange={biData.setDateRange}
             selectedPlantId={biData.selectedPlantId}
             setSelectedPlantId={biData.setSelectedPlantId}
-            authorizedPlants={biData.authPlants}
+            authorizedPlants={biData.authPlants || []}
             colors={biData.colors}
             setColors={biData.setColors}
           />
