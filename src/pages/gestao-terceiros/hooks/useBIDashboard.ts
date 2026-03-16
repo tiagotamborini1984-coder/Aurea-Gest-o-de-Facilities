@@ -1,131 +1,258 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { format, subDays } from 'date-fns'
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
+import { useAppStore } from '@/store/AppContext'
+import { DateRange } from 'react-day-picker'
 
 export function useBIDashboard(
   plants: any[],
   contracted: any[],
   employees: any[],
   equipment: any[],
+  locations: any[],
+  goals: any[],
 ) {
+  const { profile } = useAppStore()
   const [logs, setLogs] = useState<any[]>([])
+  const [monthlyGoals, setMonthlyGoals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  })
+  const [selectedPlantId, setSelectedPlantId] = useState<string>('all')
+  const [compSelectedLocs, setCompSelectedLocs] = useState<string[]>([])
+  const [colors, setColors] = useState({
+    primary: '#3b82f6',
+    secondary: '#ef4444',
+    tertiary: '#10b981',
+  })
+
+  const authPlants = useMemo(() => {
+    const ids = profile?.authorized_plants as string[] | undefined
+    if (!ids || ids.length === 0) return plants
+    return plants.filter((p) => ids.includes(p.id))
+  }, [plants, profile])
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      if (plants.length === 0) {
-        setLoading(false)
-        return
-      }
+    const fetchLogsAndGoals = async () => {
+      if (!dateRange?.from || !dateRange?.to || authPlants.length === 0) return setLoading(false)
       setLoading(true)
-      const { data } = await supabase
+      const fStr = format(dateRange.from, 'yyyy-MM-dd')
+      const tStr = format(dateRange.to, 'yyyy-MM-dd')
+
+      const { data: logData } = await supabase
         .from('daily_logs')
         .select('*')
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
+        .gte('date', fStr)
+        .lte('date', tStr)
+      setLogs(logData || [])
 
-      setLogs(data || [])
+      const mFrom = format(startOfMonth(dateRange.from), 'yyyy-MM-dd')
+      const mTo = format(endOfMonth(dateRange.to), 'yyyy-MM-dd')
+      const { data: mData } = await supabase
+        .from('monthly_goals_data')
+        .select('*')
+        .gte('reference_month', mFrom)
+        .lte('reference_month', mTo)
+      setMonthlyGoals(mData || [])
       setLoading(false)
     }
-    fetchLogs()
-  }, [plants, dateFrom, dateTo])
+    fetchLogsAndGoals()
+  }, [dateRange, authPlants])
+
+  useEffect(() => {
+    if (compSelectedLocs.length === 0 && locations.length > 0) {
+      setCompSelectedLocs(locations.slice(0, 3).map((l) => l.id))
+    }
+  }, [locations])
+
+  const activePlantIds = useMemo(() => {
+    if (selectedPlantId === 'all') return authPlants.map((p) => p.id)
+    return [selectedPlantId]
+  }, [selectedPlantId, authPlants])
 
   const dashboardData = useMemo(() => {
-    if (!logs.length) return { pData: [], tData: [], rankPlants: [], rankEmp: [], rankEq: [] }
-
-    const plantStats = plants.map((p) => {
-      const pLogs = logs.filter((l) => l.plant_id === p.id && l.type === 'staff')
-      const pDays = new Set(pLogs.map((l) => l.date)).size || 1
-      const presencas = pLogs.filter((l) => l.status).length
-      const presencaRate = pLogs.length > 0 ? (presencas / pLogs.length) * 100 : 0
-
-      const contr = contracted
-        .filter((c) => c.plant_id === p.id && c.type === 'colaborador')
-        .reduce((a, b) => a + b.quantity, 0)
-
-      const avgPres = presencas / pDays
-      const absRate = contr > 0 ? Math.max(0, ((contr - avgPres) / contr) * 100) : 0
-
+    if (!logs.length)
       return {
-        id: p.id,
-        name: p.name.substring(0, 15),
-        fullName: p.name,
-        presenca: Number(presencaRate.toFixed(1)),
-        absenteismo: Number(absRate.toFixed(1)),
+        pData: [],
+        lData: [],
+        eData: [],
+        cData: [],
+        gData: [],
+        rankPlants: [],
+        rankEmp: [],
+        rankEq: [],
       }
-    })
 
-    const pData = plantStats
-    const rankPlants = [...plantStats]
-      .sort((a, b) => b.absenteismo - a.absenteismo)
-      .map((p) => ({ ...p, value: p.absenteismo }))
+    const validLogs = logs.filter((l) => activePlantIds.includes(l.plant_id))
 
-    const validPlantFilter = selectedPlantId || undefined
-
-    const eqLogsAll = logs.filter(
-      (l) => l.type === 'equipment' && (!validPlantFilter || l.plant_id === validPlantFilter),
-    )
-    const dates = Array.from(new Set(eqLogsAll.map((l) => l.date))).sort()
-    const tData = dates
-      .map((d) => {
-        const dLogs = eqLogsAll.filter((l) => l.date === d)
-        const dPres = dLogs.filter((l) => l.status).length
-        const disp = dLogs.length > 0 ? (dPres / dLogs.length) * 100 : 0
+    // 1. Plant Data
+    const pData = authPlants
+      .filter((p) => activePlantIds.includes(p.id))
+      .map((p) => {
+        const pLogs = validLogs.filter((l) => l.plant_id === p.id && l.type === 'staff')
+        const pDays = new Set(pLogs.map((l) => l.date)).size || 1
+        const pres = pLogs.filter((l) => l.status).length
+        const contr = contracted
+          .filter((c) => c.plant_id === p.id && c.type === 'colaborador')
+          .reduce((a, b) => a + b.quantity, 0)
+        const presRate = pLogs.length > 0 ? (pres / pLogs.length) * 100 : 0
+        const avgPres = pres / pDays
+        const absRate = contr > 0 ? Math.max(0, ((contr - avgPres) / contr) * 100) : 0
         return {
-          name: format(new Date(d), 'dd/MM'),
-          disp: Number(disp.toFixed(1)),
+          id: p.id,
+          name: p.name.substring(0, 15),
+          presenca: Number(presRate.toFixed(1)),
+          absenteismo: Number(absRate.toFixed(1)),
         }
       })
-      .slice(-14)
 
-    const empLogs = logs.filter(
-      (l) =>
-        l.type === 'staff' && !l.status && (!validPlantFilter || l.plant_id === validPlantFilter),
-    )
+    // 2. Local Absenteismo
+    const lData = locations
+      .filter((l) => activePlantIds.includes(l.plant_id))
+      .map((loc) => {
+        const locEmps = employees.filter((e) => e.location_id === loc.id).map((e) => e.id)
+        const lLogs = validLogs.filter(
+          (l) => l.type === 'staff' && locEmps.includes(l.reference_id),
+        )
+        const lCont = contracted
+          .filter((c) => c.type === 'colaborador' && c.location_id === loc.id)
+          .reduce((a, b) => a + b.quantity, 0)
+        const lDays = new Set(lLogs.map((l) => l.date)).size || 1
+        const pres = lLogs.filter((l) => l.status).length
+        const abs = lCont > 0 ? Math.max(0, ((lCont - pres / lDays) / lCont) * 100) : 0
+        return { id: loc.id, name: loc.name, absenteismo: Number(abs.toFixed(1)) }
+      })
+      .filter((d) => d.absenteismo > 0 || contracted.some((c) => c.location_id === d.id))
+
+    // 3. Equip Disp
+    const eData = equipment
+      .filter((e) => activePlantIds.includes(e.plant_id))
+      .map((eq) => {
+        const eLogs = validLogs.filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
+        const eDays = new Set(eLogs.map((l) => l.date)).size || 1
+        const pres = eLogs.filter((l) => l.status).length
+        const eCont =
+          contracted
+            .filter((c) => c.type === 'equipamento' && c.equipment_id === eq.id)
+            .reduce((a, b) => a + b.quantity, 0) || eq.quantity
+        const disp = eCont > 0 ? Math.min(100, (pres / eDays / eCont) * 100) : 0
+        return { id: eq.id, name: eq.name, disp: Number(disp.toFixed(1)) }
+      })
+
+    // 4. Comparative Abs
+    const dates = Array.from(new Set(validLogs.map((l) => l.date))).sort()
+    const cData = dates.map((d) => {
+      const row: any = { date: format(new Date(d), 'dd/MM') }
+      compSelectedLocs.forEach((locId) => {
+        const loc = locations.find((l) => l.id === locId)
+        if (!loc) return
+        const lCont = contracted
+          .filter((c) => c.type === 'colaborador' && c.location_id === locId)
+          .reduce((a, b) => a + b.quantity, 0)
+        const dLogs = validLogs.filter(
+          (l) =>
+            l.date === d &&
+            l.type === 'staff' &&
+            employees.find((e) => e.id === l.reference_id)?.location_id === locId,
+        )
+        const pres = dLogs.filter((l) => l.status).length
+        const abs = lCont > 0 ? Math.max(0, ((lCont - pres) / lCont) * 100) : 0
+        row[loc.name] = Number(abs.toFixed(1))
+      })
+      return row
+    })
+
+    // 5. Goals Data
+    const gData = []
+    const totalCont = contracted
+      .filter((c) => c.type === 'colaborador' && activePlantIds.includes(c.plant_id))
+      .reduce((a, b) => a + b.quantity, 0)
+    const staffLogs = validLogs.filter((l) => l.type === 'staff')
+    const tDays = new Set(staffLogs.map((l) => l.date)).size || 1
+    const absG =
+      totalCont > 0
+        ? Math.max(
+            0,
+            ((totalCont - staffLogs.filter((l) => l.status).length / tDays) / totalCont) * 100,
+          )
+        : 0
+    gData.push({ name: 'Absenteísmo', value: absG < 4 ? 100 : 0 })
+
+    const eqCont = contracted
+      .filter((c) => c.type === 'equipamento' && activePlantIds.includes(c.plant_id))
+      .reduce((a, b) => a + b.quantity, 0)
+    const eqLogs = validLogs.filter((l) => l.type === 'equipment')
+    const eqDays = new Set(eqLogs.map((l) => l.date)).size || 1
+    const dispG =
+      eqCont > 0
+        ? Math.min(100, (eqLogs.filter((l) => l.status).length / eqDays / eqCont) * 100)
+        : 0
+    gData.push({ name: 'Disp. Equip.', value: Number(dispG.toFixed(1)) })
+
+    goals
+      .filter((g) => g.is_active)
+      .forEach((g) => {
+        const mData = monthlyGoals.filter(
+          (m) => m.goal_id === g.id && activePlantIds.includes(m.plant_id),
+        )
+        if (mData.length > 0)
+          gData.push({
+            name: g.name,
+            value: Number(
+              (mData.reduce((a, b) => a + Number(b.value), 0) / mData.length).toFixed(1),
+            ),
+          })
+      })
+
+    // Rankings
+    const rankPlants = [...pData]
+      .sort((a, b) => b.absenteismo - a.absenteismo)
+      .map((p) => ({ ...p, value: p.absenteismo }))
     const empCount: Record<string, number> = {}
-    empLogs.forEach((l) => {
-      empCount[l.reference_id] = (empCount[l.reference_id] || 0) + 1
-    })
+    validLogs
+      .filter((l) => l.type === 'staff' && !l.status)
+      .forEach((l) => (empCount[l.reference_id] = (empCount[l.reference_id] || 0) + 1))
     const rankEmp = Object.entries(empCount)
-      .map(([id, count]) => {
-        const emp = employees.find((e) => e.id === id)
-        return { id, name: emp?.name || 'Desconhecido', value: count }
-      })
+      .map(([id, c]) => ({ id, name: employees.find((e) => e.id === id)?.name || 'N/A', value: c }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10)
 
-    const eqLogs = logs.filter(
-      (l) =>
-        l.type === 'equipment' &&
-        !l.status &&
-        (!validPlantFilter || l.plant_id === validPlantFilter),
-    )
     const eqCount: Record<string, number> = {}
-    eqLogs.forEach((l) => {
-      eqCount[l.reference_id] = (eqCount[l.reference_id] || 0) + 1
-    })
+    validLogs
+      .filter((l) => l.type === 'equipment' && !l.status)
+      .forEach((l) => (eqCount[l.reference_id] = (eqCount[l.reference_id] || 0) + 1))
     const rankEq = Object.entries(eqCount)
-      .map(([id, count]) => {
-        const eq = equipment.find((e) => e.id === id)
-        return { id, name: eq?.name || 'Desconhecido', value: count }
-      })
+      .map(([id, c]) => ({ id, name: equipment.find((e) => e.id === id)?.name || 'N/A', value: c }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10)
 
-    return { pData, tData, rankPlants, rankEmp, rankEq }
-  }, [logs, plants, contracted, employees, equipment, selectedPlantId])
+    return { pData, lData, eData, cData, gData, rankPlants, rankEmp, rankEq }
+  }, [
+    logs,
+    activePlantIds,
+    authPlants,
+    contracted,
+    employees,
+    equipment,
+    locations,
+    compSelectedLocs,
+    goals,
+    monthlyGoals,
+  ])
 
   return {
     ...dashboardData,
     loading,
-    dateFrom,
-    setDateFrom,
-    dateTo,
-    setDateTo,
+    dateRange,
+    setDateRange,
     selectedPlantId,
     setSelectedPlantId,
+    authPlants,
+    compSelectedLocs,
+    setCompSelectedLocs,
+    colors,
+    setColors,
   }
 }

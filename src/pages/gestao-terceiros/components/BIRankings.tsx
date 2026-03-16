@@ -1,4 +1,12 @@
-export function RankingList({ items, valueSuffix = '' }: { items: any[]; valueSuffix?: string }) {
+export function RankingList({
+  items,
+  valueSuffix = '',
+  colors,
+}: {
+  items: any[]
+  valueSuffix?: string
+  colors?: any
+}) {
   if (!items?.length) {
     return <p className="text-sm text-muted-foreground py-4 text-center">Sem dados no período.</p>
   }
@@ -28,7 +36,10 @@ export function RankingList({ items, valueSuffix = '' }: { items: any[]; valueSu
               {item.name}
             </span>
           </div>
-          <span className="font-semibold text-primary text-sm shrink-0 pl-3">
+          <span
+            className="font-semibold text-sm shrink-0 pl-3"
+            style={{ color: colors?.secondary || 'var(--primary)' }}
+          >
             {item.value}
             {valueSuffix}
           </span>
