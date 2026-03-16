@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { Loader2 } from 'lucide-react'
+import { AutoLogout } from './AutoLogout'
 
 export function ProtectedRoute() {
   const { user, loading } = useAuth()
@@ -17,5 +18,10 @@ export function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  return <Outlet />
+  return (
+    <>
+      <AutoLogout />
+      <Outlet />
+    </>
+  )
 }

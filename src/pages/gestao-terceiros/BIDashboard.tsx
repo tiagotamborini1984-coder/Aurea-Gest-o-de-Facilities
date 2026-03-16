@@ -1,76 +1,64 @@
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Line, LineChart } from 'recharts'
+import { useState } from 'react'
 import { useMasterData } from '@/hooks/use-master-data'
-import { supabase } from '@/lib/supabase/client'
-import { format, subDays } from 'date-fns'
-import { Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { Loader2, Settings2, X, Calendar as CalendarIcon } from 'lucide-react'
+import { useBIDashboard } from './hooks/useBIDashboard'
+import { DraggableWidget } from './components/DraggableWidget'
+import { ChartPlants, ChartTrend } from './components/BICharts'
+import { RankingList } from './components/BIRankings'
+
+const initialWidgets = [
+  {
+    id: 'chart-plants',
+    title: 'Taxa Presença vs Absenteísmo por Planta',
+    size: 'col-span-1 lg:col-span-2 xl:col-span-1',
+  },
+  {
+    id: 'chart-trend',
+    title: 'Tendência de Disponibilidade - Equipamentos',
+    size: 'col-span-1 lg:col-span-2 xl:col-span-1',
+  },
+  { id: 'rank-plants', title: 'Ranking de Plantas (Absenteísmo)', size: 'col-span-1' },
+  { id: 'rank-employees', title: 'Ranking de Colaboradores (Faltas)', size: 'col-span-1' },
+  {
+    id: 'rank-equipments',
+    title: 'Ranking de Equipamentos (Indisponibilidade)',
+    size: 'col-span-1',
+  },
+]
 
 export default function BIDashboard() {
-  const { plants, contracted } = useMasterData()
-  const [data, setData] = useState<any[]>([])
-  const [trendData, setTrendData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { plants, contracted, employees, equipment } = useMasterData()
+  const biData = useBIDashboard(plants, contracted, employees, equipment)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (plants.length === 0) return
+  const [widgets, setWidgets] = useState(initialWidgets.map((w) => ({ ...w, visible: true })))
 
-      const dateFrom = format(subDays(new Date(), 30), 'yyyy-MM-dd')
-      const dateTo = format(new Date(), 'yyyy-MM-dd')
+  const toggleWidget = (id: string) => {
+    setWidgets((prev) => prev.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w)))
+  }
 
-      const { data: logs } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
+  const handleReorder = (sourceId: string, targetId: string) => {
+    setWidgets((prev) => {
+      const arr = [...prev]
+      const sIdx = arr.findIndex((w) => w.id === sourceId)
+      const tIdx = arr.findIndex((w) => w.id === targetId)
+      const [item] = arr.splice(sIdx, 1)
+      arr.splice(tIdx, 0, item)
+      return arr
+    })
+  }
 
-      const safeLogs = logs || []
-
-      // Chart 1: Plant Performance (Staff)
-      const pData = plants.map((p) => {
-        const plantLogs = safeLogs.filter((l) => l.plant_id === p.id && l.type === 'staff')
-        const presencas = plantLogs.filter((l) => l.status).length
-        const total = plantLogs.length
-        const presencaRate = total > 0 ? (presencas / total) * 100 : 0
-        const contr = contracted
-          .filter((c) => c.plant_id === p.id && c.type === 'colaborador')
-          .reduce((a, b) => a + b.quantity, 0)
-        // Avg present per day
-        const days = new Set(plantLogs.map((l) => l.date)).size || 1
-        const avgPres = presencas / days
-        const absRate = contr > 0 ? Math.max(0, ((contr - avgPres) / contr) * 100) : 0
-
-        return {
-          name: p.name.substring(0, 15),
-          presenca: Number(presencaRate.toFixed(1)),
-          absenteismo: Number(absRate.toFixed(1)),
-        }
-      })
-      setData(pData)
-
-      // Chart 2: Daily Equipment Trend
-      const eqLogs = safeLogs.filter((l) => l.type === 'equipment')
-      const dates = Array.from(new Set(eqLogs.map((l) => l.date))).sort()
-
-      const tData = dates.map((d) => {
-        const dLogs = eqLogs.filter((l) => l.date === d)
-        const dPres = dLogs.filter((l) => l.status).length
-        const disp = dLogs.length > 0 ? (dPres / dLogs.length) * 100 : 0
-        return {
-          name: format(new Date(d), 'dd/MM'),
-          disp: Number(disp.toFixed(1)),
-        }
-      })
-      setTrendData(tData.slice(-14)) // Last 14 days with data
-
-      setLoading(false)
-    }
-    fetchData()
-  }, [plants, contracted])
-
-  if (loading) {
+  if (biData.loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-brand-blue" />
@@ -78,76 +66,107 @@ export default function BIDashboard() {
     )
   }
 
+  const renderWidgetContent = (id: string) => {
+    switch (id) {
+      case 'chart-plants':
+        return (
+          <ChartPlants
+            data={biData.pData}
+            onPlantClick={biData.setSelectedPlantId}
+            selectedPlantId={biData.selectedPlantId}
+          />
+        )
+      case 'chart-trend':
+        return <ChartTrend data={biData.tData} />
+      case 'rank-plants':
+        return <RankingList items={biData.rankPlants} valueSuffix="%" />
+      case 'rank-employees':
+        return <RankingList items={biData.rankEmp} valueSuffix=" faltas" />
+      case 'rank-equipments':
+        return <RankingList items={biData.rankEq} valueSuffix=" instâncias" />
+      default:
+        return null
+    }
+  }
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">BI Dashboard</h2>
-        <p className="text-muted-foreground mt-1">
-          Análise gráfica consolidada da operação (Últimos 30 dias).
-        </p>
+    <div className="max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">BI Dashboard</h2>
+            {biData.selectedPlantId && (
+              <Badge
+                variant="secondary"
+                className="cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
+                onClick={() => biData.setSelectedPlantId(null)}
+              >
+                Filtro: {plants.find((p) => p.id === biData.selectedPlantId)?.name}
+                <X className="ml-1.5 h-3 w-3" />
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Análise gráfica interativa (arraste os painéis para reordenar).
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl border border-border shadow-sm">
+          <div className="flex items-center gap-2 relative">
+            <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="date"
+              className="h-9 w-[140px] pl-9 text-xs bg-muted/20"
+              value={biData.dateFrom}
+              onChange={(e) => biData.setDateFrom(e.target.value)}
+            />
+          </div>
+          <span className="text-muted-foreground text-sm font-medium">até</span>
+          <div className="flex items-center gap-2 relative">
+            <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="date"
+              className="h-9 w-[140px] pl-9 text-xs bg-muted/20"
+              value={biData.dateTo}
+              onChange={(e) => biData.setDateTo(e.target.value)}
+            />
+          </div>
+
+          <div className="w-[1px] h-6 bg-border mx-1" />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9">
+                <Settings2 className="h-4 w-4 mr-2" /> Personalizar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Painéis Visíveis</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {widgets.map((w) => (
+                <DropdownMenuCheckboxItem
+                  key={w.id}
+                  checked={w.visible}
+                  onCheckedChange={() => toggleWidget(w.id)}
+                >
+                  {w.title}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm border-brand-light">
-          <CardHeader>
-            <CardTitle>Taxa de Presença vs Absenteísmo por Planta (%)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            <ChartContainer
-              config={{
-                presenca: { color: 'hsl(var(--primary))', label: 'Taxa Presença' },
-                absenteismo: { color: 'hsl(var(--destructive))', label: 'Absenteísmo' },
-              }}
-              className="h-full w-full"
-            >
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} />
-                <YAxis tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar
-                  dataKey="presenca"
-                  fill="var(--color-presenca)"
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                />
-                <Bar
-                  dataKey="absenteismo"
-                  fill="var(--color-absenteismo)"
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-brand-light">
-          <CardHeader>
-            <CardTitle>Tendência de Disponibilidade - Equipamentos (%)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            <ChartContainer
-              config={{ disp: { color: '#10b981', label: 'Disponibilidade (%)' } }}
-              className="h-full w-full"
-            >
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} />
-                <YAxis domain={[0, 100]} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line
-                  type="monotone"
-                  dataKey="disp"
-                  stroke="var(--color-disp)"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: 'var(--color-disp)' }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {widgets
+          .filter((w) => w.visible)
+          .map((w) => (
+            <div key={w.id} className={w.size}>
+              <DraggableWidget id={w.id} title={w.title} onReorder={handleReorder}>
+                {renderWidgetContent(w.id)}
+              </DraggableWidget>
+            </div>
+          ))}
       </div>
     </div>
   )
