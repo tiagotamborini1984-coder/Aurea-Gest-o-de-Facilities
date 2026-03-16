@@ -703,8 +703,8 @@ export const Constants = {
 //   url_slug: text (not null)
 //   admin_name: text (not null, default: ''::text)
 //   logo_url: text (nullable)
-//   primary_color: text (nullable, default: '#1e293b'::text)
-//   secondary_color: text (nullable, default: '#0ea5e9'::text)
+//   primary_color: text (nullable, default: '#1f2937'::text)
+//   secondary_color: text (nullable, default: '#1e3a8a'::text)
 //   status: text (not null, default: 'Ativo'::text)
 //   modules: jsonb (not null, default: '[]'::jsonb)
 //   created_at: timestamp with time zone (not null, default: now())
@@ -959,7 +959,7 @@ export const Constants = {
 // Table: audit_logs
 //   trigger_clean_audit_logs: CREATE TRIGGER trigger_clean_audit_logs AFTER INSERT ON public.audit_logs FOR EACH STATEMENT EXECUTE FUNCTION clean_old_audit_logs()
 // Table: daily_logs
-//   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE OR UPDATE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+//   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: employees
 //   audit_employees: CREATE TRIGGER audit_employees AFTER INSERT OR DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: equipment

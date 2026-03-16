@@ -110,7 +110,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden">
-                        <item.icon className="h-5 w-5 group-hover:text-blue-400 transition-colors" />
+                        <item.icon className="h-5 w-5 group-hover:text-brand-vividBlue transition-colors" />
                         <span className="font-medium tracking-wide">{item.title}</span>
                         <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
@@ -127,7 +127,7 @@ export function AppSidebar() {
                                 className={cn(
                                   'py-4 text-sidebar-foreground/60 hover:text-white hover:bg-sidebar-accent transition-colors my-0.5 rounded-md',
                                   isActive &&
-                                    'bg-brand-deepBlue text-white font-medium shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
+                                    'bg-brand-vividBlue text-white font-medium shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
                                 )}
                               >
                                 <Link to={sub.path}>{sub.title}</Link>
@@ -151,7 +151,7 @@ export function AppSidebar() {
                   className={cn(
                     'w-full mb-1 transition-all duration-300 py-5 rounded-md relative overflow-hidden group',
                     isActive
-                      ? 'bg-brand-deepBlue text-white shadow-[inset_0_0_12px_rgba(0,0,0,0.2)] border-l-4 border-white/20'
+                      ? 'bg-brand-vividBlue text-white shadow-[inset_0_0_12px_rgba(0,0,0,0.2)] border-l-4 border-white/20'
                       : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white',
                   )}
                 >

@@ -33,6 +33,7 @@ export default {
         brand: {
           graphite: '#1f2937',
           deepBlue: '#1e3a8a',
+          vividBlue: '#3b82f6',
           light: '#f3f4f6',
         },
         border: 'hsl(var(--border))',
