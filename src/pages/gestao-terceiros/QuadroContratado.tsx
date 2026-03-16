@@ -43,6 +43,7 @@ export default function QuadroContratado() {
 
   const [form, setForm] = useState({
     plant_id: '',
+    location_id: 'none',
     function_id: 'none',
     equipment_id: 'none',
     quantity: '',
@@ -71,6 +72,7 @@ export default function QuadroContratado() {
     setEditingId(null)
     setForm({
       plant_id: filterPlant !== 'all' ? filterPlant : '',
+      location_id: 'none',
       function_id: 'none',
       equipment_id: 'none',
       quantity: '',
@@ -87,6 +89,7 @@ export default function QuadroContratado() {
     setEntryType(item.type === 'colaborador' ? 'colaboradores' : 'equipamentos')
     setForm({
       plant_id: item.plant_id || '',
+      location_id: item.location_id || 'none',
       function_id: item.function_id || 'none',
       equipment_id: item.equipment_id || 'none',
       quantity: item.quantity?.toString() || '',
@@ -128,7 +131,7 @@ export default function QuadroContratado() {
           client_id: profile!.client_id,
           type: isStaff ? 'colaborador' : 'equipamento',
           plant_id: form.plant_id,
-          location_id: null, // Hidden per acceptance criteria for colaboradores
+          location_id: form.location_id !== 'none' ? form.location_id : null,
           function_id: isStaff && form.function_id !== 'none' ? form.function_id : null,
           equipment_id: !isStaff && form.equipment_id !== 'none' ? form.equipment_id : null,
           quantity: Number(form.quantity),
@@ -235,6 +238,7 @@ export default function QuadroContratado() {
             <TableRow className="hover:bg-transparent">
               <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
               <TableHead className="font-semibold text-slate-600">Planta</TableHead>
+              <TableHead className="font-semibold text-slate-600">Local</TableHead>
               <TableHead className="font-semibold text-slate-600">Equipamento</TableHead>
               <TableHead className="font-semibold text-slate-600">Função</TableHead>
               <TableHead className="font-semibold text-slate-600">Quantidade</TableHead>
@@ -244,13 +248,13 @@ export default function QuadroContratado() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10">
+                <TableCell colSpan={7} className="text-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                   Nenhum registro encontrado.
                 </TableCell>
               </TableRow>
@@ -270,6 +274,9 @@ export default function QuadroContratado() {
                   </TableCell>
                   <TableCell className="font-medium text-slate-700">
                     {plants.find((p) => p.id === item.plant_id)?.name || '-'}
+                  </TableCell>
+                  <TableCell className="text-slate-600">
+                    {locations.find((l) => l.id === item.location_id)?.name || '-'}
                   </TableCell>
                   <TableCell className="text-slate-600">
                     {item.type === 'colaborador'
@@ -361,7 +368,9 @@ export default function QuadroContratado() {
                 <Label className="text-slate-700">Planta *</Label>
                 <Select
                   value={form.plant_id}
-                  onValueChange={(v) => setForm({ ...form, plant_id: v })}
+                  onValueChange={(v) =>
+                    setForm({ ...form, plant_id: v, location_id: 'none', equipment_id: 'none' })
+                  }
                 >
                   <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Selecione..." />
@@ -375,6 +384,31 @@ export default function QuadroContratado() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {entryType !== 'metas' && (
+                <div className="space-y-2">
+                  <Label className="text-slate-700">Local</Label>
+                  <Select
+                    value={form.location_id}
+                    onValueChange={(v) => setForm({ ...form, location_id: v })}
+                    disabled={!form.plant_id}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {locations
+                        .filter((l) => l.plant_id === form.plant_id)
+                        .map((l) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {entryType === 'colaboradores' && (
                 <div className="space-y-2">
@@ -404,6 +438,7 @@ export default function QuadroContratado() {
                   <Select
                     value={form.equipment_id}
                     onValueChange={(v) => setForm({ ...form, equipment_id: v })}
+                    disabled={!form.plant_id}
                   >
                     <SelectTrigger className="bg-white">
                       <SelectValue placeholder="Selecione..." />

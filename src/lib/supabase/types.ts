@@ -382,6 +382,7 @@ export type Database = {
       }
       locations: {
         Row: {
+          client_id: string
           created_at: string
           description: string | null
           id: string
@@ -389,6 +390,7 @@ export type Database = {
           plant_id: string
         }
         Insert: {
+          client_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -396,6 +398,7 @@ export type Database = {
           plant_id: string
         }
         Update: {
+          client_id?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -403,6 +406,13 @@ export type Database = {
           plant_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'locations_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'locations_plant_id_fkey'
             columns: ['plant_id']
@@ -764,6 +774,7 @@ export const Constants = {
 //   name: text (not null)
 //   description: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   client_id: uuid (not null)
 // Table: monthly_goals_data
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -829,6 +840,7 @@ export const Constants = {
 //   FOREIGN KEY goals_book_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY goals_book_pkey: PRIMARY KEY (id)
 // Table: locations
+//   FOREIGN KEY locations_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY locations_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY locations_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
 // Table: monthly_goals_data

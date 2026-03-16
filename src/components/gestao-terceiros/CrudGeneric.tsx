@@ -40,9 +40,11 @@ export type FieldDef = {
   name: string
   label: string
   type: 'text' | 'textarea' | 'number' | 'select' | 'toggle'
-  options?: { value: string; label: string }[]
+  options?: { value: string; label: string }[] | ((form: any) => { value: string; label: string }[])
   required?: boolean
   hidden?: (form: any) => boolean
+  disabled?: (form: any) => boolean
+  onChangeReset?: string[]
 }
 
 export type ColumnDef = {
@@ -421,6 +423,7 @@ export function CrudGeneric({
                         className={cn(
                           formErrors[f.name] && 'border-red-500 focus-visible:ring-red-500',
                         )}
+                        disabled={f.disabled ? f.disabled(form) : false}
                       />
                     )}
                     {f.type === 'textarea' && (
@@ -435,15 +438,24 @@ export function CrudGeneric({
                           formErrors[f.name] && 'border-red-500 focus-visible:ring-red-500',
                         )}
                         rows={3}
+                        disabled={f.disabled ? f.disabled(form) : false}
                       />
                     )}
                     {f.type === 'select' && (
                       <Select
                         value={form[f.name] === null ? 'none' : form[f.name]?.toString() || 'none'}
                         onValueChange={(v) => {
-                          setForm({ ...form, [f.name]: v === 'none' ? null : v })
+                          const newValue = v === 'none' ? null : v
+                          const newForm = { ...form, [f.name]: newValue }
+                          if (f.onChangeReset) {
+                            f.onChangeReset.forEach((field) => {
+                              newForm[field] = null
+                            })
+                          }
+                          setForm(newForm)
                           if (formErrors[f.name]) setFormErrors({ ...formErrors, [f.name]: false })
                         }}
+                        disabled={f.disabled ? f.disabled(form) : false}
                       >
                         <SelectTrigger
                           className={cn(
@@ -457,11 +469,13 @@ export function CrudGeneric({
                           <SelectItem value="none" className="text-muted-foreground">
                             Nenhum / Não aplicável
                           </SelectItem>
-                          {f.options?.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
+                          {(typeof f.options === 'function' ? f.options(form) : f.options)?.map(
+                            (o: any) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                     )}
@@ -471,6 +485,7 @@ export function CrudGeneric({
                         <Switch
                           checked={form[f.name] || false}
                           onCheckedChange={(v) => setForm({ ...form, [f.name]: v })}
+                          disabled={f.disabled ? f.disabled(form) : false}
                         />
                       </>
                     )}

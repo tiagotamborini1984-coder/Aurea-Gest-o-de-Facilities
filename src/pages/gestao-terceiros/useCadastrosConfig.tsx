@@ -116,13 +116,23 @@ export function useCadastrosConfig(
           fields: [
             { name: 'name', label: 'Nome Completo', type: 'text' },
             { name: 'company_name', label: 'Empresa', type: 'text' },
-            { name: 'plant_id', label: 'Planta', type: 'select', options: plantOptions },
+            {
+              name: 'plant_id',
+              label: 'Planta',
+              type: 'select',
+              options: plantOptions,
+              onChangeReset: ['location_id'],
+            },
             {
               name: 'location_id',
               label: 'Local',
               type: 'select',
-              options: locationOptions,
+              options: (form: any) =>
+                locations
+                  .filter((l) => l.plant_id === form.plant_id)
+                  .map((l) => ({ value: l.id, label: l.name })),
               required: false,
+              disabled: (form: any) => !form.plant_id,
             },
             {
               name: 'function_id',
@@ -216,14 +226,23 @@ export function useCadastrosConfig(
                 { value: 'equipamento', label: 'Equipamento' },
               ],
             },
-            { name: 'plant_id', label: 'Planta', type: 'select', options: plantOptions },
+            {
+              name: 'plant_id',
+              label: 'Planta',
+              type: 'select',
+              options: plantOptions,
+              onChangeReset: ['location_id', 'equipment_id'],
+            },
             {
               name: 'location_id',
-              label: 'Local (Colaborador)',
+              label: 'Local',
               type: 'select',
-              options: locationOptions,
+              options: (form: any) =>
+                locations
+                  .filter((l) => l.plant_id === form.plant_id)
+                  .map((l) => ({ value: l.id, label: l.name })),
               required: false,
-              hidden: (form: any) => form.type === 'colaborador',
+              disabled: (form: any) => !form.plant_id,
             },
             {
               name: 'function_id',
@@ -237,9 +256,13 @@ export function useCadastrosConfig(
               name: 'equipment_id',
               label: 'Equipamento (Apenas p/ Equip.)',
               type: 'select',
-              options: equipmentOptions,
+              options: (form: any) =>
+                equipment
+                  .filter((e) => e.plant_id === form.plant_id)
+                  .map((e) => ({ value: e.id, label: e.name })),
               required: false,
               hidden: (form: any) => form.type === 'colaborador',
+              disabled: (form: any) => !form.plant_id,
             },
             { name: 'quantity', label: 'Quantidade', type: 'number' },
           ],
