@@ -25,7 +25,6 @@ import { cn } from '@/lib/utils'
 
 export default function DashboardGestor() {
   const { activeClient } = useAppStore()
-  // Default values mapping to Graphite and Deep Blue
   const brandPrimary = activeClient?.primaryColor || '#1f2937'
   const brandSecondary = activeClient?.secondaryColor || '#1e3a8a'
 
@@ -179,9 +178,7 @@ export default function DashboardGestor() {
             .filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
             .sort((a, b) => a.date.localeCompare(b.date))
 
-          // Filter expanded view to only display days with recorded logs
           const history = eqLogs.map((log) => ({ date: log.date, status: log.status }))
-
           let presCount = eqLogs.filter((l) => l.status).length
           let absCount = eqLogs.filter((l) => !l.status).length
 
@@ -212,9 +209,7 @@ export default function DashboardGestor() {
             .filter((l) => l.type === 'staff' && l.reference_id === emp.id)
             .sort((a, b) => a.date.localeCompare(b.date))
 
-          // Filter expanded view to only display days with recorded logs
           const history = empLogs.map((log) => ({ date: log.date, status: log.status }))
-
           const presCount = empLogs.filter((l) => l.status).length
           const absCount = empLogs.filter((l) => !l.status).length
 
@@ -227,7 +222,7 @@ export default function DashboardGestor() {
             location: locations.find((l) => l.id === emp.location_id)?.name || 'N/A',
           }
         })
-        .filter((c) => c.history.length > 0) // Only show those who have recorded logs in the period
+        .filter((c) => c.history.length > 0)
     }
 
     return {
@@ -294,119 +289,137 @@ export default function DashboardGestor() {
   const goalsData = getGoalsData()
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
+    <div className="w-full max-w-[1600px] mx-auto space-y-4 lg:space-y-5 pb-12 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1 mb-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Dashboard do Gestor</h2>
-        <p className="text-muted-foreground text-sm">Visão geral do efetivo por período</p>
+        <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
+          Dashboard do Gestor
+        </h2>
+        <p className="text-muted-foreground text-xs lg:text-sm">
+          Visão geral do efetivo por período
+        </p>
       </div>
 
-      {/* Global Filters & Tabs */}
+      {/* 1. Top Section: Plant Selector */}
+      <Card className="shadow-subtle border-border bg-card">
+        <CardHeader className="py-3 px-4 lg:px-6 bg-muted/30 border-b border-border">
+          <CardTitle className="text-xs lg:text-sm font-semibold flex items-center gap-2 text-foreground/90">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            Seleção de Plantas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 lg:px-6">
+          <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+            <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
+              <Checkbox
+                id="all-plants"
+                checked={selectedPlants.length > 0 && selectedPlants.length === plants.length}
+                onCheckedChange={toggleAllPlants}
+              />
+              <label
+                htmlFor="all-plants"
+                className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
+              >
+                Todas as plantas
+              </label>
+            </div>
+            {plants.map((p) => (
+              <div key={p.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`plant-${p.id}`}
+                  checked={selectedPlants.includes(p.id)}
+                  onCheckedChange={() => togglePlant(p.id)}
+                />
+                <label
+                  htmlFor={`plant-${p.id}`}
+                  className="text-xs lg:text-sm text-muted-foreground leading-none cursor-pointer hover:text-foreground transition-colors"
+                >
+                  {p.name}
+                </label>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 2. Middle Section: Dates & Tabs */}
       <Card className="shadow-subtle border-border overflow-hidden rounded-xl bg-card">
         <CardContent className="p-0 flex flex-col xl:flex-row divide-y border-border xl:divide-y-0 xl:divide-x">
           {/* Dates */}
-          <div className="flex gap-4 items-center p-4 xl:px-6 bg-muted/50">
+          <div className="flex gap-4 items-center p-3 lg:p-4 xl:px-6 bg-muted/20">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">De</Label>
+              <Label className="text-[10px] lg:text-xs text-muted-foreground uppercase tracking-wider">
+                De
+              </Label>
               <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-[140px] h-9 text-sm bg-background border-border"
+                className="w-[130px] lg:w-[140px] h-8 lg:h-9 text-xs lg:text-sm bg-background border-border"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Até</Label>
+              <Label className="text-[10px] lg:text-xs text-muted-foreground uppercase tracking-wider">
+                Até
+              </Label>
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-[140px] h-9 text-sm bg-background border-border"
+                className="w-[130px] lg:w-[140px] h-8 lg:h-9 text-xs lg:text-sm bg-background border-border"
               />
             </div>
             {activeTab === 'metas' && (
-              <div className="space-y-1.5 ml-4 border-l border-border pl-4">
-                <Label className="text-xs text-muted-foreground">Mês de Referência</Label>
+              <div className="space-y-1.5 ml-2 lg:ml-4 border-l border-border pl-4">
+                <Label className="text-[10px] lg:text-xs text-muted-foreground uppercase tracking-wider">
+                  Mês Ref.
+                </Label>
                 <Input
                   type="month"
                   value={referenceMonth}
                   onChange={(e) => setReferenceMonth(e.target.value)}
-                  className="w-[150px] h-9 text-sm bg-background border-border"
+                  className="w-[140px] lg:w-[150px] h-8 lg:h-9 text-xs lg:text-sm bg-background border-border"
                 />
               </div>
             )}
           </div>
 
-          {/* Plant Checkboxes */}
-          <div className="flex-1 p-4 xl:px-6 flex items-center overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-6 min-w-max">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="all-plants"
-                  checked={selectedPlants.length > 0 && selectedPlants.length === plants.length}
-                  onCheckedChange={toggleAllPlants}
-                />
-                <label
-                  htmlFor="all-plants"
-                  className="text-sm font-medium leading-none cursor-pointer"
-                >
-                  Todas as plantas
-                </label>
-              </div>
-              {plants.map((p) => (
-                <div key={p.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`plant-${p.id}`}
-                    checked={selectedPlants.includes(p.id)}
-                    onCheckedChange={() => togglePlant(p.id)}
-                  />
-                  <label
-                    htmlFor={`plant-${p.id}`}
-                    className="text-sm text-muted-foreground leading-none cursor-pointer hover:text-foreground"
-                  >
-                    {p.name}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Tabs */}
-          <div className="flex gap-2 p-4 xl:px-6 bg-muted/50 justify-end items-center">
+          <div className="flex-1 flex gap-2 p-3 lg:p-4 xl:px-6 bg-muted/20 justify-start xl:justify-end items-center overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('colaboradores')}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border',
+                'flex items-center gap-1.5 lg:gap-2 px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-xs lg:text-sm font-medium transition-all border whitespace-nowrap',
                 activeTab === 'colaboradores'
                   ? 'text-white border-transparent shadow-sm'
                   : 'bg-background text-muted-foreground border-border hover:bg-muted',
               )}
               style={activeTab === 'colaboradores' ? { backgroundColor: brandSecondary } : {}}
             >
-              <Users className="h-4 w-4" /> Colaboradores
+              <Users className="h-3.5 w-3.5 lg:h-4 lg:w-4" /> Colaboradores
             </button>
             <button
               onClick={() => setActiveTab('equipamentos')}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border',
+                'flex items-center gap-1.5 lg:gap-2 px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-xs lg:text-sm font-medium transition-all border whitespace-nowrap',
                 activeTab === 'equipamentos'
                   ? 'text-white border-transparent shadow-sm'
                   : 'bg-background text-muted-foreground border-border hover:bg-muted',
               )}
               style={activeTab === 'equipamentos' ? { backgroundColor: brandSecondary } : {}}
             >
-              <Wrench className="h-4 w-4" /> Equipamentos
+              <Wrench className="h-3.5 w-3.5 lg:h-4 lg:w-4" /> Equipamentos
             </button>
             <button
               onClick={() => setActiveTab('metas')}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border',
+                'flex items-center gap-1.5 lg:gap-2 px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-xs lg:text-sm font-medium transition-all border whitespace-nowrap',
                 activeTab === 'metas'
                   ? 'text-white border-transparent shadow-sm'
                   : 'bg-background text-muted-foreground border-border hover:bg-muted',
               )}
               style={activeTab === 'metas' ? { backgroundColor: brandSecondary } : {}}
             >
-              <Target className="h-4 w-4" /> Book de Metas
+              <Target className="h-3.5 w-3.5 lg:h-4 lg:w-4" /> Metas
             </button>
           </div>
         </CardContent>
@@ -414,99 +427,100 @@ export default function DashboardGestor() {
 
       {/* Empty State vs Main Content */}
       {selectedPlants.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-16 mt-6 bg-card rounded-xl border border-border shadow-sm animate-in fade-in">
-          <Building2 className="w-16 h-16 text-muted-foreground/50 mb-4" />
-          <h3 className="text-xl font-bold text-foreground">Nenhuma planta selecionada</h3>
-          <p className="text-muted-foreground mt-2 text-center max-w-md">
+        <div className="flex flex-col items-center justify-center p-12 lg:p-16 mt-4 bg-card rounded-xl border border-border shadow-sm animate-in fade-in">
+          <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg lg:text-xl font-bold text-foreground">
+            Nenhuma planta selecionada
+          </h3>
+          <p className="text-muted-foreground text-xs lg:text-sm mt-2 text-center max-w-md">
             Por favor, selecione uma ou mais plantas no filtro acima para visualizar os indicadores
             e relatórios do dashboard.
           </p>
         </div>
       ) : activeTab !== 'metas' ? (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-          {/* Top Metrics Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 lg:gap-6">
+        <div className="space-y-4 lg:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+          {/* Top Metrics Cards - Optimized for Notebooks */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 lg:gap-4">
             <Card className="shadow-subtle border-border">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="bg-blue-500/10 p-3 rounded-xl shrink-0 border border-blue-500/10">
-                  <FileText className="h-6 w-6 text-blue-500" />
+              <CardContent className="p-3 lg:p-4 flex items-center gap-3">
+                <div className="bg-blue-500/10 p-2 lg:p-3 rounded-lg shrink-0 border border-blue-500/10">
+                  <FileText className="h-4 w-4 lg:h-5 lg:w-5 text-blue-500" />
                 </div>
                 <div>
                   <p
-                    className="text-xs font-medium text-blue-500 uppercase tracking-wider cursor-help"
-                    title="Média diária no período selecionado"
+                    className="text-[10px] lg:text-xs font-medium text-blue-500 uppercase tracking-wider"
+                    title="Média diária no período"
                   >
-                    Média Lançada/dia
+                    Média Lançada
                   </p>
-                  <p className="text-3xl font-bold text-foreground mt-0.5">{metrics.lancado}</p>
+                  <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
+                    {metrics.lancado}
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-subtle border-border">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="bg-amber-500/10 p-3 rounded-xl shrink-0 border border-amber-500/10">
-                  <ClipboardCheck className="h-6 w-6 text-amber-500" />
+              <CardContent className="p-3 lg:p-4 flex items-center gap-3">
+                <div className="bg-amber-500/10 p-2 lg:p-3 rounded-lg shrink-0 border border-amber-500/10">
+                  <ClipboardCheck className="h-4 w-4 lg:h-5 lg:w-5 text-amber-500" />
                 </div>
                 <div>
                   <p
-                    className="text-xs font-medium text-amber-500 uppercase tracking-wider cursor-help"
-                    title="Média diária de contratação no período"
+                    className="text-[10px] lg:text-xs font-medium text-amber-500 uppercase tracking-wider"
+                    title="Média de contratação"
                   >
-                    Média Contratado/dia
+                    Média Contratado
                   </p>
-                  <p className="text-3xl font-bold text-foreground mt-0.5">{metrics.contratado}</p>
+                  <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
+                    {metrics.contratado}
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-subtle border-border">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="bg-green-500/10 p-3 rounded-xl shrink-0 border border-green-500/10">
-                  <Users className="h-6 w-6 text-green-500" />
+              <CardContent className="p-3 lg:p-4 flex items-center gap-3">
+                <div className="bg-green-500/10 p-2 lg:p-3 rounded-lg shrink-0 border border-green-500/10">
+                  <Users className="h-4 w-4 lg:h-5 lg:w-5 text-green-500" />
                 </div>
                 <div>
-                  <p
-                    className="text-xs font-medium text-green-500 uppercase tracking-wider cursor-help"
-                    title="Média diária no período selecionado"
-                  >
-                    Média {activeTab === 'colaboradores' ? 'Presentes' : 'Disponíveis'}/dia
+                  <p className="text-[10px] lg:text-xs font-medium text-green-500 uppercase tracking-wider">
+                    {activeTab === 'colaboradores' ? 'Presentes' : 'Disponíveis'}
                   </p>
-                  <p className="text-3xl font-bold text-foreground mt-0.5">{metrics.presente}</p>
+                  <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
+                    {metrics.presente}
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-subtle border-border">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="bg-red-500/10 p-3 rounded-xl shrink-0 border border-red-500/10">
-                  <XCircle className="h-6 w-6 text-red-500" />
+              <CardContent className="p-3 lg:p-4 flex items-center gap-3">
+                <div className="bg-red-500/10 p-2 lg:p-3 rounded-lg shrink-0 border border-red-500/10">
+                  <XCircle className="h-4 w-4 lg:h-5 lg:w-5 text-red-500" />
                 </div>
                 <div>
-                  <p
-                    className="text-xs font-medium text-red-500 uppercase tracking-wider cursor-help"
-                    title="Média diária no período selecionado"
-                  >
-                    Média {activeTab === 'colaboradores' ? 'Ausentes' : 'Indisponíveis'}/dia
+                  <p className="text-[10px] lg:text-xs font-medium text-red-500 uppercase tracking-wider">
+                    {activeTab === 'colaboradores' ? 'Ausentes' : 'Indisponíveis'}
                   </p>
-                  <p className="text-3xl font-bold text-foreground mt-0.5">{metrics.ausente}</p>
+                  <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
+                    {metrics.ausente}
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="shadow-subtle border-border relative overflow-hidden">
-              <CardContent className="p-5 flex items-center gap-4 relative z-10">
-                <div className="bg-orange-500/10 p-3 rounded-xl shrink-0 border border-orange-500/10">
-                  <TrendingDown className="h-6 w-6 text-orange-500" />
+            <Card className="shadow-subtle border-border relative overflow-hidden col-span-2 md:col-span-1 xl:col-span-1">
+              <CardContent className="p-3 lg:p-4 flex items-center gap-3 relative z-10">
+                <div className="bg-orange-500/10 p-2 lg:p-3 rounded-lg shrink-0 border border-orange-500/10">
+                  <TrendingDown className="h-4 w-4 lg:h-5 lg:w-5 text-orange-500" />
                 </div>
                 <div>
-                  <p
-                    className="text-xs font-medium text-orange-500 uppercase tracking-wider cursor-help"
-                    title="Taxa média geral do período"
-                  >
-                    {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Indisponibilidade'}
+                  <p className="text-[10px] lg:text-xs font-medium text-orange-500 uppercase tracking-wider">
+                    {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Indisp.'}
                   </p>
-                  <p className="text-3xl font-bold text-foreground mt-0.5">
+                  <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
                     {metrics.absenteismo.toFixed(1)}%
                   </p>
                 </div>
@@ -515,59 +529,62 @@ export default function DashboardGestor() {
           </div>
 
           {/* Por Planta & Por Local */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <Card className="shadow-subtle border-border flex flex-col h-full bg-card">
-              <CardHeader className="pb-3 border-b border-border/50 px-6 shrink-0">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground/90">
-                  <Building2 className="h-5 w-5 text-muted-foreground/80" /> Resumo por Planta
+              <CardHeader className="pb-2 lg:pb-3 border-b border-border/50 px-4 lg:px-5 shrink-0">
+                <CardTitle className="text-sm lg:text-base font-semibold flex items-center gap-2 text-foreground/90">
+                  <Building2 className="h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground/80" /> Resumo
+                  por Planta
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
-                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30 shrink-0">
+                <div className="px-4 lg:px-5 py-2 lg:py-3 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30 shrink-0">
                   <div className="col-span-4">Planta</div>
-                  <div className="col-span-2 text-center" title="Média Diária">
-                    Média Presença
+                  <div className="col-span-2 text-center" title="Média Presença">
+                    Pres.
                   </div>
-                  <div className="col-span-2 text-center" title="Média Diária">
-                    Média Falta
+                  <div className="col-span-2 text-center" title="Média Falta">
+                    Falta
                   </div>
-                  <div className="col-span-2 text-center">Contratado</div>
-                  <div className="col-span-2 text-right">Taxa / Abs.</div>
+                  <div className="col-span-2 text-center">Contrat.</div>
+                  <div className="col-span-2 text-right">Taxa</div>
                 </div>
-                <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[250px] max-h-[400px]">
+                <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[350px]">
                   {plantStats.map((p) => (
                     <div
                       key={p.id}
-                      className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-muted/50 transition-colors"
+                      className="px-4 lg:px-5 py-2.5 lg:py-3 grid grid-cols-12 gap-2 lg:gap-4 items-center hover:bg-muted/50 transition-colors"
                     >
-                      <div className="col-span-4 font-semibold text-foreground">{p.name}</div>
+                      <div
+                        className="col-span-4 font-semibold text-xs lg:text-sm text-foreground truncate"
+                        title={p.name}
+                      >
+                        {p.name}
+                      </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="bg-green-500/10 text-green-500 border border-green-500/20 text-xs font-bold px-2.5 py-1 rounded">
+                        <span className="bg-green-500/10 text-green-600 border border-green-500/20 text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded">
                           {p.presentes}
                         </span>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-bold px-2.5 py-1 rounded">
+                        <span className="bg-red-500/10 text-red-600 border border-red-500/20 text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded">
                           {p.ausentes}
                         </span>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-bold px-4 py-1 rounded-full">
+                        <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[10px] lg:text-xs font-bold px-2 lg:px-3 py-0.5 rounded-full">
                           {p.contratado}
                         </span>
                       </div>
                       <div className="col-span-2 text-right">
-                        <div className="font-bold text-sm text-foreground">
+                        <div className="font-bold text-xs lg:text-sm text-foreground">
                           {p.absenteismo.toFixed(1)}%
-                        </div>
-                        <div className="text-[10px] text-muted-foreground/80 font-medium">
-                          {p.absenteismo.toFixed(1)}% abs.
                         </div>
                       </div>
                     </div>
                   ))}
                   {plantStats.length === 0 && (
-                    <div className="p-8 text-center text-muted-foreground/80 text-sm">
+                    <div className="p-8 text-center text-muted-foreground/80 text-xs lg:text-sm">
                       Sem dados para exibir.
                     </div>
                   )}
@@ -576,60 +593,63 @@ export default function DashboardGestor() {
             </Card>
 
             <Card className="shadow-subtle border-border flex flex-col h-full bg-card">
-              <CardHeader className="pb-3 border-b border-border/50 px-6 shrink-0">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground/90">
-                  <MapPin className="h-5 w-5 text-muted-foreground/80" /> Resumo por Local
+              <CardHeader className="pb-2 lg:pb-3 border-b border-border/50 px-4 lg:px-5 shrink-0">
+                <CardTitle className="text-sm lg:text-base font-semibold flex items-center gap-2 text-foreground/90">
+                  <MapPin className="h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground/80" /> Resumo por
+                  Local
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
-                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30 shrink-0">
-                  <div className="col-span-4">Local / Planta</div>
-                  <div className="col-span-2 text-center" title="Média Diária">
-                    Média Presença
+                <div className="px-4 lg:px-5 py-2 lg:py-3 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30 shrink-0">
+                  <div className="col-span-4">Local</div>
+                  <div className="col-span-2 text-center" title="Média Presença">
+                    Pres.
                   </div>
-                  <div className="col-span-2 text-center" title="Média Diária">
-                    Média Falta
+                  <div className="col-span-2 text-center" title="Média Falta">
+                    Falta
                   </div>
-                  <div className="col-span-2 text-center">Contratado</div>
-                  <div className="col-span-2 text-right">Taxa / Abs.</div>
+                  <div className="col-span-2 text-center">Contrat.</div>
+                  <div className="col-span-2 text-right">Taxa</div>
                 </div>
-                <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[250px] max-h-[400px]">
+                <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[350px]">
                   {locationStats.map((l) => (
                     <div
                       key={l.id}
-                      className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-muted/50 transition-colors"
+                      className="px-4 lg:px-5 py-2.5 lg:py-3 grid grid-cols-12 gap-2 lg:gap-4 items-center hover:bg-muted/50 transition-colors"
                     >
                       <div className="col-span-4">
-                        <p className="font-semibold text-foreground leading-tight">{l.name}</p>
+                        <p
+                          className="font-semibold text-xs lg:text-sm text-foreground truncate"
+                          title={l.name}
+                        >
+                          {l.name}
+                        </p>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="bg-green-500/10 text-green-500 border border-green-500/20 text-xs font-bold px-2.5 py-1 rounded">
+                        <span className="bg-green-500/10 text-green-600 border border-green-500/20 text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded">
                           {l.presentes}
                         </span>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-bold px-2.5 py-1 rounded">
+                        <span className="bg-red-500/10 text-red-600 border border-red-500/20 text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded">
                           {l.ausentes}
                         </span>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-bold px-4 py-1 rounded-full">
+                        <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[10px] lg:text-xs font-bold px-2 lg:px-3 py-0.5 rounded-full">
                           {l.contratado}
                         </span>
                       </div>
                       <div className="col-span-2 text-right">
-                        <div className="font-bold text-sm text-foreground">
+                        <div className="font-bold text-xs lg:text-sm text-foreground">
                           {l.contratado > 0 ? (100 - l.absenteismo).toFixed(1) : 0}%
-                        </div>
-                        <div className="text-[10px] text-muted-foreground/80 font-medium">
-                          {l.absenteismo.toFixed(1)}% abs.
                         </div>
                       </div>
                     </div>
                   ))}
                   {locationStats.length === 0 && (
-                    <div className="p-8 text-center text-muted-foreground/80 text-sm">
-                      Sem dados de locais associados.
+                    <div className="p-8 text-center text-muted-foreground/80 text-xs lg:text-sm">
+                      Sem dados de locais.
                     </div>
                   )}
                 </div>
@@ -640,84 +660,82 @@ export default function DashboardGestor() {
           {/* Por Equipamento Details */}
           {activeTab === 'equipamentos' && (
             <Card className="shadow-subtle border-border bg-card animate-in fade-in slide-in-from-bottom-4">
-              <CardHeader className="pb-3 border-b border-border/50 px-6">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground/90">
-                  <Wrench className="h-5 w-5 text-muted-foreground/80" /> Por Equipamento
+              <CardHeader className="pb-2 lg:pb-3 border-b border-border/50 px-4 lg:px-5">
+                <CardTitle className="text-sm lg:text-base font-semibold flex items-center gap-2 text-foreground/90">
+                  <Wrench className="h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground/80" /> Por
+                  Equipamento
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30">
-                  <div className="col-span-4">Equipamento</div>
+                <div className="px-4 lg:px-5 py-2.5 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30">
+                  <div className="col-span-4 lg:col-span-5">Equipamento</div>
                   <div className="col-span-2 text-center">Contratado</div>
-                  <div className="col-span-2 text-center">Média Presença</div>
-                  <div className="col-span-2 text-center">Média Falta</div>
-                  <div className="col-span-2 text-right">Taxa Disp.</div>
+                  <div className="col-span-2 text-center">Presença</div>
+                  <div className="col-span-2 text-center">Falta</div>
+                  <div className="col-span-2 lg:col-span-1 text-right">Disp.</div>
                 </div>
-                <div className="divide-y divide-border/50 max-h-[500px] overflow-y-auto custom-scrollbar">
+                <div className="divide-y divide-border/50 max-h-[400px] overflow-y-auto custom-scrollbar">
                   {equipmentStats.map((eq) => (
                     <Collapsible key={eq.id}>
                       <CollapsibleTrigger className="w-full group focus-visible:outline-none">
-                        <div className="px-6 py-4 grid grid-cols-12 gap-4 items-center group-hover:bg-muted/50 transition-colors cursor-pointer text-left">
-                          <div className="col-span-4 font-semibold text-foreground flex items-center gap-2">
-                            <ChevronRight className="w-4 h-4 text-muted-foreground/80 group-data-[state=open]:rotate-90 transition-transform" />
-                            {eq.name}
+                        <div className="px-4 lg:px-5 py-3 grid grid-cols-12 gap-2 lg:gap-4 items-center group-hover:bg-muted/50 transition-colors cursor-pointer text-left">
+                          <div className="col-span-4 lg:col-span-5 font-semibold text-xs lg:text-sm text-foreground flex items-center gap-1.5 lg:gap-2">
+                            <ChevronRight className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-muted-foreground/80 group-data-[state=open]:rotate-90 transition-transform shrink-0" />
+                            <span className="truncate" title={eq.name}>
+                              {eq.name}
+                            </span>
                           </div>
                           <div className="col-span-2 text-center">
                             <Badge
                               variant="outline"
-                              className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold px-3"
+                              className="bg-amber-500/10 text-amber-600 border-amber-500/20 font-bold px-2 py-0.5 text-[10px] lg:text-xs"
                             >
                               {eq.contratado}
                             </Badge>
                           </div>
                           <div className="col-span-2 text-center">
-                            <span className="text-green-500 font-bold text-sm">
+                            <span className="text-green-600 font-bold text-xs lg:text-sm">
                               {eq.mediaPresenca.toFixed(1)}
                             </span>
                           </div>
                           <div className="col-span-2 text-center">
-                            <span className="text-red-500 font-bold text-sm">
+                            <span className="text-red-600 font-bold text-xs lg:text-sm">
                               {eq.mediaFalta.toFixed(1)}
                             </span>
                           </div>
-                          <div className="col-span-2 text-right">
-                            <span className="font-bold text-sm text-foreground">
-                              {eq.taxaDisp.toFixed(1)}%
+                          <div className="col-span-2 lg:col-span-1 text-right">
+                            <span className="font-bold text-xs lg:text-sm text-foreground">
+                              {eq.taxaDisp.toFixed(0)}%
                             </span>
                           </div>
                         </div>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="px-6 py-5 bg-muted/20 border-t border-border/50 shadow-inner">
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 flex items-center gap-2">
-                            <TrendingDown className="w-4 h-4 text-muted-foreground/80" />
-                            Histórico de Lançamentos (Apenas dias com registro)
+                        <div className="px-5 lg:px-6 py-4 bg-muted/20 border-t border-border/50 shadow-inner">
+                          <h4 className="text-[10px] lg:text-xs font-semibold text-muted-foreground uppercase mb-2.5 flex items-center gap-1.5">
+                            <TrendingDown className="w-3.5 h-3.5 text-muted-foreground/80" />{' '}
+                            Histórico
                           </h4>
                           <div className="flex flex-wrap gap-2">
                             {eq.history.length === 0 ? (
-                              <span className="text-sm text-muted-foreground/80">
-                                Sem lançamentos no período.
+                              <span className="text-xs text-muted-foreground/80">
+                                Sem lançamentos.
                               </span>
                             ) : (
                               eq.history.map((day: any, idx: number) => (
                                 <div
                                   key={idx}
-                                  className="flex flex-col items-center justify-center bg-background py-1.5 px-3 border border-border rounded-lg shadow-sm min-w-[70px]"
+                                  className="flex flex-col items-center justify-center bg-background py-1 px-2 lg:px-2.5 border border-border rounded shadow-sm min-w-[50px] lg:min-w-[60px]"
                                 >
-                                  <span className="text-[10px] text-muted-foreground/80 font-medium mb-0.5">
+                                  <span className="text-[9px] lg:text-[10px] text-muted-foreground/80 font-medium mb-0.5">
                                     {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
                                   </span>
-                                  {day.status ? (
-                                    <div
-                                      className="w-2.5 h-2.5 rounded-full bg-green-500"
-                                      title="Disponível"
-                                    />
-                                  ) : (
-                                    <div
-                                      className="w-2.5 h-2.5 rounded-full bg-red-500"
-                                      title="Indisponível"
-                                    />
-                                  )}
+                                  <div
+                                    className={cn(
+                                      'w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full',
+                                      day.status ? 'bg-green-500' : 'bg-red-500',
+                                    )}
+                                  />
                                 </div>
                               ))
                             )}
@@ -727,8 +745,8 @@ export default function DashboardGestor() {
                     </Collapsible>
                   ))}
                   {equipmentStats.length === 0 && (
-                    <div className="p-8 text-center text-muted-foreground/80 text-sm">
-                      Nenhum equipamento vinculado às plantas selecionadas com dados neste período.
+                    <div className="p-8 text-center text-muted-foreground/80 text-xs lg:text-sm">
+                      Sem dados neste período.
                     </div>
                   )}
                 </div>
@@ -739,84 +757,81 @@ export default function DashboardGestor() {
           {/* Por Colaborador Details */}
           {activeTab === 'colaboradores' && (
             <Card className="shadow-subtle border-border bg-card animate-in fade-in slide-in-from-bottom-4">
-              <CardHeader className="pb-3 border-b border-border/50 px-6">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground/90">
-                  <Users className="h-5 w-5 text-muted-foreground/80" /> Por Colaborador
-                  (Lançamentos no Período)
+              <CardHeader className="pb-2 lg:pb-3 border-b border-border/50 px-4 lg:px-5">
+                <CardTitle className="text-sm lg:text-base font-semibold flex items-center gap-2 text-foreground/90">
+                  <Users className="h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground/80" /> Por
+                  Colaborador
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="px-6 py-3 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30">
-                  <div className="col-span-5">Colaborador / Local</div>
-                  <div className="col-span-3 text-center">Total Presenças</div>
-                  <div className="col-span-3 text-center">Total Faltas</div>
-                  <div className="col-span-1 text-right">Taxa</div>
+                <div className="px-4 lg:px-5 py-2.5 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30">
+                  <div className="col-span-5 lg:col-span-6">Colaborador / Local</div>
+                  <div className="col-span-3 text-center">Presenças</div>
+                  <div className="col-span-2 text-center">Faltas</div>
+                  <div className="col-span-2 lg:col-span-1 text-right">Taxa</div>
                 </div>
-                <div className="divide-y divide-border/50 max-h-[500px] overflow-y-auto custom-scrollbar">
+                <div className="divide-y divide-border/50 max-h-[400px] overflow-y-auto custom-scrollbar">
                   {collaboratorStats.map((col) => {
                     const total = col.presencas + col.faltas
                     const taxa = total > 0 ? (col.presencas / total) * 100 : 0
                     return (
                       <Collapsible key={col.id}>
                         <CollapsibleTrigger className="w-full group focus-visible:outline-none">
-                          <div className="px-6 py-4 grid grid-cols-12 gap-4 items-center group-hover:bg-muted/50 transition-colors cursor-pointer text-left">
-                            <div className="col-span-5">
-                              <div className="font-semibold text-foreground flex items-center gap-2">
-                                <ChevronRight className="w-4 h-4 text-muted-foreground/80 group-data-[state=open]:rotate-90 transition-transform shrink-0" />
-                                <span className="truncate">{col.name}</span>
+                          <div className="px-4 lg:px-5 py-3 grid grid-cols-12 gap-2 lg:gap-4 items-center group-hover:bg-muted/50 transition-colors cursor-pointer text-left">
+                            <div className="col-span-5 lg:col-span-6 overflow-hidden">
+                              <div className="font-semibold text-xs lg:text-sm text-foreground flex items-center gap-1.5 lg:gap-2">
+                                <ChevronRight className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-muted-foreground/80 group-data-[state=open]:rotate-90 transition-transform shrink-0" />
+                                <span className="truncate" title={col.name}>
+                                  {col.name}
+                                </span>
                               </div>
-                              <div className="text-xs text-muted-foreground ml-6 mt-0.5">
+                              <div className="text-[10px] lg:text-xs text-muted-foreground ml-5 lg:ml-6 mt-0.5 truncate">
                                 {col.location}
                               </div>
                             </div>
                             <div className="col-span-3 text-center">
-                              <span className="inline-flex items-center justify-center min-w-[32px] h-7 rounded-md bg-green-500/10 text-green-500 border border-green-500/20 font-bold text-sm px-2">
+                              <span className="inline-flex items-center justify-center min-w-[28px] h-6 rounded-md bg-green-500/10 text-green-600 border border-green-500/20 font-bold text-xs lg:text-sm px-1.5">
                                 {col.presencas}
                               </span>
                             </div>
-                            <div className="col-span-3 text-center">
-                              <span className="inline-flex items-center justify-center min-w-[32px] h-7 rounded-md bg-red-500/10 text-red-500 border border-red-500/20 font-bold text-sm px-2">
+                            <div className="col-span-2 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[28px] h-6 rounded-md bg-red-500/10 text-red-600 border border-red-500/20 font-bold text-xs lg:text-sm px-1.5">
                                 {col.faltas}
                               </span>
                             </div>
-                            <div className="col-span-1 text-right">
-                              <span className="font-bold text-sm text-foreground">
+                            <div className="col-span-2 lg:col-span-1 text-right">
+                              <span className="font-bold text-xs lg:text-sm text-foreground">
                                 {taxa.toFixed(0)}%
                               </span>
                             </div>
                           </div>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                          <div className="px-6 py-5 bg-muted/20 border-t border-border/50 shadow-inner">
-                            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 flex items-center gap-2">
-                              <TrendingDown className="w-4 h-4 text-muted-foreground/80" />
-                              Histórico de Lançamentos (Apenas dias com registro)
+                          <div className="px-5 lg:px-6 py-4 bg-muted/20 border-t border-border/50 shadow-inner">
+                            <h4 className="text-[10px] lg:text-xs font-semibold text-muted-foreground uppercase mb-2.5 flex items-center gap-1.5">
+                              <TrendingDown className="w-3.5 h-3.5 text-muted-foreground/80" />{' '}
+                              Histórico
                             </h4>
                             <div className="flex flex-wrap gap-2">
                               {col.history.length === 0 ? (
-                                <span className="text-sm text-muted-foreground/80">
-                                  Sem lançamentos no período.
+                                <span className="text-xs text-muted-foreground/80">
+                                  Sem lançamentos.
                                 </span>
                               ) : (
                                 col.history.map((day: any, idx: number) => (
                                   <div
                                     key={idx}
-                                    className="flex flex-col items-center justify-center bg-background py-1.5 px-3 border border-border rounded-lg shadow-sm min-w-[70px]"
+                                    className="flex flex-col items-center justify-center bg-background py-1 px-2 lg:px-2.5 border border-border rounded shadow-sm min-w-[50px] lg:min-w-[60px]"
                                   >
-                                    <span className="text-[10px] text-muted-foreground/80 font-medium mb-0.5">
+                                    <span className="text-[9px] lg:text-[10px] text-muted-foreground/80 font-medium mb-0.5">
                                       {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
                                     </span>
-                                    {day.status ? (
-                                      <div
-                                        className="w-2.5 h-2.5 rounded-full bg-green-500"
-                                        title="Presente"
-                                      />
-                                    ) : (
-                                      <div
-                                        className="w-2.5 h-2.5 rounded-full bg-red-500"
-                                        title="Falta"
-                                      />
-                                    )}
+                                    <div
+                                      className={cn(
+                                        'w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full',
+                                        day.status ? 'bg-green-500' : 'bg-red-500',
+                                      )}
+                                    />
                                   </div>
                                 ))
                               )}
@@ -827,8 +842,8 @@ export default function DashboardGestor() {
                     )
                   })}
                   {collaboratorStats.length === 0 && (
-                    <div className="p-8 text-center text-muted-foreground/80 text-sm">
-                      Nenhum colaborador com lançamentos registrados no período.
+                    <div className="p-8 text-center text-muted-foreground/80 text-xs lg:text-sm">
+                      Sem lançamentos.
                     </div>
                   )}
                 </div>
@@ -838,22 +853,21 @@ export default function DashboardGestor() {
         </div>
       ) : (
         /* Book de Metas View */
-        <div className="space-y-4 max-w-5xl animate-in slide-in-from-bottom-4 duration-500 mt-6">
-          {/* Automated Goal 1 */}
+        <div className="space-y-4 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500 mt-6">
           <div
-            className="flex items-center justify-between bg-card border border-border rounded-lg p-5 shadow-sm border-l-4"
+            className="flex items-center justify-between bg-card border border-border rounded-lg p-4 lg:p-5 shadow-sm border-l-4"
             style={{ borderLeftColor: brandSecondary }}
           >
             <div>
-              <h3 className="font-bold text-foreground text-lg">Absenteísmo</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Automático — absenteísmo &lt; 4% = 100% | ≥ 4% = 0% | Calculado:{' '}
+              <h3 className="font-bold text-foreground text-base lg:text-lg">Absenteísmo</h3>
+              <p className="text-[10px] lg:text-xs text-muted-foreground mt-1">
+                Automático — absenteísmo &lt; 4% = 100% | ≥ 4% = 0% | Calc:{' '}
                 {metrics.absenteismo.toFixed(1)}%
               </p>
             </div>
             <div
               className={cn(
-                'text-3xl font-black',
+                'text-2xl lg:text-3xl font-black',
                 goalsData.absAchieved === 100 ? 'text-green-500' : 'text-red-500',
               )}
             >
@@ -861,41 +875,43 @@ export default function DashboardGestor() {
             </div>
           </div>
 
-          {/* Automated Goal 2 */}
           <div
-            className="flex items-center justify-between bg-card border border-border rounded-lg p-5 shadow-sm border-l-4"
+            className="flex items-center justify-between bg-card border border-border rounded-lg p-4 lg:p-5 shadow-sm border-l-4"
             style={{ borderLeftColor: '#eab308' }}
           >
             <div>
-              <h3 className="font-bold text-foreground text-lg">Disponibilidade de Equipamentos</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Automático — média equipamentos disponíveis / quadro contratado
+              <h3 className="font-bold text-foreground text-base lg:text-lg">
+                Disponibilidade de Equipamentos
+              </h3>
+              <p className="text-[10px] lg:text-xs text-muted-foreground mt-1">
+                Automático — média disponíveis / contratado
               </p>
             </div>
-            <div className="text-3xl font-black text-amber-500">
+            <div className="text-2xl lg:text-3xl font-black text-amber-500">
               {goalsData.equipDisp.toFixed(0)}%
             </div>
           </div>
 
-          {/* Manual Goals from DB */}
           {goalsData.manualGoals.map((g) => (
             <div
               key={g.id}
-              className="flex items-center justify-between bg-card border border-border rounded-lg p-5 shadow-sm border-l-4 border-l-muted"
+              className="flex items-center justify-between bg-card border border-border rounded-lg p-4 lg:p-5 shadow-sm border-l-4 border-l-muted"
             >
               <div className="pr-4">
-                <h3 className="font-bold text-foreground text-lg">{g.name}</h3>
+                <h3 className="font-bold text-foreground text-base lg:text-lg">{g.name}</h3>
                 {g.description && (
-                  <p className="text-xs text-muted-foreground mt-1">{g.description}</p>
+                  <p className="text-[10px] lg:text-xs text-muted-foreground mt-1">
+                    {g.description}
+                  </p>
                 )}
               </div>
               <div className="text-right shrink-0">
                 {g.avg !== null ? (
-                  <div className="text-2xl font-black text-foreground">
+                  <div className="text-xl lg:text-2xl font-black text-foreground">
                     {Number(g.avg).toFixed(1)}%
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground/80 font-medium whitespace-nowrap">
+                  <div className="text-xs text-muted-foreground/80 font-medium whitespace-nowrap">
                     Sem lançamento
                   </div>
                 )}
@@ -903,20 +919,17 @@ export default function DashboardGestor() {
             </div>
           ))}
 
-          {/* General Score */}
           <div
-            className="flex items-center justify-between bg-muted/50 border border-border rounded-lg p-6 shadow-sm mt-8 border-l-8"
+            className="flex items-center justify-between bg-muted/50 border border-border rounded-lg p-5 lg:p-6 shadow-sm mt-6 lg:mt-8 border-l-[6px] lg:border-l-8"
             style={{ borderLeftColor: brandSecondary }}
           >
             <div>
-              <h3 className="font-black text-foreground text-xl">Nota Geral</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Média de atingimento de todas as metas
-              </p>
+              <h3 className="font-black text-foreground text-lg lg:text-xl">Nota Geral</h3>
+              <p className="text-xs lg:text-sm text-muted-foreground mt-1">Média de atingimento</p>
             </div>
             <div
               className={cn(
-                'text-5xl font-black',
+                'text-4xl lg:text-5xl font-black',
                 Number(goalsData.notaGeral) >= 80
                   ? 'text-green-500'
                   : Number(goalsData.notaGeral) >= 50
