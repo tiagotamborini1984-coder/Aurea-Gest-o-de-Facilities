@@ -65,20 +65,18 @@ export default function Cadastros() {
           const { error } = await supabase.from(config.tableName).insert(payload)
           if (!error) {
             refetch()
-            return true
+            return { success: true }
           }
-          console.error(`Erro ao salvar em ${config.tableName}:`, error)
-          return false
+          return { success: false, error }
         }}
         onUpdate={async (id: string, record: any) => {
           const payload = { ...record }
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
             refetch()
-            return true
+            return { success: true }
           }
-          console.error(`Erro ao atualizar em ${config.tableName}:`, error)
-          return false
+          return { success: false, error }
         }}
         onRemove={async () => {
           refetch()

@@ -109,6 +109,19 @@ export function CrudGeneric({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      toast({
+        title: 'Sessão expirada',
+        description: 'Sua sessão expirou. Por favor, faça login novamente para salvar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const errors: Record<string, boolean> = {}
     let hasError = false
 
@@ -124,10 +137,14 @@ export function CrudGeneric({
     }
 
     if (hasError) {
+      const missingFields = fields
+        .filter((f: FieldDef) => errors[f.name])
+        .map((f: FieldDef) => f.label)
+        .join(', ')
       setFormErrors(errors)
       toast({
         title: 'Campos obrigatórios ausentes',
-        description: 'Por favor, preencha todos os campos destacados.',
+        description: `Por favor, preencha: ${missingFields}`,
         variant: 'destructive',
       })
       return
@@ -136,33 +153,45 @@ export function CrudGeneric({
     setFormErrors({})
     setIsSubmitting(true)
 
-    const payload = { ...form }
-    // Clean up hidden fields before sending
-    for (const field of fields) {
-      if (field.hidden && field.hidden(form)) {
-        payload[field.name] = null
+    try {
+      const payload = { ...form }
+      for (const field of fields) {
+        if (field.hidden && field.hidden(form)) {
+          payload[field.name] = null
+        }
       }
-    }
 
-    const success = editingItem ? await onUpdate(editingItem.id, payload) : await onAdd(payload)
+      const result = editingItem ? await onUpdate(editingItem.id, payload) : await onAdd(payload)
 
-    const itemName = singularName || title
-    const itemNameLower = singularName ? singularName.toLowerCase() : title.toLowerCase()
+      const success = typeof result === 'boolean' ? result : result?.success
+      const errorObj = typeof result === 'boolean' ? null : result?.error
 
-    if (success) {
+      const itemName = singularName || title
+      const itemNameLower = singularName ? singularName.toLowerCase() : title.toLowerCase()
+
+      if (success) {
+        toast({
+          title: `${itemName} ${editingItem ? 'atualizado' : 'salvo'} com sucesso!`,
+          className: 'bg-green-50 text-green-900 border-green-200',
+        })
+        setIsModalOpen(false)
+        load()
+      } else {
+        toast({
+          title: `Erro ao salvar o ${itemNameLower}.`,
+          description: errorObj?.message || 'Por favor, verifique os dados e tente novamente.',
+          variant: 'destructive',
+        })
+      }
+    } catch (err: any) {
       toast({
-        title: `${itemName} ${editingItem ? 'atualizado' : 'cadastrado'} com sucesso!`,
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-      setIsModalOpen(false)
-      load()
-    } else {
-      toast({
-        title: `Erro ao salvar o ${itemNameLower}. Por favor, tente novamente.`,
+        title: 'Erro inesperado',
+        description: err.message || 'Falha ao processar a requisição.',
         variant: 'destructive',
       })
+    } finally {
+      setIsSubmitting(false)
     }
-    setIsSubmitting(false)
   }
 
   const confirmDelete = async () => {
