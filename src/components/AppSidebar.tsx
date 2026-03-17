@@ -42,6 +42,7 @@ export function AppSidebar() {
       subItems: [
         { title: 'Plantas', path: '/gestao-terceiros/cadastros/plantas' },
         { title: 'Locais', path: '/gestao-terceiros/cadastros/locais' },
+        { title: 'Empresas', path: '/gestao-terceiros/cadastros/empresas' },
         { title: 'Funções', path: '/gestao-terceiros/cadastros/funcoes' },
         { title: 'Colaboradores', path: '/gestao-terceiros/cadastros/colaboradores' },
         { title: 'Equipamentos', path: '/gestao-terceiros/cadastros/equipamentos' },

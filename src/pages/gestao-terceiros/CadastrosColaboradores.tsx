@@ -58,6 +58,7 @@ export default function CadastrosColaboradores() {
     trainings,
     functionRequiredTrainings,
     employeeTrainingRecords,
+    companies,
     refetch,
     loading,
   } = useMasterData()
@@ -72,6 +73,7 @@ export default function CadastrosColaboradores() {
 
   const [form, setForm] = useState({
     name: '',
+    company_id: 'none',
     company_name: '',
     plant_id: '',
     location_id: 'none',
@@ -99,17 +101,28 @@ export default function CadastrosColaboradores() {
 
   const filteredData = useMemo(() => {
     return employees.filter((e) => {
+      const cName = e.company_id
+        ? companies.find((c) => c.id === e.company_id)?.name || e.company_name
+        : e.company_name
+
       const matchSearch =
         e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.company_name.toLowerCase().includes(searchTerm.toLowerCase())
+        (cName || '').toLowerCase().includes(searchTerm.toLowerCase())
       const matchPlant = filterPlant === 'all' || e.plant_id === filterPlant
       return matchSearch && matchPlant
     })
-  }, [employees, searchTerm, filterPlant])
+  }, [employees, companies, searchTerm, filterPlant])
 
   const openAdd = () => {
     setEditingId(null)
-    setForm({ name: '', company_name: '', plant_id: '', location_id: 'none', function_id: 'none' })
+    setForm({
+      name: '',
+      company_id: 'none',
+      company_name: '',
+      plant_id: '',
+      location_id: 'none',
+      function_id: 'none',
+    })
     setTrainingFiles({})
     setIsModalOpen(true)
   }
@@ -118,7 +131,8 @@ export default function CadastrosColaboradores() {
     setEditingId(item.id)
     setForm({
       name: item.name,
-      company_name: item.company_name,
+      company_id: item.company_id || 'none',
+      company_name: item.company_name || '',
       plant_id: item.plant_id,
       location_id: item.location_id || 'none',
       function_id: item.function_id || 'none',
@@ -148,7 +162,7 @@ export default function CadastrosColaboradores() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profile?.client_id || !form.name || !form.company_name || !form.plant_id) return
+    if (!profile?.client_id || !form.name || form.company_id === 'none' || !form.plant_id) return
     setIsSubmitting(true)
 
     try {
@@ -173,7 +187,8 @@ export default function CadastrosColaboradores() {
           plant_id: form.plant_id,
           location_id: form.location_id !== 'none' ? form.location_id : null,
           function_id: form.function_id !== 'none' ? form.function_id : null,
-          company_name: form.company_name,
+          company_id: form.company_id !== 'none' ? form.company_id : null,
+          company_name: form.company_name, // fallback storage
           name: form.name,
         })
         .select()
@@ -238,7 +253,7 @@ export default function CadastrosColaboradores() {
   })
 
   const isSaveDisabled =
-    isSubmitting || !form.name || !form.company_name || !form.plant_id || missingRequired
+    isSubmitting || !form.name || form.company_id === 'none' || !form.plant_id || missingRequired
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -311,49 +326,55 @@ export default function CadastrosColaboradores() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-slate-50/50">
-                  <TableCell className="font-medium text-slate-700">{item.name}</TableCell>
-                  <TableCell className="text-slate-600">{item.company_name}</TableCell>
-                  <TableCell className="text-slate-600">
-                    {plants.find((p) => p.id === item.plant_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-slate-600">
-                    {functions.find((f) => f.id === item.function_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-right pr-6">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setAuditEmployee(item)}
-                        className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
-                        title="Auditoria de Treinamentos"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(item)}
-                        className="text-gray-400 hover:text-brand-deepBlue hover:bg-slate-100"
-                        title="Editar"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(item.id)}
-                        className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                        title="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredData.map((item) => {
+                const displayCompany = item.company_id
+                  ? companies.find((c) => c.id === item.company_id)?.name || item.company_name
+                  : item.company_name
+
+                return (
+                  <TableRow key={item.id} className="hover:bg-slate-50/50">
+                    <TableCell className="font-medium text-slate-700">{item.name}</TableCell>
+                    <TableCell className="text-slate-600">{displayCompany}</TableCell>
+                    <TableCell className="text-slate-600">
+                      {plants.find((p) => p.id === item.plant_id)?.name || '-'}
+                    </TableCell>
+                    <TableCell className="text-slate-600">
+                      {functions.find((f) => f.id === item.function_id)?.name || '-'}
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setAuditEmployee(item)}
+                          className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
+                          title="Auditoria de Treinamentos"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(item)}
+                          className="text-gray-400 hover:text-brand-deepBlue hover:bg-slate-100"
+                          title="Editar"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(item.id)}
+                          className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                          title="Remover"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -376,11 +397,37 @@ export default function CadastrosColaboradores() {
               </div>
               <div className="space-y-2">
                 <Label>Empresa *</Label>
-                <Input
-                  value={form.company_name}
-                  onChange={(e) => setForm({ ...form, company_name: e.target.value })}
-                  required
-                />
+                <Select
+                  value={form.company_id}
+                  onValueChange={(v) => {
+                    const comp = companies.find((c) => c.id === v)
+                    setForm({ ...form, company_id: v, company_name: comp?.name || '' })
+                  }}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Selecione a empresa..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" disabled>
+                      Selecione uma empresa
+                    </SelectItem>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {companies.length === 0 && (
+                  <p className="text-[11px] text-red-500 mt-1">
+                    Cadastre empresas no menu "Empresas" primeiro.
+                  </p>
+                )}
+                {editingId && form.company_id === 'none' && form.company_name && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Atual: {form.company_name}. Vincule a uma empresa cadastrada.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Planta *</Label>
@@ -569,8 +616,11 @@ export default function CadastrosColaboradores() {
             <SheetDescription className="text-base font-medium text-slate-700 mt-2">
               {auditEmployee?.name}
               <span className="block text-sm font-normal text-muted-foreground">
-                {auditEmployee?.company_name} •{' '}
-                {functions.find((f) => f.id === auditEmployee?.function_id)?.name || 'Sem função'}
+                {auditEmployee?.company_id
+                  ? companies.find((c) => c.id === auditEmployee.company_id)?.name ||
+                    auditEmployee.company_name
+                  : auditEmployee?.company_name}{' '}
+                • {functions.find((f) => f.id === auditEmployee?.function_id)?.name || 'Sem função'}
               </span>
             </SheetDescription>
           </SheetHeader>
