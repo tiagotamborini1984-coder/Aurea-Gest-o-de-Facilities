@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { format } from 'date-fns'
+import { format, addMonths, isBefore, startOfDay } from 'date-fns'
 import {
   Search,
   Users,
@@ -24,6 +24,7 @@ import {
   XCircle,
   Check,
   Calendar as CalendarIcon,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -40,7 +41,17 @@ export default function Lancamentos() {
   const [isSaving, setIsSaving] = useState(false)
 
   const { toast } = useToast()
-  const { plants, employees, equipment, functions, locations, goals } = useMasterData()
+  const {
+    plants,
+    employees,
+    equipment,
+    functions,
+    locations,
+    goals,
+    functionRequiredTrainings,
+    employeeTrainingRecords,
+    trainings,
+  } = useMasterData()
   const { profile, activeClient } = useAppStore()
 
   // Default plant selection if none selected
@@ -524,6 +535,45 @@ export default function Lancamentos() {
                           const isPresent = presences[item.id] || false
                           const locName = locations.find((l) => l.id === item.location_id)?.name
 
+                          let isNonCompliant = false
+                          let complianceMessage = ''
+
+                          if (activeTab === 'staff') {
+                            const empRequiredTrainings = functionRequiredTrainings.filter(
+                              (frt) => frt.function_id === item.function_id,
+                            )
+
+                            if (empRequiredTrainings.length > 0) {
+                              for (const req of empRequiredTrainings) {
+                                const record = employeeTrainingRecords.find(
+                                  (etr) =>
+                                    etr.employee_id === item.id &&
+                                    etr.training_id === req.training_id,
+                                )
+                                const training = trainings.find((t) => t.id === req.training_id)
+
+                                if (!record) {
+                                  isNonCompliant = true
+                                  complianceMessage = `Pendente: ${training?.name}`
+                                  break
+                                } else if (training?.validity_months) {
+                                  const completionDate = new Date(
+                                    record.completion_date + 'T12:00:00',
+                                  )
+                                  const expirationDate = addMonths(
+                                    completionDate,
+                                    training.validity_months,
+                                  )
+                                  if (isBefore(expirationDate, startOfDay(new Date()))) {
+                                    isNonCompliant = true
+                                    complianceMessage = `Vencido: ${training?.name}`
+                                    break
+                                  }
+                                }
+                              }
+                            }
+                          }
+
                           return (
                             <div
                               key={item.id}
@@ -539,12 +589,27 @@ export default function Lancamentos() {
                                   />
                                 </div>
                                 <div>
-                                  <p className="font-medium text-slate-800">{item.name}</p>
+                                  <p
+                                    className={cn(
+                                      'font-medium',
+                                      isNonCompliant ? 'text-red-600' : 'text-slate-800',
+                                    )}
+                                  >
+                                    {item.name}
+                                  </p>
                                   {activeTab === 'staff' && (
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                      {plants.find((p) => p.id === plantId)?.code}
-                                      {locName ? ` - ${locName}` : ''}
-                                    </p>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5">
+                                      <p className="text-xs text-slate-500">
+                                        {plants.find((p) => p.id === plantId)?.code}
+                                        {locName ? ` - ${locName}` : ''}
+                                      </p>
+                                      {isNonCompliant && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded w-fit">
+                                          <AlertTriangle className="h-3 w-3" />
+                                          {complianceMessage}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>

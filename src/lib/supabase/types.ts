@@ -206,6 +206,58 @@ export type Database = {
           },
         ]
       }
+      employee_training_records: {
+        Row: {
+          client_id: string
+          completion_date: string
+          created_at: string
+          document_url: string
+          employee_id: string
+          id: string
+          training_id: string
+        }
+        Insert: {
+          client_id: string
+          completion_date: string
+          created_at?: string
+          document_url: string
+          employee_id: string
+          id?: string
+          training_id: string
+        }
+        Update: {
+          client_id?: string
+          completion_date?: string
+          created_at?: string
+          document_url?: string
+          employee_id?: string
+          id?: string
+          training_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'employee_training_records_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'employee_training_records_employee_id_fkey'
+            columns: ['employee_id']
+            isOneToOne: false
+            referencedRelation: 'employees'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'employee_training_records_training_id_fkey'
+            columns: ['training_id']
+            isOneToOne: false
+            referencedRelation: 'trainings'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       employees: {
         Row: {
           client_id: string
@@ -309,6 +361,49 @@ export type Database = {
             columns: ['plant_id']
             isOneToOne: false
             referencedRelation: 'plants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      function_required_trainings: {
+        Row: {
+          client_id: string
+          function_id: string
+          id: string
+          training_id: string
+        }
+        Insert: {
+          client_id: string
+          function_id: string
+          id?: string
+          training_id: string
+        }
+        Update: {
+          client_id?: string
+          function_id?: string
+          id?: string
+          training_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'function_required_trainings_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'function_required_trainings_function_id_fkey'
+            columns: ['function_id']
+            isOneToOne: false
+            referencedRelation: 'functions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'function_required_trainings_training_id_fkey'
+            columns: ['training_id']
+            isOneToOne: false
+            referencedRelation: 'trainings'
             referencedColumns: ['id']
           },
         ]
@@ -553,6 +648,38 @@ export type Database = {
           },
         ]
       }
+      trainings: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'trainings_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -738,6 +865,14 @@ export const Constants = {
 //   reference_id: uuid (not null)
 //   status: boolean (not null, default: false)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: employee_training_records
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   employee_id: uuid (not null)
+//   training_id: uuid (not null)
+//   document_url: text (not null)
+//   completion_date: date (not null)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: employees
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -755,6 +890,11 @@ export const Constants = {
 //   type: text (not null)
 //   quantity: integer (not null, default: 1)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: function_required_trainings
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   function_id: uuid (not null)
+//   training_id: uuid (not null)
 // Table: functions
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -800,6 +940,12 @@ export const Constants = {
 //   authorized_plants: jsonb (nullable, default: '[]'::jsonb)
 //   force_password_change: boolean (nullable, default: false)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: trainings
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   name: text (not null)
+//   description: text (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 
 // --- CONSTRAINTS ---
 // Table: audit_logs
@@ -823,6 +969,12 @@ export const Constants = {
 //   PRIMARY KEY daily_logs_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY daily_logs_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
 //   CHECK daily_logs_type_check: CHECK ((type = ANY (ARRAY['staff'::text, 'equipment'::text])))
+// Table: employee_training_records
+//   FOREIGN KEY employee_training_records_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   FOREIGN KEY employee_training_records_employee_id_fkey: FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+//   UNIQUE employee_training_records_employee_id_training_id_key: UNIQUE (employee_id, training_id)
+//   PRIMARY KEY employee_training_records_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY employee_training_records_training_id_fkey: FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE
 // Table: employees
 //   FOREIGN KEY employees_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   FOREIGN KEY employees_function_id_fkey: FOREIGN KEY (function_id) REFERENCES functions(id) ON DELETE SET NULL
@@ -833,6 +985,12 @@ export const Constants = {
 //   FOREIGN KEY equipment_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY equipment_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY equipment_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
+// Table: function_required_trainings
+//   FOREIGN KEY function_required_trainings_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   FOREIGN KEY function_required_trainings_function_id_fkey: FOREIGN KEY (function_id) REFERENCES functions(id) ON DELETE CASCADE
+//   UNIQUE function_required_trainings_function_id_training_id_key: UNIQUE (function_id, training_id)
+//   PRIMARY KEY function_required_trainings_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY function_required_trainings_training_id_fkey: FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE
 // Table: functions
 //   FOREIGN KEY functions_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY functions_pkey: PRIMARY KEY (id)
@@ -856,6 +1014,9 @@ export const Constants = {
 //   FOREIGN KEY profiles_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   FOREIGN KEY profiles_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 //   PRIMARY KEY profiles_pkey: PRIMARY KEY (id)
+// Table: trainings
+//   FOREIGN KEY trainings_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   PRIMARY KEY trainings_pkey: PRIMARY KEY (id)
 
 // --- ROW LEVEL SECURITY POLICIES ---
 // Table: audit_logs
@@ -870,11 +1031,17 @@ export const Constants = {
 // Table: daily_logs
 //   Policy "Allow authenticated full access on daily_logs" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
+// Table: employee_training_records
+//   Policy "Allow authenticated full access on employee_training_records" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: employees
 //   Policy "Allow authenticated full access on employees" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: equipment
 //   Policy "Allow authenticated full access on equipment" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: function_required_trainings
+//   Policy "Allow authenticated full access on function_required_trainings" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: functions
 //   Policy "Allow authenticated full access on functions" (ALL, PERMISSIVE) roles={authenticated}
@@ -893,6 +1060,9 @@ export const Constants = {
 //     USING: true
 // Table: profiles
 //   Policy "Allow authenticated full access on profiles" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: trainings
+//   Policy "Allow authenticated full access on trainings" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 
 // --- DATABASE FUNCTIONS ---
@@ -988,5 +1158,9 @@ export const Constants = {
 //   CREATE UNIQUE INDEX clients_url_slug_key ON public.clients USING btree (url_slug)
 // Table: daily_logs
 //   CREATE UNIQUE INDEX daily_logs_date_type_reference_id_key ON public.daily_logs USING btree (date, type, reference_id)
+// Table: employee_training_records
+//   CREATE UNIQUE INDEX employee_training_records_employee_id_training_id_key ON public.employee_training_records USING btree (employee_id, training_id)
+// Table: function_required_trainings
+//   CREATE UNIQUE INDEX function_required_trainings_function_id_training_id_key ON public.function_required_trainings USING btree (function_id, training_id)
 // Table: monthly_goals_data
 //   CREATE UNIQUE INDEX monthly_goals_data_plant_id_goal_id_reference_month_key ON public.monthly_goals_data USING btree (plant_id, goal_id, reference_month)

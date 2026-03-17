@@ -134,6 +134,12 @@ export function useCadastrosConfig(
           columns: [
             { header: 'Nome', accessor: 'name' },
             {
+              header: 'Validade',
+              accessor: 'validity_months',
+              render: (item: any) =>
+                item.validity_months ? `${item.validity_months} meses` : 'Sem validade',
+            },
+            {
               header: 'Descrição',
               accessor: 'description',
               render: (item: any) => item.description || '-',
@@ -141,6 +147,7 @@ export function useCadastrosConfig(
           ],
           fields: [
             { name: 'name', label: 'Nome do Treinamento', type: 'text' },
+            { name: 'validity_months', label: 'Validade (meses)', type: 'number', required: false },
             { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
         }
