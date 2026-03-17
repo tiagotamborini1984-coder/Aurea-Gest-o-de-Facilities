@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'
+import { useHasAccess } from '@/hooks/use-has-access'
+import { Navigate } from 'react-router-dom'
 import {
   Table,
   TableBody,
@@ -28,8 +30,10 @@ import { Badge } from '@/components/ui/badge'
 
 export default function QuadroContratado() {
   const { profile } = useAppStore()
-  const { plants, locations, functions, equipment, goals, refetch } = useMasterData()
+  const { plants, locations, functions, equipment, goals, companies, refetch } = useMasterData()
   const { toast } = useToast()
+
+  const hasAccess = useHasAccess('Cadastros:Quadro Contratado')
 
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,6 +47,7 @@ export default function QuadroContratado() {
 
   const [form, setForm] = useState({
     plant_id: '',
+    company_id: 'none',
     location_id: 'none',
     function_id: 'none',
     equipment_id: 'none',
@@ -51,6 +56,23 @@ export default function QuadroContratado() {
     reference_month: '',
     value: '',
   })
+
+  useEffect(() => {
+    if (!profile?.client_id || !hasAccess) return
+    const loadData = async () => {
+      setLoading(true)
+      const { data: res } = await supabase
+        .from('contracted_headcount')
+        .select('*')
+        .eq('client_id', profile.client_id)
+        .order('created_at', { ascending: false })
+      setData(res || [])
+      setLoading(false)
+    }
+    loadData()
+  }, [profile, hasAccess])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const loadData = async () => {
     if (!profile?.client_id) return
@@ -64,14 +86,11 @@ export default function QuadroContratado() {
     setLoading(false)
   }
 
-  useEffect(() => {
-    loadData()
-  }, [profile])
-
   const openAdd = () => {
     setEditingId(null)
     setForm({
       plant_id: filterPlant !== 'all' ? filterPlant : '',
+      company_id: 'none',
       location_id: 'none',
       function_id: 'none',
       equipment_id: 'none',
@@ -89,6 +108,7 @@ export default function QuadroContratado() {
     setEntryType(item.type === 'colaborador' ? 'colaboradores' : 'equipamentos')
     setForm({
       plant_id: item.plant_id || '',
+      company_id: item.company_id || 'none',
       location_id: item.location_id || 'none',
       function_id: item.function_id || 'none',
       equipment_id: item.equipment_id || 'none',
@@ -131,6 +151,7 @@ export default function QuadroContratado() {
           client_id: profile!.client_id,
           type: isStaff ? 'colaborador' : 'equipamento',
           plant_id: form.plant_id,
+          company_id: form.company_id !== 'none' ? form.company_id : null,
           location_id: form.location_id !== 'none' ? form.location_id : null,
           function_id: isStaff && form.function_id !== 'none' ? form.function_id : null,
           equipment_id: !isStaff && form.equipment_id !== 'none' ? form.equipment_id : null,
@@ -184,7 +205,7 @@ export default function QuadroContratado() {
   })
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-12">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
@@ -238,10 +259,10 @@ export default function QuadroContratado() {
             <TableRow className="hover:bg-transparent">
               <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
               <TableHead className="font-semibold text-slate-600">Planta</TableHead>
+              <TableHead className="font-semibold text-slate-600">Empresa</TableHead>
               <TableHead className="font-semibold text-slate-600">Local</TableHead>
-              <TableHead className="font-semibold text-slate-600">Equipamento</TableHead>
-              <TableHead className="font-semibold text-slate-600">Função</TableHead>
-              <TableHead className="font-semibold text-slate-600">Quantidade</TableHead>
+              <TableHead className="font-semibold text-slate-600">Equip. / Função</TableHead>
+              <TableHead className="font-semibold text-slate-600">Qtd.</TableHead>
               <TableHead className="font-semibold text-slate-600 text-right pr-6">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -276,15 +297,15 @@ export default function QuadroContratado() {
                     {plants.find((p) => p.id === item.plant_id)?.name || '-'}
                   </TableCell>
                   <TableCell className="text-slate-600">
+                    {companies.find((c) => c.id === item.company_id)?.name || '-'}
+                  </TableCell>
+                  <TableCell className="text-slate-600">
                     {locations.find((l) => l.id === item.location_id)?.name || '-'}
                   </TableCell>
                   <TableCell className="text-slate-600">
                     {item.type === 'colaborador'
-                      ? '-'
+                      ? functions.find((f) => f.id === item.function_id)?.name || '-'
                       : equipment.find((e) => e.id === item.equipment_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-slate-600">
-                    {functions.find((f) => f.id === item.function_id)?.name || '-'}
                   </TableCell>
                   <TableCell className="font-bold text-slate-800">{item.quantity}</TableCell>
                   <TableCell className="text-right pr-6">
@@ -384,6 +405,28 @@ export default function QuadroContratado() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {entryType !== 'metas' && (
+                <div className="space-y-2">
+                  <Label className="text-slate-700">Empresa</Label>
+                  <Select
+                    value={form.company_id}
+                    onValueChange={(v) => setForm({ ...form, company_id: v })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {entryType !== 'metas' && (
                 <div className="space-y-2">

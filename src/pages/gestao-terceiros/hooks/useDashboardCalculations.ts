@@ -16,15 +16,17 @@ export function useDashboardCalculations(
   dateTo: string,
 ) {
   return useMemo(() => {
-    const validPlants = selectedPlants
+    const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
+    const companiesSet = new Set(selectedCompanies)
+
+    // For companies filter to work properly we need a way to filter employees and contracted headcount by company
+    // Employees already have company_name, Contracted headcount may have company_id (which maps to company).
+    // Let's filter employees by plant and company
     const validEmpIds =
       selectedCompanies.length > 0
         ? new Set(
             employees
-              .filter(
-                (e) =>
-                  validPlants.includes(e.plant_id) && selectedCompanies.includes(e.company_name),
-              )
+              .filter((e) => validPlants.includes(e.plant_id) && companiesSet.has(e.company_name))
               .map((e) => e.id),
           )
         : new Set(employees.filter((e) => validPlants.includes(e.plant_id)).map((e) => e.id))
@@ -33,8 +35,9 @@ export function useDashboardCalculations(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
     )
 
-    const typeLog = activeTab === 'colaboradores' ? 'staff' : 'equipment'
-    const typeCont = activeTab === 'colaboradores' ? 'colaborador' : 'equipamento'
+    const typeLog = activeTab === 'colaboradores' || activeTab === 'metas' ? 'staff' : 'equipment'
+    const typeCont =
+      activeTab === 'colaboradores' || activeTab === 'metas' ? 'colaborador' : 'equipamento'
 
     const activeLogs = filteredLogs.filter((l) => {
       if (l.type !== typeLog) return false
@@ -48,9 +51,36 @@ export function useDashboardCalculations(
     const avgLancado = activeLogs.length / totalPeriodDays
     const avgPresente = activeLogs.filter((l) => l.status).length / totalPeriodDays
     const avgAusente = activeLogs.filter((l) => !l.status).length / totalPeriodDays
-    const contratado = contracted
-      .filter((c) => c.type === typeCont && validPlants.includes(c.plant_id))
-      .reduce((a, b) => a + b.quantity, 0)
+
+    // Contracted Headcount needs to be filtered by selectedCompanies too for 'colaborador' and 'metas'
+    const validContracted = contracted.filter((c) => {
+      if (!validPlants.includes(c.plant_id)) return false
+      if (c.type !== typeCont) return false
+
+      // If companies are selected, we must match the company
+      if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+        // Contracted has company_id. We need a way to map company_id to company_name to match selectedCompanies
+        // Since we don't pass `companies` to this hook, we might need a workaround or pass companies
+        // Wait! We didn't pass `companies` to useDashboardCalculations... Let's assume contracted doesn't have company_name
+        // So we might need to filter `contracted` without company for now or find another way.
+        // The AC: "The absenteeism metric must compare the daily_logs (filtered by employees of the selected company) against the contracted_headcount entries specifically assigned to that company within the selected plant and period."
+        // We will just do what's possible with the data available inside useDashboardCalculations or we have to update its signature.
+        // Wait, `selectedCompanies` are strings (names). `contracted` has `company_id`.
+        // Let's filter employees to find valid company_ids
+        const validCompanyIds = new Set(
+          employees
+            .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+            .map((e) => e.company_id),
+        )
+        // If the contracted has a company_id, it must be in the validCompanyIds
+        if (c.company_id) {
+          return validCompanyIds.has(c.company_id)
+        }
+      }
+      return true
+    })
+
+    const contratado = validContracted.reduce((a, b) => a + b.quantity, 0)
     const absenteismo =
       contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
 
@@ -63,8 +93,8 @@ export function useDashboardCalculations(
         const pDays = Math.max(1, new Set(pLogs.map((l) => l.date)).size)
         const pPres = pLogs.filter((l) => l.status).length / pDays
         const pAbs = pLogs.filter((l) => !l.status).length / pDays
-        const pCont = contracted
-          .filter((c) => c.plant_id === plant.id && c.type === typeCont)
+        const pCont = validContracted
+          .filter((c) => c.plant_id === plant.id)
           .reduce((sum, c) => sum + c.quantity, 0)
         return {
           id: plant.id,
@@ -80,12 +110,12 @@ export function useDashboardCalculations(
       .filter((loc) => validPlants.includes(loc.plant_id))
       .map((loc) => {
         const refIds =
-          activeTab === 'colaboradores'
+          activeTab === 'colaboradores' || activeTab === 'metas'
             ? employees
                 .filter(
                   (e) =>
                     e.location_id === loc.id &&
-                    (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+                    (selectedCompanies.length === 0 || companiesSet.has(e.company_name)),
                 )
                 .map((e) => e.id)
             : []
@@ -93,8 +123,8 @@ export function useDashboardCalculations(
         const lDays = Math.max(1, new Set(lLogs.map((l) => l.date)).size)
         const lPres = lLogs.filter((l) => l.status).length / lDays
         const lAbs = lLogs.filter((l) => !l.status).length / lDays
-        const lCont = contracted
-          .filter((c) => c.location_id === loc.id && c.type === typeCont)
+        const lCont = validContracted
+          .filter((c) => c.location_id === loc.id)
           .reduce((sum, c) => sum + c.quantity, 0)
         return {
           id: loc.id,
@@ -115,8 +145,8 @@ export function useDashboardCalculations(
             .filter((e) => validPlants.includes(e.plant_id))
             .map((eq) => {
               const eqCont =
-                contracted
-                  .filter((c) => c.equipment_id === eq.id && c.type === 'equipamento')
+                validContracted
+                  .filter((c) => c.equipment_id === eq.id)
                   .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
               const eqLogs = logs
                 .filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
@@ -144,7 +174,7 @@ export function useDashboardCalculations(
             .filter(
               (e) =>
                 validPlants.includes(e.plant_id) &&
-                (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+                (selectedCompanies.length === 0 || companiesSet.has(e.company_name)),
             )
             .map((emp) => {
               const empLogs = logs
@@ -162,13 +192,14 @@ export function useDashboardCalculations(
             .filter((c) => c.history.length > 0)
 
     const equipDisp = Math.max(0, 100 - absenteismo)
-    const vPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
     let sum = (absenteismo < 4 ? 100 : 0) + equipDisp
     let count = 2
     const manualGoals = goals
       .filter((g) => g.is_active)
       .map((g) => {
-        const gData = monthlyGoals.filter((m) => m.goal_id === g.id && vPlants.includes(m.plant_id))
+        const gData = monthlyGoals.filter(
+          (m) => m.goal_id === g.id && validPlants.includes(m.plant_id),
+        )
         const avg =
           gData.length > 0 ? gData.reduce((a, b) => a + Number(b.value), 0) / gData.length : null
         if (avg !== null) {

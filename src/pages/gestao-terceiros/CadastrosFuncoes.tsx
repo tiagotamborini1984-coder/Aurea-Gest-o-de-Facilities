@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'
+import { useHasAccess } from '@/hooks/use-has-access'
 import { supabase } from '@/lib/supabase/client'
 import {
   Table,
@@ -21,6 +23,7 @@ import { useToast } from '@/hooks/use-toast'
 
 export default function CadastrosFuncoes() {
   const { profile } = useAppStore()
+  const hasAccess = useHasAccess('Cadastros:Funções')
   const { functions, trainings, functionRequiredTrainings, refetch, loading } = useMasterData()
   const { toast } = useToast()
 
@@ -35,6 +38,8 @@ export default function CadastrosFuncoes() {
   const filteredData = useMemo(() => {
     return functions.filter((f) => f.name.toLowerCase().includes(searchTerm.toLowerCase()))
   }, [functions, searchTerm])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const openAdd = () => {
     setEditingId(null)

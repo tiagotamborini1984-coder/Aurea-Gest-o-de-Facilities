@@ -19,15 +19,26 @@ import { useMasterData } from '@/hooks/use-master-data'
 import { useToast } from '@/hooks/use-toast'
 import { logAudit } from '@/services/audit'
 
-const MENU_OPTIONS = [
+const MAIN_MENUS = [
   'Dashboard Gestor',
   'Lançamentos',
-  'Cadastros',
   'Relatórios',
   'BI Dashboard',
   'Email Reports',
   'Log de Auditoria',
   'Usuários',
+]
+
+const CADASTROS_SUBMENUS = [
+  'Plantas',
+  'Locais',
+  'Empresas',
+  'Funções',
+  'Colaboradores',
+  'Equipamentos',
+  'Treinamentos',
+  'Quadro Contratado',
+  'Book de Metas',
 ]
 
 export function EditUserDialog({
@@ -104,13 +115,27 @@ export function EditUserDialog({
     }
   }
 
-  const toggleMenu = (menu: string) =>
-    setForm((p) => ({
-      ...p,
-      accessible_menus: p.accessible_menus.includes(menu)
-        ? p.accessible_menus.filter((m) => m !== menu)
-        : [...p.accessible_menus, menu],
-    }))
+  const toggleMenu = (menu: string) => {
+    setForm((p) => {
+      let next = [...p.accessible_menus]
+
+      if (menu.startsWith('Cadastros:') && next.includes('Cadastros')) {
+        next = next.filter((m) => m !== 'Cadastros')
+        CADASTROS_SUBMENUS.forEach((sub) => {
+          if (`Cadastros:${sub}` !== menu) next.push(`Cadastros:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (next.includes(menu)) {
+        next = next.filter((m) => m !== menu)
+      } else {
+        next.push(menu)
+      }
+      return { ...p, accessible_menus: next }
+    })
+  }
+
   const togglePlant = (plantId: string) =>
     setForm((p) => ({
       ...p,
@@ -153,20 +178,45 @@ export function EditUserDialog({
               </SelectContent>
             </Select>
           </div>
-          {form.role === 'Gestor' && (
-            <div className="pt-2 animate-in fade-in">
-              <Label className="mb-2 block">Menus Acessíveis (Apenas para Gestores)</Label>
-              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
-                {MENU_OPTIONS.map((menu) => (
-                  <Badge
-                    key={menu}
-                    variant={form.accessible_menus.includes(menu) ? 'default' : 'outline'}
-                    className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(menu) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
-                    onClick={() => toggleMenu(menu)}
-                  >
-                    {menu}
-                  </Badge>
-                ))}
+          {['Gestor', 'Operacional'].includes(form.role) && (
+            <div className="pt-2 animate-in fade-in space-y-4">
+              <div>
+                <Label className="mb-2 block">Menus Principais Acessíveis</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {MAIN_MENUS.map((menu) => (
+                    <Badge
+                      key={menu}
+                      variant={form.accessible_menus.includes(menu) ? 'default' : 'outline'}
+                      className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(menu) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                      onClick={() => toggleMenu(menu)}
+                    >
+                      {menu}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Cadastros</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {CADASTROS_SUBMENUS.map((menu) => {
+                    const key = `Cadastros:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Cadastros')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Cadastros') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -176,11 +226,7 @@ export function EditUserDialog({
               módulos.
             </div>
           )}
-          {form.role === 'Operacional' && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600 mt-2">
-              <strong>Acesso Fixo:</strong> O nível Operacional possui acesso restrito.
-            </div>
-          )}
+
           <div className="pt-2">
             <Label className="mb-2 block">Plantas Autorizadas</Label>
             <div className="flex flex-wrap gap-2">

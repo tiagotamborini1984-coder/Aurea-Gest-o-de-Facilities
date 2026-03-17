@@ -3,6 +3,7 @@ import { CrudGeneric, FieldDef, ColumnDef } from '@/components/gestao-terceiros/
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
+import { useHasAccess } from '@/hooks/use-has-access'
 import { useCadastrosConfig } from './useCadastrosConfig'
 import QuadroContratado from './QuadroContratado'
 import CadastrosFuncoes from './CadastrosFuncoes'
@@ -22,6 +23,10 @@ export default function Cadastros() {
   if (type === 'colaboradores') return <CadastrosColaboradores />
 
   if (!config) return <Navigate to="/gestao-terceiros" replace />
+
+  // We need to fetch the access right here for dynamic CRUDs
+  const hasAccess = useHasAccess(`Cadastros:${config.title}`)
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">

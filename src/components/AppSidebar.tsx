@@ -61,20 +61,44 @@ export function AppSidebar() {
   const visibleItems = navItems
     .filter((item) => {
       if (role === 'Administrador' || role === 'Master') return true
-      if (role === 'Gestor') return accessibleMenus.includes(item.title)
-      if (role === 'Operacional') {
-        if (item.title === 'Lançamentos') return true
-        if (item.title === 'Cadastros') return true
-        return false
+
+      let userMenus = accessibleMenus
+      if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
+        userMenus = [
+          'Lançamentos',
+          'Cadastros:Colaboradores',
+          'Cadastros:Equipamentos',
+          'Cadastros:Quadro Contratado',
+        ]
       }
-      return false
+
+      if (item.title === 'Cadastros') {
+        return item.subItems?.some(
+          (sub) => userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
+        )
+      }
+      return userMenus.includes(item.title)
     })
     .map((item) => {
-      if (role === 'Operacional' && item.title === 'Cadastros' && item.subItems) {
+      if (item.title === 'Cadastros' && item.subItems) {
+        let userMenus = accessibleMenus
+        if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
+          userMenus = [
+            'Lançamentos',
+            'Cadastros:Colaboradores',
+            'Cadastros:Equipamentos',
+            'Cadastros:Quadro Contratado',
+          ]
+        }
+
         return {
           ...item,
-          subItems: item.subItems.filter((sub) =>
-            ['Colaboradores', 'Equipamentos', 'Quadro Contratado'].includes(sub.title),
+          subItems: item.subItems.filter(
+            (sub) =>
+              role === 'Administrador' ||
+              role === 'Master' ||
+              userMenus.includes('Cadastros') ||
+              userMenus.includes(`Cadastros:${sub.title}`),
           ),
         }
       }

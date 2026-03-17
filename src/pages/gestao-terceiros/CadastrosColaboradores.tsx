@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'
+import { useHasAccess } from '@/hooks/use-has-access'
 import { supabase } from '@/lib/supabase/client'
 import {
   Table,
@@ -50,6 +52,7 @@ type TrainingFileState = {
 
 export default function CadastrosColaboradores() {
   const { profile } = useAppStore()
+  const hasAccess = useHasAccess('Cadastros:Colaboradores')
   const {
     employees,
     plants,
@@ -112,6 +115,8 @@ export default function CadastrosColaboradores() {
       return matchSearch && matchPlant
     })
   }, [employees, companies, searchTerm, filterPlant])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const openAdd = () => {
     setEditingId(null)
@@ -188,7 +193,7 @@ export default function CadastrosColaboradores() {
           location_id: form.location_id !== 'none' ? form.location_id : null,
           function_id: form.function_id !== 'none' ? form.function_id : null,
           company_id: form.company_id !== 'none' ? form.company_id : null,
-          company_name: form.company_name, // fallback storage
+          company_name: form.company_name,
           name: form.name,
         })
         .select()
@@ -286,7 +291,7 @@ export default function CadastrosColaboradores() {
         </div>
         <div className="w-full sm:w-64 pr-2">
           <Select value={filterPlant} onValueChange={setFilterPlant}>
-            <SelectTrigger className="border-0 shadow-none focus:ring-0 bg-transparent h-10">
+            <SelectTrigger className="border-0 shadow-none focus:ring:0 bg-transparent h-10">
               <SelectValue placeholder="Todas as Plantas" />
             </SelectTrigger>
             <SelectContent>

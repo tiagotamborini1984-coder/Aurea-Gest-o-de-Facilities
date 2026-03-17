@@ -95,49 +95,50 @@ export default function DashboardFilters({
             ))}
           </div>
 
-          {activeTab === 'colaboradores' && availableCompanies.length > 0 && (
-            <>
-              <div className="h-px bg-border w-full" />
-              <div className="flex flex-wrap items-center gap-4 lg:gap-6">
-                <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  Empresa(s)
-                </div>
-                <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
-                  <Checkbox
-                    id="all-companies"
-                    checked={
-                      selectedCompanies.length === 0 ||
-                      selectedCompanies.length === availableCompanies.length
-                    }
-                    onCheckedChange={() => setSelectedCompanies([])}
-                  />
-                  <label
-                    htmlFor="all-companies"
-                    className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
-                  >
-                    Todas
-                  </label>
-                </div>
-                {availableCompanies.map((c: any) => (
-                  <div key={c} className="flex items-center space-x-2">
+          {(activeTab === 'colaboradores' || activeTab === 'metas') &&
+            availableCompanies.length > 0 && (
+              <>
+                <div className="h-px bg-border w-full" />
+                <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                  <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                    Empresa(s)
+                  </div>
+                  <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
                     <Checkbox
-                      id={`company-${c}`}
+                      id="all-companies"
                       checked={
-                        selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
+                        selectedCompanies.length === 0 ||
+                        selectedCompanies.length === availableCompanies.length
                       }
-                      onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
+                      onCheckedChange={() => setSelectedCompanies([])}
                     />
                     <label
-                      htmlFor={`company-${c}`}
-                      className="text-xs lg:text-sm text-muted-foreground cursor-pointer hover:text-foreground"
+                      htmlFor="all-companies"
+                      className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
                     >
-                      {c}
+                      Todas
                     </label>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
+                  {availableCompanies.map((c: any) => (
+                    <div key={c} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`company-${c}`}
+                        checked={
+                          selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
+                        }
+                        onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
+                      />
+                      <label
+                        htmlFor={`company-${c}`}
+                        className="text-xs lg:text-sm text-muted-foreground cursor-pointer hover:text-foreground"
+                      >
+                        {c}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
         </CardContent>
       </Card>
 

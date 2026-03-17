@@ -86,6 +86,38 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          name: string
+          service_type: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          name: string
+          service_type: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          service_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'companies_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       contracted_headcount: {
         Row: {
           client_id: string
@@ -261,6 +293,7 @@ export type Database = {
       employees: {
         Row: {
           client_id: string
+          company_id: string | null
           company_name: string
           created_at: string
           function_id: string | null
@@ -271,6 +304,7 @@ export type Database = {
         }
         Insert: {
           client_id: string
+          company_id?: string | null
           company_name: string
           created_at?: string
           function_id?: string | null
@@ -281,6 +315,7 @@ export type Database = {
         }
         Update: {
           client_id?: string
+          company_id?: string | null
           company_name?: string
           created_at?: string
           function_id?: string | null
@@ -295,6 +330,13 @@ export type Database = {
             columns: ['client_id']
             isOneToOne: false
             referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'employees_company_id_fkey'
+            columns: ['company_id']
+            isOneToOne: false
+            referencedRelation: 'companies'
             referencedColumns: ['id']
           },
           {
@@ -849,6 +891,12 @@ export const Constants = {
 //   modules: jsonb (not null, default: '[]'::jsonb)
 //   created_at: timestamp with time zone (not null, default: now())
 //   updated_at: timestamp with time zone (not null, default: now())
+// Table: companies
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   name: text (not null)
+//   service_type: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: contracted_headcount
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -885,6 +933,7 @@ export const Constants = {
 //   company_name: text (not null)
 //   name: text (not null)
 //   created_at: timestamp with time zone (not null, default: now())
+//   company_id: uuid (nullable)
 // Table: equipment
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -959,6 +1008,9 @@ export const Constants = {
 // Table: clients
 //   PRIMARY KEY clients_pkey: PRIMARY KEY (id)
 //   UNIQUE clients_url_slug_key: UNIQUE (url_slug)
+// Table: companies
+//   FOREIGN KEY companies_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   PRIMARY KEY companies_pkey: PRIMARY KEY (id)
 // Table: contracted_headcount
 //   FOREIGN KEY contracted_headcount_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   FOREIGN KEY contracted_headcount_equipment_id_fkey: FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
@@ -981,6 +1033,7 @@ export const Constants = {
 //   FOREIGN KEY employee_training_records_training_id_fkey: FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE
 // Table: employees
 //   FOREIGN KEY employees_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   FOREIGN KEY employees_company_id_fkey: FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
 //   FOREIGN KEY employees_function_id_fkey: FOREIGN KEY (function_id) REFERENCES functions(id) ON DELETE SET NULL
 //   FOREIGN KEY employees_location_id_fkey: FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
 //   PRIMARY KEY employees_pkey: PRIMARY KEY (id)
@@ -1028,6 +1081,9 @@ export const Constants = {
 //     USING: true
 // Table: clients
 //   Policy "Allow authenticated full access on clients" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: companies
+//   Policy "Allow authenticated full access on companies" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: contracted_headcount
 //   Policy "Allow authenticated full access on contracted_headcount" (ALL, PERMISSIVE) roles={authenticated}
