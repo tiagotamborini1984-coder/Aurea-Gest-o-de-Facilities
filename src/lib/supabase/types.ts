@@ -655,6 +655,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          validity_months: number | null
         }
         Insert: {
           client_id: string
@@ -662,6 +663,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          validity_months?: number | null
         }
         Update: {
           client_id?: string
@@ -669,6 +671,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          validity_months?: number | null
         }
         Relationships: [
           {
@@ -946,6 +949,7 @@ export const Constants = {
 //   name: text (not null)
 //   description: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   validity_months: integer (nullable, default: 0)
 
 // --- CONSTRAINTS ---
 // Table: audit_logs

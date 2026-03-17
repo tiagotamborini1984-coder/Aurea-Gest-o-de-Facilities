@@ -10,18 +10,37 @@ export function useDashboardCalculations(
   equipment: any[],
   goals: any[],
   selectedPlants: string[],
+  selectedCompanies: string[],
   activeTab: 'colaboradores' | 'equipamentos' | 'metas',
   dateFrom: string,
   dateTo: string,
 ) {
   return useMemo(() => {
     const validPlants = selectedPlants
+    const validEmpIds =
+      selectedCompanies.length > 0
+        ? new Set(
+            employees
+              .filter(
+                (e) =>
+                  validPlants.includes(e.plant_id) && selectedCompanies.includes(e.company_name),
+              )
+              .map((e) => e.id),
+          )
+        : new Set(employees.filter((e) => validPlants.includes(e.plant_id)).map((e) => e.id))
+
     const filteredLogs = logs.filter(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
     )
+
     const typeLog = activeTab === 'colaboradores' ? 'staff' : 'equipment'
     const typeCont = activeTab === 'colaboradores' ? 'colaborador' : 'equipamento'
-    const activeLogs = filteredLogs.filter((l) => l.type === typeLog)
+
+    const activeLogs = filteredLogs.filter((l) => {
+      if (l.type !== typeLog) return false
+      if (typeLog === 'staff') return validEmpIds.has(l.reference_id)
+      return true
+    })
 
     const uniqueDates = new Set(activeLogs.map((l) => l.date))
     const totalPeriodDays = Math.max(1, uniqueDates.size)
@@ -62,7 +81,13 @@ export function useDashboardCalculations(
       .map((loc) => {
         const refIds =
           activeTab === 'colaboradores'
-            ? employees.filter((e) => e.location_id === loc.id).map((e) => e.id)
+            ? employees
+                .filter(
+                  (e) =>
+                    e.location_id === loc.id &&
+                    (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+                )
+                .map((e) => e.id)
             : []
         const lLogs = activeLogs.filter((l) => refIds.includes(l.reference_id))
         const lDays = Math.max(1, new Set(lLogs.map((l) => l.date)).size)
@@ -116,7 +141,11 @@ export function useDashboardCalculations(
       activeTab !== 'colaboradores'
         ? []
         : employees
-            .filter((e) => validPlants.includes(e.plant_id))
+            .filter(
+              (e) =>
+                validPlants.includes(e.plant_id) &&
+                (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+            )
             .map((emp) => {
               const empLogs = logs
                 .filter((l) => l.type === 'staff' && l.reference_id === emp.id)
@@ -173,6 +202,7 @@ export function useDashboardCalculations(
     monthlyGoals,
     contracted,
     selectedPlants,
+    selectedCompanies,
     plants,
     activeTab,
     dateFrom,

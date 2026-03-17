@@ -25,6 +25,7 @@ export default function Relatorios() {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [selectedPlants, setSelectedPlants] = useState<string[]>([])
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState('colaborador')
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -54,6 +55,25 @@ export default function Relatorios() {
     if (plants.length > 0 && activeTab !== 'treinamentos') fetchLogs()
   }, [dateFrom, dateTo, plants, activeTab])
 
+  const availableCompanies = useMemo(() => {
+    const empsInPlants = employees.filter(
+      (e) => selectedPlants.length === 0 || selectedPlants.includes(e.plant_id),
+    )
+    const companies = new Set(empsInPlants.map((e) => e.company_name).filter(Boolean))
+    return Array.from(companies).sort()
+  }, [employees, selectedPlants])
+
+  const handleCompanyChange = (c: string, checked: boolean) => {
+    if (selectedCompanies.length === 0) {
+      setSelectedCompanies(availableCompanies.filter((x) => x !== c) as string[])
+    } else if (checked) {
+      const next = [...selectedCompanies, c]
+      setSelectedCompanies(next.length === availableCompanies.length ? [] : next)
+    } else {
+      setSelectedCompanies(selectedCompanies.filter((x) => x !== c))
+    }
+  }
+
   const reportData = useMemo(() => {
     const validLogs = logs.filter(
       (l) => selectedPlants.length === 0 || selectedPlants.includes(l.plant_id),
@@ -65,7 +85,9 @@ export default function Relatorios() {
 
     if (activeTab === 'colaborador') {
       const targets = employees.filter(
-        (e) => selectedPlants.length === 0 || selectedPlants.includes(e.plant_id),
+        (e) =>
+          (selectedPlants.length === 0 || selectedPlants.includes(e.plant_id)) &&
+          (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
       )
       result = targets.map((emp) => {
         const eLogs = validLogs.filter((l) => l.type === 'staff' && l.reference_id === emp.id)
@@ -88,7 +110,13 @@ export default function Relatorios() {
         (l) => selectedPlants.length === 0 || selectedPlants.includes(l.plant_id),
       )
       result = targets.map((loc) => {
-        const empIds = employees.filter((e) => e.location_id === loc.id).map((e) => e.id)
+        const empIds = employees
+          .filter(
+            (e) =>
+              e.location_id === loc.id &&
+              (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+          )
+          .map((e) => e.id)
         const eLogs = validLogs.filter((l) => l.type === 'staff' && empIds.includes(l.reference_id))
         const pres = eLogs.filter((l) => l.status).length
         const faltas = eLogs.filter((l) => !l.status).length
@@ -111,7 +139,14 @@ export default function Relatorios() {
         (p) => selectedPlants.length === 0 || selectedPlants.includes(p.id),
       )
       result = targets.map((p) => {
-        const eLogs = validLogs.filter((l) => l.type === 'staff' && l.plant_id === p.id)
+        const empIds = employees
+          .filter(
+            (e) =>
+              e.plant_id === p.id &&
+              (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+          )
+          .map((e) => e.id)
+        const eLogs = validLogs.filter((l) => l.type === 'staff' && empIds.includes(l.reference_id))
         const pres = eLogs.filter((l) => l.status).length
         const faltas = eLogs.filter((l) => !l.status).length
         const mPres = pres / validDays
@@ -155,7 +190,9 @@ export default function Relatorios() {
       const today = startOfDay(new Date())
 
       const targets = employees.filter(
-        (e) => selectedPlants.length === 0 || selectedPlants.includes(e.plant_id),
+        (e) =>
+          (selectedPlants.length === 0 || selectedPlants.includes(e.plant_id)) &&
+          (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
       )
       const targetIds = targets.map((e) => e.id)
 
@@ -195,6 +232,7 @@ export default function Relatorios() {
   }, [
     logs,
     selectedPlants,
+    selectedCompanies,
     activeTab,
     employees,
     locations,
@@ -307,6 +345,54 @@ export default function Relatorios() {
               )}
             </div>
           </div>
+
+          {activeTab !== 'equipamento' && availableCompanies.length > 0 && (
+            <>
+              <div className="h-px bg-slate-100 my-4" />
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+                  Filtrar por Empresa (múltipla seleção)
+                </Label>
+                <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="all-companies-report"
+                      checked={
+                        selectedCompanies.length === 0 ||
+                        selectedCompanies.length === availableCompanies.length
+                      }
+                      onCheckedChange={() => setSelectedCompanies([])}
+                      className="w-5 h-5 rounded"
+                    />
+                    <Label
+                      htmlFor="all-companies-report"
+                      className="font-medium cursor-pointer text-sm"
+                    >
+                      Todas as empresas
+                    </Label>
+                  </div>
+                  {availableCompanies.map((c: any) => (
+                    <div key={c} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`company-${c}`}
+                        checked={
+                          selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
+                        }
+                        onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
+                        className="w-5 h-5 rounded"
+                      />
+                      <Label
+                        htmlFor={`company-${c}`}
+                        className="font-medium cursor-pointer text-sm text-muted-foreground"
+                      >
+                        {c}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

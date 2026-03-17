@@ -19,6 +19,7 @@ export default function DashboardGestor() {
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [referenceMonth, setReferenceMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [selectedPlants, setSelectedPlants] = useState<string[]>([])
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'colaboradores' | 'equipamentos' | 'metas'>(
     'colaboradores',
   )
@@ -37,6 +38,7 @@ export default function DashboardGestor() {
       equipment,
       goals,
       selectedPlants,
+      selectedCompanies,
       activeTab,
       dateFrom,
       dateTo,
@@ -57,8 +59,11 @@ export default function DashboardGestor() {
 
       <DashboardFilters
         plants={plants}
+        employees={employees}
         selectedPlants={selectedPlants}
         setSelectedPlants={setSelectedPlants}
+        selectedCompanies={selectedCompanies}
+        setSelectedCompanies={setSelectedCompanies}
         dateFrom={dateFrom}
         setDateFrom={setDateFrom}
         dateTo={dateTo}

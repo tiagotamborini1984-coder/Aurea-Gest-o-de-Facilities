@@ -32,6 +32,7 @@ export default function Lancamentos() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [plantId, setPlantId] = useState<string>('')
+  const [selectedCompany, setSelectedCompany] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'staff' | 'equipment' | 'metas'>('staff')
   const [presences, setPresences] = useState<Record<string, boolean>>({})
   const [goalValues, setGoalValues] = useState<Record<string, number>>({})
@@ -54,12 +55,25 @@ export default function Lancamentos() {
   } = useMasterData()
   const { profile, activeClient } = useAppStore()
 
-  // Default plant selection if none selected
   useEffect(() => {
     if (plants.length > 0 && !plantId) {
       setPlantId(plants[0].id)
     }
   }, [plants, plantId])
+
+  const availableCompanies = useMemo(() => {
+    if (!plantId) return []
+    const emps = employees.filter((e) => e.plant_id === plantId)
+    return Array.from(new Set(emps.map((e) => e.company_name).filter(Boolean))).sort()
+  }, [employees, plantId])
+
+  useEffect(() => {
+    if (activeTab === 'staff' && availableCompanies.length > 0) {
+      if (selectedCompany && !availableCompanies.includes(selectedCompany)) {
+        setSelectedCompany('')
+      }
+    }
+  }, [availableCompanies, activeTab, selectedCompany])
 
   useEffect(() => {
     if (!plantId || !profile) return
@@ -125,7 +139,7 @@ export default function Lancamentos() {
       } else {
         const list =
           activeTab === 'staff'
-            ? employees.filter((e) => e.plant_id === plantId)
+            ? employees.filter((e) => e.plant_id === plantId && e.company_name === selectedCompany)
             : equipment.filter((e) => e.plant_id === plantId)
 
         const payload = list.map((item) => ({
@@ -156,17 +170,22 @@ export default function Lancamentos() {
     }
   }
 
-  // Data processing for rendering
   const { filteredData, groupedData, summary, equipmentTypes } = useMemo(() => {
     const searchLower = searchTerm.toLowerCase()
 
-    // Dynamic equipment types based on current plant
     const currentPlantEq = equipment.filter((e) => e.plant_id === plantId)
     const eqTypes = Array.from(new Set(currentPlantEq.map((e) => e.type).filter(Boolean)))
 
     if (activeTab === 'staff') {
+      if (!selectedCompany) {
+        return { filteredData: [], groupedData: {}, equipmentTypes: eqTypes, summary: null }
+      }
+
       const filtered = employees.filter(
-        (e) => e.plant_id === plantId && e.name.toLowerCase().includes(searchLower),
+        (e) =>
+          e.plant_id === plantId &&
+          e.company_name === selectedCompany &&
+          e.name.toLowerCase().includes(searchLower),
       )
       const grouped = filtered.reduce(
         (acc, emp) => {
@@ -244,6 +263,7 @@ export default function Lancamentos() {
     presences,
     equipmentFilter,
     goalFilter,
+    selectedCompany,
   ])
 
   const CustomCheckbox = ({
@@ -267,6 +287,7 @@ export default function Lancamentos() {
   )
 
   const themeColor = activeClient?.primaryColor || 'hsl(var(--primary))'
+  const canSave = activeTab !== 'staff' || selectedCompany !== ''
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
@@ -277,7 +298,6 @@ export default function Lancamentos() {
         </p>
       </div>
 
-      {/* Top Filters */}
       <Card className="shadow-sm border-slate-200">
         <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 sm:gap-6 flex-wrap">
           {activeTab !== 'metas' ? (
@@ -324,6 +344,26 @@ export default function Lancamentos() {
             </Select>
           </div>
 
+          {activeTab === 'staff' && (
+            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
+              <label className="text-xs font-medium text-slate-500">
+                Empresa <span className="text-red-500">*</span>
+              </label>
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger className="h-11 bg-white">
+                  <SelectValue placeholder="Selecione a empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCompanies.map((c) => (
+                    <SelectItem key={c as string} value={c as string}>
+                      {c as string}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {activeTab === 'equipment' && (
             <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
               <label className="text-xs font-medium text-slate-500">Tipo de Equipamento</label>
@@ -366,7 +406,6 @@ export default function Lancamentos() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
       <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 custom-scrollbar">
         <button
           onClick={() => {
@@ -418,7 +457,6 @@ export default function Lancamentos() {
 
       {plantId && (
         <div className="space-y-4 animate-slide-up">
-          {/* Action Row: Summaries & Save Button */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
             {summary ? (
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
@@ -435,6 +473,10 @@ export default function Lancamentos() {
                   {summary.absent} {summary.labels[2]}
                 </div>
               </div>
+            ) : activeTab === 'staff' && !selectedCompany ? (
+              <div className="text-sm font-medium text-slate-500 px-2">
+                Selecione uma empresa para visualizar
+              </div>
             ) : (
               <div className="text-sm font-medium text-slate-500 px-2">
                 Preencha os valores do mês de referência
@@ -443,7 +485,7 @@ export default function Lancamentos() {
 
             <Button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !canSave}
               className="w-full sm:w-auto shadow-md"
               style={{ backgroundColor: themeColor }}
             >
@@ -452,7 +494,6 @@ export default function Lancamentos() {
             </Button>
           </div>
 
-          {/* Search Bar */}
           {activeTab !== 'metas' && (
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -461,14 +502,13 @@ export default function Lancamentos() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 h-12 bg-white border-slate-200 rounded-xl shadow-sm text-base"
+                disabled={activeTab === 'staff' && !selectedCompany}
               />
             </div>
           )}
 
-          {/* List Content */}
           <div className="space-y-6 pb-10">
             {activeTab === 'metas' ? (
-              // Book de Metas Layout
               <div className="space-y-3">
                 {filteredData.length === 0 ? (
                   <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">
@@ -510,8 +550,11 @@ export default function Lancamentos() {
                   ))
                 )}
               </div>
+            ) : activeTab === 'staff' && !selectedCompany ? (
+              <div className="p-12 text-center text-slate-500 bg-white rounded-xl border border-slate-200">
+                Por favor, selecione uma empresa para iniciar os lançamentos.
+              </div>
             ) : (
-              // Colaboradores & Equipamentos Layout
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 {Object.keys(groupedData).length === 0 ? (
                   <div className="p-12 text-center text-slate-500">
@@ -520,7 +563,6 @@ export default function Lancamentos() {
                 ) : (
                   Object.entries(groupedData).map(([groupName, items]: [string, any[]]) => (
                     <div key={groupName} className="border-b border-slate-100 last:border-0">
-                      {/* Group Header */}
                       <div className="bg-slate-50/80 px-4 py-3 flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                         <h3 className="font-semibold text-slate-800 text-sm">{groupName}</h3>
@@ -529,7 +571,6 @@ export default function Lancamentos() {
                         </span>
                       </div>
 
-                      {/* Items List */}
                       <div className="divide-y divide-slate-100">
                         {items.map((item) => {
                           const isPresent = presences[item.id] || false

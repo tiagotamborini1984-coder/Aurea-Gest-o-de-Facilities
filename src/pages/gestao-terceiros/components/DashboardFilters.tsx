@@ -1,14 +1,18 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useMemo } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building2, Users, Wrench, Target } from 'lucide-react'
+import { Users, Wrench, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function DashboardFilters({
   plants,
+  employees,
   selectedPlants,
   setSelectedPlants,
+  selectedCompanies,
+  setSelectedCompanies,
   dateFrom,
   setDateFrom,
   dateTo,
@@ -19,6 +23,14 @@ export default function DashboardFilters({
   setActiveTab,
   brandSecondary,
 }: any) {
+  const availableCompanies = useMemo(() => {
+    const empsInPlants = employees.filter(
+      (e: any) => selectedPlants.length === 0 || selectedPlants.includes(e.plant_id),
+    )
+    const companies = new Set(empsInPlants.map((e: any) => e.company_name).filter(Boolean))
+    return Array.from(companies).sort()
+  }, [employees, selectedPlants])
+
   const toggleAllPlants = () => {
     setSelectedPlants(selectedPlants.length === plants.length ? [] : plants.map((p: any) => p.id))
   }
@@ -26,6 +38,17 @@ export default function DashboardFilters({
     setSelectedPlants((prev: string[]) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     )
+  }
+
+  const handleCompanyChange = (c: string, checked: boolean) => {
+    if (selectedCompanies.length === 0) {
+      setSelectedCompanies(availableCompanies.filter((x: any) => x !== c) as string[])
+    } else if (checked) {
+      const next = [...selectedCompanies, c]
+      setSelectedCompanies(next.length === availableCompanies.length ? [] : next)
+    } else {
+      setSelectedCompanies(selectedCompanies.filter((x: any) => x !== c))
+    }
   }
 
   const tabs = [
@@ -37,13 +60,11 @@ export default function DashboardFilters({
   return (
     <>
       <Card className="shadow-subtle border-border bg-card">
-        <CardHeader className="py-3 px-4 lg:px-6 bg-muted/30 border-b border-border">
-          <CardTitle className="text-xs lg:text-sm font-semibold flex items-center gap-2 text-foreground/90">
-            <Building2 className="h-4 w-4 text-muted-foreground" /> Seleção de Plantas
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 lg:px-6">
+        <CardContent className="p-4 lg:px-6 flex flex-col space-y-4">
           <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+            <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              Planta(s)
+            </div>
             <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
               <Checkbox
                 id="all-plants"
@@ -73,6 +94,50 @@ export default function DashboardFilters({
               </div>
             ))}
           </div>
+
+          {activeTab === 'colaboradores' && availableCompanies.length > 0 && (
+            <>
+              <div className="h-px bg-border w-full" />
+              <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  Empresa(s)
+                </div>
+                <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
+                  <Checkbox
+                    id="all-companies"
+                    checked={
+                      selectedCompanies.length === 0 ||
+                      selectedCompanies.length === availableCompanies.length
+                    }
+                    onCheckedChange={() => setSelectedCompanies([])}
+                  />
+                  <label
+                    htmlFor="all-companies"
+                    className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
+                  >
+                    Todas
+                  </label>
+                </div>
+                {availableCompanies.map((c: any) => (
+                  <div key={c} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`company-${c}`}
+                      checked={
+                        selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
+                      }
+                      onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
+                    />
+                    <label
+                      htmlFor={`company-${c}`}
+                      className="text-xs lg:text-sm text-muted-foreground cursor-pointer hover:text-foreground"
+                    >
+                      {c}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
