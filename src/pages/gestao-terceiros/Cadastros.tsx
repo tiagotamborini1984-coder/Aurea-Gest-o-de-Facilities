@@ -16,6 +16,9 @@ export default function Cadastros() {
 
   const config = useCadastrosConfig(type, plants, locations, functions, equipment)
 
+  const menuName = config ? `Cadastros:${config.title}` : ''
+  const hasAccess = useHasAccess(menuName)
+
   if (!profile?.client_id) return null
 
   if (type === 'quadro-contratado') return <QuadroContratado />
@@ -25,7 +28,6 @@ export default function Cadastros() {
   if (!config) return <Navigate to="/gestao-terceiros" replace />
 
   // We need to fetch the access right here for dynamic CRUDs
-  const hasAccess = useHasAccess(`Cadastros:${config.title}`)
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
