@@ -45,6 +45,7 @@ export function AppSidebar() {
         { title: 'Funções', path: '/gestao-terceiros/cadastros/funcoes' },
         { title: 'Colaboradores', path: '/gestao-terceiros/cadastros/colaboradores' },
         { title: 'Equipamentos', path: '/gestao-terceiros/cadastros/equipamentos' },
+        { title: 'Treinamentos', path: '/gestao-terceiros/cadastros/treinamentos' },
         { title: 'Quadro Contratado', path: '/gestao-terceiros/cadastros/quadro-contratado' },
         { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
       ],

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Building2, MapPin, Briefcase, Users, Wrench, ClipboardList, Target } from 'lucide-react'
+import { Building2, MapPin, Wrench, ClipboardList, Target, GraduationCap } from 'lucide-react'
 
 export function useCadastrosConfig(
   type: string | undefined,
@@ -64,85 +64,6 @@ export function useCadastrosConfig(
             { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
         }
-      case 'funcoes':
-        return {
-          title: 'Funções',
-          singularName: 'Função',
-          subtitle: 'Cargos e funções dos colaboradores',
-          icon: Briefcase,
-          tableName: 'functions',
-          searchFields: ['name', 'description'],
-          columns: [
-            { header: 'Nome', accessor: 'name' },
-            {
-              header: 'Descrição',
-              accessor: 'description',
-              render: (item: any) => item.description || '-',
-            },
-          ],
-          fields: [
-            { name: 'name', label: 'Nome da Função', type: 'text' },
-            { name: 'description', label: 'Descrição', type: 'textarea', required: false },
-          ],
-        }
-      case 'colaboradores':
-        return {
-          title: 'Colaboradores',
-          singularName: 'Colaborador',
-          subtitle: 'Quadro de funcionários terceirizados',
-          icon: Users,
-          tableName: 'employees',
-          plantField: 'plant_id',
-          searchFields: ['name', 'company_name'],
-          columns: [
-            { header: 'Nome', accessor: 'name' },
-            { header: 'Empresa', accessor: 'company_name' },
-            {
-              header: 'Planta',
-              accessor: 'plant_id',
-              render: (item: any) => plants.find((p) => p.id === item.plant_id)?.name || '-',
-            },
-            {
-              header: 'Local',
-              accessor: 'location_id',
-              render: (item: any) => locations.find((l) => l.id === item.location_id)?.name || '-',
-            },
-            {
-              header: 'Função',
-              accessor: 'function_id',
-              render: (item: any) => functions.find((f) => f.id === item.function_id)?.name || '-',
-            },
-          ],
-          fields: [
-            { name: 'name', label: 'Nome Completo', type: 'text' },
-            { name: 'company_name', label: 'Empresa', type: 'text' },
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              options: plantOptions,
-              onChangeReset: ['location_id'],
-            },
-            {
-              name: 'location_id',
-              label: 'Local',
-              type: 'select',
-              options: (form: any) =>
-                locations
-                  .filter((l) => l.plant_id === form.plant_id)
-                  .map((l) => ({ value: l.id, label: l.name })),
-              required: false,
-              disabled: (form: any) => !form.plant_id,
-            },
-            {
-              name: 'function_id',
-              label: 'Função',
-              type: 'select',
-              options: functionOptions,
-              required: false,
-            },
-          ],
-        }
       case 'equipamentos':
         return {
           title: 'Equipamentos',
@@ -167,104 +88,6 @@ export function useCadastrosConfig(
             { name: 'type', label: 'Tipo / Categoria', type: 'text' },
             { name: 'quantity', label: 'Quantidade', type: 'number' },
             { name: 'plant_id', label: 'Planta', type: 'select', options: plantOptions },
-          ],
-        }
-      case 'quadro-contratado':
-        return {
-          title: 'Quadro Contratado',
-          singularName: 'Registro de Quadro',
-          subtitle: 'Dimensionamento do contrato (Headcount e Equipamentos)',
-          icon: ClipboardList,
-          tableName: 'contracted_headcount',
-          plantField: 'plant_id',
-          searchFields: ['type'],
-          columns: [
-            {
-              header: 'Tipo',
-              accessor: 'type',
-              render: (item: any) => (
-                <span
-                  className={`capitalize font-medium px-2 py-0.5 rounded text-xs ${item.type === 'colaborador' ? 'bg-brand-deepBlue text-white' : 'bg-slate-200 text-slate-800'}`}
-                >
-                  {item.type}
-                </span>
-              ),
-            },
-            {
-              header: 'Planta',
-              accessor: 'plant_id',
-              render: (item: any) => plants.find((p) => p.id === item.plant_id)?.name || '-',
-            },
-            {
-              header: 'Local',
-              accessor: 'location_id',
-              render: (item: any) => locations.find((l) => l.id === item.location_id)?.name || '-',
-            },
-            {
-              header: 'Função',
-              accessor: 'function_id',
-              render: (item: any) => functions.find((f) => f.id === item.function_id)?.name || '-',
-            },
-            {
-              header: 'Equipamento',
-              accessor: 'equipment_id',
-              render: (item: any) => equipment.find((e) => e.id === item.equipment_id)?.name || '-',
-            },
-            {
-              header: 'Qtd.',
-              accessor: 'quantity',
-              render: (item: any) => <span className="font-bold">{item.quantity}</span>,
-            },
-          ],
-          fields: [
-            {
-              name: 'type',
-              label: 'Tipo',
-              type: 'select',
-              options: [
-                { value: 'colaborador', label: 'Colaborador' },
-                { value: 'equipamento', label: 'Equipamento' },
-              ],
-            },
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              options: plantOptions,
-              onChangeReset: ['location_id', 'equipment_id'],
-            },
-            {
-              name: 'location_id',
-              label: 'Local',
-              type: 'select',
-              options: (form: any) =>
-                locations
-                  .filter((l) => l.plant_id === form.plant_id)
-                  .map((l) => ({ value: l.id, label: l.name })),
-              required: false,
-              disabled: (form: any) => !form.plant_id,
-            },
-            {
-              name: 'function_id',
-              label: 'Função (Colaborador)',
-              type: 'select',
-              options: functionOptions,
-              required: false,
-              hidden: (form: any) => form.type === 'equipamento',
-            },
-            {
-              name: 'equipment_id',
-              label: 'Equipamento (Apenas p/ Equip.)',
-              type: 'select',
-              options: (form: any) =>
-                equipment
-                  .filter((e) => e.plant_id === form.plant_id)
-                  .map((e) => ({ value: e.id, label: e.name })),
-              required: false,
-              hidden: (form: any) => form.type === 'colaborador',
-              disabled: (form: any) => !form.plant_id,
-            },
-            { name: 'quantity', label: 'Quantidade', type: 'number' },
           ],
         }
       case 'book-metas':
@@ -298,6 +121,27 @@ export function useCadastrosConfig(
             { name: 'name', label: 'Nome da Meta', type: 'text' },
             { name: 'description', label: 'Descrição', type: 'textarea', required: false },
             { name: 'is_active', label: 'Ativo', type: 'toggle', required: false },
+          ],
+        }
+      case 'treinamentos':
+        return {
+          title: 'Catálogo de Treinamentos',
+          singularName: 'Treinamento',
+          subtitle: 'Gerencie os programas de capacitação e certificações',
+          icon: GraduationCap,
+          tableName: 'trainings' as any,
+          searchFields: ['name', 'description'],
+          columns: [
+            { header: 'Nome', accessor: 'name' },
+            {
+              header: 'Descrição',
+              accessor: 'description',
+              render: (item: any) => item.description || '-',
+            },
+          ],
+          fields: [
+            { name: 'name', label: 'Nome do Treinamento', type: 'text' },
+            { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
         }
       default:
