@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { CreateUserDialog } from './components/CreateUserDialog'
 import { EditUserDialog } from './components/EditUserDialog'
+import { useHasAccess } from '@/hooks/use-has-access'
+import { Navigate } from 'react-router-dom'
 
 export default function Usuarios() {
   const [usersList, setUsersList] = useState<any[]>([])
@@ -21,7 +23,9 @@ export default function Usuarios() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
+
   const { profile } = useAppStore()
+  const hasAccess = useHasAccess('Usuários')
 
   const fetchUsers = async () => {
     if (!profile?.client_id) return
@@ -37,6 +41,8 @@ export default function Usuarios() {
   useEffect(() => {
     fetchUsers()
   }, [profile])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const handleEditClick = (user: any) => {
     setSelectedUser(user)

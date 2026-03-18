@@ -33971,15 +33971,13 @@ function ET() {
         if (b === `metas`) {
           if (!D.plant_id || !D.goal_id || !D.reference_month || !D.value)
             throw Error(`Preencha todos os campos obrigatórios de Metas.`)
-          let { error: t } = await q
-            .from(`monthly_goals_data`)
-            .insert({
-              client_id: e.client_id,
-              plant_id: D.plant_id,
-              goal_id: D.goal_id,
-              reference_month: `${D.reference_month}-01`,
-              value: Number(D.value),
-            })
+          let { error: t } = await q.from(`monthly_goals_data`).insert({
+            client_id: e.client_id,
+            plant_id: D.plant_id,
+            goal_id: D.goal_id,
+            reference_month: `${D.reference_month}-01`,
+            value: Number(D.value),
+          })
           if (t) throw t
           c({
             title: `Meta lançada com sucesso`,
@@ -35060,18 +35058,16 @@ function LT() {
               let r = t[i.training_id]
               r &&
                 r.document_url &&
-                (await q
-                  .from(`employee_training_records`)
-                  .upsert(
-                    {
-                      client_id: e.client_id,
-                      employee_id: n.id,
-                      training_id: i.training_id,
-                      document_url: r.document_url,
-                      completion_date: r.completion_date,
-                    },
-                    { onConflict: `employee_id, training_id` },
-                  ))
+                (await q.from(`employee_training_records`).upsert(
+                  {
+                    client_id: e.client_id,
+                    employee_id: n.id,
+                    training_id: i.training_id,
+                    document_url: r.document_url,
+                    completion_date: r.completion_date,
+                  },
+                  { onConflict: `employee_id, training_id` },
+                ))
             }
           }
           ;(f({

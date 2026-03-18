@@ -46,7 +46,7 @@ const App = () => (
                 <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
                 <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
                 <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
-                <Route path="/gestao-terceiros/usuarios" element={<Usuarios />} />
+                <Route path="/usuarios" element={<Usuarios />} />
               </Route>
             </Route>
 

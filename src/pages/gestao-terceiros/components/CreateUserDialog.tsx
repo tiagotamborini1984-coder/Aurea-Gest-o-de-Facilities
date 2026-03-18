@@ -28,6 +28,7 @@ const MAIN_MENUS = [
   'Email Reports',
   'Log de Auditoria',
   'Usuários',
+  'Encomendas',
 ]
 
 const CADASTROS_SUBMENUS = [

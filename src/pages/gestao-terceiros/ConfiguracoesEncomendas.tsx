@@ -6,10 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Settings, Loader2 } from 'lucide-react'
+import { useHasAccess } from '@/hooks/use-has-access'
+import { Navigate } from 'react-router-dom'
 
 export default function ConfiguracoesEncomendas() {
   const { activeClient, updateClient } = useAppStore()
   const { toast } = useToast()
+  const hasAccess = useHasAccess('Encomendas')
+
   const [alertDays, setAlertDays] = useState(3)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -18,6 +22,8 @@ export default function ConfiguracoesEncomendas() {
       setAlertDays(activeClient.packageAlertDays ?? 3)
     }
   }, [activeClient])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()

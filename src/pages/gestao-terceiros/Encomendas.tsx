@@ -42,11 +42,14 @@ import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { differenceInDays, format } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { useHasAccess } from '@/hooks/use-has-access'
+import { Navigate } from 'react-router-dom'
 
 export default function Encomendas() {
   const { profile, activeClient } = useAppStore()
   const { plants, packageTypes, loading: masterLoading } = useMasterData()
   const { toast } = useToast()
+  const hasAccess = useHasAccess('Encomendas')
 
   const [packages, setPackages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -118,6 +121,8 @@ export default function Encomendas() {
   useEffect(() => {
     loadPackages()
   }, [profile?.client_id])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const openAdd = () => {
     setEditingPackageId(null)
@@ -283,7 +288,6 @@ export default function Encomendas() {
         setIsModalOpen(false)
         loadPackages()
 
-        // Invoke notification safely without crashing if fetch fails
         supabase.functions
           .invoke('package-notifications', {
             body: {

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Database, Building2, ChevronRight, Package, Briefcase } from 'lucide-react'
+import { Database, Building2, ChevronRight, Package, Briefcase, Users } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +32,6 @@ export function AppSidebar() {
         { title: 'BI Dashboard', path: '/gestao-terceiros/bi' },
         { title: 'Email Reports', path: '/gestao-terceiros/email-reports' },
         { title: 'Log de Auditoria', path: '/gestao-terceiros/auditoria' },
-        { title: 'Usuários', path: '/gestao-terceiros/usuarios' },
       ],
     },
     {
@@ -58,6 +57,11 @@ export function AppSidebar() {
         { title: 'Quadro Contratado', path: '/gestao-terceiros/cadastros/quadro-contratado' },
         { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
       ],
+    },
+    {
+      title: 'Usuários',
+      icon: Users,
+      path: '/usuarios',
     },
   ]
 
@@ -91,13 +95,16 @@ export function AppSidebar() {
         }
 
         return { ...item, subItems: filteredSubItems }
+      } else {
+        if (!userMenus.includes(item.title)) return null
       }
 
       return item
     })
     .filter((item) => {
+      if (!item) return false
       if (role === 'Administrador' || role === 'Master') return true
-      return item.subItems && item.subItems.length > 0
+      return (item.subItems && item.subItems.length > 0) || item.path
     })
 
   return (
@@ -119,9 +126,9 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="px-3 pt-6">
         <SidebarMenu>
-          {visibleItems.map((item) => {
+          {visibleItems.map((item: any) => {
             if (item.subItems) {
-              const isSubActive = item.subItems.some((s) => {
+              const isSubActive = item.subItems.some((s: any) => {
                 if (s.path === '/gestao-terceiros') return location.pathname === '/gestao-terceiros'
                 return location.pathname === s.path || location.pathname.startsWith(s.path + '/')
               })
@@ -142,7 +149,7 @@ export function AppSidebar() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub className="border-sidebar-border mr-0 pr-0 ml-4 pl-3">
-                        {item.subItems.map((sub) => {
+                        {item.subItems.map((sub: any) => {
                           const isActive = location.pathname === sub.path
 
                           return (
@@ -168,7 +175,26 @@ export function AppSidebar() {
               )
             }
 
-            return null
+            const isActive =
+              location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive}
+                  className={cn(
+                    'py-5 mb-1 text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden',
+                    isActive &&
+                      'bg-sidebar-accent text-white shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
+                  )}
+                >
+                  <Link to={item.path}>
+                    <item.icon className="h-5 w-5 group-hover:text-brand-vividBlue transition-colors" />
+                    <span className="font-medium tracking-wide">{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
           })}
         </SidebarMenu>
       </SidebarContent>

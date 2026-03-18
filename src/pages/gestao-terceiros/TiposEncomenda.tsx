@@ -16,11 +16,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label'
 import { Package, Search, Plus, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useHasAccess } from '@/hooks/use-has-access'
+import { Navigate } from 'react-router-dom'
 
 export default function TiposEncomenda() {
   const { profile } = useAppStore()
   const { packageTypes, refetch, loading } = useMasterData()
   const { toast } = useToast()
+  const hasAccess = useHasAccess('Encomendas')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -30,6 +33,8 @@ export default function TiposEncomenda() {
   const filteredTypes = useMemo(() => {
     return packageTypes.filter((t) => t.name.toLowerCase().includes(searchTerm.toLowerCase()))
   }, [packageTypes, searchTerm])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()

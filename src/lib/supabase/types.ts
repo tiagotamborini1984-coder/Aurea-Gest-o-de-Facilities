@@ -656,12 +656,14 @@ export type Database = {
       packages: {
         Row: {
           arrival_date: string
+          attachment_url: string | null
           client_id: string
           created_at: string
           delivery_date: string | null
           id: string
           observations: string | null
           package_type_id: string | null
+          pickup_responsible: string | null
           plant_id: string
           protocol_number: string
           recipient_email: string
@@ -672,12 +674,14 @@ export type Database = {
         }
         Insert: {
           arrival_date: string
+          attachment_url?: string | null
           client_id: string
           created_at?: string
           delivery_date?: string | null
           id?: string
           observations?: string | null
           package_type_id?: string | null
+          pickup_responsible?: string | null
           plant_id: string
           protocol_number: string
           recipient_email: string
@@ -688,12 +692,14 @@ export type Database = {
         }
         Update: {
           arrival_date?: string
+          attachment_url?: string | null
           client_id?: string
           created_at?: string
           delivery_date?: string | null
           id?: string
           observations?: string | null
           package_type_id?: string | null
+          pickup_responsible?: string | null
           plant_id?: string
           protocol_number?: string
           recipient_email?: string
@@ -1112,6 +1118,8 @@ export const Constants = {
 //   status: text (not null, default: 'Aguardando Retirada'::text)
 //   delivery_date: timestamp with time zone (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   pickup_responsible: text (nullable)
+//   attachment_url: text (nullable)
 // Table: plants
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
