@@ -139,7 +139,7 @@ export default function QuadroContratado() {
         if (error) throw error
         toast({
           title: 'Meta lançada com sucesso',
-          className: 'bg-green-500/20 text-brand-deepBlue border-brand-deepBlue/50',
+          className: 'bg-green-50 text-green-900 border-green-200',
         })
       } else {
         if (!form.plant_id || !form.quantity) {
@@ -166,14 +166,14 @@ export default function QuadroContratado() {
           if (error) throw error
           toast({
             title: 'Quadro contratado atualizado',
-            className: 'bg-green-500/20 text-brand-deepBlue border-brand-deepBlue/50',
+            className: 'bg-green-50 text-green-900 border-green-200',
           })
         } else {
           const { error } = await supabase.from('contracted_headcount').insert(payload)
           if (error) throw error
           toast({
             title: 'Quadro contratado salvo',
-            className: 'bg-green-500/20 text-brand-deepBlue border-brand-deepBlue/50',
+            className: 'bg-green-50 text-green-900 border-green-200',
           })
         }
         loadData()
@@ -314,7 +314,7 @@ export default function QuadroContratado() {
                         variant="ghost"
                         size="icon"
                         onClick={() => openEdit(item)}
-                        className="text-gray-400 hover:text-brand-deepBlue hover:bg-slate-100"
+                        className="text-slate-600 hover:text-brand-deepBlue hover:bg-slate-100"
                         title="Editar"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -323,7 +323,7 @@ export default function QuadroContratado() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(item.id)}
-                        className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        className="text-slate-600 hover:text-red-600 hover:bg-red-50"
                         title="Remover"
                       >
                         <Trash2 className="h-4 w-4" />

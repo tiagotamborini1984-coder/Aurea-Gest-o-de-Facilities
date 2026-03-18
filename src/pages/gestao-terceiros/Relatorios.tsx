@@ -295,32 +295,32 @@ export default function Relatorios() {
           {activeTab !== 'treinamentos' && (
             <div className="flex flex-wrap gap-6">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+                <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
                   De
                 </Label>
                 <Input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-[160px] h-10"
+                  className="w-[160px] h-10 border-slate-200"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+                <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
                   Até
                 </Label>
                 <Input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-[160px] h-10"
+                  className="w-[160px] h-10 border-slate-200"
                 />
               </div>
             </div>
           )}
 
           <div className="space-y-3">
-            <Label className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+            <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
               Filtrar por Planta (múltipla seleção)
             </Label>
             <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
@@ -333,15 +333,18 @@ export default function Relatorios() {
                       if (checked) setSelectedPlants([...selectedPlants, p.id])
                       else setSelectedPlants(selectedPlants.filter((id) => id !== p.id))
                     }}
-                    className="w-5 h-5 rounded"
+                    className="w-5 h-5 rounded border-slate-300"
                   />
-                  <Label htmlFor={`plant-${p.id}`} className="font-medium cursor-pointer text-sm">
+                  <Label
+                    htmlFor={`plant-${p.id}`}
+                    className="font-medium cursor-pointer text-sm text-slate-800"
+                  >
                     {p.name}
                   </Label>
                 </div>
               ))}
               {plants.length === 0 && (
-                <span className="text-sm text-muted-foreground">Nenhuma planta cadastrada.</span>
+                <span className="text-sm text-slate-600">Nenhuma planta cadastrada.</span>
               )}
             </div>
           </div>
@@ -350,7 +353,7 @@ export default function Relatorios() {
             <>
               <div className="h-px bg-slate-100 my-4" />
               <div className="space-y-3">
-                <Label className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+                <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
                   Filtrar por Empresa (múltipla seleção)
                 </Label>
                 <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
@@ -362,11 +365,11 @@ export default function Relatorios() {
                         selectedCompanies.length === availableCompanies.length
                       }
                       onCheckedChange={() => setSelectedCompanies([])}
-                      className="w-5 h-5 rounded"
+                      className="w-5 h-5 rounded border-slate-300"
                     />
                     <Label
                       htmlFor="all-companies-report"
-                      className="font-medium cursor-pointer text-sm"
+                      className="font-medium cursor-pointer text-sm text-slate-800"
                     >
                       Todas as empresas
                     </Label>
@@ -379,11 +382,11 @@ export default function Relatorios() {
                           selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
                         }
                         onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
-                        className="w-5 h-5 rounded"
+                        className="w-5 h-5 rounded border-slate-300"
                       />
                       <Label
                         htmlFor={`company-${c}`}
-                        className="font-medium cursor-pointer text-sm text-muted-foreground"
+                        className="font-medium cursor-pointer text-sm text-slate-700"
                       >
                         {c}
                       </Label>
@@ -399,19 +402,34 @@ export default function Relatorios() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
           <TabsList className="bg-white border border-gray-200 p-1 flex-wrap sm:flex-nowrap h-auto w-full sm:w-auto">
-            <TabsTrigger value="colaborador" className="data-[state=active]:bg-slate-100">
+            <TabsTrigger
+              value="colaborador"
+              className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-600"
+            >
               Por Colaborador
             </TabsTrigger>
-            <TabsTrigger value="local" className="data-[state=active]:bg-slate-100">
+            <TabsTrigger
+              value="local"
+              className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-600"
+            >
               Por Local
             </TabsTrigger>
-            <TabsTrigger value="planta" className="data-[state=active]:bg-slate-100">
+            <TabsTrigger
+              value="planta"
+              className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-600"
+            >
               Por Planta
             </TabsTrigger>
-            <TabsTrigger value="equipamento" className="data-[state=active]:bg-slate-100">
+            <TabsTrigger
+              value="equipamento"
+              className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-600"
+            >
               Por Equipamento
             </TabsTrigger>
-            <TabsTrigger value="treinamentos" className="data-[state=active]:bg-slate-100">
+            <TabsTrigger
+              value="treinamentos"
+              className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-600"
+            >
               Treinamentos a Vencer
             </TabsTrigger>
           </TabsList>
@@ -421,7 +439,7 @@ export default function Relatorios() {
             variant="outline"
             onClick={handleExportPDF}
             disabled={reportData.length === 0}
-            className="bg-white hover:bg-slate-50 border-gray-200"
+            className="bg-white hover:bg-slate-50 border-gray-300 text-slate-700"
           >
             <Printer className="h-4 w-4 mr-2" /> Exportar para PDF
           </Button>
@@ -429,49 +447,49 @@ export default function Relatorios() {
             variant="outline"
             onClick={handleExportCSV}
             disabled={reportData.length === 0}
-            className="bg-white hover:bg-slate-50 border-gray-200"
+            className="bg-white hover:bg-slate-50 border-gray-300 text-slate-700"
           >
             <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar para Excel
           </Button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print:border-none print:shadow-none">
         <Table className="print:border-collapse print:w-full">
-          <TableHeader className="bg-slate-50/80 border-b border-gray-100 print:bg-transparent print:border-b-2 print:border-slate-800">
+          <TableHeader className="bg-slate-50/80 border-b border-gray-200 print:bg-transparent print:border-b-2 print:border-slate-800">
             {activeTab === 'treinamentos' ? (
               <TableRow>
-                <TableHead className="font-semibold text-slate-600 h-12 print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 h-12 print:text-black print:p-2">
                   Nome do Colaborador
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 print:text-black print:p-2">
                   Treinamento
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Data de Vencimento
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Dias para o Vencimento
                 </TableHead>
               </TableRow>
             ) : (
               <TableRow>
-                <TableHead className="font-semibold text-slate-600 h-12 print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 h-12 print:text-black print:p-2">
                   {entityKey}
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Média Presenças
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Média Faltas
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Contratado
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Taxa Presença
                 </TableHead>
-                <TableHead className="font-semibold text-slate-600 text-center print:text-black print:p-2">
+                <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                   Absenteísmo
                 </TableHead>
               </TableRow>
@@ -484,14 +502,14 @@ export default function Relatorios() {
                   colSpan={activeTab === 'treinamentos' ? 4 : 6}
                   className="text-center py-12"
                 >
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : reportData.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={activeTab === 'treinamentos' ? 4 : 6}
-                  className="text-center py-12 text-muted-foreground"
+                  className="text-center py-12 text-slate-600"
                 >
                   Sem dados para exibir no período selecionado.
                 </TableCell>
@@ -500,9 +518,9 @@ export default function Relatorios() {
               reportData.map((row, i) => (
                 <TableRow
                   key={i}
-                  className="hover:bg-slate-50/50 print:border-b print:border-slate-200"
+                  className="hover:bg-slate-50/50 border-gray-100 print:border-b print:border-slate-200"
                 >
-                  <TableCell className="font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
+                  <TableCell className="font-medium text-slate-800 print:text-black print:p-2 print:break-inside-avoid">
                     {row['Nome do Colaborador']}
                   </TableCell>
                   <TableCell className="text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
@@ -533,9 +551,9 @@ export default function Relatorios() {
               reportData.map((row, i) => (
                 <TableRow
                   key={i}
-                  className="hover:bg-slate-50/50 print:border-b print:border-slate-200"
+                  className="hover:bg-slate-50/50 border-gray-100 print:border-b print:border-slate-200"
                 >
-                  <TableCell className="font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
+                  <TableCell className="font-medium text-slate-800 print:text-black print:p-2 print:break-inside-avoid">
                     {row.Entidade}
                   </TableCell>
                   <TableCell className="text-center print:p-2 print:break-inside-avoid">
@@ -548,7 +566,7 @@ export default function Relatorios() {
                       {Number(row['Média Faltas']).toFixed(1)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center font-bold text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
+                  <TableCell className="text-center font-bold text-slate-800 print:text-black print:p-2 print:break-inside-avoid">
                     {row.Contratado}
                   </TableCell>
                   <TableCell className="text-center font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
@@ -558,8 +576,8 @@ export default function Relatorios() {
                     className={cn(
                       'text-center font-semibold print:text-black print:p-2 print:break-inside-avoid',
                       Number(row.Absenteísmo) > 0
-                        ? 'text-red-600 print:text-black'
-                        : 'text-slate-600 print:text-black',
+                        ? 'text-red-700 print:text-black'
+                        : 'text-slate-700 print:text-black',
                     )}
                   >
                     {Number(row.Absenteísmo).toFixed(1)}%

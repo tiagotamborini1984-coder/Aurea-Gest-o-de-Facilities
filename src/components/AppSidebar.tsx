@@ -1,17 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import {
-  LayoutDashboard,
-  ClipboardList,
-  Database,
-  FileBarChart,
-  PieChart,
-  History,
-  Users,
-  Building2,
-  Mail,
-  ChevronRight,
-  Package,
-} from 'lucide-react'
+import { Database, Building2, ChevronRight, Package, Briefcase } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -34,11 +22,21 @@ export function AppSidebar() {
   const accessibleMenus = profile?.accessible_menus || []
 
   const navItems = [
-    { title: 'Dashboard Gestor', path: '/gestao-terceiros', icon: LayoutDashboard },
-    { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos', icon: ClipboardList },
+    {
+      title: 'Gestão de Terceiros',
+      icon: Briefcase,
+      subItems: [
+        { title: 'Dashboard Gestor', path: '/gestao-terceiros' },
+        { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
+        { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
+        { title: 'BI Dashboard', path: '/gestao-terceiros/bi' },
+        { title: 'Email Reports', path: '/gestao-terceiros/email-reports' },
+        { title: 'Log de Auditoria', path: '/gestao-terceiros/auditoria' },
+        { title: 'Usuários', path: '/gestao-terceiros/usuarios' },
+      ],
+    },
     {
       title: 'Encomendas',
-      path: '/gestao-terceiros/encomendas',
       icon: Package,
       subItems: [
         { title: 'Painel', path: '/gestao-terceiros/encomendas' },
@@ -48,7 +46,6 @@ export function AppSidebar() {
     },
     {
       title: 'Cadastros',
-      path: '/gestao-terceiros/cadastros',
       icon: Database,
       subItems: [
         { title: 'Plantas', path: '/gestao-terceiros/cadastros/plantas' },
@@ -62,16 +59,11 @@ export function AppSidebar() {
         { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
       ],
     },
-    { title: 'Relatórios', path: '/gestao-terceiros/relatorios', icon: FileBarChart },
-    { title: 'BI Dashboard', path: '/gestao-terceiros/bi', icon: PieChart },
-    { title: 'Email Reports', path: '/gestao-terceiros/email-reports', icon: Mail },
-    { title: 'Log de Auditoria', path: '/gestao-terceiros/auditoria', icon: History },
-    { title: 'Usuários', path: '/gestao-terceiros/usuarios', icon: Users },
   ]
 
   const visibleItems = navItems
-    .filter((item) => {
-      if (role === 'Administrador' || role === 'Master') return true
+    .map((item) => {
+      if (role === 'Administrador' || role === 'Master') return item
 
       let userMenus = accessibleMenus
       if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
@@ -84,41 +76,28 @@ export function AppSidebar() {
         ]
       }
 
-      if (item.title === 'Cadastros') {
-        return item.subItems?.some(
-          (sub) => userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
-        )
-      }
-      if (item.title === 'Encomendas') {
-        return userMenus.includes('Encomendas')
-      }
-      return userMenus.includes(item.title)
-    })
-    .map((item) => {
-      if (item.title === 'Cadastros' && item.subItems) {
-        let userMenus = accessibleMenus
-        if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
-          userMenus = [
-            'Lançamentos',
-            'Encomendas',
-            'Cadastros:Colaboradores',
-            'Cadastros:Equipamentos',
-            'Cadastros:Quadro Contratado',
-          ]
+      if (item.subItems) {
+        let filteredSubItems = item.subItems
+
+        if (item.title === 'Cadastros') {
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
+          )
+        } else if (item.title === 'Encomendas') {
+          filteredSubItems = userMenus.includes('Encomendas') ? item.subItems : []
+        } else if (item.title === 'Gestão de Terceiros') {
+          filteredSubItems = item.subItems.filter((sub) => userMenus.includes(sub.title))
         }
 
-        return {
-          ...item,
-          subItems: item.subItems.filter(
-            (sub) =>
-              role === 'Administrador' ||
-              role === 'Master' ||
-              userMenus.includes('Cadastros') ||
-              userMenus.includes(`Cadastros:${sub.title}`),
-          ),
-        }
+        return { ...item, subItems: filteredSubItems }
       }
+
       return item
+    })
+    .filter((item) => {
+      if (role === 'Administrador' || role === 'Master') return true
+      return item.subItems && item.subItems.length > 0
     })
 
   return (
@@ -142,16 +121,20 @@ export function AppSidebar() {
         <SidebarMenu>
           {visibleItems.map((item) => {
             if (item.subItems) {
-              const isSubActive = item.subItems.some((s) => location.pathname === s.path)
+              const isSubActive = item.subItems.some((s) => {
+                if (s.path === '/gestao-terceiros') return location.pathname === '/gestao-terceiros'
+                return location.pathname === s.path || location.pathname.startsWith(s.path + '/')
+              })
+
               return (
                 <Collapsible
-                  key={item.path}
+                  key={item.title}
                   defaultOpen={isSubActive}
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden">
+                      <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden">
                         <item.icon className="h-5 w-5 group-hover:text-brand-vividBlue transition-colors" />
                         <span className="font-medium tracking-wide">{item.title}</span>
                         <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
@@ -161,13 +144,14 @@ export function AppSidebar() {
                       <SidebarMenuSub className="border-sidebar-border mr-0 pr-0 ml-4 pl-3">
                         {item.subItems.map((sub) => {
                           const isActive = location.pathname === sub.path
+
                           return (
                             <SidebarMenuSubItem key={sub.path}>
                               <SidebarMenuSubButton
                                 asChild
                                 isActive={isActive}
                                 className={cn(
-                                  'py-4 text-sidebar-foreground/60 hover:text-white hover:bg-sidebar-accent transition-colors my-0.5 rounded-md',
+                                  'py-4 text-sidebar-foreground/80 hover:text-white hover:bg-sidebar-accent transition-colors my-0.5 rounded-md',
                                   isActive &&
                                     'bg-brand-vividBlue text-white font-medium shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
                                 )}
@@ -184,33 +168,7 @@ export function AppSidebar() {
               )
             }
 
-            const isActive = location.pathname === item.path
-            return (
-              <SidebarMenuItem key={item.path}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive}
-                  className={cn(
-                    'w-full mb-1 transition-all duration-300 py-5 rounded-md relative overflow-hidden group',
-                    isActive
-                      ? 'bg-brand-vividBlue text-white shadow-[inset_0_0_12px_rgba(0,0,0,0.2)] border-l-4 border-white/20'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white',
-                  )}
-                >
-                  <Link to={item.path} className="flex items-center gap-3">
-                    <item.icon
-                      className={cn(
-                        'h-5 w-5 transition-colors',
-                        isActive
-                          ? 'text-white'
-                          : 'text-sidebar-foreground/70 group-hover:text-white',
-                      )}
-                    />
-                    <span className="font-medium tracking-wide">{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )
+            return null
           })}
         </SidebarMenu>
       </SidebarContent>

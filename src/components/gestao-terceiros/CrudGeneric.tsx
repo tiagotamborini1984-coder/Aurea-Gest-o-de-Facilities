@@ -274,7 +274,7 @@ export function CrudGeneric({
       <div className="animate-fade-in">
         {loading ? (
           <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-brand-deepBlue" />
           </div>
         ) : filteredData.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground bg-white rounded-xl border border-gray-100 border-dashed">
@@ -308,14 +308,14 @@ export function CrudGeneric({
                         <button
                           type="button"
                           onClick={() => openEdit(item)}
-                          className="p-1.5 text-gray-400 hover:text-brand-deepBlue bg-white hover:bg-slate-100 rounded-md transition-colors"
+                          className="p-1.5 text-slate-600 hover:text-brand-deepBlue bg-white hover:bg-slate-100 rounded-md transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setItemToDelete(item.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 rounded-md transition-colors"
+                          className="p-1.5 text-slate-600 hover:text-red-600 bg-white hover:bg-red-50 rounded-md transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -335,7 +335,7 @@ export function CrudGeneric({
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full flex flex-shrink-0 items-center justify-center bg-gray-50">
-                    {Icon && <Icon className="w-6 h-6 text-gray-500" />}
+                    {Icon && <Icon className="w-6 h-6 text-slate-600" />}
                   </div>
                   <div>
                     <h5 className="font-semibold text-gray-900 text-sm mb-0.5">
@@ -362,14 +362,14 @@ export function CrudGeneric({
                     <button
                       type="button"
                       onClick={() => openEdit(item)}
-                      className="p-2 text-gray-400 hover:text-brand-deepBlue bg-white border border-gray-100 rounded-full shadow-sm"
+                      className="p-2 text-slate-600 hover:text-brand-deepBlue bg-white border border-gray-100 rounded-full shadow-sm"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setItemToDelete(item.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 bg-white border border-gray-100 rounded-full shadow-sm"
+                      className="p-2 text-slate-600 hover:text-red-600 bg-white border border-gray-100 rounded-full shadow-sm"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

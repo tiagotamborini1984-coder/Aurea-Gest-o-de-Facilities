@@ -60,14 +60,14 @@ export default function Usuarios() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-brand-light overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Nível de Acesso</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+          <TableHeader className="bg-slate-50/80 border-b border-gray-200">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="font-semibold text-slate-800">Nome</TableHead>
+              <TableHead className="font-semibold text-slate-800">E-mail</TableHead>
+              <TableHead className="font-semibold text-slate-800">Nível de Acesso</TableHead>
+              <TableHead className="font-semibold text-slate-800 text-right pr-6">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -79,15 +79,15 @@ export default function Usuarios() {
               </TableRow>
             ) : usersList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={4} className="text-center py-8 text-slate-600">
                   Nenhum usuário encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               usersList.map((u) => (
-                <TableRow key={u.id} className="hover:bg-muted/30">
+                <TableRow key={u.id} className="hover:bg-slate-50 border-gray-100">
                   <TableCell className="font-medium text-brand-graphite">{u.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                  <TableCell className="text-slate-600">{u.email}</TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
@@ -96,17 +96,17 @@ export default function Usuarios() {
                           ? 'bg-brand-vividBlue text-white border-brand-vividBlue'
                           : u.role === 'Gestor'
                             ? 'bg-amber-500 text-white border-amber-500'
-                            : 'bg-slate-100 text-slate-600'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
                       }
                     >
                       {u.role === 'Master' ? 'Administrador' : u.role}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right pr-6">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-brand-vividBlue hover:bg-brand-vividBlue/10"
+                      className="text-brand-vividBlue hover:bg-brand-vividBlue/10 hover:text-brand-vividBlue"
                       onClick={() => handleEditClick(u)}
                     >
                       Editar

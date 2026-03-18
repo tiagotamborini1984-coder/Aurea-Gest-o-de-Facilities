@@ -361,7 +361,7 @@ export default function CadastrosColaboradores() {
                           variant="ghost"
                           size="icon"
                           onClick={() => openEdit(item)}
-                          className="text-gray-400 hover:text-brand-deepBlue hover:bg-slate-100"
+                          className="text-slate-600 hover:text-brand-deepBlue hover:bg-slate-100"
                           title="Editar"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -370,7 +370,7 @@ export default function CadastrosColaboradores() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(item.id)}
-                          className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                          className="text-slate-600 hover:text-red-600 hover:bg-red-50"
                           title="Remover"
                         >
                           <Trash2 className="h-4 w-4" />

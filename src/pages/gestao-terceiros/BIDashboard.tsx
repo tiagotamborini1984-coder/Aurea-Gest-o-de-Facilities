@@ -75,7 +75,7 @@ export default function BIDashboard() {
   if (biData.loading)
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-brand-blue" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-deepBlue" />
       </div>
     )
 
@@ -96,7 +96,11 @@ export default function BIDashboard() {
             <div className="flex justify-end mb-1">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-slate-600 hover:text-slate-900"
+                  >
                     <Columns3 className="h-3 w-3 mr-2" /> Locais
                   </Button>
                 </DropdownMenuTrigger>
@@ -175,7 +179,10 @@ export default function BIDashboard() {
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-10 shadow-sm bg-card">
+              <Button
+                variant="outline"
+                className="h-10 shadow-sm bg-card border-gray-200 text-slate-700"
+              >
                 <Settings2 className="h-4 w-4 mr-2" /> Painéis
               </Button>
             </DropdownMenuTrigger>

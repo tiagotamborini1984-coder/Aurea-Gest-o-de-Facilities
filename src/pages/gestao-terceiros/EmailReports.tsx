@@ -40,50 +40,55 @@ export default function EmailReports() {
         </p>
       </div>
 
-      <Card className="shadow-sm border-brand-light">
+      <Card className="shadow-sm border-gray-200">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-brand-blue" />
-            <CardTitle>Relatório Diário Operacional</CardTitle>
+            <Mail className="h-5 w-5 text-brand-deepBlue" />
+            <CardTitle className="text-slate-800">Relatório Diário Operacional</CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-slate-600">
             Enviado todos os dias (segunda a sábado) às 12:00 para Gestores e Administradores.
             Contém o resumo de efetivo lançado na manhã.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-between pt-2">
-          <span className="font-medium text-sm">Ativar envio automático</span>
+          <span className="font-medium text-sm text-slate-800">Ativar envio automático</span>
           <Switch
             defaultChecked
             onCheckedChange={handleSave}
-            className="data-[state=checked]:bg-brand-blue"
+            className="data-[state=checked]:bg-brand-deepBlue"
           />
         </CardContent>
       </Card>
 
-      <Card className="shadow-sm border-brand-light">
+      <Card className="shadow-sm border-gray-200">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-brand-blue" />
-            <CardTitle>Relatório Mensal Consolidado</CardTitle>
+            <Mail className="h-5 w-5 text-brand-deepBlue" />
+            <CardTitle className="text-slate-800">Relatório Mensal Consolidado</CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-slate-600">
             Enviado no primeiro dia útil do mês. Contém o fechamento do Absenteísmo, Metas e
             Disponibilidade.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-between pt-2">
-          <span className="font-medium text-sm">Ativar envio automático</span>
+          <span className="font-medium text-sm text-slate-800">Ativar envio automático</span>
           <Switch
             defaultChecked
             onCheckedChange={handleSave}
-            className="data-[state=checked]:bg-brand-blue"
+            className="data-[state=checked]:bg-brand-deepBlue"
           />
         </CardContent>
       </Card>
 
       <div className="flex justify-end pt-4">
-        <Button onClick={sendTestEmail} disabled={testing}>
+        <Button
+          onClick={sendTestEmail}
+          disabled={testing}
+          variant="outline"
+          className="border-brand-deepBlue text-brand-deepBlue hover:bg-brand-deepBlue/5"
+        >
           {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Enviar E-mail de Teste Agora
         </Button>

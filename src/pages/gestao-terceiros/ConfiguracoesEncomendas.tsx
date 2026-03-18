@@ -64,10 +64,10 @@ export default function ConfiguracoesEncomendas() {
         </div>
       </div>
 
-      <Card className="shadow-sm border-gray-100">
-        <CardHeader className="bg-slate-50/50 border-b border-gray-100">
-          <CardTitle className="text-lg">Alerta de Retirada (Lead Time)</CardTitle>
-          <CardDescription>
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-slate-50/50 border-b border-gray-200">
+          <CardTitle className="text-lg text-slate-800">Alerta de Retirada (Lead Time)</CardTitle>
+          <CardDescription className="text-slate-600">
             Defina o número de dias que uma encomenda pode aguardar na recepção antes de ser
             sinalizada como em atraso.
           </CardDescription>
@@ -75,13 +75,14 @@ export default function ConfiguracoesEncomendas() {
         <CardContent className="pt-6">
           <form onSubmit={handleSave} className="space-y-4 max-w-sm">
             <div className="space-y-2">
-              <Label>Dias para Alerta de Retirada</Label>
+              <Label className="text-slate-700">Dias para Alerta de Retirada</Label>
               <Input
                 type="number"
                 min="1"
                 value={alertDays}
                 onChange={(e) => setAlertDays(Number(e.target.value))}
                 required
+                className="border-gray-300 text-slate-800"
               />
             </div>
             <Button type="submit" variant="tech" disabled={isSubmitting}>

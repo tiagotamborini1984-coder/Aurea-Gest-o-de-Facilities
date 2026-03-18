@@ -69,18 +69,18 @@ export default function Auditoria() {
             Rastreabilidade de ações no sistema (retenção automática de 2 meses).
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-2">
             <Input
               type="date"
-              className="h-9 w-36"
+              className="h-9 w-36 border-gray-200 text-slate-800"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
             />
-            <span className="text-muted-foreground">-</span>
+            <span className="text-slate-500">-</span>
             <Input
               type="date"
-              className="h-9 w-36"
+              className="h-9 w-36 border-gray-200 text-slate-800"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
             />
@@ -90,54 +90,55 @@ export default function Auditoria() {
             size="sm"
             onClick={handleExport}
             disabled={logs.length === 0 || loading}
+            className="text-slate-700 border-gray-300 hover:bg-slate-50"
           >
             <Download className="h-4 w-4 mr-2" /> Exportar
           </Button>
         </div>
       </div>
 
-      <Card className="overflow-hidden shadow-sm border border-brand-light">
+      <Card className="overflow-hidden shadow-sm border border-gray-200">
         <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead className="w-[180px]">Data / Hora</TableHead>
-              <TableHead>Usuário (ID)</TableHead>
-              <TableHead>Ação</TableHead>
-              <TableHead>Detalhes</TableHead>
+          <TableHeader className="bg-slate-50/80 border-b border-gray-200">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[180px] font-semibold text-slate-800">Data / Hora</TableHead>
+              <TableHead className="font-semibold text-slate-800">Usuário (ID)</TableHead>
+              <TableHead className="font-semibold text-slate-800">Ação</TableHead>
+              <TableHead className="font-semibold text-slate-800">Detalhes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-blue" />
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : logs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={4} className="text-center py-8 text-slate-600">
                   Nenhum log encontrado no período selecionado.
                 </TableCell>
               </TableRow>
             ) : (
               logs.map((log) => (
-                <TableRow key={log.id} className="hover:bg-muted/30">
-                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                <TableRow key={log.id} className="hover:bg-slate-50 border-gray-100">
+                  <TableCell className="text-xs text-slate-600 whitespace-nowrap">
                     {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss')}
                   </TableCell>
-                  <TableCell className="font-medium text-sm">
+                  <TableCell className="font-medium text-sm text-slate-800">
                     {log.user_id.substring(0, 8)}...
                   </TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className="bg-brand-blue/5 text-brand-blue font-medium"
+                      className="bg-brand-deepBlue/5 text-brand-deepBlue border-brand-deepBlue/20 font-medium"
                     >
                       {log.action_type}
                     </Badge>
                   </TableCell>
                   <TableCell
-                    className="text-xs text-muted-foreground truncate max-w-[400px]"
+                    className="text-xs text-slate-600 truncate max-w-[400px]"
                     title={log.details}
                   >
                     {log.details}

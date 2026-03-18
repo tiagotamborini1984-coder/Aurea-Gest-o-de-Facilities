@@ -23,7 +23,7 @@
     --secondary-foreground: 215 28% 17%;
 
     --muted: 215 16% 94%;
-    --muted-foreground: 215 20% 65%;
+    --muted-foreground: 215 25% 45%; /* High-contrast darker gray for legibility */
 
     --accent: 215 16% 94%;
     --accent-foreground: 215 28% 17%;
@@ -61,7 +61,7 @@
     --secondary: 215 16% 94%;
     --secondary-foreground: 215 28% 17%;
     --muted: 215 16% 94%;
-    --muted-foreground: 215 20% 65%;
+    --muted-foreground: 215 25% 45%;
     --accent: 215 16% 94%;
     --accent-foreground: 215 28% 17%;
     --destructive: 0 84.2% 60.2%;
