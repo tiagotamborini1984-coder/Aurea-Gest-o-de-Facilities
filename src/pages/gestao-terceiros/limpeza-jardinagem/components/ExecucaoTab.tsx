@@ -28,12 +28,13 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Loader2, CheckCircle2, XCircle, FileText, Download } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, FileText, Download, Printer, FileDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { exportToCSV } from '@/lib/export'
 
 export function ExecucaoTab() {
   const { profile } = useAppStore()
@@ -85,12 +86,12 @@ export function ExecucaoTab() {
     if (!selectedSched) return
     if (execStatus === 'Não Realizado' && !justification)
       return toast({ variant: 'destructive', title: 'Justificativa obrigatória' })
-    if (execStatus === 'Realizado' && !file)
+    if (execStatus === 'Realizado' && !file && !selectedSched.evidence_url)
       return toast({ variant: 'destructive', title: 'Evidência (Anexo) obrigatória' })
 
     setIsSaving(true)
     try {
-      let evidence_url = null
+      let evidence_url = selectedSched.evidence_url
       if (file && execStatus === 'Realizado') {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
@@ -108,14 +109,17 @@ export function ExecucaoTab() {
         .update({
           status: execStatus,
           justification: execStatus === 'Não Realizado' ? justification : null,
-          evidence_url,
+          evidence_url: execStatus === 'Realizado' ? evidence_url : null,
         })
         .eq('id', selectedSched.id)
 
       if (error) throw error
       toast({
-        title: 'Execução registrada!',
-        className: 'bg-green-50 text-green-900 border-green-200',
+        title: 'Status atualizado!',
+        className:
+          execStatus === 'Realizado'
+            ? 'bg-green-50 text-green-900 border-green-200'
+            : 'bg-red-50 text-red-900 border-red-200',
       })
       setModalOpen(false)
       fetchSchedules()
@@ -126,79 +130,130 @@ export function ExecucaoTab() {
     }
   }
 
+  const handleExportCSV = () => {
+    const data = schedules.map((s) => ({
+      Data: s.activity_date.split('-').reverse().join('/'),
+      Início: s.start_time.substring(0, 5),
+      Fim: s.end_time ? s.end_time.substring(0, 5) : '-',
+      Área: s.areas?.name || '-',
+      Tipo: s.areas?.type === 'cleaning' ? 'Limpeza' : 'Jardinagem',
+      Descrição: s.description,
+      Status: s.status,
+      Justificativa: s.justification || '-',
+    }))
+    exportToCSV(`execucoes_${dateFrom}_${dateTo}.csv`, data)
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm items-end">
-        <div className="space-y-1">
-          <Label className="text-xs text-slate-500">De</Label>
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="h-9 w-36"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-slate-500">Até</Label>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="h-9 w-36"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-slate-500">Planta</Label>
-          <Select value={plantId} onValueChange={setPlantId}>
-            <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue placeholder="Planta" />
-            </SelectTrigger>
-            <SelectContent>
-              {plants.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
+    <div className="space-y-6">
+      <div className="flex flex-wrap justify-between items-end gap-6 bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm print:hidden">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-bold text-slate-700">Data Inicial</Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-11 w-40 text-base font-semibold"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-bold text-slate-700">Data Final</Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-11 w-40 text-base font-semibold"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-bold text-slate-700">Planta Operacional</Label>
+            <Select value={plantId} onValueChange={setPlantId}>
+              <SelectTrigger className="h-11 w-[200px] text-base font-semibold">
+                <SelectValue placeholder="Planta" />
+              </SelectTrigger>
+              <SelectContent>
+                {plants.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-base">
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-bold text-slate-700">Tipo de Serviço</Label>
+            <Select value={serviceType} onValueChange={setServiceType}>
+              <SelectTrigger className="h-11 w-[180px] text-base font-semibold">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-base">
+                  Todos
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                <SelectItem value="cleaning" className="text-base">
+                  Limpeza
+                </SelectItem>
+                <SelectItem value="gardening" className="text-base">
+                  Jardinagem
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-slate-500">Serviço</Label>
-          <Select value={serviceType} onValueChange={setServiceType}>
-            <SelectTrigger className="h-9 w-[150px]">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="cleaning">Limpeza</SelectItem>
-              <SelectItem value="gardening">Jardinagem</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => window.print()}
+            className="gap-2 h-11 px-6 font-bold text-base"
+          >
+            <Printer className="h-5 w-5" /> PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportCSV}
+            className="gap-2 h-11 px-6 font-bold text-base"
+          >
+            <FileDown className="h-5 w-5" /> Excel
+          </Button>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader className="bg-slate-50 border-b border-gray-200">
-            <TableRow>
-              <TableHead className="font-semibold text-slate-800">Data e Hora</TableHead>
-              <TableHead className="font-semibold text-slate-800">Área / Serviço</TableHead>
-              <TableHead className="font-semibold text-slate-800">Atividade</TableHead>
-              <TableHead className="font-semibold text-slate-800">Status</TableHead>
-              <TableHead className="font-semibold text-slate-800 text-right">Ação</TableHead>
+      <div className="bg-white border-2 border-gray-300 rounded-2xl overflow-hidden shadow-md print:border-none print:shadow-none">
+        <Table className="min-w-full">
+          <TableHeader>
+            <TableRow className="bg-slate-200 hover:bg-slate-200">
+              <TableHead className="font-extrabold text-base text-slate-900 py-4 border-b-2 border-gray-300">
+                Data e Hora
+              </TableHead>
+              <TableHead className="font-extrabold text-base text-slate-900 py-4 border-b-2 border-gray-300">
+                Local / Serviço
+              </TableHead>
+              <TableHead className="font-extrabold text-base text-slate-900 py-4 border-b-2 border-gray-300">
+                Atividade
+              </TableHead>
+              <TableHead className="font-extrabold text-base text-slate-900 py-4 border-b-2 border-gray-300">
+                Status
+              </TableHead>
+              <TableHead className="font-extrabold text-base text-slate-900 py-4 border-b-2 border-gray-300 text-right print:hidden">
+                Ação
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-deepBlue" />
+                <TableCell colSpan={5} className="text-center py-12">
+                  <Loader2 className="h-10 w-10 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : schedules.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                  Nenhum registro no período.
+                <TableCell
+                  colSpan={5}
+                  className="text-center py-12 text-slate-500 font-semibold text-lg"
+                >
+                  Nenhum registro encontrado no período.
                 </TableCell>
               </TableRow>
             ) : (
@@ -208,70 +263,88 @@ export function ExecucaoTab() {
                   startOfDay(new Date()),
                 )
                 return (
-                  <TableRow key={s.id} className="hover:bg-slate-50">
-                    <TableCell className="text-slate-700 whitespace-nowrap font-medium">
-                      {s.activity_date.split('-').reverse().join('/')}{' '}
-                      <span className="text-slate-400 font-normal ml-1">
-                        {s.start_time.substring(0, 5)}
-                      </span>
+                  <TableRow
+                    key={s.id}
+                    className={cn(
+                      'transition-colors border-b-2 border-gray-200 cursor-pointer print-break-inside-avoid',
+                      s.status === 'Realizado'
+                        ? 'bg-[#f0fdf4] hover:bg-[#dcfce7]'
+                        : s.status === 'Não Realizado'
+                          ? 'bg-[#fef2f2] hover:bg-[#fee2e2]'
+                          : 'bg-[#fefce8] hover:bg-[#fef9c3]',
+                    )}
+                    onClick={() => {
+                      if (isFuture && s.status === 'Pendente')
+                        return toast({
+                          title: 'Atividade Futura',
+                          description: 'Aguarde a data para confirmar.',
+                        })
+                      setSelectedSched(s)
+                      setExecStatus(s.status === 'Pendente' ? 'Realizado' : s.status)
+                      setJustification(s.justification || '')
+                      setFile(null)
+                      setModalOpen(true)
+                    }}
+                  >
+                    <TableCell className="py-4">
+                      <div className="font-bold text-base text-slate-900">
+                        {s.activity_date.split('-').reverse().join('/')}
+                      </div>
+                      <div className="text-sm font-semibold text-slate-600 mt-0.5">
+                        {s.start_time.substring(0, 5)}{' '}
+                        {s.end_time ? `- ${s.end_time.substring(0, 5)}` : ''}
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="font-semibold text-slate-800">{s.areas?.name}</div>
-                      <div className="text-xs text-slate-500">
+                    <TableCell className="py-4">
+                      <div className="font-extrabold text-base text-slate-900">{s.areas?.name}</div>
+                      <div className="text-sm font-bold text-slate-500 mt-0.5">
                         {s.areas?.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-slate-700">{s.description}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-base font-semibold text-slate-800 py-4 max-w-[300px]">
+                      {s.description}
+                    </TableCell>
+                    <TableCell className="py-4">
                       <Badge
-                        variant="outline"
                         className={cn(
+                          'text-sm px-3 py-1 font-bold border-2',
                           s.status === 'Realizado'
-                            ? 'bg-green-100 text-green-800 border-green-200'
+                            ? 'bg-[#dcfce7] text-[#166534] border-[#86efac]'
                             : s.status === 'Não Realizado'
-                              ? 'bg-red-100 text-red-800 border-red-200'
-                              : 'bg-amber-100 text-amber-800 border-amber-200',
+                              ? 'bg-[#fee2e2] text-[#991b1b] border-[#fca5a5]'
+                              : 'bg-[#fef9c3] text-[#854d0e] border-[#fde047]',
                         )}
                       >
                         {s.status}
                       </Badge>
                       {s.justification && (
-                        <p
-                          className="text-[10px] text-red-600 mt-1 max-w-[200px] truncate"
-                          title={s.justification}
-                        >
-                          {s.justification}
+                        <p className="text-sm font-semibold text-red-700 mt-2 max-w-[250px] italic">
+                          "{s.justification}"
                         </p>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-4 print:hidden">
                       {s.status === 'Pendente' ? (
                         <Button
                           size="sm"
                           variant="tech"
                           disabled={isFuture}
-                          onClick={() => {
-                            setSelectedSched(s)
-                            setExecStatus('Realizado')
-                            setFile(null)
-                            setJustification('')
-                            setModalOpen(true)
+                          className="h-10 px-4 font-bold"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            document.getElementById(`row-${s.id}`)?.click()
                           }}
-                          className="h-8"
                         >
-                          Confirmar Execução
+                          Confirmar
                         </Button>
-                      ) : s.evidence_url ? (
-                        <a
-                          href={s.evidence_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center text-xs text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-2 py-1 rounded"
-                        >
-                          <Download className="h-3 w-3 mr-1" /> Evidência
-                        </a>
                       ) : (
-                        <span className="text-xs text-slate-400">-</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-10 px-4 font-bold bg-white/50"
+                        >
+                          Editar Status
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -283,85 +356,139 @@ export function ExecucaoTab() {
       </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Registrar Execução</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-slate-800">
+              Situação da Atividade
+            </DialogTitle>
           </DialogHeader>
           {selectedSched && (
-            <div className="space-y-5 py-2">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm">
-                <p>
-                  <span className="font-semibold">Atividade:</span> {selectedSched.description}
+            <div className="space-y-6 py-2">
+              <div className="bg-slate-100 p-4 rounded-xl border-2 border-slate-200">
+                <p className="text-base text-slate-800">
+                  <span className="font-extrabold">Atividade:</span> {selectedSched.description}
                 </p>
-                <p className="mt-1">
-                  <span className="font-semibold">Data/Hora:</span>{' '}
-                  {selectedSched.activity_date.split('-').reverse().join('/')} às{' '}
-                  {selectedSched.start_time.substring(0, 5)}
+                <p className="text-base text-slate-800 mt-2">
+                  <span className="font-extrabold">Data:</span>{' '}
+                  {selectedSched.activity_date.split('-').reverse().join('/')} (
+                  {selectedSched.start_time.substring(0, 5)} -{' '}
+                  {selectedSched.end_time?.substring(0, 5)})
+                </p>
+                <p className="text-base text-slate-800 mt-2">
+                  <span className="font-extrabold">Local:</span> {selectedSched.areas?.name}
                 </p>
               </div>
-              <div className="space-y-3">
-                <Label className="text-base">Situação da Atividade</Label>
-                <RadioGroup value={execStatus} onValueChange={setExecStatus} className="flex gap-4">
+
+              <div className="space-y-4">
+                <Label className="text-lg font-bold text-slate-800">Status da Execução</Label>
+                <RadioGroup
+                  value={execStatus}
+                  onValueChange={setExecStatus}
+                  className="grid grid-cols-2 gap-4"
+                >
                   <div
-                    className="flex items-center space-x-2 border p-3 rounded-lg flex-1 cursor-pointer hover:bg-slate-50 transition-colors"
+                    className={cn(
+                      'flex items-center space-x-3 border-2 p-4 rounded-xl cursor-pointer transition-all',
+                      execStatus === 'Realizado'
+                        ? 'bg-[#f0fdf4] border-[#86efac] shadow-sm'
+                        : 'bg-white hover:bg-slate-50 border-slate-200',
+                    )}
                     onClick={() => setExecStatus('Realizado')}
                   >
                     <RadioGroupItem value="Realizado" id="r1" />
                     <Label
                       htmlFor="r1"
-                      className="cursor-pointer text-green-700 font-semibold flex items-center"
+                      className="cursor-pointer text-[#166534] font-extrabold text-lg flex items-center"
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-1" /> Realizado
+                      <CheckCircle2 className="h-6 w-6 mr-2" /> Realizado
                     </Label>
                   </div>
                   <div
-                    className="flex items-center space-x-2 border p-3 rounded-lg flex-1 cursor-pointer hover:bg-slate-50 transition-colors"
+                    className={cn(
+                      'flex items-center space-x-3 border-2 p-4 rounded-xl cursor-pointer transition-all',
+                      execStatus === 'Não Realizado'
+                        ? 'bg-[#fef2f2] border-[#fca5a5] shadow-sm'
+                        : 'bg-white hover:bg-slate-50 border-slate-200',
+                    )}
                     onClick={() => setExecStatus('Não Realizado')}
                   >
                     <RadioGroupItem value="Não Realizado" id="r2" />
                     <Label
                       htmlFor="r2"
-                      className="cursor-pointer text-red-700 font-semibold flex items-center"
+                      className="cursor-pointer text-[#991b1b] font-extrabold text-lg flex items-center"
                     >
-                      <XCircle className="h-4 w-4 mr-1" /> Não Realizado
+                      <XCircle className="h-6 w-6 mr-2" /> Não Realizado
                     </Label>
                   </div>
                 </RadioGroup>
               </div>
 
               {execStatus === 'Realizado' && (
-                <div className="space-y-2 animate-in fade-in zoom-in-95">
-                  <Label>Anexar Evidência (Obrigatório)</Label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors">
+                <div className="space-y-3 animate-in fade-in zoom-in-95 bg-[#f0fdf4] p-4 rounded-xl border border-[#86efac]">
+                  <Label className="text-base font-bold text-[#166534]">
+                    Anexar Evidência (Obrigatório)
+                  </Label>
+                  <div className="border-2 border-dashed border-[#86efac] bg-white rounded-xl p-6 text-center hover:bg-[#f8fafc] transition-colors">
                     <Input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
-                      className="max-w-[250px] mx-auto"
+                      className="max-w-[300px] mx-auto text-base"
                     />
-                    <p className="text-xs text-slate-500 mt-2">Formatos aceitos: JPG, PNG, PDF</p>
+                    <p className="text-sm font-semibold text-slate-500 mt-3">
+                      Formatos aceitos: JPG, PNG, PDF
+                    </p>
                   </div>
+                  {selectedSched.evidence_url && !file && (
+                    <div className="mt-4 p-3 bg-white border border-[#86efac] rounded-lg">
+                      <p className="text-sm font-bold text-slate-600 mb-2">Evidência Atual:</p>
+                      <a
+                        href={selectedSched.evidence_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-base font-bold text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-3 py-2 rounded-md"
+                      >
+                        <FileText className="h-5 w-5 mr-2" /> Visualizar Arquivo
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
+
               {execStatus === 'Não Realizado' && (
-                <div className="space-y-2 animate-in fade-in zoom-in-95">
-                  <Label>Justificativa (Obrigatório)</Label>
+                <div className="space-y-3 animate-in fade-in zoom-in-95 bg-[#fef2f2] p-4 rounded-xl border border-[#fca5a5]">
+                  <Label className="text-base font-bold text-[#991b1b]">
+                    Justificativa (Obrigatório)
+                  </Label>
                   <Textarea
                     value={justification}
                     onChange={(e) => setJustification(e.target.value)}
-                    placeholder="Por que a atividade não foi realizada?"
-                    className="resize-none"
+                    placeholder="Descreva detalhadamente por que a atividade não foi realizada..."
+                    className="resize-none h-28 text-base bg-white border-2 border-[#fca5a5] focus-visible:ring-[#991b1b]"
                   />
                 </div>
               )}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setModalOpen(false)}
+              className="h-12 px-6 font-bold text-base"
+            >
               Cancelar
             </Button>
-            <Button variant="tech" onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirmar
+            <Button
+              variant="tech"
+              onClick={handleSave}
+              disabled={
+                isSaving ||
+                (execStatus === 'Realizado' && !file && !selectedSched?.evidence_url) ||
+                (execStatus === 'Não Realizado' && !justification)
+              }
+              className="h-12 px-8 font-bold text-base"
+            >
+              {isSaving && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>
