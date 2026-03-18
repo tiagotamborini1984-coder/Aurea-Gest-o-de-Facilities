@@ -20,6 +20,12 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
 
+// Limpeza e Jardinagem Pages
+import AreasLJ from './pages/gestao-terceiros/limpeza-jardinagem/Areas'
+import CronogramaLJ from './pages/gestao-terceiros/limpeza-jardinagem/Cronograma'
+import DashboardLJ from './pages/gestao-terceiros/limpeza-jardinagem/Dashboard'
+import RelatoriosLJ from './pages/gestao-terceiros/limpeza-jardinagem/Relatorios'
+
 const App = () => (
   <AuthProvider>
     <AppProvider>
@@ -35,12 +41,21 @@ const App = () => (
                 <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
                 <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                 <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
+
+                {/* Limpeza e Jardinagem */}
+                <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
+                <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
+                <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
+                <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
+
+                {/* Encomendas */}
                 <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
                 <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
                 <Route
                   path="/gestao-terceiros/encomendas/configuracoes"
                   element={<ConfiguracoesEncomendas />}
                 />
+
                 <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
                 <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
                 <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
