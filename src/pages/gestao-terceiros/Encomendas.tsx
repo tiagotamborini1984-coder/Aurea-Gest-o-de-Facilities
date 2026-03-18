@@ -33,6 +33,8 @@ import {
   CalendarDays,
   Inbox,
   Edit,
+  Paperclip,
+  FileText,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -57,6 +59,14 @@ export default function Encomendas() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
+  const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false)
+  const [dischargePkg, setDischargePkg] = useState<any>(null)
+  const [dischargeForm, setDischargeForm] = useState({
+    date: '',
+    responsible: '',
+  })
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -69,6 +79,7 @@ export default function Encomendas() {
     observations: '',
     status: 'Aguardando Retirada',
     protocol_number: '',
+    attachment_url: '',
   })
 
   const authPlants = useMemo(() => {
@@ -110,6 +121,7 @@ export default function Encomendas() {
 
   const openAdd = () => {
     setEditingPackageId(null)
+    setSelectedFile(null)
     setForm({
       plant_id:
         filterPlant !== 'all' ? filterPlant : authPlants.length === 1 ? authPlants[0].id : '',
@@ -122,12 +134,14 @@ export default function Encomendas() {
       observations: '',
       status: 'Aguardando Retirada',
       protocol_number: '',
+      attachment_url: '',
     })
     setIsModalOpen(true)
   }
 
   const openEdit = (pkg: any) => {
     setEditingPackageId(pkg.id)
+    setSelectedFile(null)
     setForm({
       plant_id: pkg.plant_id,
       package_type_id: pkg.package_type_id || 'none',
@@ -139,8 +153,18 @@ export default function Encomendas() {
       observations: pkg.observations || '',
       status: pkg.status,
       protocol_number: pkg.protocol_number,
+      attachment_url: pkg.attachment_url || '',
     })
     setIsModalOpen(true)
+  }
+
+  const openDischarge = (pkg: any) => {
+    setDischargePkg(pkg)
+    setDischargeForm({
+      date: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      responsible: '',
+    })
+    setIsDischargeModalOpen(true)
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -157,6 +181,26 @@ export default function Encomendas() {
     setIsSubmitting(true)
 
     try {
+      let attachment_url = form.attachment_url
+
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+        const filePath = `${profile!.client_id}/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('package-attachments')
+          .upload(filePath, selectedFile)
+
+        if (uploadError) throw uploadError
+
+        const { data: publicUrlData } = supabase.storage
+          .from('package-attachments')
+          .getPublicUrl(filePath)
+
+        attachment_url = publicUrlData.publicUrl
+      }
+
       if (editingPackageId) {
         const payload: any = {
           plant_id: form.plant_id,
@@ -168,6 +212,7 @@ export default function Encomendas() {
           tracking_code: form.tracking_code,
           observations: form.observations,
           status: form.status,
+          attachment_url,
         }
 
         if (form.status === 'Entregue') {
@@ -177,6 +222,7 @@ export default function Encomendas() {
           }
         } else {
           payload.delivery_date = null
+          payload.pickup_responsible = null
         }
 
         const { error } = await supabase
@@ -223,6 +269,7 @@ export default function Encomendas() {
           tracking_code: form.tracking_code,
           observations: form.observations,
           status: form.status,
+          attachment_url,
         }
 
         const { error } = await supabase.from('packages' as any).insert(payload)
@@ -260,23 +307,37 @@ export default function Encomendas() {
     }
   }
 
-  const handleDischarge = async (id: string) => {
-    const { error } = await supabase
-      .from('packages' as any)
-      .update({
-        status: 'Entregue',
-        delivery_date: new Date().toISOString(),
-      })
-      .eq('id', id)
+  const handleDischargeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!dischargeForm.responsible || !dischargeForm.date) return
+    setIsSubmitting(true)
 
-    if (error) {
-      toast({ title: 'Erro ao dar baixa', variant: 'destructive' })
-    } else {
+    try {
+      const { error } = await supabase
+        .from('packages' as any)
+        .update({
+          status: 'Entregue',
+          delivery_date: new Date(dischargeForm.date).toISOString(),
+          pickup_responsible: dischargeForm.responsible,
+        })
+        .eq('id', dischargePkg.id)
+
+      if (error) throw error
+
       toast({
         title: 'Baixa realizada com sucesso!',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
+      setIsDischargeModalOpen(false)
       loadPackages()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao dar baixa',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -496,6 +557,22 @@ export default function Encomendas() {
                         <TableCell>
                           <div className="font-medium text-slate-800">{pkg.recipient_name}</div>
                           <div className="text-xs text-slate-500">{pkg.sender} (Remetente)</div>
+                          {pkg.attachment_url && (
+                            <a
+                              href={pkg.attachment_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-brand-deepBlue text-xs flex items-center hover:underline mt-1 w-fit"
+                            >
+                              <Paperclip className="w-3 h-3 mr-1" /> Visualizar Anexo
+                            </a>
+                          )}
+                          {pkg.status === 'Entregue' && pkg.pickup_responsible && (
+                            <div className="text-xs text-green-700 mt-1 font-medium flex items-center">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Retirado por: {pkg.pickup_responsible}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-slate-700 hidden lg:table-cell">
                           {packageTypes.find((t) => t.id === pkg.package_type_id)?.name || '-'}
@@ -533,8 +610,8 @@ export default function Encomendas() {
                             {pkg.status === 'Aguardando Retirada' && (
                               <Button
                                 size="sm"
-                                onClick={() => handleDischarge(pkg.id)}
-                                className="bg-brand-deepBlue hover:bg-brand-deepBlue/90 text-white text-xs h-8 whitespace-nowrap"
+                                onClick={() => openDischarge(pkg)}
+                                className="bg-brand-deepBlue hover:bg-brand-deepBlue/90 text-white text-xs h-8 whitespace-nowrap shadow-sm"
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1 sm:mr-1.5" />{' '}
                                 <span className="hidden sm:inline">Dar Baixa</span>
@@ -826,6 +903,25 @@ export default function Encomendas() {
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
+                <Label className="text-slate-700">Anexar Arquivo</Label>
+                <Input
+                  type="file"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="bg-white border-slate-200 text-slate-800"
+                  accept="image/*,.pdf,.doc,.docx"
+                />
+                {form.attachment_url && !selectedFile && (
+                  <a
+                    href={form.attachment_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand-deepBlue text-xs flex items-center hover:underline mt-1 w-fit"
+                  >
+                    <FileText className="w-3 h-3 mr-1" /> Visualizar anexo atual
+                  </a>
+                )}
+              </div>
+              <div className="space-y-2 sm:col-span-2">
                 <Label className="text-slate-700">Observações</Label>
                 <Textarea
                   value={form.observations}
@@ -847,6 +943,51 @@ export default function Encomendas() {
               <Button type="submit" variant="tech" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}{' '}
                 {editingPackageId ? 'Salvar' : 'Salvar & Notificar'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDischargeModalOpen} onOpenChange={setIsDischargeModalOpen}>
+        <DialogContent className="sm:max-w-md bg-white border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-slate-800">Confirmar Retirada</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleDischargeSubmit} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-slate-700">Data de Retirada *</Label>
+              <Input
+                type="datetime-local"
+                value={dischargeForm.date}
+                onChange={(e) => setDischargeForm({ ...dischargeForm, date: e.target.value })}
+                required
+                className="bg-white border-slate-200 text-slate-800"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-700">Responsável pela Retirada *</Label>
+              <Input
+                value={dischargeForm.responsible}
+                onChange={(e) =>
+                  setDischargeForm({ ...dischargeForm, responsible: e.target.value })
+                }
+                required
+                placeholder="Nome da pessoa que retirou"
+                className="bg-white border-slate-200 text-slate-800"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDischargeModalOpen(false)}
+                className="text-slate-700 border-gray-300"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" variant="tech" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar
               </Button>
             </div>
           </form>
