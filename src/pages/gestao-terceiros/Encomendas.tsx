@@ -283,16 +283,21 @@ export default function Encomendas() {
         setIsModalOpen(false)
         loadPackages()
 
-        await supabase.functions.invoke('package-notifications', {
-          body: {
-            recipient_email: form.recipient_email,
-            recipient_name: form.recipient_name,
-            protocol_number: protocol,
-            sender: form.sender,
-            arrival_date: form.arrival_date,
-            plant_name: plants.find((p) => p.id === form.plant_id)?.name || 'sua unidade',
-          },
-        })
+        // Invoke notification safely without crashing if fetch fails
+        supabase.functions
+          .invoke('package-notifications', {
+            body: {
+              recipient_email: form.recipient_email,
+              recipient_name: form.recipient_name,
+              protocol_number: protocol,
+              sender: form.sender,
+              arrival_date: form.arrival_date,
+              plant_name: plants.find((p) => p.id === form.plant_id)?.name || 'sua unidade',
+            },
+          })
+          .catch((err) => {
+            console.error('Failed to invoke package-notifications:', err)
+          })
       }
     } catch (err: any) {
       toast({
