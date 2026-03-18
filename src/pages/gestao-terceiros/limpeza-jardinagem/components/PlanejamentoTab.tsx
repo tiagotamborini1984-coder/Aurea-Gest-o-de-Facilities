@@ -24,6 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ChevronLeft, ChevronRight, Loader2, Trash2, Plus } from 'lucide-react'
@@ -90,9 +96,20 @@ export function PlanejamentoTab() {
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   )
+
   const allSlots = useMemo(() => {
     const base = Array.from({ length: 13 }, (_, i) => `${(i + 6).toString().padStart(2, '0')}:00`)
-    return Array.from(new Set([...base, ...extraSlots])).sort()
+    const combined = [...base, ...extraSlots].sort()
+
+    return combined.map((time, idx) => {
+      const occurrenceIndex = combined.slice(0, idx).filter((t) => t === time).length
+      const totalOccurrences = combined.filter((t) => t === time).length
+      return {
+        time,
+        occurrenceIndex,
+        isLastOccurrence: occurrenceIndex === totalOccurrences - 1,
+      }
+    })
   }, [extraSlots])
 
   const handleSave = async () => {
@@ -193,7 +210,9 @@ export function PlanejamentoTab() {
         <Table className="min-w-[800px]">
           <TableHeader className="bg-slate-50 border-b border-gray-200">
             <TableRow>
-              <TableHead className="w-[80px] text-center font-semibold">Horário</TableHead>
+              <TableHead className="w-[80px] text-center font-semibold border-r border-gray-200">
+                Horário
+              </TableHead>
               {days.map((d) => (
                 <TableHead
                   key={d.toISOString()}
@@ -216,85 +235,120 @@ export function PlanejamentoTab() {
                 </TableCell>
               </TableRow>
             ) : (
-              allSlots.map((time) => (
-                <TableRow key={time}>
-                  <TableCell className="font-medium text-xs text-slate-500 text-center relative group p-0">
-                    <span className="py-2 inline-block">{time}</span>
-                    {time.endsWith(':00') && (
-                      <button
-                        onClick={() => {
-                          const newTime = time.replace(':00', ':30')
-                          if (!extraSlots.includes(newTime)) setExtraSlots([...extraSlots, newTime])
-                        }}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-brand-deepBlue text-white rounded p-0.5"
-                        title="Adicionar meia hora"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
+              allSlots.map((slot, rowIdx) => {
+                const time = slot.time
+                return (
+                  <TableRow
+                    key={`${time}-${slot.occurrenceIndex}`}
+                    className={cn(
+                      'group hover:bg-slate-50/80 transition-colors',
+                      rowIdx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white',
                     )}
-                  </TableCell>
-                  {days.map((d) => {
-                    const cDate = format(d, 'yyyy-MM-dd')
-                    const cScheds = schedules.filter(
-                      (s) => s.activity_date === cDate && s.start_time.startsWith(time),
-                    )
-                    const locked = isSameDay(d, new Date()) || isBefore(d, startOfDay(new Date()))
-
-                    return (
-                      <TableCell
-                        key={d.toISOString()}
-                        className={cn(
-                          'border-l border-gray-100 align-top p-1.5 h-16 min-w-[120px]',
-                          locked ? 'bg-slate-50/70' : 'hover:bg-slate-50 cursor-pointer',
-                        )}
-                        onClick={(e) => {
-                          if (e.target === e.currentTarget && !locked) {
-                            setModalData({
-                              date: cDate,
-                              time,
-                              area_id: '',
-                              description: '',
-                              id: null,
-                            })
-                            setModalOpen(true)
-                          } else if (locked && e.target === e.currentTarget)
-                            toast({
-                              title: 'Bloqueado',
-                              description: 'Não é possível alterar registros desta data.',
-                            })
-                        }}
-                      >
-                        <div className="space-y-1">
-                          {cScheds.map((cs) => (
-                            <div
-                              key={cs.id}
+                  >
+                    <TableCell className="font-medium text-xs text-slate-500 text-center relative p-0 border-r border-gray-100">
+                      <span className="py-2 inline-block">{time}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-brand-deepBlue text-white rounded p-0.5 transition-opacity shadow-sm"
+                            title="Opções de horário"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-56">
+                          {time.endsWith(':00') && (
+                            <DropdownMenuItem
                               onClick={() => {
-                                if (locked)
-                                  return toast({
-                                    title: 'Visualização Apenas',
-                                    description: 'Agendamento bloqueado para edições.',
-                                  })
-                                setModalData({
-                                  date: cDate,
-                                  time,
-                                  area_id: cs.area_id,
-                                  description: cs.description,
-                                  id: cs.id,
-                                })
-                                setModalOpen(true)
+                                const newTime = time.replace(':00', ':30')
+                                if (!extraSlots.includes(newTime))
+                                  setExtraSlots([...extraSlots, newTime])
                               }}
-                              className="text-[10px] p-1.5 bg-brand-deepBlue/10 border border-brand-deepBlue/20 text-brand-deepBlue rounded shadow-sm hover:shadow cursor-pointer"
                             >
-                              <p className="font-bold truncate">{cs.areas?.name}</p>
-                              <p className="truncate opacity-80">{cs.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
-              ))
+                              Adicionar intervalo de 30 min
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setExtraSlots([...extraSlots, time])
+                            }}
+                          >
+                            Duplicar horário
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                    {days.map((d, colIdx) => {
+                      const cDate = format(d, 'yyyy-MM-dd')
+                      const cScheds = schedules.filter(
+                        (s) => s.activity_date === cDate && s.start_time.startsWith(time),
+                      )
+
+                      const displayScheds = slot.isLastOccurrence
+                        ? cScheds.slice(slot.occurrenceIndex)
+                        : cScheds.slice(slot.occurrenceIndex, slot.occurrenceIndex + 1)
+
+                      const locked = isSameDay(d, new Date()) || isBefore(d, startOfDay(new Date()))
+
+                      return (
+                        <TableCell
+                          key={d.toISOString()}
+                          className={cn(
+                            'border-l border-gray-100 align-top p-1.5 h-16 min-w-[120px] transition-colors',
+                            colIdx % 2 === 1 && !locked && 'bg-slate-50/30',
+                            locked
+                              ? 'bg-slate-100/50 cursor-not-allowed'
+                              : 'hover:bg-slate-100/80 cursor-pointer',
+                          )}
+                          onClick={(e) => {
+                            if (e.target === e.currentTarget && !locked) {
+                              setModalData({
+                                date: cDate,
+                                time,
+                                area_id: '',
+                                description: '',
+                                id: null,
+                              })
+                              setModalOpen(true)
+                            } else if (locked && e.target === e.currentTarget)
+                              toast({
+                                title: 'Bloqueado',
+                                description: 'Não é possível alterar registros desta data.',
+                              })
+                          }}
+                        >
+                          <div className="space-y-1">
+                            {displayScheds.map((cs) => (
+                              <div
+                                key={cs.id}
+                                onClick={() => {
+                                  if (locked)
+                                    return toast({
+                                      title: 'Visualização Apenas',
+                                      description: 'Agendamento bloqueado para edições.',
+                                    })
+                                  setModalData({
+                                    date: cDate,
+                                    time,
+                                    area_id: cs.area_id,
+                                    description: cs.description,
+                                    id: cs.id,
+                                  })
+                                  setModalOpen(true)
+                                }}
+                                className="text-[10px] p-1.5 bg-brand-deepBlue/10 border border-brand-deepBlue/20 text-brand-deepBlue rounded shadow-sm hover:shadow cursor-pointer transition-all"
+                              >
+                                <p className="font-bold truncate">{cs.areas?.name}</p>
+                                <p className="truncate opacity-80">{cs.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

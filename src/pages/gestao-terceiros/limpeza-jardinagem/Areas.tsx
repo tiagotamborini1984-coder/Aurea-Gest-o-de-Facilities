@@ -19,6 +19,13 @@ export default function AreasLJ() {
         icon={Leaf as any}
         fields={
           [
+            {
+              name: 'plant_id',
+              label: 'Planta',
+              type: 'select',
+              required: true,
+              options: plants.map((p) => ({ value: p.id, label: p.name })),
+            },
             { name: 'name', label: 'Nome da Área', type: 'text', required: true },
             { name: 'description', label: 'Descrição', type: 'text' },
             {
@@ -37,9 +44,14 @@ export default function AreasLJ() {
           [
             { accessorKey: 'name', header: 'Nome' },
             {
+              accessorKey: 'plant_id',
+              header: 'Planta',
+              render: (item: any) => plants.find((p) => p.id === item.plant_id)?.name || '-',
+            },
+            {
               accessorKey: 'type',
               header: 'Tipo',
-              render: (val: string) => (val === 'cleaning' ? 'Limpeza' : 'Jardinagem'),
+              render: (item: any) => (item.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'),
             },
             { accessorKey: 'description', header: 'Descrição' },
           ] as ColumnDef[]

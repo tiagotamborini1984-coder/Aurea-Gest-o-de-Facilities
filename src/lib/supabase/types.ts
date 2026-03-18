@@ -44,6 +44,115 @@ export type Database = {
           },
         ]
       }
+      cleaning_gardening_areas: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          plant_id: string
+          type: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          plant_id: string
+          type: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          plant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'cleaning_gardening_areas_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'cleaning_gardening_areas_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      cleaning_gardening_schedules: {
+        Row: {
+          activity_date: string
+          area_id: string
+          client_id: string
+          created_at: string
+          description: string
+          evidence_url: string | null
+          id: string
+          justification: string | null
+          plant_id: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          activity_date: string
+          area_id: string
+          client_id: string
+          created_at?: string
+          description: string
+          evidence_url?: string | null
+          id?: string
+          justification?: string | null
+          plant_id: string
+          start_time: string
+          status?: string
+        }
+        Update: {
+          activity_date?: string
+          area_id?: string
+          client_id?: string
+          created_at?: string
+          description?: string
+          evidence_url?: string | null
+          id?: string
+          justification?: string | null
+          plant_id?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'cleaning_gardening_schedules_area_id_fkey'
+            columns: ['area_id']
+            isOneToOne: false
+            referencedRelation: 'cleaning_gardening_areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'cleaning_gardening_schedules_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'cleaning_gardening_schedules_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       clients: {
         Row: {
           admin_name: string
@@ -1000,6 +1109,26 @@ export const Constants = {
 //   action_type: text (not null)
 //   details: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: cleaning_gardening_areas
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   plant_id: uuid (not null)
+//   name: text (not null)
+//   description: text (nullable)
+//   type: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: cleaning_gardening_schedules
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   plant_id: uuid (not null)
+//   area_id: uuid (not null)
+//   activity_date: date (not null)
+//   start_time: time without time zone (not null)
+//   description: text (not null)
+//   status: text (not null, default: 'Pendente'::text)
+//   evidence_url: text (nullable)
+//   justification: text (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: clients
 //   id: uuid (not null, default: gen_random_uuid())
 //   name: text (not null)
@@ -1150,6 +1279,17 @@ export const Constants = {
 //   FOREIGN KEY audit_logs_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY audit_logs_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY audit_logs_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: cleaning_gardening_areas
+//   FOREIGN KEY cleaning_gardening_areas_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   PRIMARY KEY cleaning_gardening_areas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY cleaning_gardening_areas_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
+//   CHECK cleaning_gardening_areas_type_check: CHECK ((type = ANY (ARRAY['cleaning'::text, 'gardening'::text])))
+// Table: cleaning_gardening_schedules
+//   FOREIGN KEY cleaning_gardening_schedules_area_id_fkey: FOREIGN KEY (area_id) REFERENCES cleaning_gardening_areas(id) ON DELETE CASCADE
+//   FOREIGN KEY cleaning_gardening_schedules_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   PRIMARY KEY cleaning_gardening_schedules_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY cleaning_gardening_schedules_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
+//   CHECK cleaning_gardening_schedules_status_check: CHECK ((status = ANY (ARRAY['Pendente'::text, 'Realizado'::text, 'Não Realizado'::text])))
 // Table: clients
 //   PRIMARY KEY clients_pkey: PRIMARY KEY (id)
 //   UNIQUE clients_url_slug_key: UNIQUE (url_slug)
@@ -1234,6 +1374,26 @@ export const Constants = {
 // Table: audit_logs
 //   Policy "Allow authenticated full access on audit_logs" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
+// Table: cleaning_gardening_areas
+//   Policy "authenticated_delete_areas" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_insert_areas" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_areas" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_update_areas" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
+// Table: cleaning_gardening_schedules
+//   Policy "authenticated_delete_schedules" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_insert_schedules" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_schedules" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_update_schedules" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: clients
 //   Policy "Allow authenticated full access on clients" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -1361,6 +1521,10 @@ export const Constants = {
 // --- TRIGGERS ---
 // Table: audit_logs
 //   trigger_clean_audit_logs: CREATE TRIGGER trigger_clean_audit_logs AFTER INSERT ON public.audit_logs FOR EACH STATEMENT EXECUTE FUNCTION clean_old_audit_logs()
+// Table: cleaning_gardening_areas
+//   audit_cleaning_gardening_areas: CREATE TRIGGER audit_cleaning_gardening_areas AFTER INSERT OR DELETE OR UPDATE ON public.cleaning_gardening_areas FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: cleaning_gardening_schedules
+//   audit_cleaning_gardening_schedules: CREATE TRIGGER audit_cleaning_gardening_schedules AFTER INSERT OR DELETE OR UPDATE ON public.cleaning_gardening_schedules FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: daily_logs
 //   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: employees
