@@ -7,6 +7,7 @@ import {
   Target,
   GraduationCap,
   Building,
+  Package,
 } from 'lucide-react'
 
 export function useCadastrosConfig(
@@ -175,6 +176,17 @@ export function useCadastrosConfig(
             { name: 'validity_months', label: 'Validade (meses)', type: 'number', required: false },
             { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
+        }
+      case 'tipos-encomenda':
+        return {
+          title: 'Tipos de Encomenda',
+          singularName: 'Tipo',
+          subtitle: 'Categorias de pacotes e correspondências',
+          icon: Package,
+          tableName: 'package_types',
+          searchFields: ['name'],
+          columns: [{ header: 'Nome do Tipo', accessor: 'name' }],
+          fields: [{ name: 'name', label: 'Nome do Tipo', type: 'text' }],
         }
       default:
         return null

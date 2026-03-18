@@ -12,6 +12,7 @@ export function useMasterData() {
   const [goals, setGoals] = useState<any[]>([])
   const [contracted, setContracted] = useState<any[]>([])
   const [companies, setCompanies] = useState<any[]>([])
+  const [packageTypes, setPackageTypes] = useState<any[]>([])
 
   // Training Management
   const [trainings, setTrainings] = useState<any[]>([])
@@ -25,7 +26,7 @@ export function useMasterData() {
     setLoading(true)
     const cid = profile.client_id
 
-    const [pRes, fRes, eRes, gRes, empRes, cRes, lRes, tRes, frtRes, etrRes, compRes] =
+    const [pRes, fRes, eRes, gRes, empRes, cRes, lRes, tRes, frtRes, etrRes, compRes, ptRes] =
       await Promise.all([
         supabase.from('plants').select('*').eq('client_id', cid),
         supabase.from('functions').select('*').eq('client_id', cid),
@@ -50,6 +51,10 @@ export function useMasterData() {
           .from('companies' as any)
           .select('*')
           .eq('client_id', cid),
+        supabase
+          .from('package_types' as any)
+          .select('*')
+          .eq('client_id', cid),
       ])
 
     setPlants(pRes.data || [])
@@ -63,6 +68,7 @@ export function useMasterData() {
     setFunctionRequiredTrainings(frtRes.data || [])
     setEmployeeTrainingRecords(etrRes.data || [])
     setCompanies(compRes.data || [])
+    setPackageTypes(ptRes.data || [])
 
     setLoading(false)
   }, [profile?.client_id])
@@ -83,6 +89,7 @@ export function useMasterData() {
     functionRequiredTrainings,
     employeeTrainingRecords,
     companies,
+    packageTypes,
     loading,
     refetch: fetchData,
   }

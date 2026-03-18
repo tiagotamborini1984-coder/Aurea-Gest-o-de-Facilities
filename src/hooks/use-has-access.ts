@@ -9,9 +9,11 @@ export function useHasAccess(menuName: string) {
   if (profile.role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
     userMenus = [
       'Lançamentos',
+      'Encomendas',
       'Cadastros:Colaboradores',
       'Cadastros:Equipamentos',
       'Cadastros:Quadro Contratado',
+      'Cadastros:Tipos de Encomenda',
     ]
   }
 

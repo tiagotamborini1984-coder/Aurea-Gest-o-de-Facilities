@@ -13,6 +13,7 @@ export type Client = {
   secondaryColor?: string
   status: 'Ativo' | 'Inativo'
   modules: string[]
+  packageAlertDays: number
 }
 
 export type Profile = {
@@ -30,7 +31,7 @@ interface AppContextType {
   isLoadingClients: boolean
   profile: Profile | null
   activeClient: Client | null
-  addClient: (client: Omit<Client, 'id' | 'url'>) => Promise<boolean>
+  addClient: (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => Promise<boolean>
   updateClient: (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => Promise<boolean>
   deleteClient: (id: string) => Promise<boolean>
 }
@@ -81,6 +82,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               secondaryColor: data.secondary_color || undefined,
               status: data.status as 'Ativo' | 'Inativo',
               modules: (data.modules as string[]) || [],
+              packageAlertDays: (data as any).package_alert_days ?? 3,
             })
           }
         })
@@ -106,6 +108,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           secondaryColor: d.secondary_color || undefined,
           status: d.status as 'Ativo' | 'Inativo',
           modules: (d.modules as string[]) || [],
+          packageAlertDays: (d as any).package_alert_days ?? 3,
         })),
       )
     }
@@ -116,7 +119,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (user && profile?.role === 'Master') fetchClients()
   }, [user, profile])
 
-  const addClient = async (client: Omit<Client, 'id' | 'url'>) => {
+  const addClient = async (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => {
     const { data, error } = await supabase
       .from('clients')
       .insert([
@@ -150,6 +153,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       secondary_color: data.secondaryColor,
       status: data.status,
       modules: data.modules,
+      package_alert_days: data.packageAlertDays,
     }
     Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
     const { error } = await supabase.from('clients').update(payload).eq('id', id)

@@ -6,6 +6,7 @@ import DashboardGestor from './pages/gestao-terceiros/DashboardGestor'
 import Lancamentos from './pages/gestao-terceiros/Lancamentos'
 import Cadastros from './pages/gestao-terceiros/Cadastros'
 import Relatorios from './pages/gestao-terceiros/Relatorios'
+import Encomendas from './pages/gestao-terceiros/Encomendas'
 import BIDashboard from './pages/gestao-terceiros/BIDashboard'
 import Auditoria from './pages/gestao-terceiros/Auditoria'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
@@ -32,6 +33,7 @@ const App = () => (
                 <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
                 <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                 <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
+                <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
                 <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
                 <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
                 <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />

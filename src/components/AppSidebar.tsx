@@ -10,6 +10,7 @@ import {
   Building2,
   Mail,
   ChevronRight,
+  Package,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -35,6 +36,7 @@ export function AppSidebar() {
   const navItems = [
     { title: 'Dashboard Gestor', path: '/gestao-terceiros', icon: LayoutDashboard },
     { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos', icon: ClipboardList },
+    { title: 'Encomendas', path: '/gestao-terceiros/encomendas', icon: Package },
     {
       title: 'Cadastros',
       path: '/gestao-terceiros/cadastros',
@@ -48,6 +50,7 @@ export function AppSidebar() {
         { title: 'Equipamentos', path: '/gestao-terceiros/cadastros/equipamentos' },
         { title: 'Treinamentos', path: '/gestao-terceiros/cadastros/treinamentos' },
         { title: 'Quadro Contratado', path: '/gestao-terceiros/cadastros/quadro-contratado' },
+        { title: 'Tipos de Encomenda', path: '/gestao-terceiros/cadastros/tipos-encomenda' },
         { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
       ],
     },
@@ -66,9 +69,11 @@ export function AppSidebar() {
       if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
         userMenus = [
           'Lançamentos',
+          'Encomendas',
           'Cadastros:Colaboradores',
           'Cadastros:Equipamentos',
           'Cadastros:Quadro Contratado',
+          'Cadastros:Tipos de Encomenda',
         ]
       }
 
@@ -85,9 +90,11 @@ export function AppSidebar() {
         if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
           userMenus = [
             'Lançamentos',
+            'Encomendas',
             'Cadastros:Colaboradores',
             'Cadastros:Equipamentos',
             'Cadastros:Quadro Contratado',
+            'Cadastros:Tipos de Encomenda',
           ]
         }
 

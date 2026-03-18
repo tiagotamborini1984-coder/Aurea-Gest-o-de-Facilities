@@ -121,6 +121,7 @@ export type Database = {
       contracted_headcount: {
         Row: {
           client_id: string
+          company_id: string | null
           created_at: string
           equipment_id: string | null
           function_id: string | null
@@ -132,6 +133,7 @@ export type Database = {
         }
         Insert: {
           client_id: string
+          company_id?: string | null
           created_at?: string
           equipment_id?: string | null
           function_id?: string | null
@@ -143,6 +145,7 @@ export type Database = {
         }
         Update: {
           client_id?: string
+          company_id?: string | null
           created_at?: string
           equipment_id?: string | null
           function_id?: string | null
@@ -158,6 +161,13 @@ export type Database = {
             columns: ['client_id']
             isOneToOne: false
             referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'contracted_headcount_company_id_fkey'
+            columns: ['company_id']
+            isOneToOne: false
+            referencedRelation: 'companies'
             referencedColumns: ['id']
           },
           {
@@ -907,6 +917,7 @@ export const Constants = {
 //   equipment_id: uuid (nullable)
 //   quantity: integer (not null, default: 0)
 //   created_at: timestamp with time zone (not null, default: now())
+//   company_id: uuid (nullable)
 // Table: daily_logs
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -1013,6 +1024,7 @@ export const Constants = {
 //   PRIMARY KEY companies_pkey: PRIMARY KEY (id)
 // Table: contracted_headcount
 //   FOREIGN KEY contracted_headcount_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   FOREIGN KEY contracted_headcount_company_id_fkey: FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 //   FOREIGN KEY contracted_headcount_equipment_id_fkey: FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 //   FOREIGN KEY contracted_headcount_function_id_fkey: FOREIGN KEY (function_id) REFERENCES functions(id) ON DELETE CASCADE
 //   FOREIGN KEY contracted_headcount_location_id_fkey: FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE
