@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { Leaf, Sprout, Wind, Loader2 } from 'lucide-react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'

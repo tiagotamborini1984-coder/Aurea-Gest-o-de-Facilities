@@ -96,6 +96,7 @@ export type Database = {
           client_id: string
           created_at: string
           description: string
+          end_time: string | null
           evidence_url: string | null
           id: string
           justification: string | null
@@ -109,6 +110,7 @@ export type Database = {
           client_id: string
           created_at?: string
           description: string
+          end_time?: string | null
           evidence_url?: string | null
           id?: string
           justification?: string | null
@@ -122,6 +124,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           description?: string
+          end_time?: string | null
           evidence_url?: string | null
           id?: string
           justification?: string | null
@@ -1129,6 +1132,7 @@ export const Constants = {
 //   evidence_url: text (nullable)
 //   justification: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   end_time: time without time zone (nullable)
 // Table: clients
 //   id: uuid (not null, default: gen_random_uuid())
 //   name: text (not null)
