@@ -13,6 +13,7 @@ export function useHasAccess(menuName: string) {
       'Cadastros:Colaboradores',
       'Cadastros:Equipamentos',
       'Cadastros:Quadro Contratado',
+      'Limpeza e Jardinagem',
     ]
   }
 

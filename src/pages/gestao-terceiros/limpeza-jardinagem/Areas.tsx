@@ -3,12 +3,16 @@ import { Leaf } from 'lucide-react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
+import { Navigate } from 'react-router-dom'
+import { useHasAccess } from '@/hooks/use-has-access'
 
 export default function AreasLJ() {
   const { plants } = useMasterData()
   const { profile } = useAppStore()
+  const hasAccess = useHasAccess('Limpeza e Jardinagem')
 
   if (!profile) return null
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">

@@ -3,9 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Leaf } from 'lucide-react'
 import { PlanejamentoTab } from './components/PlanejamentoTab'
 import { ExecucaoTab } from './components/ExecucaoTab'
+import { Navigate } from 'react-router-dom'
+import { useHasAccess } from '@/hooks/use-has-access'
+import { useAppStore } from '@/store/AppContext'
 
 export default function Cronograma() {
   const [activeTab, setActiveTab] = useState('planejamento')
+  const { profile } = useAppStore()
+  const hasAccess = useHasAccess('Limpeza e Jardinagem')
+
+  if (!profile) return null
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 pb-12 animate-fade-in print:p-0 print:m-0 print:space-y-2">

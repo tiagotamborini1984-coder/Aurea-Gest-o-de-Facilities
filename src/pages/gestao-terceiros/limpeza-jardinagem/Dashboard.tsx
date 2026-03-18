@@ -15,10 +15,13 @@ import { supabase } from '@/lib/supabase/client'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend, ResponsiveContainer } from 'recharts'
+import { Navigate } from 'react-router-dom'
+import { useHasAccess } from '@/hooks/use-has-access'
 
 export default function DashboardLJ() {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
+  const hasAccess = useHasAccess('Limpeza e Jardinagem')
   const [plantId, setPlantId] = useState('all')
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [schedules, setSchedules] = useState<any[]>([])
@@ -84,6 +87,9 @@ export default function DashboardLJ() {
       )
       .slice(0, 10)
   }, [schedules])
+
+  if (!profile) return null
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-fade-in">

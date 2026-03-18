@@ -24,10 +24,13 @@ import { supabase } from '@/lib/supabase/client'
 import { format, subDays } from 'date-fns'
 import { exportToCSV } from '@/lib/export'
 import { Badge } from '@/components/ui/badge'
+import { Navigate } from 'react-router-dom'
+import { useHasAccess } from '@/hooks/use-has-access'
 
 export default function RelatoriosLJ() {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
+  const hasAccess = useHasAccess('Limpeza e Jardinagem')
   const [plantId, setPlantId] = useState('all')
   const [serviceType, setServiceType] = useState('all')
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
@@ -74,6 +77,9 @@ export default function RelatoriosLJ() {
     }))
     exportToCSV(`Relatorio_Limpeza_Jardinagem_${format(new Date(), 'yyyyMMdd')}.csv`, exportData)
   }
+
+  if (!profile) return null
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 pb-12 animate-fade-in print:max-w-none">

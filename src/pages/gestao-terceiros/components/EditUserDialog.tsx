@@ -28,6 +28,7 @@ const MAIN_MENUS = [
   'Log de Auditoria',
   'Usuários',
   'Encomendas',
+  'Limpeza e Jardinagem',
 ]
 
 const CADASTROS_SUBMENUS = [
