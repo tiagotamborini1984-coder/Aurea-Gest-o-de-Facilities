@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ import {
   AlertTriangle,
   CalendarDays,
   Inbox,
+  Edit,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -54,6 +56,7 @@ export default function Encomendas() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [editingPackageId, setEditingPackageId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -64,6 +67,8 @@ export default function Encomendas() {
     recipient_email: '',
     tracking_code: '',
     observations: '',
+    status: 'Aguardando Retirada',
+    protocol_number: '',
   })
 
   const authPlants = useMemo(() => {
@@ -104,6 +109,7 @@ export default function Encomendas() {
   }, [profile?.client_id])
 
   const openAdd = () => {
+    setEditingPackageId(null)
     setForm({
       plant_id:
         filterPlant !== 'all' ? filterPlant : authPlants.length === 1 ? authPlants[0].id : '',
@@ -114,73 +120,138 @@ export default function Encomendas() {
       recipient_email: '',
       tracking_code: '',
       observations: '',
+      status: 'Aguardando Retirada',
+      protocol_number: '',
+    })
+    setIsModalOpen(true)
+  }
+
+  const openEdit = (pkg: any) => {
+    setEditingPackageId(pkg.id)
+    setForm({
+      plant_id: pkg.plant_id,
+      package_type_id: pkg.package_type_id || 'none',
+      arrival_date: pkg.arrival_date,
+      sender: pkg.sender,
+      recipient_name: pkg.recipient_name,
+      recipient_email: pkg.recipient_email,
+      tracking_code: pkg.tracking_code || '',
+      observations: pkg.observations || '',
+      status: pkg.status,
+      protocol_number: pkg.protocol_number,
     })
     setIsModalOpen(true)
   }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.plant_id || !form.sender || !form.recipient_name || !form.recipient_email) return
+    if (
+      !form.plant_id ||
+      !form.sender ||
+      !form.recipient_name ||
+      !form.recipient_email ||
+      !form.arrival_date ||
+      !form.status
+    )
+      return
     setIsSubmitting(true)
 
     try {
-      const year = new Date(form.arrival_date).getFullYear()
-
-      const { data: latest } = await supabase
-        .from('packages' as any)
-        .select('protocol_number')
-        .eq('client_id', profile!.client_id)
-        .like('protocol_number', `ENC-${year}-%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      let seq = 1
-      if (latest && latest.length > 0) {
-        const parts = latest[0].protocol_number.split('-')
-        if (parts.length === 3) {
-          seq = parseInt(parts[2], 10) + 1
-        }
-      }
-      const protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
-
-      const payload = {
-        client_id: profile!.client_id,
-        plant_id: form.plant_id,
-        package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
-        protocol_number: protocol,
-        arrival_date: form.arrival_date,
-        sender: form.sender,
-        recipient_name: form.recipient_name,
-        recipient_email: form.recipient_email,
-        tracking_code: form.tracking_code,
-        observations: form.observations,
-        status: 'Aguardando Retirada',
-      }
-
-      const { error } = await supabase.from('packages' as any).insert(payload)
-      if (error) throw error
-
-      toast({
-        title: 'Encomenda registrada com sucesso!',
-        description: `Protocolo: ${protocol}`,
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-      setIsModalOpen(false)
-      loadPackages()
-
-      await supabase.functions.invoke('package-notifications', {
-        body: {
-          recipient_email: form.recipient_email,
-          recipient_name: form.recipient_name,
-          protocol_number: protocol,
-          sender: form.sender,
+      if (editingPackageId) {
+        const payload: any = {
+          plant_id: form.plant_id,
+          package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
           arrival_date: form.arrival_date,
-          plant_name: plants.find((p) => p.id === form.plant_id)?.name || 'sua unidade',
-        },
-      })
+          sender: form.sender,
+          recipient_name: form.recipient_name,
+          recipient_email: form.recipient_email,
+          tracking_code: form.tracking_code,
+          observations: form.observations,
+          status: form.status,
+        }
+
+        if (form.status === 'Entregue') {
+          const pkg = packages.find((p) => p.id === editingPackageId)
+          if (!pkg?.delivery_date) {
+            payload.delivery_date = new Date().toISOString()
+          }
+        } else {
+          payload.delivery_date = null
+        }
+
+        const { error } = await supabase
+          .from('packages' as any)
+          .update(payload)
+          .eq('id', editingPackageId)
+        if (error) throw error
+
+        toast({
+          title: 'Encomenda atualizada com sucesso!',
+          className: 'bg-green-50 text-green-900 border-green-200',
+        })
+        setIsModalOpen(false)
+        loadPackages()
+      } else {
+        const year = new Date(form.arrival_date).getFullYear()
+
+        const { data: latest } = await supabase
+          .from('packages' as any)
+          .select('protocol_number')
+          .eq('client_id', profile!.client_id)
+          .like('protocol_number', `ENC-${year}-%`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        let seq = 1
+        if (latest && latest.length > 0) {
+          const parts = latest[0].protocol_number.split('-')
+          if (parts.length === 3) {
+            seq = parseInt(parts[2], 10) + 1
+          }
+        }
+        const protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
+
+        const payload = {
+          client_id: profile!.client_id,
+          plant_id: form.plant_id,
+          package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
+          protocol_number: protocol,
+          arrival_date: form.arrival_date,
+          sender: form.sender,
+          recipient_name: form.recipient_name,
+          recipient_email: form.recipient_email,
+          tracking_code: form.tracking_code,
+          observations: form.observations,
+          status: form.status,
+        }
+
+        const { error } = await supabase.from('packages' as any).insert(payload)
+        if (error) throw error
+
+        toast({
+          title: 'Encomenda registrada com sucesso!',
+          description: `Protocolo: ${protocol}`,
+          className: 'bg-green-50 text-green-900 border-green-200',
+        })
+        setIsModalOpen(false)
+        loadPackages()
+
+        await supabase.functions.invoke('package-notifications', {
+          body: {
+            recipient_email: form.recipient_email,
+            recipient_name: form.recipient_name,
+            protocol_number: protocol,
+            sender: form.sender,
+            arrival_date: form.arrival_date,
+            plant_name: plants.find((p) => p.id === form.plant_id)?.name || 'sua unidade',
+          },
+        })
+      }
     } catch (err: any) {
       toast({
-        title: 'Erro ao registrar encomenda',
+        title: editingPackageId
+          ? 'Erro ao atualizar encomenda. Tente novamente.'
+          : 'Erro ao registrar encomenda',
         description: err.message,
         variant: 'destructive',
       })
@@ -360,6 +431,7 @@ export default function Encomendas() {
                   <SelectItem value="all">Todos os Status</SelectItem>
                   <SelectItem value="Aguardando Retirada">Aguardando Retirada</SelectItem>
                   <SelectItem value="Entregue">Entregue</SelectItem>
+                  <SelectItem value="Devolvido">Devolvido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -431,9 +503,11 @@ export default function Encomendas() {
                               'font-medium',
                               pkg.status === 'Entregue'
                                 ? 'bg-green-100 text-green-800 border-green-200'
-                                : isStale
-                                  ? 'bg-red-100 text-red-800 border-red-200 shadow-sm'
-                                  : 'bg-amber-100 text-amber-800 border-amber-200',
+                                : pkg.status === 'Devolvido'
+                                  ? 'bg-slate-100 text-slate-800 border-slate-200'
+                                  : isStale
+                                    ? 'bg-red-100 text-red-800 border-red-200 shadow-sm'
+                                    : 'bg-amber-100 text-amber-800 border-amber-200',
                             )}
                           >
                             {isStale && <AlertTriangle className="w-3 h-3 mr-1" />}
@@ -451,16 +525,27 @@ export default function Encomendas() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {pkg.status === 'Aguardando Retirada' && (
+                          <div className="flex flex-wrap items-center justify-end gap-1">
+                            {pkg.status === 'Aguardando Retirada' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleDischarge(pkg.id)}
+                                className="bg-brand-deepBlue hover:bg-brand-deepBlue/90 text-white text-xs h-8 whitespace-nowrap"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1 sm:mr-1.5" />{' '}
+                                <span className="hidden sm:inline">Dar Baixa</span>
+                              </Button>
+                            )}
                             <Button
-                              size="sm"
-                              onClick={() => handleDischarge(pkg.id)}
-                              className="bg-brand-deepBlue hover:bg-brand-deepBlue/90 text-white text-xs h-8 whitespace-nowrap"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openEdit(pkg)}
+                              className="h-8 w-8 text-slate-500 hover:text-brand-deepBlue"
+                              title="Editar"
                             >
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1 sm:mr-1.5" />{' '}
-                              <span className="hidden sm:inline">Dar Baixa</span>
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -612,15 +697,41 @@ export default function Encomendas() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Registrar Encomenda</DialogTitle>
+            <DialogTitle>
+              {editingPackageId ? 'Editar Encomenda' : 'Registrar Encomenda'}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Protocolo</Label>
+                <Input
+                  value={form.protocol_number}
+                  readOnly
+                  disabled
+                  className="bg-slate-50 text-slate-500"
+                  placeholder={editingPackageId ? '' : 'Gerado automaticamente'}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status *</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Aguardando Retirada">Aguardando Retirada</SelectItem>
+                    <SelectItem value="Entregue">Entregue</SelectItem>
+                    <SelectItem value="Devolvido">Devolvido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Planta *</Label>
                 <Select
                   value={form.plant_id}
                   onValueChange={(v) => setForm({ ...form, plant_id: v })}
+                  required
                 >
                   <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Selecione..." />
@@ -698,7 +809,7 @@ export default function Encomendas() {
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Observações</Label>
-                <Input
+                <Textarea
                   value={form.observations}
                   onChange={(e) => setForm({ ...form, observations: e.target.value })}
                   placeholder="Ex: Caixa avariada, frágil..."
@@ -710,8 +821,8 @@ export default function Encomendas() {
                 Cancelar
               </Button>
               <Button type="submit" variant="tech" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar &
-                Notificar
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}{' '}
+                {editingPackageId ? 'Salvar' : 'Salvar & Notificar'}
               </Button>
             </div>
           </form>
