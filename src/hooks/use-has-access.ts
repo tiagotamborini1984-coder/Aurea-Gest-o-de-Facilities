@@ -13,7 +13,6 @@ export function useHasAccess(menuName: string) {
       'Cadastros:Colaboradores',
       'Cadastros:Equipamentos',
       'Cadastros:Quadro Contratado',
-      'Cadastros:Tipos de Encomenda',
     ]
   }
 

@@ -31,7 +31,6 @@ import {
   AlertTriangle,
   CalendarDays,
   Inbox,
-  Settings,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -41,7 +40,7 @@ import { differenceInDays, format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
 export default function Encomendas() {
-  const { profile, activeClient, updateClient } = useAppStore()
+  const { profile, activeClient } = useAppStore()
   const { plants, packageTypes, loading: masterLoading } = useMasterData()
   const { toast } = useToast()
 
@@ -54,9 +53,7 @@ export default function Encomendas() {
   const [filterStatus, setFilterStatus] = useState('all')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [alertDays, setAlertDays] = useState(3)
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -106,12 +103,6 @@ export default function Encomendas() {
     loadPackages()
   }, [profile?.client_id])
 
-  useEffect(() => {
-    if (activeClient) {
-      setAlertDays(activeClient.packageAlertDays ?? 3)
-    }
-  }, [activeClient])
-
   const openAdd = () => {
     setForm({
       plant_id:
@@ -125,23 +116,6 @@ export default function Encomendas() {
       observations: '',
     })
     setIsModalOpen(true)
-  }
-
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!activeClient) return
-    setIsSubmitting(true)
-    const success = await updateClient(activeClient.id, { packageAlertDays: alertDays })
-    if (success) {
-      toast({
-        title: 'Configurações atualizadas com sucesso.',
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-      setIsSettingsOpen(false)
-    } else {
-      toast({ title: 'Erro ao atualizar configurações.', variant: 'destructive' })
-    }
-    setIsSubmitting(false)
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -293,13 +267,11 @@ export default function Encomendas() {
     const stalePkgs = packages.filter(
       (p) =>
         p.status === 'Aguardando Retirada' &&
-        differenceInDays(new Date(), new Date(p.arrival_date + 'T12:00:00')) > threshold,
+        differenceInDays(new Date(), new Date(p.arrival_date + 'T12:00:00')) >= threshold,
     )
 
     return { openCount, avgLead, byPlant, stalePkgs }
   }, [packages, authPlants, threshold])
-
-  const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
 
   if (masterLoading) {
     return (
@@ -318,7 +290,7 @@ export default function Encomendas() {
           </div>
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Gestão de Encomendas
+              Painel de Encomendas
             </h2>
             <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
               Registro, rastreio e entrega de correspondências
@@ -326,11 +298,6 @@ export default function Encomendas() {
           </div>
         </div>
         <div className="flex gap-2">
-          {isAdmin && (
-            <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="shadow-sm">
-              <Settings className="w-4 h-4" />
-            </Button>
-          )}
           <Button onClick={openAdd} variant="tech" className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" /> Nova Encomenda
           </Button>
@@ -340,7 +307,7 @@ export default function Encomendas() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white border border-gray-200">
           <TabsTrigger value="gestao" className="data-[state=active]:bg-slate-100">
-            Painel de Gestão
+            Lista e Gestão
           </TabsTrigger>
           <TabsTrigger
             value="relatorios"
@@ -432,7 +399,7 @@ export default function Encomendas() {
                   filteredPackages.map((pkg) => {
                     const isStale =
                       pkg.status === 'Aguardando Retirada' &&
-                      differenceInDays(new Date(), new Date(pkg.arrival_date + 'T12:00:00')) >
+                      differenceInDays(new Date(), new Date(pkg.arrival_date + 'T12:00:00')) >=
                         threshold
                     return (
                       <TableRow
@@ -641,38 +608,6 @@ export default function Encomendas() {
           </div>
         </TabsContent>
       </Tabs>
-
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Configurações de Encomendas</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSaveSettings} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Tempo limite para retirada (dias)</Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Encomendas que não forem retiradas dentro deste prazo serão marcadas como "Em
-                Atraso".
-              </p>
-              <Input
-                type="number"
-                min="1"
-                value={alertDays}
-                onChange={(e) => setAlertDays(Number(e.target.value))}
-                required
-              />
-            </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-              <Button type="button" variant="outline" onClick={() => setIsSettingsOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="tech" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-xl">

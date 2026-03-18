@@ -36,7 +36,16 @@ export function AppSidebar() {
   const navItems = [
     { title: 'Dashboard Gestor', path: '/gestao-terceiros', icon: LayoutDashboard },
     { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos', icon: ClipboardList },
-    { title: 'Encomendas', path: '/gestao-terceiros/encomendas', icon: Package },
+    {
+      title: 'Encomendas',
+      path: '/gestao-terceiros/encomendas',
+      icon: Package,
+      subItems: [
+        { title: 'Painel', path: '/gestao-terceiros/encomendas' },
+        { title: 'Tipos de Embalagem', path: '/gestao-terceiros/encomendas/tipos' },
+        { title: 'Configurações', path: '/gestao-terceiros/encomendas/configuracoes' },
+      ],
+    },
     {
       title: 'Cadastros',
       path: '/gestao-terceiros/cadastros',
@@ -50,7 +59,6 @@ export function AppSidebar() {
         { title: 'Equipamentos', path: '/gestao-terceiros/cadastros/equipamentos' },
         { title: 'Treinamentos', path: '/gestao-terceiros/cadastros/treinamentos' },
         { title: 'Quadro Contratado', path: '/gestao-terceiros/cadastros/quadro-contratado' },
-        { title: 'Tipos de Encomenda', path: '/gestao-terceiros/cadastros/tipos-encomenda' },
         { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
       ],
     },
@@ -73,7 +81,6 @@ export function AppSidebar() {
           'Cadastros:Colaboradores',
           'Cadastros:Equipamentos',
           'Cadastros:Quadro Contratado',
-          'Cadastros:Tipos de Encomenda',
         ]
       }
 
@@ -81,6 +88,9 @@ export function AppSidebar() {
         return item.subItems?.some(
           (sub) => userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
         )
+      }
+      if (item.title === 'Encomendas') {
+        return userMenus.includes('Encomendas')
       }
       return userMenus.includes(item.title)
     })
@@ -94,7 +104,6 @@ export function AppSidebar() {
             'Cadastros:Colaboradores',
             'Cadastros:Equipamentos',
             'Cadastros:Quadro Contratado',
-            'Cadastros:Tipos de Encomenda',
           ]
         }
 
