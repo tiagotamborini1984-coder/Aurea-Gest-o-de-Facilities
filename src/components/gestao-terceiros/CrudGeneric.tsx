@@ -96,11 +96,16 @@ export function CrudGeneric({
   }, [load])
 
   const openAdd = () => {
-    setForm({})
+    const initialForm: any = {}
+    if (plantField && selectedPlant !== 'all') {
+      initialForm[plantField] = selectedPlant
+    }
+    setForm(initialForm)
     setEditingItem(null)
     setFormErrors({})
     setIsModalOpen(true)
   }
+
   const openEdit = (item: any) => {
     setForm({ ...item })
     setEditingItem(item)
@@ -131,7 +136,12 @@ export function CrudGeneric({
       if (field.hidden && field.hidden(form)) continue
       if (field.required !== false && field.type !== 'toggle') {
         const val = form[field.name]
-        if (val === undefined || val === null || val === '') {
+        if (
+          val === undefined ||
+          val === null ||
+          val === '' ||
+          (typeof val === 'string' && val.trim() === '')
+        ) {
           errors[field.name] = true
           hasError = true
         }

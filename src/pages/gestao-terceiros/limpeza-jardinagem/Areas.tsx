@@ -27,7 +27,7 @@ export default function AreasLJ() {
               options: plants.map((p) => ({ value: p.id, label: p.name })),
             },
             { name: 'name', label: 'Nome da Área', type: 'text', required: true },
-            { name: 'description', label: 'Descrição', type: 'text' },
+            { name: 'description', label: 'Descrição', type: 'text', required: false },
             {
               name: 'type',
               label: 'Tipo de Serviço',
@@ -67,11 +67,15 @@ export default function AreasLJ() {
           return data
         }}
         onAdd={async (record: any) => {
+          if (!record.plant_id)
+            return { success: false, error: { message: 'A Planta é obrigatória.' } }
           const payload = { ...record, client_id: profile.client_id }
           const { error } = await supabase.from('cleaning_gardening_areas').insert(payload)
           return { success: !error, error }
         }}
         onUpdate={async (id: string, record: any) => {
+          if (!record.plant_id)
+            return { success: false, error: { message: 'A Planta é obrigatória.' } }
           const { error } = await supabase
             .from('cleaning_gardening_areas')
             .update(record)
