@@ -52,6 +52,7 @@ export type Database = {
           logo_url: string | null
           modules: Json
           name: string
+          package_alert_days: number
           primary_color: string | null
           secondary_color: string | null
           status: string
@@ -65,6 +66,7 @@ export type Database = {
           logo_url?: string | null
           modules?: Json
           name: string
+          package_alert_days?: number
           primary_color?: string | null
           secondary_color?: string | null
           status?: string
@@ -78,6 +80,7 @@ export type Database = {
           logo_url?: string | null
           modules?: Json
           name?: string
+          package_alert_days?: number
           primary_color?: string | null
           secondary_color?: string | null
           status?: string
@@ -621,6 +624,108 @@ export type Database = {
           },
         ]
       }
+      package_types: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'package_types_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      packages: {
+        Row: {
+          arrival_date: string
+          client_id: string
+          created_at: string
+          delivery_date: string | null
+          id: string
+          observations: string | null
+          package_type_id: string | null
+          plant_id: string
+          protocol_number: string
+          recipient_email: string
+          recipient_name: string
+          sender: string
+          status: string
+          tracking_code: string | null
+        }
+        Insert: {
+          arrival_date: string
+          client_id: string
+          created_at?: string
+          delivery_date?: string | null
+          id?: string
+          observations?: string | null
+          package_type_id?: string | null
+          plant_id: string
+          protocol_number: string
+          recipient_email: string
+          recipient_name: string
+          sender: string
+          status?: string
+          tracking_code?: string | null
+        }
+        Update: {
+          arrival_date?: string
+          client_id?: string
+          created_at?: string
+          delivery_date?: string | null
+          id?: string
+          observations?: string | null
+          package_type_id?: string | null
+          plant_id?: string
+          protocol_number?: string
+          recipient_email?: string
+          recipient_name?: string
+          sender?: string
+          status?: string
+          tracking_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'packages_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'packages_package_type_id_fkey'
+            columns: ['package_type_id']
+            isOneToOne: false
+            referencedRelation: 'package_types'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'packages_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       plants: {
         Row: {
           city: string
@@ -901,6 +1006,7 @@ export const Constants = {
 //   modules: jsonb (not null, default: '[]'::jsonb)
 //   created_at: timestamp with time zone (not null, default: now())
 //   updated_at: timestamp with time zone (not null, default: now())
+//   package_alert_days: integer (not null, default: 3)
 // Table: companies
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -985,6 +1091,26 @@ export const Constants = {
 //   goal_id: uuid (not null)
 //   reference_month: date (not null)
 //   value: numeric (not null, default: 0)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: package_types
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   name: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: packages
+//   id: uuid (not null, default: gen_random_uuid())
+//   client_id: uuid (not null)
+//   plant_id: uuid (not null)
+//   package_type_id: uuid (nullable)
+//   protocol_number: text (not null)
+//   arrival_date: date (not null)
+//   sender: text (not null)
+//   recipient_name: text (not null)
+//   recipient_email: text (not null)
+//   tracking_code: text (nullable)
+//   observations: text (nullable)
+//   status: text (not null, default: 'Aguardando Retirada'::text)
+//   delivery_date: timestamp with time zone (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
 // Table: plants
 //   id: uuid (not null, default: gen_random_uuid())
@@ -1076,6 +1202,15 @@ export const Constants = {
 //   PRIMARY KEY monthly_goals_data_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY monthly_goals_data_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
 //   UNIQUE monthly_goals_data_plant_id_goal_id_reference_month_key: UNIQUE (plant_id, goal_id, reference_month)
+// Table: package_types
+//   FOREIGN KEY package_types_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   PRIMARY KEY package_types_pkey: PRIMARY KEY (id)
+// Table: packages
+//   FOREIGN KEY packages_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   UNIQUE packages_client_id_protocol_number_key: UNIQUE (client_id, protocol_number)
+//   FOREIGN KEY packages_package_type_id_fkey: FOREIGN KEY (package_type_id) REFERENCES package_types(id) ON DELETE SET NULL
+//   PRIMARY KEY packages_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY packages_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE CASCADE
 // Table: plants
 //   FOREIGN KEY plants_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY plants_pkey: PRIMARY KEY (id)
@@ -1126,6 +1261,12 @@ export const Constants = {
 //     USING: true
 // Table: monthly_goals_data
 //   Policy "Allow authenticated full access on monthly_goals_data" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: package_types
+//   Policy "Allow authenticated full access on package_types" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: packages
+//   Policy "Allow authenticated full access on packages" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: plants
 //   Policy "Allow authenticated full access on plants" (ALL, PERMISSIVE) roles={authenticated}
@@ -1236,3 +1377,5 @@ export const Constants = {
 //   CREATE UNIQUE INDEX function_required_trainings_function_id_training_id_key ON public.function_required_trainings USING btree (function_id, training_id)
 // Table: monthly_goals_data
 //   CREATE UNIQUE INDEX monthly_goals_data_plant_id_goal_id_reference_month_key ON public.monthly_goals_data USING btree (plant_id, goal_id, reference_month)
+// Table: packages
+//   CREATE UNIQUE INDEX packages_client_id_protocol_number_key ON public.packages USING btree (client_id, protocol_number)

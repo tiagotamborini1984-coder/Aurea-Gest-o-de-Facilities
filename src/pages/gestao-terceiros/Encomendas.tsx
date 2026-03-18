@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   CalendarDays,
   Inbox,
+  Settings,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -40,7 +41,7 @@ import { differenceInDays, format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
 export default function Encomendas() {
-  const { profile, activeClient } = useAppStore()
+  const { profile, activeClient, updateClient } = useAppStore()
   const { plants, packageTypes, loading: masterLoading } = useMasterData()
   const { toast } = useToast()
 
@@ -53,7 +54,9 @@ export default function Encomendas() {
   const [filterStatus, setFilterStatus] = useState('all')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [alertDays, setAlertDays] = useState(3)
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -66,14 +69,34 @@ export default function Encomendas() {
     observations: '',
   })
 
+  const authPlants = useMemo(() => {
+    if (profile?.role === 'Administrador' || profile?.role === 'Master') return plants
+    const authIds = Array.isArray(profile?.authorized_plants) ? profile.authorized_plants : []
+    return plants.filter((p) => authIds.includes(p.id))
+  }, [plants, profile])
+
   const loadPackages = async () => {
     if (!profile?.client_id) return
     setLoading(true)
-    const { data } = await supabase
+
+    let query = supabase
       .from('packages' as any)
       .select('*')
       .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
+
+    if (profile.role !== 'Administrador' && profile.role !== 'Master') {
+      const authIds = Array.isArray(profile.authorized_plants) ? profile.authorized_plants : []
+      if (authIds.length > 0) {
+        query = query.in('plant_id', authIds)
+      } else {
+        setPackages([])
+        setLoading(false)
+        return
+      }
+    }
+
+    const { data } = await query
 
     setPackages(data || [])
     setLoading(false)
@@ -83,9 +106,16 @@ export default function Encomendas() {
     loadPackages()
   }, [profile?.client_id])
 
+  useEffect(() => {
+    if (activeClient) {
+      setAlertDays(activeClient.packageAlertDays ?? 3)
+    }
+  }, [activeClient])
+
   const openAdd = () => {
     setForm({
-      plant_id: filterPlant !== 'all' ? filterPlant : '',
+      plant_id:
+        filterPlant !== 'all' ? filterPlant : authPlants.length === 1 ? authPlants[0].id : '',
       package_type_id: 'none',
       arrival_date: format(new Date(), 'yyyy-MM-dd'),
       sender: '',
@@ -97,16 +127,47 @@ export default function Encomendas() {
     setIsModalOpen(true)
   }
 
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!activeClient) return
+    setIsSubmitting(true)
+    const success = await updateClient(activeClient.id, { packageAlertDays: alertDays })
+    if (success) {
+      toast({
+        title: 'Configurações atualizadas com sucesso.',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      setIsSettingsOpen(false)
+    } else {
+      toast({ title: 'Erro ao atualizar configurações.', variant: 'destructive' })
+    }
+    setIsSubmitting(false)
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.plant_id || !form.sender || !form.recipient_name || !form.recipient_email) return
     setIsSubmitting(true)
 
     try {
-      const year = new Date().getFullYear()
-      const protocol = `ENC-${year}-${Math.floor(Date.now() / 1000)
-        .toString()
-        .slice(-5)}`
+      const year = new Date(form.arrival_date).getFullYear()
+
+      const { data: latest } = await supabase
+        .from('packages' as any)
+        .select('protocol_number')
+        .eq('client_id', profile!.client_id)
+        .like('protocol_number', `ENC-${year}-%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      let seq = 1
+      if (latest && latest.length > 0) {
+        const parts = latest[0].protocol_number.split('-')
+        if (parts.length === 3) {
+          seq = parseInt(parts[2], 10) + 1
+        }
+      }
+      const protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
 
       const payload = {
         client_id: profile!.client_id,
@@ -205,7 +266,7 @@ export default function Encomendas() {
 
     const avgLead = deliveredCount > 0 ? (totalDeliveredLead / deliveredCount).toFixed(1) : '0'
 
-    const byPlant = plants
+    const byPlant = authPlants
       .map((plant) => {
         const pPkgs = packages.filter((p) => p.plant_id === plant.id)
         const pOpen = pPkgs.filter((p) => p.status === 'Aguardando Retirada').length
@@ -229,8 +290,16 @@ export default function Encomendas() {
       })
       .filter((p) => p.total > 0)
 
-    return { openCount, avgLead, byPlant }
-  }, [packages, plants])
+    const stalePkgs = packages.filter(
+      (p) =>
+        p.status === 'Aguardando Retirada' &&
+        differenceInDays(new Date(), new Date(p.arrival_date + 'T12:00:00')) > threshold,
+    )
+
+    return { openCount, avgLead, byPlant, stalePkgs }
+  }, [packages, authPlants, threshold])
+
+  const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
 
   if (masterLoading) {
     return (
@@ -256,9 +325,16 @@ export default function Encomendas() {
             </p>
           </div>
         </div>
-        <Button onClick={openAdd} variant="tech" className="w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" /> Nova Encomenda
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="shadow-sm">
+              <Settings className="w-4 h-4" />
+            </Button>
+          )}
+          <Button onClick={openAdd} variant="tech" className="w-full sm:w-auto">
+            <Plus className="w-4 h-4 mr-2" /> Nova Encomenda
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -266,8 +342,19 @@ export default function Encomendas() {
           <TabsTrigger value="gestao" className="data-[state=active]:bg-slate-100">
             Painel de Gestão
           </TabsTrigger>
-          <TabsTrigger value="relatorios" className="data-[state=active]:bg-slate-100">
+          <TabsTrigger
+            value="relatorios"
+            className="data-[state=active]:bg-slate-100 flex items-center gap-2"
+          >
             Relatórios & Métricas
+            {metrics.stalePkgs.length > 0 && (
+              <Badge
+                variant="destructive"
+                className="h-5 px-1.5 min-w-[20px] rounded-full text-[10px] flex items-center justify-center"
+              >
+                {metrics.stalePkgs.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -289,7 +376,7 @@ export default function Encomendas() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as Plantas</SelectItem>
-                  {plants.map((p) => (
+                  {authPlants.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>
@@ -447,57 +534,145 @@ export default function Encomendas() {
             </Card>
           </div>
 
-          <Card className="shadow-sm border-gray-100 overflow-hidden">
-            <CardHeader className="bg-slate-50/50 border-b border-gray-100 py-4">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-slate-500" />
-                Benchmarking por Planta
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Planta</TableHead>
-                    <TableHead className="text-center">Total Recebido</TableHead>
-                    <TableHead className="text-center">Aguardando Retirada</TableHead>
-                    <TableHead className="text-right">Lead Time Médio (Dias)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {metrics.byPlant.length === 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="shadow-sm border-gray-100 overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-gray-100 py-4">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-slate-500" />
+                  Benchmarking por Planta
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                        Sem dados suficientes.
-                      </TableCell>
+                      <TableHead>Planta</TableHead>
+                      <TableHead className="text-center">Total Recebido</TableHead>
+                      <TableHead className="text-center">Aguardando</TableHead>
+                      <TableHead className="text-right">Lead Time Médio</TableHead>
                     </TableRow>
-                  ) : (
-                    metrics.byPlant.map((p) => (
-                      <TableRow key={p.name}>
-                        <TableCell className="font-medium">{p.name}</TableCell>
-                        <TableCell className="text-center">{p.total}</TableCell>
-                        <TableCell className="text-center">
-                          <span
-                            className={cn(
-                              'px-2 py-0.5 rounded text-xs font-semibold',
-                              p.open > 0 ? 'bg-amber-100 text-amber-800' : 'text-slate-500',
-                            )}
-                          >
-                            {p.open}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-brand-deepBlue">
-                          {p.avgLeadTime}
+                  </TableHeader>
+                  <TableBody>
+                    {metrics.byPlant.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                          Sem dados suficientes.
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    ) : (
+                      metrics.byPlant.map((p) => (
+                        <TableRow key={p.name}>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell className="text-center">{p.total}</TableCell>
+                          <TableCell className="text-center">
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 rounded text-xs font-semibold',
+                                p.open > 0 ? 'bg-amber-100 text-amber-800' : 'text-slate-500',
+                              )}
+                            >
+                              {p.open}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-brand-deepBlue">
+                            {p.avgLeadTime} dias
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-red-200 overflow-hidden">
+              <CardHeader className="bg-red-50/50 border-b border-red-100 py-4">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2 text-red-800">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  Encomendas em Atraso ({metrics.stalePkgs.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="max-h-[300px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="bg-white sticky top-0 shadow-sm z-10">
+                      <TableRow>
+                        <TableHead>Protocolo</TableHead>
+                        <TableHead>Destinatário</TableHead>
+                        <TableHead className="text-right">Atraso</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {metrics.stalePkgs.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                            Nenhuma encomenda em atraso.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        metrics.stalePkgs.map((pkg) => {
+                          const days = differenceInDays(
+                            new Date(),
+                            new Date(pkg.arrival_date + 'T12:00:00'),
+                          )
+                          return (
+                            <TableRow key={pkg.id} className="bg-red-50/10">
+                              <TableCell className="font-medium text-slate-800">
+                                {pkg.protocol_number}
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm font-medium">{pkg.recipient_name}</div>
+                                <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                  {plants.find((p) => p.id === pkg.plant_id)?.name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-red-600">
+                                {days} dias
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Configurações de Encomendas</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveSettings} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Tempo limite para retirada (dias)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Encomendas que não forem retiradas dentro deste prazo serão marcadas como "Em
+                Atraso".
+              </p>
+              <Input
+                type="number"
+                min="1"
+                value={alertDays}
+                onChange={(e) => setAlertDays(Number(e.target.value))}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <Button type="button" variant="outline" onClick={() => setIsSettingsOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="tech" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-xl">
@@ -516,7 +691,7 @@ export default function Encomendas() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {plants.map((p) => (
+                    {authPlants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
                       </SelectItem>
