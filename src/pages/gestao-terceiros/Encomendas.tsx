@@ -122,8 +122,6 @@ export default function Encomendas() {
     loadPackages()
   }, [profile?.client_id])
 
-  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
-
   const openAdd = () => {
     setEditingPackageId(null)
     setSelectedFile(null)
@@ -413,6 +411,8 @@ export default function Encomendas() {
 
     return { openCount, avgLead, byPlant, stalePkgs }
   }, [packages, authPlants, threshold])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   if (masterLoading) {
     return (
