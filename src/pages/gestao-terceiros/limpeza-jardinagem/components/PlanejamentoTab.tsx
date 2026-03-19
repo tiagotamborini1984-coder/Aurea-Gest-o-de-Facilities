@@ -115,20 +115,6 @@ export function PlanejamentoTab() {
     })
   }, [extraSlots])
 
-  const calculateSpan = (start: string, end: string) => {
-    if (!end) return 1
-    const sTime = start.substring(0, 5)
-    const eTime = end.substring(0, 5)
-    const sIdx = allSlots.findIndex((s) => s.time === sTime)
-    if (sIdx === -1) return 1
-    let eIdx = allSlots.findIndex((s) => s.time === eTime)
-    if (eIdx === -1) {
-      eIdx = allSlots.findIndex((s) => s.time > eTime)
-      if (eIdx === -1) eIdx = allSlots.length
-    }
-    return Math.max(1, eIdx - sIdx)
-  }
-
   const handleSave = async () => {
     if (!modalData.area_id || !modalData.description || !modalData.end_time) return
     setIsSaving(true)
@@ -419,10 +405,9 @@ export function PlanejamentoTab() {
                         >
                           <div
                             data-slot="true"
-                            className="w-full h-full min-h-[6rem] p-1.5 relative"
+                            className="w-full h-full min-h-[6rem] p-1.5 flex flex-col gap-2"
                           >
-                            {displayScheds.map((cs, csIdx) => {
-                              const span = calculateSpan(cs.start_time, cs.end_time)
+                            {displayScheds.map((cs) => {
                               return (
                                 <div
                                   key={cs.id}
@@ -447,25 +432,16 @@ export function PlanejamentoTab() {
                                     setModalOpen(true)
                                   }}
                                   title={`${cs.description}\nStatus: ${cs.status}`}
-                                  style={{
-                                    height: `calc(${span * 100}% + ${span > 1 ? (span - 1) * 2 : 0}px)`,
-                                    top: `${csIdx * 6}px`,
-                                    left: `${csIdx * 6 + 6}px`,
-                                    right: '6px',
-                                    zIndex: 10 + csIdx,
-                                  }}
                                   className={cn(
-                                    'absolute p-3 border-2 rounded-lg shadow-sm hover:shadow-lg cursor-grab active:cursor-grabbing transition-all overflow-hidden flex flex-col',
+                                    'relative p-3 border-2 rounded-lg shadow-sm hover:shadow-lg cursor-grab active:cursor-grabbing transition-all flex flex-col break-words whitespace-normal',
                                     getStatusColor(cs.status),
                                   )}
                                 >
-                                  <p className="font-extrabold text-sm truncate">
-                                    {cs.areas?.name}
-                                  </p>
+                                  <p className="font-extrabold text-sm">{cs.areas?.name}</p>
                                   <p className="text-xs font-bold opacity-80 mt-0.5">
                                     {cs.start_time.substring(0, 5)} - {cs.end_time?.substring(0, 5)}
                                   </p>
-                                  <p className="text-sm font-medium mt-1.5 leading-tight overflow-hidden text-ellipsis line-clamp-3">
+                                  <p className="text-sm font-medium mt-1.5 leading-tight">
                                     {cs.description}
                                   </p>
                                 </div>

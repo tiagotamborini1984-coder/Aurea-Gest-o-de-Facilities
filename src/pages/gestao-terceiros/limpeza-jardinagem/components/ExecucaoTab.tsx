@@ -35,6 +35,7 @@ import { useMasterData } from '@/hooks/use-master-data'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { exportToCSV } from '@/lib/export'
+import { isExpiredPendente } from '@/lib/business-days'
 
 export function ExecucaoTab() {
   const { profile } = useAppStore()
@@ -54,6 +55,7 @@ export function ExecucaoTab() {
   const [justification, setJustification] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isViewMode, setIsViewMode] = useState(false)
 
   useEffect(() => {
     if (plants.length > 0 && !plantId) setPlantId(plants[0].id)
@@ -72,7 +74,25 @@ export function ExecucaoTab() {
       .order('start_time', { ascending: true })
 
     const { data } = await q
-    let filtered = data || []
+    let rawData = data || []
+
+    const expiredIds: string[] = []
+    rawData = rawData.map((s) => {
+      if (s.status === 'Pendente' && isExpiredPendente(s.activity_date)) {
+        expiredIds.push(s.id)
+        return { ...s, status: 'Não Realizado', justification: 'Sem preenchimento' }
+      }
+      return s
+    })
+
+    if (expiredIds.length > 0) {
+      await supabase
+        .from('cleaning_gardening_schedules')
+        .update({ status: 'Não Realizado', justification: 'Sem preenchimento' })
+        .in('id', expiredIds)
+    }
+
+    let filtered = rawData
     if (serviceType !== 'all') filtered = filtered.filter((s) => s.areas?.type === serviceType)
     setSchedules(filtered)
     setLoading(false)
@@ -83,7 +103,7 @@ export function ExecucaoTab() {
   }, [plantId, dateFrom, dateTo, serviceType, profile])
 
   const handleSave = async () => {
-    if (!selectedSched) return
+    if (!selectedSched || isViewMode) return
     if (execStatus === 'Não Realizado' && !justification)
       return toast({ variant: 'destructive', title: 'Justificativa obrigatória' })
     if (execStatus === 'Realizado' && !file && !selectedSched.evidence_url)
@@ -265,6 +285,7 @@ export function ExecucaoTab() {
                 return (
                   <TableRow
                     key={s.id}
+                    id={`row-${s.id}`}
                     className={cn(
                       'transition-colors border-b-2 border-gray-200 cursor-pointer print-break-inside-avoid',
                       s.status === 'Realizado'
@@ -279,6 +300,9 @@ export function ExecucaoTab() {
                           title: 'Atividade Futura',
                           description: 'Aguarde a data para confirmar.',
                         })
+
+                      const isView = s.status !== 'Pendente'
+                      setIsViewMode(isView)
                       setSelectedSched(s)
                       setExecStatus(s.status === 'Pendente' ? 'Realizado' : s.status)
                       setJustification(s.justification || '')
@@ -341,9 +365,13 @@ export function ExecucaoTab() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-10 px-4 font-bold bg-white/50"
+                          className="h-10 px-4 font-bold bg-white/50 text-slate-700 border-slate-300"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            document.getElementById(`row-${s.id}`)?.click()
+                          }}
                         >
-                          Editar Status
+                          Visualizar
                         </Button>
                       )}
                     </TableCell>
@@ -379,69 +407,34 @@ export function ExecucaoTab() {
                 </p>
               </div>
 
-              <div className="space-y-4">
-                <Label className="text-lg font-bold text-slate-800">Status da Execução</Label>
-                <RadioGroup
-                  value={execStatus}
-                  onValueChange={setExecStatus}
-                  className="grid grid-cols-2 gap-4"
-                >
+              {isViewMode ? (
+                <div className="space-y-4">
+                  <Label className="text-lg font-bold text-slate-800">Status da Execução</Label>
                   <div
                     className={cn(
-                      'flex items-center space-x-3 border-2 p-4 rounded-xl cursor-pointer transition-all',
-                      execStatus === 'Realizado'
-                        ? 'bg-[#f0fdf4] border-[#86efac] shadow-sm'
-                        : 'bg-white hover:bg-slate-50 border-slate-200',
+                      'flex items-center space-x-3 border-2 p-4 rounded-xl',
+                      selectedSched.status === 'Realizado'
+                        ? 'bg-[#f0fdf4] border-[#86efac]'
+                        : 'bg-[#fef2f2] border-[#fca5a5]',
                     )}
-                    onClick={() => setExecStatus('Realizado')}
                   >
-                    <RadioGroupItem value="Realizado" id="r1" />
-                    <Label
-                      htmlFor="r1"
-                      className="cursor-pointer text-[#166534] font-extrabold text-lg flex items-center"
-                    >
-                      <CheckCircle2 className="h-6 w-6 mr-2" /> Realizado
-                    </Label>
-                  </div>
-                  <div
-                    className={cn(
-                      'flex items-center space-x-3 border-2 p-4 rounded-xl cursor-pointer transition-all',
-                      execStatus === 'Não Realizado'
-                        ? 'bg-[#fef2f2] border-[#fca5a5] shadow-sm'
-                        : 'bg-white hover:bg-slate-50 border-slate-200',
+                    {selectedSched.status === 'Realizado' ? (
+                      <CheckCircle2 className="h-6 w-6 text-[#166534] mr-2" />
+                    ) : (
+                      <XCircle className="h-6 w-6 text-[#991b1b] mr-2" />
                     )}
-                    onClick={() => setExecStatus('Não Realizado')}
-                  >
-                    <RadioGroupItem value="Não Realizado" id="r2" />
-                    <Label
-                      htmlFor="r2"
-                      className="cursor-pointer text-[#991b1b] font-extrabold text-lg flex items-center"
+                    <span
+                      className={cn(
+                        'font-extrabold text-lg',
+                        selectedSched.status === 'Realizado' ? 'text-[#166534]' : 'text-[#991b1b]',
+                      )}
                     >
-                      <XCircle className="h-6 w-6 mr-2" /> Não Realizado
-                    </Label>
+                      {selectedSched.status}
+                    </span>
                   </div>
-                </RadioGroup>
-              </div>
-
-              {execStatus === 'Realizado' && (
-                <div className="space-y-3 animate-in fade-in zoom-in-95 bg-[#f0fdf4] p-4 rounded-xl border border-[#86efac]">
-                  <Label className="text-base font-bold text-[#166534]">
-                    Anexar Evidência (Obrigatório)
-                  </Label>
-                  <div className="border-2 border-dashed border-[#86efac] bg-white rounded-xl p-6 text-center hover:bg-[#f8fafc] transition-colors">
-                    <Input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
-                      className="max-w-[300px] mx-auto text-base"
-                    />
-                    <p className="text-sm font-semibold text-slate-500 mt-3">
-                      Formatos aceitos: JPG, PNG, PDF
-                    </p>
-                  </div>
-                  {selectedSched.evidence_url && !file && (
-                    <div className="mt-4 p-3 bg-white border border-[#86efac] rounded-lg">
-                      <p className="text-sm font-bold text-slate-600 mb-2">Evidência Atual:</p>
+                  {selectedSched.status === 'Realizado' && selectedSched.evidence_url && (
+                    <div className="mt-4 p-3 bg-white border-2 border-[#86efac] rounded-lg">
+                      <p className="text-sm font-bold text-slate-600 mb-2">Evidência Anexada:</p>
                       <a
                         href={selectedSched.evidence_url}
                         target="_blank"
@@ -452,44 +445,138 @@ export function ExecucaoTab() {
                       </a>
                     </div>
                   )}
+                  {selectedSched.status === 'Não Realizado' && selectedSched.justification && (
+                    <div className="space-y-3 bg-[#fef2f2] p-4 rounded-xl border-2 border-[#fca5a5]">
+                      <Label className="text-base font-bold text-[#991b1b]">Justificativa</Label>
+                      <p className="text-base text-slate-800">{selectedSched.justification}</p>
+                    </div>
+                  )}
                 </div>
-              )}
+              ) : (
+                <div className="space-y-4">
+                  <Label className="text-lg font-bold text-slate-800">Status da Execução</Label>
+                  <RadioGroup
+                    value={execStatus}
+                    onValueChange={setExecStatus}
+                    className="grid grid-cols-2 gap-4"
+                  >
+                    <div
+                      className={cn(
+                        'flex items-center space-x-3 border-2 p-4 rounded-xl cursor-pointer transition-all',
+                        execStatus === 'Realizado'
+                          ? 'bg-[#f0fdf4] border-[#86efac] shadow-sm'
+                          : 'bg-white hover:bg-slate-50 border-slate-200',
+                      )}
+                      onClick={() => setExecStatus('Realizado')}
+                    >
+                      <RadioGroupItem value="Realizado" id="r1" />
+                      <Label
+                        htmlFor="r1"
+                        className="cursor-pointer text-[#166534] font-extrabold text-lg flex items-center"
+                      >
+                        <CheckCircle2 className="h-6 w-6 mr-2" /> Realizado
+                      </Label>
+                    </div>
+                    <div
+                      className={cn(
+                        'flex items-center space-x-3 border-2 p-4 rounded-xl cursor-pointer transition-all',
+                        execStatus === 'Não Realizado'
+                          ? 'bg-[#fef2f2] border-[#fca5a5] shadow-sm'
+                          : 'bg-white hover:bg-slate-50 border-slate-200',
+                      )}
+                      onClick={() => setExecStatus('Não Realizado')}
+                    >
+                      <RadioGroupItem value="Não Realizado" id="r2" />
+                      <Label
+                        htmlFor="r2"
+                        className="cursor-pointer text-[#991b1b] font-extrabold text-lg flex items-center"
+                      >
+                        <XCircle className="h-6 w-6 mr-2" /> Não Realizado
+                      </Label>
+                    </div>
+                  </RadioGroup>
 
-              {execStatus === 'Não Realizado' && (
-                <div className="space-y-3 animate-in fade-in zoom-in-95 bg-[#fef2f2] p-4 rounded-xl border border-[#fca5a5]">
-                  <Label className="text-base font-bold text-[#991b1b]">
-                    Justificativa (Obrigatório)
-                  </Label>
-                  <Textarea
-                    value={justification}
-                    onChange={(e) => setJustification(e.target.value)}
-                    placeholder="Descreva detalhadamente por que a atividade não foi realizada..."
-                    className="resize-none h-28 text-base bg-white border-2 border-[#fca5a5] focus-visible:ring-[#991b1b]"
-                  />
+                  {execStatus === 'Realizado' && (
+                    <div className="space-y-3 animate-in fade-in zoom-in-95 bg-[#f0fdf4] p-4 rounded-xl border border-[#86efac]">
+                      <Label className="text-base font-bold text-[#166534]">
+                        Anexar Evidência (Obrigatório)
+                      </Label>
+                      <div className="border-2 border-dashed border-[#86efac] bg-white rounded-xl p-6 text-center hover:bg-[#f8fafc] transition-colors">
+                        <Input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          className="max-w-[300px] mx-auto text-base"
+                        />
+                        <p className="text-sm font-semibold text-slate-500 mt-3">
+                          Formatos aceitos: JPG, PNG, PDF
+                        </p>
+                      </div>
+                      {selectedSched.evidence_url && !file && (
+                        <div className="mt-4 p-3 bg-white border border-[#86efac] rounded-lg">
+                          <p className="text-sm font-bold text-slate-600 mb-2">Evidência Atual:</p>
+                          <a
+                            href={selectedSched.evidence_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-base font-bold text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-3 py-2 rounded-md"
+                          >
+                            <FileText className="h-5 w-5 mr-2" /> Visualizar Arquivo
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {execStatus === 'Não Realizado' && (
+                    <div className="space-y-3 animate-in fade-in zoom-in-95 bg-[#fef2f2] p-4 rounded-xl border border-[#fca5a5]">
+                      <Label className="text-base font-bold text-[#991b1b]">
+                        Justificativa (Obrigatório)
+                      </Label>
+                      <Textarea
+                        value={justification}
+                        onChange={(e) => setJustification(e.target.value)}
+                        placeholder="Descreva detalhadamente por que a atividade não foi realizada..."
+                        className="resize-none h-28 text-base bg-white border-2 border-[#fca5a5] focus-visible:ring-[#991b1b]"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
           <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setModalOpen(false)}
-              className="h-12 px-6 font-bold text-base"
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="tech"
-              onClick={handleSave}
-              disabled={
-                isSaving ||
-                (execStatus === 'Realizado' && !file && !selectedSched?.evidence_url) ||
-                (execStatus === 'Não Realizado' && !justification)
-              }
-              className="h-12 px-8 font-bold text-base"
-            >
-              {isSaving && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Confirmar
-            </Button>
+            {isViewMode ? (
+              <Button
+                variant="outline"
+                onClick={() => setModalOpen(false)}
+                className="h-12 px-8 font-bold text-base bg-slate-100 border-slate-300"
+              >
+                Fechar
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setModalOpen(false)}
+                  className="h-12 px-6 font-bold text-base"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="tech"
+                  onClick={handleSave}
+                  disabled={
+                    isSaving ||
+                    (execStatus === 'Realizado' && !file && !selectedSched?.evidence_url) ||
+                    (execStatus === 'Não Realizado' && !justification)
+                  }
+                  className="h-12 px-8 font-bold text-base"
+                >
+                  {isSaving && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Confirmar
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

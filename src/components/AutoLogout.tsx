@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
-const TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 const WARNING_MS = 60 * 1000 // 60 seconds
 
 export function AutoLogout() {
