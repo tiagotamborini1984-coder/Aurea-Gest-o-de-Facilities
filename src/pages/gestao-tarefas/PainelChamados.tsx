@@ -23,6 +23,8 @@ import {
   Inbox,
   ListFilter,
   PauseCircle,
+  X,
+  Paperclip,
 } from 'lucide-react'
 import {
   Select,
@@ -64,7 +66,7 @@ export default function PainelChamados() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
   const [selectedTask, setSelectedTask] = useState<any>(null)
 
@@ -122,8 +124,18 @@ export default function PainelChamados() {
       return
     }
     setForm({ plant_id: '', type_id: '', assignee_id: '', title: '', description: '' })
-    setSelectedFile(null)
+    setSelectedFiles([])
     setIsModalOpen(true)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,21 +145,25 @@ export default function PainelChamados() {
     setIsSubmitting(true)
 
     try {
-      let attachment_url = null
-      if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-        const filePath = `${profile.client_id}/${fileName}`
+      let attachment_urls: string[] = []
 
-        const { error: uploadError } = await supabase.storage
-          .from('task-attachments')
-          .upload(filePath, selectedFile)
-        if (uploadError) throw uploadError
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+          const filePath = `${profile.client_id}/${fileName}`
 
-        const { data: publicUrlData } = supabase.storage
-          .from('task-attachments')
-          .getPublicUrl(filePath)
-        attachment_url = publicUrlData.publicUrl
+          const { error: uploadError } = await supabase.storage
+            .from('task-attachments')
+            .upload(filePath, file)
+          if (uploadError) throw uploadError
+
+          const { data: publicUrlData } = supabase.storage
+            .from('task-attachments')
+            .getPublicUrl(filePath)
+
+          attachment_urls.push(publicUrlData.publicUrl)
+        }
       }
 
       const year = new Date().getFullYear()
@@ -180,7 +196,8 @@ export default function PainelChamados() {
           task_number: taskNumber,
           title: form.title,
           description: form.description,
-          attachment_url,
+          attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
+          attachment_urls,
           status_updated_at: new Date().toISOString(),
         } as any)
         .select()
@@ -416,7 +433,7 @@ export default function PainelChamados() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Chamado</DialogTitle>
           </DialogHeader>
@@ -499,12 +516,40 @@ export default function PainelChamados() {
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label>Anexo</Label>
+                <Label>Anexos (Opcional)</Label>
                 <Input
                   type="file"
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  accept="image/*,.pdf,.doc,.docx"
+                  multiple
+                  onChange={handleFileChange}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  className="cursor-pointer file:cursor-pointer"
                 />
+                {selectedFiles.length > 0 && (
+                  <div className="flex flex-col gap-2 mt-3">
+                    {selectedFiles.map((file, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <Paperclip className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="text-sm font-medium text-slate-700 truncate">
+                            {file.name}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                          onClick={() => removeFile(i)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-4">

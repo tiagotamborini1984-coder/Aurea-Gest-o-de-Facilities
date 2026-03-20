@@ -87,6 +87,12 @@ export function TaskDetailsSheet({
   const getAssigneeName = (id: string) =>
     users.find((u: any) => u.id === id)?.name || 'Desconhecido'
 
+  const attachmentUrls: string[] = task?.attachment_urls?.length
+    ? task.attachment_urls
+    : task?.attachment_url
+      ? [task.attachment_url]
+      : []
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="sm:max-w-xl flex flex-col h-full p-0 bg-slate-50 border-l border-gray-200">
@@ -108,15 +114,25 @@ export function TaskDetailsSheet({
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
             <h4 className="font-semibold text-slate-800 mb-2">Descrição</h4>
             <p className="text-slate-600 text-sm whitespace-pre-wrap">{task?.description}</p>
-            {task?.attachment_url && (
-              <a
-                href={task.attachment_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center mt-4 text-sm text-brand-deepBlue hover:underline"
-              >
-                <Paperclip className="w-4 h-4 mr-1" /> Ver Anexo
-              </a>
+
+            {attachmentUrls.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <h5 className="text-sm font-medium text-slate-700 mb-3">Anexos</h5>
+                <div className="flex flex-col gap-2">
+                  {attachmentUrls.map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center p-2 rounded-md bg-slate-50 border border-slate-200 text-sm text-brand-deepBlue hover:bg-slate-100 transition-colors w-fit"
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Anexo {i + 1}
+                    </a>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
