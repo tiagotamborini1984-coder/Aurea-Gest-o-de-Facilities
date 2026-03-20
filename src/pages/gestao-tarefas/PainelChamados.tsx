@@ -72,6 +72,7 @@ export default function PainelChamados() {
     plant_id: '',
     type_id: '',
     assignee_id: '',
+    title: '',
     description: '',
   })
 
@@ -120,14 +121,15 @@ export default function PainelChamados() {
       })
       return
     }
-    setForm({ plant_id: '', type_id: '', assignee_id: '', description: '' })
+    setForm({ plant_id: '', type_id: '', assignee_id: '', title: '', description: '' })
     setSelectedFile(null)
     setIsModalOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.plant_id || !form.type_id || !form.assignee_id || !form.description) return
+    if (!form.plant_id || !form.type_id || !form.assignee_id || !form.title || !form.description)
+      return
     setIsSubmitting(true)
 
     try {
@@ -176,10 +178,11 @@ export default function PainelChamados() {
           requester_id: profile.id,
           assignee_id: form.assignee_id,
           task_number: taskNumber,
+          title: form.title,
           description: form.description,
           attachment_url,
           status_updated_at: new Date().toISOString(),
-        })
+        } as any)
         .select()
         .single()
 
@@ -212,6 +215,7 @@ export default function PainelChamados() {
     const matchAssignee = filterAssignee === 'all' || t.assignee_id === filterAssignee
     const matchSearch =
       t.task_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.title && t.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
       t.description.toLowerCase().includes(searchTerm.toLowerCase())
 
     let matchTab = true
@@ -271,7 +275,7 @@ export default function PainelChamados() {
           <div className="flex-1 flex items-center px-3 gap-2 xl:border-r border-gray-200">
             <Search className="w-5 h-5 text-slate-500" />
             <Input
-              placeholder="Buscar protocolo ou descrição..."
+              placeholder="Buscar protocolo, nome ou descrição..."
               className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -332,6 +336,7 @@ export default function PainelChamados() {
           <TableHeader className="bg-slate-50/80 border-b border-gray-200">
             <TableRow>
               <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
+              <TableHead className="font-semibold text-slate-800">Nome</TableHead>
               <TableHead className="font-semibold text-slate-800">Planta</TableHead>
               <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
               <TableHead className="font-semibold text-slate-800">Solicitante</TableHead>
@@ -344,13 +349,13 @@ export default function PainelChamados() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : filteredTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                   Nenhum chamado encontrado.
                 </TableCell>
               </TableRow>
@@ -366,6 +371,9 @@ export default function PainelChamados() {
                 return (
                   <TableRow key={task.id} className="hover:bg-slate-50">
                     <TableCell className="font-medium text-slate-800">{task.task_number}</TableCell>
+                    <TableCell className="font-medium text-slate-800">
+                      {task.title || '-'}
+                    </TableCell>
                     <TableCell className="text-slate-600">{plant?.name || '-'}</TableCell>
                     <TableCell className="text-slate-600">{type?.name || '-'}</TableCell>
                     <TableCell className="text-slate-600">{requester?.name || '-'}</TableCell>
@@ -414,6 +422,15 @@ export default function PainelChamados() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Nome do Chamado *</Label>
+                <Input
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="Ex: Manutenção do Ar Condicionado"
+                  required
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Planta *</Label>
                 <Select

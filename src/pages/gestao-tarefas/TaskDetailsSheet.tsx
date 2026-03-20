@@ -91,7 +91,9 @@ export function TaskDetailsSheet({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="sm:max-w-xl flex flex-col h-full p-0 bg-slate-50 border-l border-gray-200">
         <SheetHeader className="p-6 pb-4 bg-white border-b border-gray-200">
-          <SheetTitle className="text-xl text-slate-800">Chamado {task?.task_number}</SheetTitle>
+          <SheetTitle className="text-xl text-slate-800">
+            {task?.task_number} {task?.title ? `- ${task.title}` : ''}
+          </SheetTitle>
           <div className="text-sm text-slate-500 mt-1">
             Aberto por{' '}
             <span className="font-medium text-slate-700">
