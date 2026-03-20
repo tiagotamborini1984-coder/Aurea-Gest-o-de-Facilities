@@ -51,7 +51,9 @@ export default function Encomendas() {
   const { toast } = useToast()
 
   // Checking access for the renamed module
-  const hasAccess = useHasAccess('Gestão de Encomendas') || useHasAccess('Encomendas')
+  const hasAccessGestao = useHasAccess('Gestão de Encomendas')
+  const hasAccessEncomendas = useHasAccess('Encomendas')
+  const hasAccess = hasAccessGestao || hasAccessEncomendas
 
   const [packages, setPackages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
