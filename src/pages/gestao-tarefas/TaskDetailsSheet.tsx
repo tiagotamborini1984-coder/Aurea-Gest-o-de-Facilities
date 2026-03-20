@@ -212,8 +212,112 @@ export function TaskDetailsSheet({
         await handleStatusChange(terminalStatus.id)
       }
 
+      // Automatically generate Non-Conformity tasks for scores 1-3
+      const ncActions = auditActions.filter((action) => {
+        const score = auditAnswers[action.id]?.score
+        return score && score >= 1 && score <= 3
+      })
+
+      if (ncActions.length > 0 && profile) {
+        const baseDate = auditRealizationDate
+          ? new Date(`${auditRealizationDate}T12:00:00Z`)
+          : new Date()
+        let nextDate = new Date(baseDate)
+        const freq = auditExecution.audits?.frequency || 'Única'
+
+        if (freq === 'Diária') nextDate.setDate(nextDate.getDate() + 1)
+        else if (freq === 'Semanal') nextDate.setDate(nextDate.getDate() + 7)
+        else if (freq === 'Mensal') nextDate.setMonth(nextDate.getMonth() + 1)
+        else if (freq === 'Semestral') nextDate.setMonth(nextDate.getMonth() + 6)
+        else if (freq === 'Anual') nextDate.setFullYear(nextDate.getFullYear() + 1)
+        else nextDate.setDate(nextDate.getDate() + 7) // fallback
+
+        let dueDate = new Date(nextDate)
+        dueDate.setDate(dueDate.getDate() - 1)
+
+        if (dueDate < new Date()) {
+          dueDate = new Date()
+        }
+        dueDate.setHours(23, 59, 59, 999)
+
+        const { data: types } = await supabase
+          .from('task_types')
+          .select('id, name')
+          .eq('client_id', profile.client_id)
+        let ncType = types?.find(
+          (t) =>
+            t.name.toLowerCase().includes('não conformidade') ||
+            t.name.toLowerCase().includes('nc'),
+        )
+        if (!ncType && types && types.length > 0) ncType = types[0]
+
+        const { data: statuses } = await supabase
+          .from('task_statuses')
+          .select('id')
+          .eq('client_id', profile.client_id)
+          .eq('is_terminal', false)
+          .order('created_at')
+          .limit(1)
+        const initialStatusId = statuses?.[0]?.id
+
+        if (ncType && initialStatusId) {
+          const year = new Date().getFullYear()
+          const { data: latest } = await supabase
+            .from('tasks')
+            .select('task_number')
+            .eq('client_id', profile.client_id)
+            .like('task_number', `TSK-${year}-%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          let seq = 1
+          if (latest && latest.length > 0) {
+            const parts = latest[0].task_number.split('-')
+            if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
+          }
+
+          for (const nc of ncActions) {
+            const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
+            seq++
+
+            const ans = auditAnswers[nc.id]
+
+            const { data: newTask } = await supabase
+              .from('tasks')
+              .insert({
+                client_id: profile.client_id,
+                plant_id: auditExecution.plant_id,
+                type_id: ncType.id,
+                status_id: initialStatusId,
+                requester_id: profile.id,
+                assignee_id: auditExecution.assignee_id,
+                task_number: taskNumber,
+                title: `Não Conformidade: ${nc.title.substring(0, 50)}${nc.title.length > 50 ? '...' : ''}`,
+                description: `Foi identificada uma Não Conformidade durante a auditoria "${auditExecution.audits?.title}".\n\nAção Avaliada: ${nc.title}\nNota: ${ans.score}\nObservações: ${ans.observations || 'Nenhuma'}\n\nFavor providenciar correção até a data limite.`,
+                due_date: dueDate.toISOString(),
+                status_updated_at: new Date().toISOString(),
+              } as any)
+              .select()
+              .single()
+
+            if (newTask) {
+              await supabase.from('task_timeline').insert({
+                task_id: newTask.id,
+                user_id: profile.id,
+                content: `Tarefa gerada automaticamente devido à nota ${ans.score} na auditoria ${auditExecution.audits?.title}.`,
+                action_type: 'comment',
+              })
+            }
+          }
+        }
+      }
+
       toast({
         title: 'Auditoria enviada com sucesso!',
+        description:
+          ncActions.length > 0
+            ? `${ncActions.length} tarefa(s) de Não Conformidade gerada(s).`
+            : undefined,
         className: 'bg-green-50 text-green-900 border-green-200',
       })
       onClose()
@@ -347,6 +451,11 @@ export function TaskDetailsSheet({
                 </Button>
               ))}
             </div>
+            {ans.score && ans.score <= 3 && (
+              <p className="text-xs text-amber-600 font-medium mt-2">
+                ⚠️ Notas de 1 a 3 gerarão uma Não Conformidade automática.
+              </p>
+            )}
           </div>
 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -597,6 +706,10 @@ export function TaskDetailsSheet({
               Tem certeza que deseja enviar esta auditoria? Após o envio,{' '}
               <strong className="text-slate-800">as respostas não poderão ser editadas</strong> e o
               status será alterado para Finalizado.
+              <br />
+              <br />
+              Ações avaliadas com notas de 1 a 3 gerarão automaticamente tarefas de Não
+              Conformidade.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
