@@ -49,7 +49,9 @@ export default function Encomendas() {
   const { profile, activeClient } = useAppStore()
   const { plants, packageTypes, loading: masterLoading } = useMasterData()
   const { toast } = useToast()
-  const hasAccess = useHasAccess('Encomendas')
+
+  // Checking access for the renamed module
+  const hasAccess = useHasAccess('Gestão de Encomendas') || useHasAccess('Encomendas')
 
   const [packages, setPackages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -431,7 +433,7 @@ export default function Encomendas() {
           </div>
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Painel de Encomendas
+              Gestão de Encomendas
             </h2>
             <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
               Registro, rastreio e entrega de correspondências

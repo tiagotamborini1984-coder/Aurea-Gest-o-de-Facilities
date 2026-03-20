@@ -27,9 +27,10 @@ const MAIN_MENUS = [
   'Email Reports',
   'Log de Auditoria',
   'Usuários',
-  'Encomendas',
+  'Gestão de Encomendas',
   'Limpeza e Jardinagem',
   'Gestão de Tarefas',
+  'Auditoria e Checklist',
 ]
 
 const CADASTROS_SUBMENUS = [

@@ -32,6 +32,11 @@ import TiposChamado from './pages/gestao-tarefas/TiposChamado'
 import StatusChamado from './pages/gestao-tarefas/StatusChamado'
 import RelatoriosTarefas from './pages/gestao-tarefas/RelatoriosTarefas'
 
+// Auditoria e Checklist Pages
+import AuditoriaConfig from './pages/auditoria-checklist/Configuracao'
+import AuditoriaRealizadas from './pages/auditoria-checklist/Realizadas'
+import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
+
 const App = () => (
   <AuthProvider>
     <AppProvider>
@@ -59,6 +64,11 @@ const App = () => (
                 <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
                 <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
                 <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
+
+                {/* Auditoria e Checklist */}
+                <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
+                <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
+                <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
 
                 {/* Encomendas */}
                 <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />

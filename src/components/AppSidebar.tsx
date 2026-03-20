@@ -8,6 +8,7 @@ import {
   Users,
   Leaf,
   CheckSquare,
+  ClipboardCheck,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -64,7 +65,16 @@ export function AppSidebar() {
       ],
     },
     {
-      title: 'Encomendas',
+      title: 'Auditoria e Checklist',
+      icon: ClipboardCheck,
+      subItems: [
+        { title: 'Nova Auditoria', path: '/auditoria-checklist/configuracao' },
+        { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
+        { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
+      ],
+    },
+    {
+      title: 'Gestão de Encomendas',
       icon: Package,
       subItems: [
         { title: 'Painel', path: '/gestao-terceiros/encomendas' },
@@ -102,12 +112,13 @@ export function AppSidebar() {
       if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
         userMenus = [
           'Lançamentos',
-          'Encomendas',
+          'Gestão de Encomendas',
           'Cadastros:Colaboradores',
           'Cadastros:Equipamentos',
           'Cadastros:Quadro Contratado',
           'Limpeza e Jardinagem',
           'Gestão de Tarefas',
+          'Auditoria e Checklist',
         ]
       }
 
@@ -119,12 +130,17 @@ export function AppSidebar() {
             (sub) =>
               userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
           )
-        } else if (item.title === 'Encomendas') {
-          filteredSubItems = userMenus.includes('Encomendas') ? item.subItems : []
+        } else if (item.title === 'Gestão de Encomendas') {
+          filteredSubItems =
+            userMenus.includes('Gestão de Encomendas') || userMenus.includes('Encomendas')
+              ? item.subItems
+              : []
         } else if (item.title === 'Limpeza e Jardinagem') {
           filteredSubItems = userMenus.includes('Limpeza e Jardinagem') ? item.subItems : []
         } else if (item.title === 'Gestão de Tarefas') {
           filteredSubItems = userMenus.includes('Gestão de Tarefas') ? item.subItems : []
+        } else if (item.title === 'Auditoria e Checklist') {
+          filteredSubItems = userMenus.includes('Auditoria e Checklist') ? item.subItems : []
         } else if (item.title === 'Gestão de Terceiros') {
           filteredSubItems = item.subItems.filter((sub) => userMenus.includes(sub.title))
         }

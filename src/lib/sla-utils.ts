@@ -22,19 +22,31 @@ export function calculateSLA(task: any, currentStatus?: any) {
     }
   }
 
-  const slaDays = currentStatus.sla_days || 0
-  if (slaDays <= 0)
-    return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0, isLate: false }
+  let slaSecs = 0
+  let elapsedSecs = 0
+  let remainingSecs = 0
 
   const start = new Date(task.status_updated_at || task.created_at)
   const end = task.closed_at ? new Date(task.closed_at) : new Date()
 
-  let elapsedSecs = differenceInSeconds(end, start)
-  if (elapsedSecs < 0) elapsedSecs = 0
+  if (task.due_date) {
+    const due = new Date(task.due_date)
+    remainingSecs = differenceInSeconds(due, end)
+    const totalDuration = differenceInSeconds(due, new Date(task.created_at))
+    slaSecs = totalDuration > 0 ? totalDuration : 86400 // fallback to 1 day if invalid
+    elapsedSecs = totalDuration - remainingSecs
+    if (elapsedSecs < 0) elapsedSecs = 0
+  } else {
+    const slaDays = currentStatus.sla_days || 0
+    if (slaDays <= 0)
+      return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0, isLate: false }
+    slaSecs = slaDays * 24 * 60 * 60
+    elapsedSecs = differenceInSeconds(end, start)
+    if (elapsedSecs < 0) elapsedSecs = 0
+    remainingSecs = slaSecs - elapsedSecs
+  }
 
-  const slaSecs = slaDays * 24 * 60 * 60
-
-  const percentage = (elapsedSecs / slaSecs) * 100
+  const percentage = slaSecs > 0 ? (elapsedSecs / slaSecs) * 100 : 100
   let color = 'bg-green-100 text-green-800 border-green-200'
 
   if (percentage >= 100) {
@@ -43,7 +55,6 @@ export function calculateSLA(task: any, currentStatus?: any) {
     color = 'bg-amber-100 text-amber-800 border-amber-300'
   }
 
-  const remainingSecs = slaSecs - elapsedSecs
   const absSecs = Math.abs(remainingSecs)
   const days = Math.floor(absSecs / (24 * 3600))
   const hours = Math.floor((absSecs % (24 * 3600)) / 3600)

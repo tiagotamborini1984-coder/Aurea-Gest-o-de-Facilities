@@ -9,13 +9,18 @@ export function useHasAccess(menuName: string) {
   if (profile.role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
     userMenus = [
       'Lançamentos',
-      'Encomendas',
+      'Gestão de Encomendas',
       'Cadastros:Colaboradores',
       'Cadastros:Equipamentos',
       'Cadastros:Quadro Contratado',
       'Limpeza e Jardinagem',
       'Gestão de Tarefas',
+      'Auditoria e Checklist',
     ]
+  }
+
+  if (menuName === 'Gestão de Encomendas' && userMenus.includes('Encomendas')) {
+    return true
   }
 
   if (menuName.startsWith('Cadastros:') && userMenus.includes('Cadastros')) {
