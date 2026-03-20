@@ -68,6 +68,7 @@ export function PlanejamentoTab() {
     area_id: '',
     description: '',
     id: null,
+    readonly: false,
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -116,7 +117,8 @@ export function PlanejamentoTab() {
   }, [extraSlots])
 
   const handleSave = async () => {
-    if (!modalData.area_id || !modalData.description || !modalData.end_time) return
+    if (!modalData.area_id || !modalData.description || !modalData.end_time || modalData.readonly)
+      return
     setIsSaving(true)
     try {
       const payload = {
@@ -174,7 +176,7 @@ export function PlanejamentoTab() {
     if (!schedId) return
 
     const sched = schedules.find((s) => s.id === schedId)
-    if (!sched) return
+    if (!sched || sched.status !== 'Pendente') return
 
     setIsSaving(true)
     try {
@@ -398,6 +400,7 @@ export function PlanejamentoTab() {
                                 area_id: '',
                                 description: '',
                                 id: null,
+                                readonly: false,
                               })
                               setModalOpen(true)
                             }
@@ -408,19 +411,21 @@ export function PlanejamentoTab() {
                             className="w-full h-full min-h-[6rem] p-1.5 flex flex-col gap-2"
                           >
                             {displayScheds.map((cs) => {
+                              const isReadonly = cs.status !== 'Pendente'
                               return (
                                 <div
                                   key={cs.id}
-                                  draggable={!locked}
+                                  draggable={!locked && !isReadonly}
                                   onDragStart={(e) => handleDragStart(e, cs.id)}
                                   onDragEnd={(e) => e.currentTarget.classList.remove('opacity-50')}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (locked)
+                                    if (locked && !isReadonly) {
                                       return toast({
                                         title: 'Visualização',
                                         description: 'Data bloqueada.',
                                       })
+                                    }
                                     setModalData({
                                       date: cDate,
                                       time: cs.start_time.substring(0, 5),
@@ -428,6 +433,7 @@ export function PlanejamentoTab() {
                                       area_id: cs.area_id,
                                       description: cs.description,
                                       id: cs.id,
+                                      readonly: isReadonly,
                                     })
                                     setModalOpen(true)
                                   }}
@@ -463,7 +469,11 @@ export function PlanejamentoTab() {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {modalData.id ? 'Editar Atividade' : 'Agendar Atividade'}
+              {modalData.readonly
+                ? 'Visualizar Atividade'
+                : modalData.id
+                  ? 'Editar Atividade'
+                  : 'Agendar Atividade'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
@@ -488,9 +498,13 @@ export function PlanejamentoTab() {
                 <Label className="text-base font-bold text-slate-700">Horário Fim *</Label>
                 <Input
                   type="time"
-                  className="text-base font-semibold bg-white"
+                  className={cn(
+                    'text-base font-semibold',
+                    modalData.readonly ? 'bg-slate-100' : 'bg-white',
+                  )}
                   value={modalData.end_time}
                   onChange={(e) => setModalData({ ...modalData, end_time: e.target.value })}
+                  disabled={modalData.readonly}
                 />
               </div>
             </div>
@@ -499,8 +513,11 @@ export function PlanejamentoTab() {
               <Select
                 value={modalData.area_id}
                 onValueChange={(v) => setModalData({ ...modalData, area_id: v })}
+                disabled={modalData.readonly}
               >
-                <SelectTrigger className="h-12 text-base bg-white">
+                <SelectTrigger
+                  className={cn('h-12 text-base', modalData.readonly ? 'bg-slate-100' : 'bg-white')}
+                >
                   <SelectValue placeholder="Selecione a área..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -520,49 +537,62 @@ export function PlanejamentoTab() {
             <div className="space-y-2">
               <Label className="text-base font-bold text-slate-700">Descrição da Atividade *</Label>
               <Input
-                className="h-12 text-base bg-white"
+                className={cn('h-12 text-base', modalData.readonly ? 'bg-slate-100' : 'bg-white')}
                 value={modalData.description}
                 onChange={(e) => setModalData({ ...modalData, description: e.target.value })}
                 placeholder="Ex: Poda de grama, Limpeza pesada..."
+                disabled={modalData.readonly}
               />
             </div>
           </div>
           <DialogFooter className="flex justify-between items-center w-full">
-            {modalData.id ? (
-              <Button
-                variant="ghost"
-                onClick={handleDelete}
-                disabled={isSaving}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-base"
-              >
-                <Trash2 className="h-5 w-5 mr-2" /> Excluir
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex gap-3">
+            {modalData.readonly ? (
               <Button
                 variant="outline"
                 onClick={() => setModalOpen(false)}
-                className="font-bold text-base h-11 px-6"
+                className="font-bold text-base h-11 px-8 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300"
               >
-                Cancelar
+                Fechar Visualização
               </Button>
-              <Button
-                variant="tech"
-                onClick={handleSave}
-                className="font-bold text-base h-11 px-8"
-                disabled={
-                  isSaving ||
-                  !modalData.area_id ||
-                  !modalData.description ||
-                  !modalData.end_time ||
-                  modalData.end_time <= modalData.time
-                }
-              >
-                {isSaving && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Salvar
-              </Button>
-            </div>
+            ) : (
+              <>
+                {modalData.id ? (
+                  <Button
+                    variant="ghost"
+                    onClick={handleDelete}
+                    disabled={isSaving}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-base"
+                  >
+                    <Trash2 className="h-5 w-5 mr-2" /> Excluir
+                  </Button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setModalOpen(false)}
+                    className="font-bold text-base h-11 px-6"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="tech"
+                    onClick={handleSave}
+                    className="font-bold text-base h-11 px-8"
+                    disabled={
+                      isSaving ||
+                      !modalData.area_id ||
+                      !modalData.description ||
+                      !modalData.end_time ||
+                      modalData.end_time <= modalData.time
+                    }
+                  >
+                    {isSaving && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Salvar
+                  </Button>
+                </div>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

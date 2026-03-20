@@ -1,13 +1,20 @@
 import { differenceInMinutes } from 'date-fns'
 
-export function calculateSLA(task: any, taskType: any) {
+export function calculateSLA(task: any, taskType: any, currentStatus?: any) {
   if (!task || !taskType) return { text: '-', color: 'bg-slate-100 text-slate-600', percentage: 0 }
 
   const start = new Date(task.created_at)
   const end = task.closed_at ? new Date(task.closed_at) : new Date()
 
-  const elapsedMins = differenceInMinutes(end, start)
-  // Note: sla_hours is now treated as days for business logic (as requested by user)
+  let elapsedMins = differenceInMinutes(end, start) - (task.frozen_time_minutes || 0)
+
+  // Subtract time spent in current frozen status
+  if (currentStatus?.freeze_sla && !task.closed_at) {
+    elapsedMins -= differenceInMinutes(end, new Date(task.status_updated_at || task.created_at))
+  }
+
+  if (elapsedMins < 0) elapsedMins = 0
+
   const slaMins = (taskType.sla_hours || 0) * 24 * 60
 
   if (slaMins <= 0) return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0 }
@@ -31,6 +38,14 @@ export function calculateSLA(task: any, taskType: any) {
     timeText = `${days}d ${hours}h`
   } else {
     timeText = `${hours}h ${absMins % 60}m`
+  }
+
+  if (currentStatus?.freeze_sla && !task.closed_at) {
+    return {
+      text: `Pausado (${timeText} rest.)`,
+      color: 'bg-slate-200 text-slate-700 border-slate-300',
+      percentage,
+    }
   }
 
   const text = remainingMins < 0 ? `Atrasado ${timeText}` : `${timeText} restantes`

@@ -29,6 +29,12 @@ export default function StatusChamado() {
               required: true,
             },
             { name: 'is_terminal', label: 'Finaliza SLA?', type: 'toggle', required: false },
+            {
+              name: 'freeze_sla',
+              label: 'Congelar SLA (Pausar tempo)?',
+              type: 'toggle',
+              required: false,
+            },
           ] as FieldDef[]
         }
         columns={
@@ -40,7 +46,7 @@ export default function StatusChamado() {
               render: (item: any) => (
                 <span className="flex items-center gap-2">
                   <span
-                    className="w-4 h-4 rounded-full border border-gray-200"
+                    className="w-4 h-4 rounded-full border border-gray-200 shadow-sm"
                     style={{ backgroundColor: item.color }}
                   ></span>
                   {item.color}
@@ -51,6 +57,11 @@ export default function StatusChamado() {
               header: 'Finaliza SLA',
               accessor: 'is_terminal',
               render: (item: any) => (item.is_terminal ? 'Sim' : 'Não'),
+            },
+            {
+              header: 'Pausa SLA',
+              accessor: 'freeze_sla',
+              render: (item: any) => (item.freeze_sla ? 'Sim' : 'Não'),
             },
           ] as ColumnDef[]
         }
@@ -65,6 +76,7 @@ export default function StatusChamado() {
         onAdd={async (record: any) => {
           const payload = { ...record, client_id: profile.client_id }
           if (payload.is_terminal === undefined) payload.is_terminal = false
+          if (payload.freeze_sla === undefined) payload.freeze_sla = false
           const { error } = await supabase.from('task_statuses').insert(payload)
           return { success: !error, error }
         }}

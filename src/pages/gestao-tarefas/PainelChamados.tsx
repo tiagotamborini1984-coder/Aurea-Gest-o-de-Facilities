@@ -22,6 +22,7 @@ import {
   Send,
   Inbox,
   ListFilter,
+  PauseCircle,
 } from 'lucide-react'
 import {
   Select,
@@ -177,6 +178,7 @@ export default function PainelChamados() {
           task_number: taskNumber,
           description: form.description,
           attachment_url,
+          status_updated_at: new Date().toISOString(),
         })
         .select()
         .single()
@@ -359,7 +361,7 @@ export default function PainelChamados() {
                 const requester = users.find((u) => u.id === task.requester_id)
                 const assignee = users.find((u) => u.id === task.assignee_id)
                 const plant = plants.find((p) => p.id === task.plant_id)
-                const sla = calculateSLA(task, type)
+                const sla = calculateSLA(task, type, status)
 
                 return (
                   <TableRow key={task.id} className="hover:bg-slate-50">
@@ -370,17 +372,19 @@ export default function PainelChamados() {
                     <TableCell className="text-slate-600">{assignee?.name || '-'}</TableCell>
                     <TableCell>
                       <Badge
-                        variant="outline"
-                        className="font-medium"
-                        style={{ borderColor: status?.color, color: status?.color }}
+                        className="font-medium text-white border-0 shadow-sm"
+                        style={{ backgroundColor: status?.color || '#94a3b8' }}
                       >
                         {status?.name || '-'}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn('font-semibold', sla.color)}>
-                        {sla.percentage >= 100 && !task.closed_at && (
+                        {sla.percentage >= 100 && !task.closed_at && !status?.freeze_sla && (
                           <AlertTriangle className="w-3 h-3 mr-1" />
+                        )}
+                        {status?.freeze_sla && !task.closed_at && (
+                          <PauseCircle className="w-3 h-3 mr-1" />
                         )}
                         {sla.text}
                       </Badge>
