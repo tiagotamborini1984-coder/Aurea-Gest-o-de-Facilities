@@ -1,23 +1,38 @@
 import { differenceInMinutes } from 'date-fns'
 
-export function calculateSLA(task: any, taskType: any, currentStatus?: any) {
-  if (!task || !taskType) return { text: '-', color: 'bg-slate-100 text-slate-600', percentage: 0 }
+export function calculateSLA(task: any, currentStatus?: any) {
+  if (!task || !currentStatus)
+    return { text: '-', color: 'bg-slate-100 text-slate-600', percentage: 0, isLate: false }
 
-  const start = new Date(task.created_at)
-  const end = task.closed_at ? new Date(task.closed_at) : new Date()
-
-  let elapsedMins = differenceInMinutes(end, start) - (task.frozen_time_minutes || 0)
-
-  // Subtract time spent in current frozen status
-  if (currentStatus?.freeze_sla && !task.closed_at) {
-    elapsedMins -= differenceInMinutes(end, new Date(task.status_updated_at || task.created_at))
+  if (currentStatus.is_terminal) {
+    return {
+      text: 'Finalizado',
+      color: 'bg-slate-100 text-slate-600 border-slate-200',
+      percentage: 0,
+      isLate: false,
+    }
   }
 
+  if (currentStatus.freeze_sla) {
+    return {
+      text: 'Pausado',
+      color: 'bg-slate-200 text-slate-700 border-slate-300',
+      percentage: 0,
+      isLate: false,
+    }
+  }
+
+  const slaDays = currentStatus.sla_days || 0
+  if (slaDays <= 0)
+    return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0, isLate: false }
+
+  const start = new Date(task.status_updated_at || task.created_at)
+  const end = task.closed_at ? new Date(task.closed_at) : new Date()
+
+  let elapsedMins = differenceInMinutes(end, start)
   if (elapsedMins < 0) elapsedMins = 0
 
-  const slaMins = (taskType.sla_hours || 0) * 24 * 60
-
-  if (slaMins <= 0) return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0 }
+  const slaMins = slaDays * 24 * 60
 
   const percentage = (elapsedMins / slaMins) * 100
   let color = 'bg-green-100 text-green-800 border-green-200'
@@ -40,26 +55,8 @@ export function calculateSLA(task: any, taskType: any, currentStatus?: any) {
     timeText = `${hours}h ${absMins % 60}m`
   }
 
-  if (currentStatus?.freeze_sla && !task.closed_at) {
-    return {
-      text: `Pausado (${timeText} rest.)`,
-      color: 'bg-slate-200 text-slate-700 border-slate-300',
-      percentage,
-    }
-  }
+  const isLate = remainingMins < 0
+  const text = isLate ? `Atrasado ${timeText}` : `${timeText} restantes`
 
-  const text = remainingMins < 0 ? `Atrasado ${timeText}` : `${timeText} restantes`
-
-  if (task.closed_at) {
-    return {
-      text: remainingMins < 0 ? `Fechado c/ Atraso` : `No Prazo`,
-      color:
-        remainingMins < 0
-          ? 'bg-red-100 text-red-800 border-red-200'
-          : 'bg-green-100 text-green-800 border-green-200',
-      percentage,
-    }
-  }
-
-  return { text, color, percentage }
+  return { text, color, percentage, isLate }
 }

@@ -20,17 +20,9 @@ export default function TiposChamado() {
         tableName="task_types"
         icon={CheckSquare as any}
         fields={
-          [
-            { name: 'name', label: 'Nome do Tipo', type: 'text', required: true },
-            { name: 'sla_hours', label: 'SLA (Dias)', type: 'number', required: true },
-          ] as FieldDef[]
+          [{ name: 'name', label: 'Nome do Tipo', type: 'text', required: true }] as FieldDef[]
         }
-        columns={
-          [
-            { accessor: 'name', header: 'Nome' },
-            { accessor: 'sla_hours', header: 'SLA (Dias)' },
-          ] as ColumnDef[]
-        }
+        columns={[{ accessor: 'name', header: 'Nome' }] as ColumnDef[]}
         fetchQuery={async () => {
           const { data } = await supabase
             .from('task_types')

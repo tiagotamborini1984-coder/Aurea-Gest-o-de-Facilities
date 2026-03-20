@@ -337,7 +337,7 @@ export default function PainelChamados() {
               <TableHead className="font-semibold text-slate-800">Solicitante</TableHead>
               <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
               <TableHead className="font-semibold text-slate-800">Status</TableHead>
-              <TableHead className="font-semibold text-slate-800">SLA Adherence</TableHead>
+              <TableHead className="font-semibold text-slate-800">SLA Atual</TableHead>
               <TableHead className="font-semibold text-slate-800 text-right">Ação</TableHead>
             </TableRow>
           </TableHeader>
@@ -361,7 +361,7 @@ export default function PainelChamados() {
                 const requester = users.find((u) => u.id === task.requester_id)
                 const assignee = users.find((u) => u.id === task.assignee_id)
                 const plant = plants.find((p) => p.id === task.plant_id)
-                const sla = calculateSLA(task, type, status)
+                const sla = calculateSLA(task, status)
 
                 return (
                   <TableRow key={task.id} className="hover:bg-slate-50">
@@ -446,7 +446,7 @@ export default function PainelChamados() {
                   <SelectContent>
                     {taskTypes.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
-                        {t.name} (SLA: {t.sla_hours} dias)
+                        {t.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -28,6 +28,7 @@ export default function StatusChamado() {
               type: 'text',
               required: true,
             },
+            { name: 'sla_days', label: 'SLA (Dias)', type: 'number', required: true },
             { name: 'is_terminal', label: 'Finaliza SLA?', type: 'toggle', required: false },
             {
               name: 'freeze_sla',
@@ -54,6 +55,10 @@ export default function StatusChamado() {
               ),
             },
             {
+              header: 'SLA (Dias)',
+              accessor: 'sla_days',
+            },
+            {
               header: 'Finaliza SLA',
               accessor: 'is_terminal',
               render: (item: any) => (item.is_terminal ? 'Sim' : 'Não'),
@@ -77,6 +82,7 @@ export default function StatusChamado() {
           const payload = { ...record, client_id: profile.client_id }
           if (payload.is_terminal === undefined) payload.is_terminal = false
           if (payload.freeze_sla === undefined) payload.freeze_sla = false
+          if (payload.sla_days === undefined) payload.sla_days = 1
           const { error } = await supabase.from('task_statuses').insert(payload)
           return { success: !error, error }
         }}

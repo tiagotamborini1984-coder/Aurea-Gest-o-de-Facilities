@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { format, startOfWeek, addDays, subDays, isBefore, isSameDay, startOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -69,6 +70,9 @@ export function PlanejamentoTab() {
     description: '',
     id: null,
     readonly: false,
+    status: '',
+    evidence_url: '',
+    justification: '',
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -401,6 +405,9 @@ export function PlanejamentoTab() {
                                 description: '',
                                 id: null,
                                 readonly: false,
+                                status: '',
+                                evidence_url: '',
+                                justification: '',
                               })
                               setModalOpen(true)
                             }
@@ -434,6 +441,9 @@ export function PlanejamentoTab() {
                                       description: cs.description,
                                       id: cs.id,
                                       readonly: isReadonly,
+                                      status: cs.status,
+                                      evidence_url: cs.evidence_url,
+                                      justification: cs.justification,
                                     })
                                     setModalOpen(true)
                                   }}
@@ -476,7 +486,7 @@ export function PlanejamentoTab() {
                   : 'Agendar Atividade'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 py-4">
             <div className="flex gap-4">
               <div className="space-y-2 flex-1">
                 <Label className="text-base font-bold text-slate-700">Data</Label>
@@ -544,6 +554,42 @@ export function PlanejamentoTab() {
                 disabled={modalData.readonly}
               />
             </div>
+
+            {modalData.readonly && (
+              <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-bold text-slate-700">Status</Label>
+                  <Badge
+                    className={cn('px-3 py-1 text-sm border-2', getStatusColor(modalData.status))}
+                  >
+                    {modalData.status}
+                  </Badge>
+                </div>
+                {modalData.status === 'Não Realizado' && modalData.justification && (
+                  <div className="space-y-2 mt-3">
+                    <Label className="text-sm font-bold text-red-700">Justificativa</Label>
+                    <p className="text-sm text-slate-800 bg-white p-3 rounded-lg border border-red-200 leading-relaxed">
+                      {modalData.justification}
+                    </p>
+                  </div>
+                )}
+                {modalData.status === 'Realizado' && modalData.evidence_url && (
+                  <div className="space-y-2 mt-3">
+                    <Label className="text-sm font-bold text-green-700">Anexo / Evidência</Label>
+                    <div>
+                      <a
+                        href={modalData.evidence_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-sm font-bold text-brand-deepBlue hover:underline bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm"
+                      >
+                        <FileDown className="h-4 w-4 mr-2" /> Visualizar Arquivo
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter className="flex justify-between items-center w-full">
             {modalData.readonly ? (
