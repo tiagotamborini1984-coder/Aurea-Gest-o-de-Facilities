@@ -1,4 +1,4 @@
-import { differenceInMinutes } from 'date-fns'
+import { differenceInSeconds } from 'date-fns'
 
 export function calculateSLA(task: any, currentStatus?: any) {
   if (!task || !currentStatus)
@@ -29,12 +29,12 @@ export function calculateSLA(task: any, currentStatus?: any) {
   const start = new Date(task.status_updated_at || task.created_at)
   const end = task.closed_at ? new Date(task.closed_at) : new Date()
 
-  let elapsedMins = differenceInMinutes(end, start)
-  if (elapsedMins < 0) elapsedMins = 0
+  let elapsedSecs = differenceInSeconds(end, start)
+  if (elapsedSecs < 0) elapsedSecs = 0
 
-  const slaMins = slaDays * 24 * 60
+  const slaSecs = slaDays * 24 * 60 * 60
 
-  const percentage = (elapsedMins / slaMins) * 100
+  const percentage = (elapsedSecs / slaSecs) * 100
   let color = 'bg-green-100 text-green-800 border-green-200'
 
   if (percentage >= 100) {
@@ -43,20 +43,24 @@ export function calculateSLA(task: any, currentStatus?: any) {
     color = 'bg-amber-100 text-amber-800 border-amber-300'
   }
 
-  const remainingMins = slaMins - elapsedMins
-  const absMins = Math.abs(remainingMins)
-  const days = Math.floor(absMins / (24 * 60))
-  const hours = Math.floor((absMins % (24 * 60)) / 60)
+  const remainingSecs = slaSecs - elapsedSecs
+  const absSecs = Math.abs(remainingSecs)
+  const days = Math.floor(absSecs / (24 * 3600))
+  const hours = Math.floor((absSecs % (24 * 3600)) / 3600)
+  const minutes = Math.floor((absSecs % 3600) / 60)
+  const seconds = absSecs % 60
+
+  const pad = (n: number) => n.toString().padStart(2, '0')
 
   let timeText = ''
   if (days > 0) {
-    timeText = `${days}d ${hours}h`
+    timeText = `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
   } else {
-    timeText = `${hours}h ${absMins % 60}m`
+    timeText = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
   }
 
-  const isLate = remainingMins < 0
-  const text = isLate ? `Atrasado ${timeText}` : `${timeText} restantes`
+  const isLate = remainingSecs < 0
+  const text = isLate ? `-${timeText}` : timeText
 
   return { text, color, percentage, isLate }
 }

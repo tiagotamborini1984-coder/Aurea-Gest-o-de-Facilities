@@ -43,6 +43,36 @@ import { cn } from '@/lib/utils'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 
+function SLACountdown({ task, status }: { task: any; status: any }) {
+  const [sla, setSla] = useState(() => calculateSLA(task, status))
+
+  useEffect(() => {
+    if (status?.is_terminal || status?.freeze_sla || task.closed_at) {
+      setSla(calculateSLA(task, status))
+      return
+    }
+
+    const interval = setInterval(() => {
+      setSla(calculateSLA(task, status))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [task, status])
+
+  return (
+    <Badge
+      variant="outline"
+      className={cn('font-semibold tabular-nums whitespace-nowrap', sla.color)}
+    >
+      {sla.percentage >= 100 && !task.closed_at && !status?.freeze_sla && (
+        <AlertTriangle className="w-3 h-3 mr-1" />
+      )}
+      {status?.freeze_sla && !task.closed_at && <PauseCircle className="w-3 h-3 mr-1" />}
+      {sla.text}
+    </Badge>
+  )
+}
+
 export default function PainelChamados() {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
@@ -359,7 +389,7 @@ export default function PainelChamados() {
               <TableHead className="font-semibold text-slate-800">Solicitante</TableHead>
               <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
               <TableHead className="font-semibold text-slate-800">Status</TableHead>
-              <TableHead className="font-semibold text-slate-800">SLA Atual</TableHead>
+              <TableHead className="font-semibold text-slate-800">SLA</TableHead>
               <TableHead className="font-semibold text-slate-800 text-right">Ação</TableHead>
             </TableRow>
           </TableHeader>
@@ -383,7 +413,6 @@ export default function PainelChamados() {
                 const requester = users.find((u) => u.id === task.requester_id)
                 const assignee = users.find((u) => u.id === task.assignee_id)
                 const plant = plants.find((p) => p.id === task.plant_id)
-                const sla = calculateSLA(task, status)
 
                 return (
                   <TableRow key={task.id} className="hover:bg-slate-50">
@@ -404,15 +433,7 @@ export default function PainelChamados() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={cn('font-semibold', sla.color)}>
-                        {sla.percentage >= 100 && !task.closed_at && !status?.freeze_sla && (
-                          <AlertTriangle className="w-3 h-3 mr-1" />
-                        )}
-                        {status?.freeze_sla && !task.closed_at && (
-                          <PauseCircle className="w-3 h-3 mr-1" />
-                        )}
-                        {sla.text}
-                      </Badge>
+                      <SLACountdown task={task} status={status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
