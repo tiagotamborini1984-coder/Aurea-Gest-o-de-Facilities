@@ -170,16 +170,18 @@ export default function AuditoriaConfig() {
       }))
       await supabase.from('audit_assignments' as any).insert(assignmentsToInsert)
 
-      // If new, generate initial tasks if date is within advance notice
-      if (!id) {
-        const start = new Date(`${startDate}T12:00:00Z`)
-        const today = new Date()
+      // Generate initial tasks if date is within advance notice (for both new and updated)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const parts = startDate.split('-')
+      if (parts.length === 3) {
+        const start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
         const advance = parseInt(advanceNotice) || 0
         const triggerDate = new Date(start)
         triggerDate.setDate(triggerDate.getDate() - advance)
 
         if (today >= triggerDate) {
-          const { data: typeRes } = await supabase
+          let { data: typeRes } = await supabase
             .from('task_types')
             .select('id')
             .eq('client_id', profile.client_id)
@@ -187,58 +189,92 @@ export default function AuditoriaConfig() {
             .limit(1)
           let typeId = typeRes?.[0]?.id
 
-          const { data: statusRes } = await supabase
+          if (!typeId) {
+            const { data: newType } = await supabase
+              .from('task_types')
+              .insert({ client_id: profile.client_id, name: 'Auditoria', sla_hours: 24 } as any)
+              .select('id')
+              .single()
+            typeId = newType?.id
+          }
+
+          let { data: statusRes } = await supabase
             .from('task_statuses')
             .select('id')
             .eq('client_id', profile.client_id)
             .eq('is_terminal', false)
+            .order('created_at', { ascending: true })
             .limit(1)
           let statusId = statusRes?.[0]?.id
 
+          if (!statusId) {
+            const { data: newStatus } = await supabase
+              .from('task_statuses')
+              .insert({
+                client_id: profile.client_id,
+                name: 'Pendente',
+                color: '#eab308',
+                is_terminal: false,
+              } as any)
+              .select('id')
+              .single()
+            statusId = newStatus?.id
+          }
+
           if (typeId && statusId) {
             for (const assign of assignments) {
-              const year = new Date().getFullYear()
-              const { data: latest } = await supabase
-                .from('tasks')
-                .select('task_number')
-                .eq('client_id', profile.client_id)
-                .like('task_number', `TSK-${year}-%`)
-                .order('created_at', { ascending: false })
-                .limit(1)
+              const { data: existingExec } = await supabase
+                .from('audit_executions')
+                .select('id')
+                .eq('audit_id', auditId!)
+                .eq('assignee_id', assign.assignee_id)
+                .eq('plant_id', assign.plant_id)
+                .eq('status', 'Pendente')
 
-              let seq = 1
-              if (latest && latest.length > 0) {
-                const parts = latest[0].task_number.split('-')
-                if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
-              }
-              const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
+              if (!existingExec || existingExec.length === 0) {
+                const year = new Date().getFullYear()
+                const { data: latest } = await supabase
+                  .from('tasks')
+                  .select('task_number')
+                  .eq('client_id', profile.client_id)
+                  .like('task_number', `TSK-${year}-%`)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
 
-              const { data: newTask } = await supabase
-                .from('tasks')
-                .insert({
-                  client_id: profile.client_id,
-                  plant_id: assign.plant_id,
-                  type_id: typeId,
-                  status_id: statusId,
-                  requester_id: profile.id,
-                  assignee_id: assign.assignee_id,
-                  task_number: taskNumber,
-                  title: `Auditoria: ${title}`,
-                  description: `Por favor, realize a auditoria "${title}" agendada para ${startDate.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`,
-                  due_date: new Date(`${startDate}T23:59:59.999Z`).toISOString(),
-                  status_updated_at: new Date().toISOString(),
-                } as any)
-                .select()
-                .single()
+                let seq = 1
+                if (latest && latest.length > 0) {
+                  const p = latest[0].task_number.split('-')
+                  if (p.length === 3) seq = parseInt(p[2], 10) + 1
+                }
+                const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
-              if (newTask) {
-                await supabase.from('audit_executions').insert({
-                  audit_id: auditId!,
-                  task_id: newTask.id,
-                  assignee_id: assign.assignee_id,
-                  plant_id: assign.plant_id,
-                  status: 'Pendente',
-                })
+                const { data: newTask } = await supabase
+                  .from('tasks')
+                  .insert({
+                    client_id: profile.client_id,
+                    plant_id: assign.plant_id,
+                    type_id: typeId,
+                    status_id: statusId,
+                    requester_id: profile.id,
+                    assignee_id: assign.assignee_id,
+                    task_number: taskNumber,
+                    title: `Auditoria: ${title}`,
+                    description: `Por favor, realize a auditoria "${title}" agendada para ${startDate.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`,
+                    due_date: new Date(`${startDate}T23:59:59.999Z`).toISOString(),
+                    status_updated_at: new Date().toISOString(),
+                  } as any)
+                  .select()
+                  .single()
+
+                if (newTask) {
+                  await supabase.from('audit_executions').insert({
+                    audit_id: auditId!,
+                    task_id: newTask.id,
+                    assignee_id: assign.assignee_id,
+                    plant_id: assign.plant_id,
+                    status: 'Pendente',
+                  })
+                }
               }
             }
           }

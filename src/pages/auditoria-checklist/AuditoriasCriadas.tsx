@@ -76,7 +76,11 @@ export default function AuditoriasCriadas() {
     today.setHours(0, 0, 0, 0)
 
     for (const audit of auditsList) {
-      const start = new Date(`${audit.start_date}T00:00:00Z`)
+      if (!audit.start_date) continue
+      const parts = audit.start_date.split('-')
+      if (parts.length !== 3) continue
+
+      const start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
       const advanceDays = audit.advance_notice_days || 0
       const triggerDate = new Date(start)
       triggerDate.setDate(triggerDate.getDate() - advanceDays)
@@ -84,31 +88,62 @@ export default function AuditoriasCriadas() {
       if (today >= triggerDate) {
         const { data: existing } = await supabase
           .from('audit_executions')
-          .select('id')
+          .select('id, assignee_id, plant_id')
           .eq('audit_id', audit.id)
+          .eq('status', 'Pendente')
 
-        if (!existing || existing.length === 0) {
-          // Generate task
-          const { data: typeRes } = await supabase
-            .from('task_types')
-            .select('id')
-            .eq('client_id', profile.client_id)
-            .ilike('name', '%Auditoria%')
-            .limit(1)
-          let typeId = typeRes?.[0]?.id
+        const existingSet = new Set(existing?.map((e) => `${e.assignee_id}-${e.plant_id}`) || [])
 
-          const { data: statusRes } = await supabase
-            .from('task_statuses')
-            .select('id')
-            .eq('client_id', profile.client_id)
-            .eq('is_terminal', false)
-            .limit(1)
-          let statusId = statusRes?.[0]?.id
+        let typeId: string | null = null
+        let statusId: string | null = null
 
-          if (!typeId || !statusId) continue
+        const assignments = audit.audit_assignments || []
+        for (const assign of assignments) {
+          if (existingSet.has(`${assign.assignee_id}-${assign.plant_id}`)) continue
 
-          const assignments = audit.audit_assignments || []
-          for (const assign of assignments) {
+          if (!typeId) {
+            const { data: typeRes } = await supabase
+              .from('task_types')
+              .select('id')
+              .eq('client_id', profile.client_id)
+              .ilike('name', '%Auditoria%')
+              .limit(1)
+            typeId = typeRes?.[0]?.id
+            if (!typeId) {
+              const { data: newType } = await supabase
+                .from('task_types')
+                .insert({ client_id: profile.client_id, name: 'Auditoria', sla_hours: 24 } as any)
+                .select('id')
+                .single()
+              typeId = newType?.id
+            }
+          }
+
+          if (!statusId) {
+            const { data: statusRes } = await supabase
+              .from('task_statuses')
+              .select('id')
+              .eq('client_id', profile.client_id)
+              .eq('is_terminal', false)
+              .order('created_at', { ascending: true })
+              .limit(1)
+            statusId = statusRes?.[0]?.id
+            if (!statusId) {
+              const { data: newStatus } = await supabase
+                .from('task_statuses')
+                .insert({
+                  client_id: profile.client_id,
+                  name: 'Pendente',
+                  color: '#eab308',
+                  is_terminal: false,
+                } as any)
+                .select('id')
+                .single()
+              statusId = newStatus?.id
+            }
+          }
+
+          if (typeId && statusId) {
             const year = new Date().getFullYear()
             const { data: latest } = await supabase
               .from('tasks')
@@ -120,8 +155,8 @@ export default function AuditoriasCriadas() {
 
             let seq = 1
             if (latest && latest.length > 0) {
-              const parts = latest[0].task_number.split('-')
-              if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
+              const p = latest[0].task_number.split('-')
+              if (p.length === 3) seq = parseInt(p[2], 10) + 1
             }
             const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
