@@ -1,5 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Database, Building2, ChevronRight, Package, Briefcase, Users, Leaf } from 'lucide-react'
+import {
+  Database,
+  Building2,
+  ChevronRight,
+  Package,
+  Briefcase,
+  Users,
+  Leaf,
+  CheckSquare,
+} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -42,6 +51,16 @@ export function AppSidebar() {
         { title: 'Cronograma', path: '/limpeza-jardinagem/cronograma' },
         { title: 'Dashboard', path: '/limpeza-jardinagem/dashboard' },
         { title: 'Relatórios', path: '/limpeza-jardinagem/relatorios' },
+      ],
+    },
+    {
+      title: 'Gestão de Tarefas',
+      icon: CheckSquare,
+      subItems: [
+        { title: 'Painel de Chamados', path: '/gestao-tarefas' },
+        { title: 'Relatórios', path: '/gestao-tarefas/relatorios' },
+        { title: 'Tipos de Chamado', path: '/gestao-tarefas/tipos' },
+        { title: 'Status', path: '/gestao-tarefas/status' },
       ],
     },
     {
@@ -88,6 +107,7 @@ export function AppSidebar() {
           'Cadastros:Equipamentos',
           'Cadastros:Quadro Contratado',
           'Limpeza e Jardinagem',
+          'Gestão de Tarefas',
         ]
       }
 
@@ -103,6 +123,8 @@ export function AppSidebar() {
           filteredSubItems = userMenus.includes('Encomendas') ? item.subItems : []
         } else if (item.title === 'Limpeza e Jardinagem') {
           filteredSubItems = userMenus.includes('Limpeza e Jardinagem') ? item.subItems : []
+        } else if (item.title === 'Gestão de Tarefas') {
+          filteredSubItems = userMenus.includes('Gestão de Tarefas') ? item.subItems : []
         } else if (item.title === 'Gestão de Terceiros') {
           filteredSubItems = item.subItems.filter((sub) => userMenus.includes(sub.title))
         }

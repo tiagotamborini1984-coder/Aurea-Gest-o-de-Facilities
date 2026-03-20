@@ -26,6 +26,12 @@ import CronogramaLJ from './pages/gestao-terceiros/limpeza-jardinagem/Cronograma
 import DashboardLJ from './pages/gestao-terceiros/limpeza-jardinagem/Dashboard'
 import RelatoriosLJ from './pages/gestao-terceiros/limpeza-jardinagem/Relatorios'
 
+// Gestão de Tarefas Pages
+import PainelChamados from './pages/gestao-tarefas/PainelChamados'
+import TiposChamado from './pages/gestao-tarefas/TiposChamado'
+import StatusChamado from './pages/gestao-tarefas/StatusChamado'
+import RelatoriosTarefas from './pages/gestao-tarefas/RelatoriosTarefas'
+
 const App = () => (
   <AuthProvider>
     <AppProvider>
@@ -47,6 +53,12 @@ const App = () => (
                 <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
                 <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
                 <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
+
+                {/* Gestão de Tarefas */}
+                <Route path="/gestao-tarefas" element={<PainelChamados />} />
+                <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
+                <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
+                <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
 
                 {/* Encomendas */}
                 <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />

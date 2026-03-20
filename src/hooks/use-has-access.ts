@@ -14,6 +14,7 @@ export function useHasAccess(menuName: string) {
       'Cadastros:Equipamentos',
       'Cadastros:Quadro Contratado',
       'Limpeza e Jardinagem',
+      'Gestão de Tarefas',
     ]
   }
 
