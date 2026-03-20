@@ -82,151 +82,168 @@ export default function AuditoriaRealizadas() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in print:max-w-none print:w-full">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
-        <div className="flex items-center gap-3">
-          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
-            <ClipboardCheck className="h-6 w-6 text-brand-deepBlue" />
+    <>
+      <div
+        className={cn(
+          'max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in print:max-w-none print:w-full',
+          viewExec ? 'print:hidden' : 'print:block',
+        )}
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+          <div className="flex items-center gap-3">
+            <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
+              <ClipboardCheck className="h-6 w-6 text-brand-deepBlue" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                Auditorias Realizadas
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Acompanhe as auditorias enviadas e finalizadas.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Auditorias Realizadas
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Acompanhe as auditorias enviadas e finalizadas.
-            </p>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Buscar título, tipo..."
+                className="pl-9 bg-white border-slate-200"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="border-slate-200"
+              disabled={executions.length === 0}
+            >
+              <Printer className="w-4 h-4 mr-2" /> Imprimir Lista
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Buscar título, tipo..."
-              className="pl-9 bg-white border-slate-200"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-            className="border-slate-200"
-            disabled={executions.length === 0}
-          >
-            <Printer className="w-4 h-4 mr-2" /> Imprimir
-          </Button>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
-        <Table className="print:text-sm">
-          <TableHeader className="bg-slate-50/80 border-b border-slate-200 print:bg-transparent">
-            <TableRow>
-              <TableHead className="font-semibold text-slate-800 print:text-black">
-                Título da Auditoria
-              </TableHead>
-              <TableHead className="font-semibold text-slate-800 print:text-black">Tipo</TableHead>
-              <TableHead className="font-semibold text-slate-800 print:text-black">
-                Planta
-              </TableHead>
-              <TableHead className="font-semibold text-slate-800 print:text-black">
-                Responsável
-              </TableHead>
-              <TableHead className="font-semibold text-slate-800 print:text-black">
-                Status
-              </TableHead>
-              <TableHead className="font-semibold text-slate-800 print:text-black">
-                Score Final
-              </TableHead>
-              <TableHead className="font-semibold text-slate-800 text-right print:hidden">
-                Ação
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+          <Table className="print:text-sm">
+            <TableHeader className="bg-slate-50/80 border-b border-slate-200 print:bg-transparent">
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
-                </TableCell>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Título da Auditoria
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Tipo
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Planta
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Responsável
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Status
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Score Final
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 text-right print:hidden">
+                  Ação
+                </TableHead>
               </TableRow>
-            ) : filteredExecutions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                  Nenhuma auditoria encontrada.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredExecutions.map((exec) => {
-                const plant = plants.find((p) => p.id === exec.plant_id)
-                const user = users.find((u) => u.id === exec.assignee_id)
-                return (
-                  <TableRow
-                    key={exec.id}
-                    className="hover:bg-slate-50 border-slate-100 print:border-b"
-                  >
-                    <TableCell className="font-medium text-slate-800">
-                      {exec.audits?.title}
-                      {exec.realization_date && (
-                        <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                          Realizada em: {format(new Date(exec.realization_date), 'dd/MM/yyyy')}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-slate-600">{exec.audits?.type}</TableCell>
-                    <TableCell className="text-slate-600">{plant?.name || '-'}</TableCell>
-                    <TableCell className="text-slate-600">{user?.name || '-'}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'font-bold',
-                          exec.status === 'Finalizado'
-                            ? 'bg-green-100 text-green-800 border-green-200'
-                            : 'bg-amber-100 text-amber-800 border-amber-300',
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredExecutions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    Nenhuma auditoria encontrada.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredExecutions.map((exec) => {
+                  const plant = plants.find((p) => p.id === exec.plant_id)
+                  const user = users.find((u) => u.id === exec.assignee_id)
+                  return (
+                    <TableRow
+                      key={exec.id}
+                      className="hover:bg-slate-50 border-slate-100 print:border-b"
+                    >
+                      <TableCell className="font-medium text-slate-800">
+                        {exec.audits?.title}
+                        {exec.realization_date && (
+                          <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                            Realizada em: {format(new Date(exec.realization_date), 'dd/MM/yyyy')}
+                          </div>
                         )}
-                      >
-                        {exec.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {exec.status === 'Finalizado' ? (
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-bold text-brand-deepBlue text-lg">
-                            {exec.final_score}
-                          </span>
-                          <span className="text-xs text-slate-500 font-medium">
-                            / {exec.max_score}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right print:hidden">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openView(exec)}
-                        className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
-                      >
-                        <Eye className="w-4 h-4 mr-2" /> Detalhes
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
+                      </TableCell>
+                      <TableCell className="text-slate-600">{exec.audits?.type}</TableCell>
+                      <TableCell className="text-slate-600">{plant?.name || '-'}</TableCell>
+                      <TableCell className="text-slate-600">{user?.name || '-'}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'font-bold',
+                            exec.status === 'Finalizado'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-amber-100 text-amber-800 border-amber-300',
+                          )}
+                        >
+                          {exec.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {exec.status === 'Finalizado' ? (
+                          <div className="flex items-baseline gap-1">
+                            <span className="font-bold text-brand-deepBlue text-lg">
+                              {exec.final_score}
+                            </span>
+                            <span className="text-xs text-slate-500 font-medium">
+                              / {exec.max_score}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right print:hidden">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openView(exec)}
+                          className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
+                        >
+                          <Eye className="w-4 h-4 mr-2" /> Detalhes
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <Dialog open={!!viewExec} onOpenChange={(open) => !open && setViewExec(null)}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto print:hidden">
           <DialogHeader className="border-b border-slate-100 pb-4">
-            <DialogTitle className="text-xl">
-              Relatório de Auditoria: {viewExec?.audits?.title}
-            </DialogTitle>
+            <div className="flex items-center justify-between pr-6">
+              <DialogTitle className="text-xl">Relatório: {viewExec?.audits?.title}</DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                className="print:hidden hidden sm:flex"
+              >
+                <Printer className="w-4 h-4 mr-2" /> Imprimir
+              </Button>
+            </div>
           </DialogHeader>
           {viewExec && (
             <div className="space-y-6 py-4">
@@ -315,10 +332,129 @@ export default function AuditoriaRealizadas() {
                   </div>
                 )}
               </div>
+              <div className="pt-4 border-t border-slate-100 sm:hidden">
+                <Button onClick={handlePrint} className="w-full">
+                  <Printer className="w-4 h-4 mr-2" /> Imprimir Relatório
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Print-only View for Specific Audit Report */}
+      {viewExec && (
+        <div className="hidden print:block text-black bg-white w-full print:m-0 print:p-0">
+          <div className="mb-6 border-b-2 border-slate-800 pb-4">
+            <h1 className="text-3xl font-black text-slate-900">Relatório de Auditoria</h1>
+            <h2 className="text-xl text-slate-700 mt-1 font-semibold">{viewExec.audits?.title}</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-8 text-sm">
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">Planta</span>
+              <span className="font-semibold text-slate-800">
+                {plants.find((p) => p.id === viewExec.plant_id)?.name || '-'}
+              </span>
+            </div>
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                Responsável
+              </span>
+              <span className="font-semibold text-slate-800">
+                {users.find((u) => u.id === viewExec.assignee_id)?.name || '-'}
+              </span>
+            </div>
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                Data de Realização
+              </span>
+              <span className="font-semibold text-slate-800">
+                {viewExec.realization_date
+                  ? format(new Date(viewExec.realization_date), 'dd/MM/yyyy')
+                  : '-'}
+              </span>
+            </div>
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                Participantes
+              </span>
+              <span className="font-semibold text-slate-800">{viewExec.participants || '-'}</span>
+            </div>
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">Status</span>
+              <span className="font-semibold text-slate-800">{viewExec.status}</span>
+            </div>
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                Score Final
+              </span>
+              <span className="font-black text-lg text-slate-800">
+                {viewExec.final_score || 0}{' '}
+                <span className="text-sm font-medium text-slate-500">
+                  / {viewExec.max_score || 0}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold border-b-2 border-slate-200 pb-2 mb-4 text-slate-800">
+              Detalhes das Respostas
+            </h3>
+            {viewAnswers.length === 0 ? (
+              <p className="text-slate-500 italic">Nenhuma resposta registrada.</p>
+            ) : (
+              <table className="w-full text-left border-collapse mt-4">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-800">
+                    <th className="py-3 px-4 font-bold border-b border-slate-300 w-12 text-center">
+                      #
+                    </th>
+                    <th className="py-3 px-4 font-bold border-b border-slate-300">Ação Avaliada</th>
+                    <th className="py-3 px-4 font-bold border-b border-slate-300 w-24 text-center">
+                      Nota
+                    </th>
+                    <th className="py-3 px-4 font-bold border-b border-slate-300 w-1/3">
+                      Observações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewAnswers.map((ans, idx) => (
+                    <tr key={ans.id} className="border-b border-slate-200 break-inside-avoid">
+                      <td className="py-4 px-4 text-center font-medium text-slate-500">
+                        {idx + 1}
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="font-medium text-slate-800">{ans.audit_actions?.title}</div>
+                        {ans.evidence_url && (
+                          <div className="text-xs text-blue-600 mt-1 font-medium">
+                            ✓ Evidência Anexada
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="inline-block w-8 h-8 rounded-full bg-slate-100 border border-slate-300 leading-8 text-center font-bold text-slate-800">
+                          {ans.score}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-sm text-slate-600">
+                        {ans.observations || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-slate-200 flex justify-between text-sm text-slate-500 print:fixed print:bottom-0 print:w-full print:bg-white">
+            <span>Impresso em: {format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
+            <span>Sistema Aurea Facility Management</span>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
