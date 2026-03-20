@@ -22,13 +22,13 @@ export default function TiposChamado() {
         fields={
           [
             { name: 'name', label: 'Nome do Tipo', type: 'text', required: true },
-            { name: 'sla_hours', label: 'SLA (Horas)', type: 'number', required: true },
+            { name: 'sla_hours', label: 'SLA (Dias)', type: 'number', required: true },
           ] as FieldDef[]
         }
         columns={
           [
             { accessor: 'name', header: 'Nome' },
-            { accessor: 'sla_hours', header: 'SLA (Horas)' },
+            { accessor: 'sla_hours', header: 'SLA (Dias)' },
           ] as ColumnDef[]
         }
         fetchQuery={async () => {

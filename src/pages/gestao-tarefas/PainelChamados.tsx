@@ -13,7 +13,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { CheckSquare, Plus, Search, Loader2, AlertTriangle } from 'lucide-react'
+import {
+  CheckSquare,
+  Plus,
+  Search,
+  Loader2,
+  AlertTriangle,
+  Send,
+  Inbox,
+  ListFilter,
+} from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -46,6 +55,11 @@ export default function PainelChamados() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [filterAssignee, setFilterAssignee] = useState('all')
+
+  const isManager =
+    profile?.role === 'Administrador' || profile?.role === 'Master' || profile?.role === 'Gestor'
+  const [activeTab, setActiveTab] = useState(isManager ? 'todos' : 'recebidos')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -80,11 +94,7 @@ export default function PainelChamados() {
       .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
 
-    if (
-      profile.role !== 'Administrador' &&
-      profile.role !== 'Master' &&
-      profile.role !== 'Gestor'
-    ) {
+    if (!isManager) {
       query = query.or(`requester_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
     }
 
@@ -197,11 +207,23 @@ export default function PainelChamados() {
   const filteredTasks = tasks.filter((t) => {
     const matchPlant = filterPlant === 'all' || t.plant_id === filterPlant
     const matchStatus = filterStatus === 'all' || t.status_id === filterStatus
+    const matchAssignee = filterAssignee === 'all' || t.assignee_id === filterAssignee
     const matchSearch =
       t.task_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.description.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchPlant && matchStatus && matchSearch
+
+    let matchTab = true
+    if (activeTab === 'enviados') matchTab = t.requester_id === profile.id
+    if (activeTab === 'recebidos') matchTab = t.assignee_id === profile.id
+
+    return matchPlant && matchStatus && matchAssignee && matchSearch && matchTab
   })
+
+  const tabs = [
+    ...(isManager ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
+    { id: 'enviados', label: 'Enviados', icon: Send },
+    { id: 'recebidos', label: 'Recebidos', icon: Inbox },
+  ]
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in">
@@ -224,45 +246,82 @@ export default function PainelChamados() {
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex-1 flex items-center px-3 gap-2 sm:border-r border-gray-200">
-          <Search className="w-5 h-5 text-slate-500" />
-          <Input
-            placeholder="Buscar protocolo ou descrição..."
-            className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex bg-slate-100 p-1.5 rounded-xl w-full sm:w-fit border border-slate-200/80 shadow-sm overflow-x-auto no-scrollbar">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={cn(
+                'flex items-center gap-2 flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                activeTab === t.id
+                  ? 'bg-white text-brand-deepBlue shadow-sm ring-1 ring-slate-200/50'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50',
+              )}
+            >
+              <t.icon className="w-4 h-4" />
+              {t.label}
+            </button>
+          ))}
         </div>
-        <div className="w-full sm:w-56">
-          <Select value={filterPlant} onValueChange={setFilterPlant}>
-            <SelectTrigger className="border-0 shadow-none bg-transparent">
-              <SelectValue placeholder="Plantas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Plantas</SelectItem>
-              {plants.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-full sm:w-56 border-t sm:border-t-0 sm:border-l border-gray-200 pl-0 sm:pl-4">
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="border-0 shadow-none bg-transparent">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Status</SelectItem>
-              {taskStatuses.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+        <div className="flex flex-col xl:flex-row gap-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+          <div className="flex-1 flex items-center px-3 gap-2 xl:border-r border-gray-200">
+            <Search className="w-5 h-5 text-slate-500" />
+            <Input
+              placeholder="Buscar protocolo ou descrição..."
+              className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
+            <Select value={filterPlant} onValueChange={setFilterPlant}>
+              <SelectTrigger className="border-0 shadow-none bg-transparent">
+                <SelectValue placeholder="Plantas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Plantas</SelectItem>
+                {plants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="border-0 shadow-none bg-transparent">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                {taskStatuses.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {isManager && (
+            <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
+              <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+                <SelectTrigger className="border-0 shadow-none bg-transparent">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -273,6 +332,7 @@ export default function PainelChamados() {
               <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
               <TableHead className="font-semibold text-slate-800">Planta</TableHead>
               <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
+              <TableHead className="font-semibold text-slate-800">Solicitante</TableHead>
               <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
               <TableHead className="font-semibold text-slate-800">Status</TableHead>
               <TableHead className="font-semibold text-slate-800">SLA Adherence</TableHead>
@@ -282,13 +342,13 @@ export default function PainelChamados() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
                 </TableCell>
               </TableRow>
             ) : filteredTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={8} className="text-center py-8 text-slate-500">
                   Nenhum chamado encontrado.
                 </TableCell>
               </TableRow>
@@ -296,6 +356,7 @@ export default function PainelChamados() {
               filteredTasks.map((task) => {
                 const type = taskTypes.find((t) => t.id === task.type_id)
                 const status = taskStatuses.find((s) => s.id === task.status_id)
+                const requester = users.find((u) => u.id === task.requester_id)
                 const assignee = users.find((u) => u.id === task.assignee_id)
                 const plant = plants.find((p) => p.id === task.plant_id)
                 const sla = calculateSLA(task, type)
@@ -305,6 +366,7 @@ export default function PainelChamados() {
                     <TableCell className="font-medium text-slate-800">{task.task_number}</TableCell>
                     <TableCell className="text-slate-600">{plant?.name || '-'}</TableCell>
                     <TableCell className="text-slate-600">{type?.name || '-'}</TableCell>
+                    <TableCell className="text-slate-600">{requester?.name || '-'}</TableCell>
                     <TableCell className="text-slate-600">{assignee?.name || '-'}</TableCell>
                     <TableCell>
                       <Badge
@@ -380,7 +442,7 @@ export default function PainelChamados() {
                   <SelectContent>
                     {taskTypes.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
-                        {t.name} (SLA: {t.sla_hours}h)
+                        {t.name} (SLA: {t.sla_hours} dias)
                       </SelectItem>
                     ))}
                   </SelectContent>

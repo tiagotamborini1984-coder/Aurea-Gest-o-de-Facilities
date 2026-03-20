@@ -7,7 +7,8 @@ export function calculateSLA(task: any, taskType: any) {
   const end = task.closed_at ? new Date(task.closed_at) : new Date()
 
   const elapsedMins = differenceInMinutes(end, start)
-  const slaMins = (taskType.sla_hours || 0) * 60
+  // Note: sla_hours is now treated as days for business logic (as requested by user)
+  const slaMins = (taskType.sla_hours || 0) * 24 * 60
 
   if (slaMins <= 0) return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0 }
 
@@ -21,10 +22,18 @@ export function calculateSLA(task: any, taskType: any) {
   }
 
   const remainingMins = slaMins - elapsedMins
-  const hours = Math.floor(Math.abs(remainingMins) / 60)
-  const mins = Math.abs(remainingMins) % 60
+  const absMins = Math.abs(remainingMins)
+  const days = Math.floor(absMins / (24 * 60))
+  const hours = Math.floor((absMins % (24 * 60)) / 60)
 
-  const text = remainingMins < 0 ? `Atrasado ${hours}h ${mins}m` : `${hours}h ${mins}m restantes`
+  let timeText = ''
+  if (days > 0) {
+    timeText = `${days}d ${hours}h`
+  } else {
+    timeText = `${hours}h ${absMins % 60}m`
+  }
+
+  const text = remainingMins < 0 ? `Atrasado ${timeText}` : `${timeText} restantes`
 
   if (task.closed_at) {
     return {
