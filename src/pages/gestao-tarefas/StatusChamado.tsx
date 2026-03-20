@@ -7,7 +7,7 @@ import { useHasAccess } from '@/hooks/use-has-access'
 
 export default function StatusChamado() {
   const { profile } = useAppStore()
-  const hasAccess = useHasAccess('Gestão de Tarefas')
+  const hasAccess = useHasAccess('Gestão de Tarefas:Status')
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -33,6 +33,12 @@ export default function StatusChamado() {
             {
               name: 'freeze_sla',
               label: 'Congelar SLA (Pausar tempo)?',
+              type: 'toggle',
+              required: false,
+            },
+            {
+              name: 'return_to_requester',
+              label: 'Devolver para Requisitante ao entrar no status?',
               type: 'toggle',
               required: false,
             },
@@ -68,6 +74,11 @@ export default function StatusChamado() {
               accessor: 'freeze_sla',
               render: (item: any) => (item.freeze_sla ? 'Sim' : 'Não'),
             },
+            {
+              header: 'Devolve p/ Req.',
+              accessor: 'return_to_requester',
+              render: (item: any) => (item.return_to_requester ? 'Sim' : 'Não'),
+            },
           ] as ColumnDef[]
         }
         fetchQuery={async () => {
@@ -82,11 +93,13 @@ export default function StatusChamado() {
           const payload = { ...record, client_id: profile.client_id }
           if (payload.is_terminal === undefined) payload.is_terminal = false
           if (payload.freeze_sla === undefined) payload.freeze_sla = false
+          if (payload.return_to_requester === undefined) payload.return_to_requester = false
           if (payload.sla_days === undefined) payload.sla_days = 1
           const { error } = await supabase.from('task_statuses').insert(payload)
           return { success: !error, error }
         }}
         onUpdate={async (id: string, record: any) => {
+          if (record.return_to_requester === undefined) record.return_to_requester = false
           const { error } = await supabase.from('task_statuses').update(record).eq('id', id)
           return { success: !error, error }
         }}

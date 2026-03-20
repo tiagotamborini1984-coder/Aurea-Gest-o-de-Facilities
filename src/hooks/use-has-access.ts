@@ -22,5 +22,20 @@ export function useHasAccess(menuName: string) {
     return true
   }
 
+  if (menuName.startsWith('Gestão de Tarefas:') && userMenus.includes('Gestão de Tarefas')) {
+    return true
+  }
+
+  if (
+    menuName === 'Gestão de Tarefas' &&
+    userMenus.some((m) => m.startsWith('Gestão de Tarefas'))
+  ) {
+    return true
+  }
+
+  if (menuName === 'Cadastros' && userMenus.some((m) => m.startsWith('Cadastros'))) {
+    return true
+  }
+
   return userMenus.includes(menuName)
 }

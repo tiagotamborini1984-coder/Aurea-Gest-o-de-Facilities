@@ -30,6 +30,7 @@ const MAIN_MENUS = [
   'Usuários',
   'Encomendas',
   'Limpeza e Jardinagem',
+  'Gestão de Tarefas',
 ]
 
 const CADASTROS_SUBMENUS = [
@@ -43,6 +44,8 @@ const CADASTROS_SUBMENUS = [
   'Quadro Contratado',
   'Book de Metas',
 ]
+
+const GESTAO_TAREFAS_SUBMENUS = ['Painel', 'Tipos', 'Status', 'Relatórios']
 
 export function CreateUserDialog({
   open,
@@ -115,6 +118,14 @@ export function CreateUserDialog({
         next = next.filter((m) => m !== 'Cadastros')
         CADASTROS_SUBMENUS.forEach((sub) => {
           if (`Cadastros:${sub}` !== menu) next.push(`Cadastros:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (menu.startsWith('Gestão de Tarefas:') && next.includes('Gestão de Tarefas')) {
+        next = next.filter((m) => m !== 'Gestão de Tarefas')
+        GESTAO_TAREFAS_SUBMENUS.forEach((sub) => {
+          if (`Gestão de Tarefas:${sub}` !== menu) next.push(`Gestão de Tarefas:${sub}`)
         })
         return { ...p, accessible_menus: next }
       }
@@ -219,6 +230,29 @@ export function CreateUserDialog({
                             : 'outline'
                         }
                         className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Cadastros') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Gestão de Tarefas</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {GESTAO_TAREFAS_SUBMENUS.map((menu) => {
+                    const key = `Gestão de Tarefas:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Gestão de Tarefas')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Tarefas') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}
