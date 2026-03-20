@@ -34,6 +34,7 @@ import RelatoriosTarefas from './pages/gestao-tarefas/RelatoriosTarefas'
 
 // Auditoria e Checklist Pages
 import AuditoriaConfig from './pages/auditoria-checklist/Configuracao'
+import AuditoriasCriadas from './pages/auditoria-checklist/AuditoriasCriadas'
 import AuditoriaRealizadas from './pages/auditoria-checklist/Realizadas'
 import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
 
@@ -67,10 +68,12 @@ const App = () => (
 
                 {/* Auditoria e Checklist */}
                 <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
+                <Route path="/auditoria-checklist/configuracao/:id" element={<AuditoriaConfig />} />
+                <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
                 <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
                 <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
 
-                {/* Encomendas */}
+                {/* Gestão de Encomendas */}
                 <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
                 <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
                 <Route

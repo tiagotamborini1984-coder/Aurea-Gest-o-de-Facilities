@@ -275,31 +275,41 @@ export default function AuditoriaRealizadas() {
                     Nenhuma resposta registrada (Auditoria Pendente).
                   </p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {viewAnswers.map((ans, idx) => (
                       <div
                         key={ans.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-200 rounded-xl bg-white shadow-sm"
+                        className="flex flex-col p-4 border border-slate-200 rounded-xl bg-white shadow-sm"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-slate-800 text-sm">
-                            <span className="text-slate-400 mr-2">{idx + 1}.</span>
-                            {ans.audit_actions?.title}
-                          </p>
-                          {ans.evidence_url && (
-                            <a
-                              href={ans.evidence_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-block mt-2 text-xs text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-2 py-1 rounded"
-                            >
-                              Ver Evidência Anexada
-                            </a>
-                          )}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-800 text-sm">
+                              <span className="text-slate-400 mr-2">{idx + 1}.</span>
+                              {ans.audit_actions?.title}
+                            </p>
+                            {ans.evidence_url && (
+                              <a
+                                href={ans.evidence_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-block mt-2 text-xs text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-2 py-1 rounded border border-brand-deepBlue/10"
+                              >
+                                Ver Evidência Anexada
+                              </a>
+                            )}
+                          </div>
+                          <div className="shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-slate-50 border border-slate-200 text-lg font-black text-brand-deepBlue">
+                            {ans.score}
+                          </div>
                         </div>
-                        <div className="shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 border border-slate-200 text-lg font-black text-brand-deepBlue">
-                          {ans.score}
-                        </div>
+                        {ans.observations && (
+                          <div className="mt-3 pt-3 border-t border-slate-50">
+                            <p className="text-xs text-slate-500">
+                              <strong className="font-semibold text-slate-600">Observações:</strong>{' '}
+                              {ans.observations}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

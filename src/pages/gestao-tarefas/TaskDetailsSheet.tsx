@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -11,12 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Send, User, Paperclip } from 'lucide-react'
+import { Loader2, Send, User, Paperclip, CheckCircle, ArrowRight, ChevronLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export function TaskDetailsSheet({
   task,
@@ -33,7 +44,7 @@ export function TaskDetailsSheet({
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Audit specific state
+  // Audit Wizard specific state
   const [auditExecution, setAuditExecution] = useState<any>(null)
   const [auditActions, setAuditActions] = useState<any[]>([])
   const [auditAnswers, setAuditAnswers] = useState<Record<string, any>>({})
@@ -41,10 +52,16 @@ export function TaskDetailsSheet({
   const [auditParticipants, setAuditParticipants] = useState('')
   const [isSavingAudit, setIsSavingAudit] = useState(false)
 
+  const [wizardStep, setWizardStep] = useState<number>(-1)
+  const [showConfirm, setShowConfirm] = useState(false)
+
   useEffect(() => {
     if (isOpen && task) {
       loadTimeline()
       checkAudit()
+    } else {
+      setWizardStep(-1)
+      setAuditAnswers({})
     }
   }, [isOpen, task])
 
@@ -78,6 +95,7 @@ export function TaskDetailsSheet({
       setAuditActions(actions || [])
 
       if (exec.status === 'Finalizado') {
+        setWizardStep(-1)
         const { data: answers } = await supabase
           .from('audit_execution_answers')
           .select('*')
@@ -87,11 +105,14 @@ export function TaskDetailsSheet({
           ansMap[a.action_id] = a
         })
         setAuditAnswers(ansMap)
+      } else {
+        setWizardStep(0)
       }
     } else {
       setAuditExecution(null)
       setAuditActions([])
       setAuditAnswers({})
+      setWizardStep(-1)
     }
   }
 
@@ -155,39 +176,22 @@ export function TaskDetailsSheet({
   }
 
   const handleSaveAudit = async () => {
-    let hasError = false
-    for (const action of auditActions) {
-      const ans = auditAnswers[action.id]
-      if (!ans || !ans.score) {
-        hasError = true
-        toast({ title: 'Preencha todas as notas', variant: 'destructive' })
-        return
-      }
-      if (action.evidence_required && !ans.evidence_url) {
-        hasError = true
-        toast({ title: `Evidência obrigatória para: ${action.title}`, variant: 'destructive' })
-        return
-      }
-    }
-    if (!auditRealizationDate) {
-      toast({ title: 'Preencha a data de realização', variant: 'destructive' })
-      return
-    }
-
     setIsSavingAudit(true)
+    setShowConfirm(false)
     try {
       let totalScore = 0
       let maxScore = auditActions.length * 5
 
       const answersToInsert = auditActions.map((action) => {
-        const ans = auditAnswers[action.id]
-        totalScore += ans.score
+        const ans = auditAnswers[action.id] || {}
+        totalScore += ans.score || 0
         return {
           execution_id: auditExecution.id,
           action_id: action.id,
           score: ans.score,
           evidence_url: ans.evidence_url || null,
-        }
+          observations: ans.observations || null,
+        } as any
       })
 
       await supabase.from('audit_execution_answers').insert(answersToInsert)
@@ -209,7 +213,7 @@ export function TaskDetailsSheet({
       }
 
       toast({
-        title: 'Auditoria finalizada com sucesso!',
+        title: 'Auditoria enviada com sucesso!',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
       onClose()
@@ -218,6 +222,34 @@ export function TaskDetailsSheet({
       toast({ title: 'Erro ao salvar auditoria', description: e.message, variant: 'destructive' })
     } finally {
       setIsSavingAudit(false)
+    }
+  }
+
+  const handleNextStep = () => {
+    if (wizardStep === 0) {
+      if (!auditRealizationDate) {
+        toast({ title: 'Preencha a data de realização', variant: 'destructive' })
+        return
+      }
+      setWizardStep(1)
+      return
+    }
+
+    const action = auditActions[wizardStep - 1]
+    const ans = auditAnswers[action.id]
+    if (!ans || !ans.score) {
+      toast({ title: 'Selecione uma nota de 1 a 5', variant: 'destructive' })
+      return
+    }
+    if (action.evidence_required && !ans.evidence_url) {
+      toast({ title: 'A evidência é obrigatória para esta ação', variant: 'destructive' })
+      return
+    }
+
+    if (wizardStep < auditActions.length) {
+      setWizardStep(wizardStep + 1)
+    } else {
+      setShowConfirm(true)
     }
   }
 
@@ -230,281 +262,356 @@ export function TaskDetailsSheet({
       ? [task.attachment_url]
       : []
 
-  return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-full p-0 bg-slate-50 border-l border-gray-200">
-        <SheetHeader className="p-6 pb-4 bg-white border-b border-gray-200 shrink-0">
-          <SheetTitle className="text-xl text-slate-800">
-            {task?.task_number} {task?.title ? `- ${task.title}` : ''}
-          </SheetTitle>
-          <div className="text-sm text-slate-500 mt-1">
-            Aberto por{' '}
-            <span className="font-medium text-slate-700">
-              {getAssigneeName(task?.requester_id)}
-            </span>{' '}
-            para{' '}
-            <span className="font-medium text-slate-700">{getAssigneeName(task?.assignee_id)}</span>
+  const renderWizard = () => {
+    if (wizardStep === 0) {
+      return (
+        <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
+          <div className="text-center mb-6">
+            <h4 className="font-bold text-xl text-slate-800">Iniciar Auditoria</h4>
+            <p className="text-sm text-slate-500">
+              Confirme a data e os participantes antes de começar.
+            </p>
           </div>
-        </SheetHeader>
+          <div className="space-y-2">
+            <Label className="text-slate-700">Data de Realização *</Label>
+            <Input
+              type="date"
+              value={auditRealizationDate}
+              onChange={(e) => setAuditRealizationDate(e.target.value)}
+              className="border-slate-200 bg-slate-50 h-12"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-slate-700">Participantes (Opcional)</Label>
+            <Input
+              value={auditParticipants}
+              onChange={(e) => setAuditParticipants(e.target.value)}
+              placeholder="Nomes dos participantes separados por vírgula"
+              className="border-slate-200 bg-slate-50 h-12"
+            />
+          </div>
+          <Button onClick={handleNextStep} className="w-full h-12 mt-6 text-lg" variant="tech">
+            Iniciar Checklist <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+        </div>
+      )
+    }
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-            <h4 className="font-semibold text-slate-800 mb-2">Descrição</h4>
-            <p className="text-slate-600 text-sm whitespace-pre-wrap">{task?.description}</p>
+    const actionIndex = wizardStep - 1
+    const action = auditActions[actionIndex]
+    const ans = auditAnswers[action.id] || {}
 
-            {attachmentUrls.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <h5 className="text-sm font-medium text-slate-700 mb-3">Anexos</h5>
-                <div className="flex flex-col gap-2">
-                  {attachmentUrls.map((url, i) => (
-                    <a
-                      key={i}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center p-2 rounded-md bg-slate-50 border border-slate-200 text-sm text-brand-deepBlue hover:bg-slate-100 transition-colors w-fit"
-                    >
-                      <Paperclip className="w-4 h-4 mr-2" />
-                      Anexo {i + 1}
-                    </a>
-                  ))}
-                </div>
-              </div>
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-bold text-brand-deepBlue bg-brand-deepBlue/10 px-3 py-1 rounded-full">
+            Ação {wizardStep} de {auditActions.length}
+          </span>
+          <Badge variant="outline" className="border-slate-200 text-slate-500">
+            {auditExecution.audits?.title}
+          </Badge>
+        </div>
+
+        <h3 className="text-xl font-bold text-slate-800 leading-snug">
+          {action.title}
+          {action.evidence_required && (
+            <span className="block mt-1 text-red-500 text-xs font-bold tracking-wide">
+              * EVIDÊNCIA OBRIGATÓRIA
+            </span>
+          )}
+        </h3>
+
+        <div className="space-y-6 pt-2">
+          <div>
+            <Label className="mb-3 block text-slate-700">Pontuação (1 a 5) *</Label>
+            <div className="flex gap-2 sm:gap-3">
+              {[1, 2, 3, 4, 5].map((score) => (
+                <Button
+                  key={score}
+                  type="button"
+                  variant={ans.score === score ? 'default' : 'outline'}
+                  className={cn(
+                    'flex-1 h-14 text-xl font-black rounded-xl transition-all',
+                    ans.score === score
+                      ? 'bg-brand-deepBlue text-white scale-[1.02] shadow-md border-transparent'
+                      : 'text-slate-600 border-slate-200 hover:border-brand-deepBlue/50 hover:bg-brand-deepBlue/5',
+                  )}
+                  onClick={() =>
+                    setAuditAnswers({
+                      ...auditAnswers,
+                      [action.id]: { ...ans, score },
+                    })
+                  }
+                >
+                  {score}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <Label className="mb-2 block text-slate-700">
+              Anexar Evidência {action.evidence_required ? '(Obrigatória)' : '(Opcional)'}
+            </Label>
+            <div className="relative">
+              <Input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => handleEvidenceUpload(action.id, e.target.files?.[0])}
+                className="bg-white border-slate-200 cursor-pointer file:cursor-pointer"
+                disabled={ans.uploading}
+              />
+            </div>
+            {ans.uploading && (
+              <span className="text-xs text-brand-deepBlue mt-2 flex items-center font-medium">
+                <Loader2 className="w-3 h-3 animate-spin mr-1" /> Enviando arquivo...
+              </span>
+            )}
+            {ans.evidence_url && !ans.uploading && (
+              <a
+                href={ans.evidence_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-green-600 text-sm flex items-center mt-3 font-medium hover:underline bg-green-50 w-fit px-3 py-1.5 rounded-lg border border-green-100"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" /> Ver arquivo anexado
+              </a>
             )}
           </div>
 
-          {auditExecution && (
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm mt-4 animate-in fade-in">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-semibold text-slate-800 text-lg">Realização de Auditoria</h4>
-                <Badge
-                  variant="outline"
-                  className="bg-brand-deepBlue/10 text-brand-deepBlue border-brand-deepBlue/20"
-                >
-                  {auditExecution.audits?.title}
-                </Badge>
-              </div>
+          <div>
+            <Label className="mb-2 block text-slate-700">Observações (Opcional)</Label>
+            <Textarea
+              value={ans.observations || ''}
+              onChange={(e) =>
+                setAuditAnswers({
+                  ...auditAnswers,
+                  [action.id]: { ...ans, observations: e.target.value },
+                })
+              }
+              placeholder="Adicione detalhes ou justificativas sobre esta ação..."
+              className="resize-none h-24 bg-slate-50 border-slate-200"
+            />
+          </div>
+        </div>
 
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-slate-700">Data de Realização</Label>
-                    <Input
-                      type="date"
-                      value={auditRealizationDate}
-                      onChange={(e) => setAuditRealizationDate(e.target.value)}
-                      disabled={auditExecution.status === 'Finalizado'}
-                      className="border-slate-200 bg-slate-50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700">Participantes</Label>
-                    <Input
-                      value={auditParticipants}
-                      onChange={(e) => setAuditParticipants(e.target.value)}
-                      placeholder="Nomes dos participantes"
-                      disabled={auditExecution.status === 'Finalizado'}
-                      className="border-slate-200 bg-slate-50"
-                    />
-                  </div>
-                </div>
+        <div className="flex justify-between pt-6 mt-6 border-t border-slate-100">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setWizardStep(wizardStep - 1)}
+            className="h-12 px-6 border-slate-200 text-slate-600 hover:bg-slate-50"
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
+          </Button>
+          {wizardStep < auditActions.length ? (
+            <Button type="button" variant="tech" onClick={handleNextStep} className="h-12 px-8">
+              Próximo <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => setShowConfirm(true)}
+              className="h-12 px-8 bg-green-600 hover:bg-green-700 text-white shadow-md"
+            >
+              Enviar Auditoria <CheckCircle className="w-4 h-4 ml-2" />
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
-                <div className="space-y-4 pt-2">
-                  <h5 className="font-semibold text-slate-700">Ações a Avaliar</h5>
-                  {auditActions.map((action, idx) => {
-                    const ans = auditAnswers[action.id] || {}
-                    return (
-                      <div
-                        key={action.id}
-                        className="p-4 border border-slate-200 rounded-lg bg-white shadow-sm"
+  return (
+    <>
+      <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-full p-0 bg-slate-50 border-l border-gray-200">
+          <SheetHeader className="p-6 pb-4 bg-white border-b border-gray-200 shrink-0">
+            <SheetTitle className="text-xl text-slate-800">
+              {task?.task_number} {task?.title ? `- ${task.title}` : ''}
+            </SheetTitle>
+            <div className="text-sm text-slate-500 mt-1">
+              Aberto por{' '}
+              <span className="font-medium text-slate-700">
+                {getAssigneeName(task?.requester_id)}
+              </span>{' '}
+              para{' '}
+              <span className="font-medium text-slate-700">
+                {getAssigneeName(task?.assignee_id)}
+              </span>
+            </div>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+              <h4 className="font-semibold text-slate-800 mb-2">Descrição</h4>
+              <p className="text-slate-600 text-sm whitespace-pre-wrap">{task?.description}</p>
+
+              {attachmentUrls.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <h5 className="text-sm font-medium text-slate-700 mb-3">Anexos Iniciais</h5>
+                  <div className="flex flex-col gap-2">
+                    {attachmentUrls.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center p-2 rounded-md bg-slate-50 border border-slate-200 text-sm text-brand-deepBlue hover:bg-slate-100 transition-colors w-fit"
                       >
-                        <p className="font-medium text-slate-800 mb-3">
-                          {idx + 1}. {action.title}
-                          {action.evidence_required && (
-                            <span className="text-red-500 text-xs ml-2 font-bold tracking-wide">
-                              * OBRIGATÓRIO EVIDÊNCIA
-                            </span>
-                          )}
-                        </p>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-                          <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map((score) => (
-                              <Button
-                                key={score}
-                                type="button"
-                                variant={ans.score === score ? 'default' : 'outline'}
-                                className={cn(
-                                  'w-10 h-10 p-0 text-sm font-bold transition-all',
-                                  ans.score === score
-                                    ? 'bg-brand-deepBlue hover:bg-brand-deepBlue/90 scale-105'
-                                    : 'text-slate-600',
-                                )}
-                                onClick={() =>
-                                  setAuditAnswers({
-                                    ...auditAnswers,
-                                    [action.id]: { ...ans, score },
-                                  })
-                                }
-                                disabled={auditExecution.status === 'Finalizado'}
-                              >
-                                {score}
-                              </Button>
-                            ))}
-                          </div>
-                          <div className="w-full sm:w-auto">
-                            {auditExecution.status !== 'Finalizado' ? (
-                              <div className="relative">
-                                <Input
-                                  type="file"
-                                  accept="image/*,.pdf"
-                                  onChange={(e) =>
-                                    handleEvidenceUpload(action.id, e.target.files?.[0])
-                                  }
-                                  className="w-full sm:w-64 text-xs file:text-xs cursor-pointer border-slate-200"
-                                  disabled={ans.uploading}
-                                />
-                                {ans.evidence_url && !ans.uploading && (
-                                  <span className="absolute -top-2 -right-2 bg-green-500 w-4 h-4 rounded-full border-2 border-white"></span>
-                                )}
-                              </div>
-                            ) : ans.evidence_url ? (
-                              <a
-                                href={ans.evidence_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-brand-deepBlue text-sm flex items-center hover:underline bg-brand-deepBlue/5 px-3 py-1.5 rounded-md w-fit"
-                              >
-                                <Paperclip className="w-4 h-4 mr-2" /> Ver Evidência
-                              </a>
-                            ) : (
-                              <span className="text-sm text-slate-400 italic">Sem evidência</span>
-                            )}
-                            {ans.uploading && (
-                              <span className="text-xs text-brand-deepBlue mt-1 flex items-center font-medium">
-                                <Loader2 className="w-3 h-3 animate-spin mr-1" /> Enviando
-                                arquivo...
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                        <Paperclip className="w-4 h-4 mr-2" />
+                        Anexo {i + 1}
+                      </a>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
 
-                {auditExecution.status !== 'Finalizado' ? (
-                  <Button
-                    onClick={handleSaveAudit}
-                    disabled={isSavingAudit}
-                    className="w-full mt-6 shadow-md"
-                    variant="tech"
-                    size="lg"
-                  >
-                    {isSavingAudit ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                    Concluir e Salvar Auditoria
-                  </Button>
-                ) : (
-                  <div className="mt-6 p-5 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between shadow-sm">
-                    <span className="font-bold text-green-800 text-lg">Auditoria Finalizada</span>
-                    <div className="text-right">
-                      <span className="block text-xs text-green-700 font-medium uppercase tracking-wider mb-1">
-                        Pontuação Final
-                      </span>
-                      <span className="text-3xl font-black text-green-900">
-                        {auditExecution.final_score}{' '}
-                        <span className="text-lg text-green-700">/ {auditExecution.max_score}</span>
-                      </span>
-                    </div>
+            {auditExecution && wizardStep >= 0 && (
+              <div className="bg-white p-6 rounded-2xl border border-brand-deepBlue/20 shadow-md relative overflow-hidden">
+                {wizardStep > 0 && (
+                  <div className="absolute top-0 left-0 h-1.5 bg-slate-100 w-full">
+                    <div
+                      className="h-full bg-brand-vividBlue transition-all duration-500 ease-in-out"
+                      style={{ width: `${(wizardStep / auditActions.length) * 100}%` }}
+                    ></div>
                   </div>
                 )}
+                {renderWizard()}
               </div>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <h4 className="font-semibold text-slate-800">Linha do Tempo</h4>
-            {loading ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-              </div>
-            ) : timeline.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">
-                Nenhuma interação registrada.
-              </p>
-            ) : (
-              timeline.map((event: any) => (
-                <div key={event.id} className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-brand-deepBlue/10 flex items-center justify-center shrink-0">
-                    <User className="w-4 h-4 text-brand-deepBlue" />
-                  </div>
-                  <div className="flex-1 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-sm text-slate-800">
-                        {event.user?.name || 'Usuário'}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {format(new Date(event.created_at), 'dd/MM HH:mm')}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-700 mt-1 font-medium">{event.content}</p>
-                  </div>
-                </div>
-              ))
             )}
-          </div>
-        </div>
 
-        <div className="p-4 bg-white border-t border-gray-200 space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-              Alterar Status:
-            </span>
-            <Select
-              value={task?.status_id}
-              onValueChange={handleStatusChange}
-              disabled={auditExecution && auditExecution.status !== 'Finalizado'}
-            >
-              <SelectTrigger className="bg-slate-50 border-slate-200">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {taskStatuses.map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: s.color }}
-                      ></span>
-                      {s.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-2">
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Adicione um comentário ou atualização..."
-              className="resize-none h-10 min-h-[44px] bg-slate-50 border-slate-200"
-            />
-            <Button
-              onClick={handleAddComment}
-              disabled={isSubmitting || !comment.trim()}
-              variant="tech"
-              className="h-auto px-4"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+            {auditExecution && auditExecution.status === 'Finalizado' && (
+              <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in">
+                <div>
+                  <span className="font-bold text-green-900 text-lg flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-2 text-green-600" /> Auditoria Finalizada
+                  </span>
+                  <p className="text-sm text-green-700 mt-1">
+                    As respostas foram salvas e enviadas com sucesso.
+                  </p>
+                </div>
+                <div className="text-right bg-white px-4 py-2 rounded-lg border border-green-100 shadow-sm">
+                  <span className="block text-[10px] text-green-600 font-bold uppercase tracking-wider mb-0.5">
+                    Score Obtido
+                  </span>
+                  <span className="text-3xl font-black text-green-900">
+                    {auditExecution.final_score}{' '}
+                    <span className="text-lg text-green-700">/ {auditExecution.max_score}</span>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4 pt-4">
+              <h4 className="font-semibold text-slate-800">Linha do Tempo</h4>
+              {loading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : timeline.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">
+                  Nenhuma interação registrada.
+                </p>
               ) : (
-                <Send className="w-5 h-5" />
+                timeline.map((event: any) => (
+                  <div key={event.id} className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-brand-deepBlue/10 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4 text-brand-deepBlue" />
+                    </div>
+                    <div className="flex-1 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-semibold text-sm text-slate-800">
+                          {event.user?.name || 'Usuário'}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {format(new Date(event.created_at), 'dd/MM HH:mm')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-700 mt-1 font-medium">{event.content}</p>
+                    </div>
+                  </div>
+                ))
               )}
-            </Button>
+            </div>
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+
+          <div className="p-4 bg-white border-t border-gray-200 space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                Alterar Status:
+              </span>
+              <Select
+                value={task?.status_id}
+                onValueChange={handleStatusChange}
+                disabled={auditExecution && auditExecution.status !== 'Finalizado'}
+              >
+                <SelectTrigger className="bg-slate-50 border-slate-200">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {taskStatuses.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: s.color }}
+                        ></span>
+                        {s.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Adicione um comentário ou atualização..."
+                className="resize-none h-10 min-h-[44px] bg-slate-50 border-slate-200"
+              />
+              <Button
+                onClick={handleAddComment}
+                disabled={isSubmitting || !comment.trim()}
+                variant="tech"
+                className="h-auto px-4"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Envio</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja enviar esta auditoria? Após o envio,{' '}
+              <strong className="text-slate-800">as respostas não poderão ser editadas</strong> e o
+              status será alterado para Finalizado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSavingAudit}>Voltar para revisar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSaveAudit}
+              disabled={isSavingAudit}
+              className="bg-brand-deepBlue text-white"
+            >
+              {isSavingAudit ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Sim, enviar agora
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

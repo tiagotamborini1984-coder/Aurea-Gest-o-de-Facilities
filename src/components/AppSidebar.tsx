@@ -69,6 +69,7 @@ export function AppSidebar() {
       icon: ClipboardCheck,
       subItems: [
         { title: 'Nova Auditoria', path: '/auditoria-checklist/configuracao' },
+        { title: 'Auditorias Criadas', path: '/auditoria-checklist/criadas' },
         { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
         { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
       ],

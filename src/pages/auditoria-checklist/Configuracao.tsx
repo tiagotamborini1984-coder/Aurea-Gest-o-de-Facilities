@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
@@ -14,9 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Save, ClipboardCheck, ArrowRight } from 'lucide-react'
+import { Plus, Trash2, Loader2, Save, ClipboardCheck, ArrowLeft } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, Link } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { format } from 'date-fns'
 
@@ -24,6 +24,7 @@ type Assignment = { plant_id: string; assignee_id: string }
 type Action = { title: string; evidence_required: boolean }
 
 export default function AuditoriaConfig() {
+  const { id } = useParams()
   const { profile } = useAppStore()
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Auditoria e Checklist')
@@ -34,15 +35,16 @@ export default function AuditoriaConfig() {
   const [type, setType] = useState('Qualidade')
   const [frequency, setFrequency] = useState('Única')
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [advanceNotice, setAdvanceNotice] = useState('0')
 
   const [assignments, setAssignments] = useState<Assignment[]>([{ plant_id: '', assignee_id: '' }])
   const [actions, setActions] = useState<Action[]>([{ title: '', evidence_required: false }])
 
   const [users, setUsers] = useState<any[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false)
 
-  // Fetch users for assignments
-  useState(() => {
+  useEffect(() => {
     if (profile?.client_id) {
       supabase
         .from('profiles')
@@ -52,7 +54,42 @@ export default function AuditoriaConfig() {
           if (res.data) setUsers(res.data)
         })
     }
-  })
+  }, [profile])
+
+  useEffect(() => {
+    if (id && profile) {
+      setIsLoadingAudit(true)
+      const loadAudit = async () => {
+        const { data: audit } = await supabase.from('audits').select('*').eq('id', id).single()
+        if (audit) {
+          setTitle(audit.title)
+          setType(audit.type)
+          setFrequency(audit.frequency)
+          setStartDate(audit.start_date)
+          setAdvanceNotice((audit as any).advance_notice_days?.toString() || '0')
+
+          const { data: acts } = await supabase
+            .from('audit_actions')
+            .select('*')
+            .eq('audit_id', id)
+            .order('order_index')
+          if (acts && acts.length > 0) setActions(acts)
+
+          const { data: assigns } = await supabase
+            .from('audit_assignments' as any)
+            .select('*')
+            .eq('audit_id', id)
+          if (assigns && assigns.length > 0) {
+            setAssignments(
+              assigns.map((a: any) => ({ plant_id: a.plant_id, assignee_id: a.assignee_id })),
+            )
+          }
+        }
+        setIsLoadingAudit(false)
+      }
+      loadAudit()
+    }
+  }, [id, profile])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -78,136 +115,176 @@ export default function AuditoriaConfig() {
     setIsSubmitting(true)
 
     try {
-      // 1. Ensure Task Type "Auditoria" exists
-      const { data: tTypes } = await supabase
-        .from('task_types')
-        .select('id')
-        .eq('client_id', profile.client_id)
-        .ilike('name', '%Auditoria%')
-      let typeId = tTypes?.[0]?.id
-      if (!typeId) {
-        const res = await supabase
-          .from('task_types')
-          .insert({ client_id: profile.client_id, name: 'Auditoria', sla_hours: 48 })
+      let auditId = id
+
+      if (auditId) {
+        // Update Audit
+        await supabase
+          .from('audits')
+          .update({
+            title,
+            type,
+            frequency,
+            start_date: startDate,
+            advance_notice_days: parseInt(advanceNotice) || 0,
+          } as any)
+          .eq('id', auditId)
+      } else {
+        // Create Audit Template
+        const { data: newAudit, error: auditErr } = await supabase
+          .from('audits')
+          .insert({
+            client_id: profile.client_id,
+            title,
+            type,
+            frequency,
+            start_date: startDate,
+            advance_notice_days: parseInt(advanceNotice) || 0,
+          } as any)
           .select()
           .single()
-        typeId = res.data.id
+
+        if (auditErr) throw auditErr
+        auditId = newAudit.id
       }
 
-      // 2. Ensure Task Statuses exist
-      const { data: statuses } = await supabase
-        .from('task_statuses')
-        .select('*')
-        .eq('client_id', profile.client_id)
-        .order('created_at')
-      let pendingStatus = statuses?.find((s) => !s.is_terminal)?.id
-      if (!pendingStatus) {
-        const res = await supabase
-          .from('task_statuses')
-          .insert({ client_id: profile.client_id, name: 'Pendente', color: '#f59e0b', sla_days: 1 })
-          .select()
-          .single()
-        pendingStatus = res.data.id
-      }
-
-      // 3. Create Audit Template
-      const { data: newAudit, error: auditErr } = await supabase
-        .from('audits')
-        .insert({
-          client_id: profile.client_id,
-          title,
-          type,
-          frequency,
-          start_date: startDate,
-        })
-        .select()
-        .single()
-      if (auditErr) throw auditErr
-
-      // 4. Create Audit Actions
+      // Recreate Actions
+      await supabase.from('audit_actions').delete().eq('audit_id', auditId!)
       const actionsToInsert = actions.map((a, idx) => ({
-        audit_id: newAudit.id,
+        audit_id: auditId!,
         title: a.title,
         evidence_required: a.evidence_required,
         order_index: idx,
       }))
-      const { error: actErr } = await supabase.from('audit_actions').insert(actionsToInsert)
-      if (actErr) throw actErr
+      await supabase.from('audit_actions').insert(actionsToInsert)
 
-      // 5. Create Tasks and Executions
-      for (const assign of assignments) {
-        // Generate Task Number
-        const year = new Date().getFullYear()
-        const { data: latest } = await supabase
-          .from('tasks')
-          .select('task_number')
-          .eq('client_id', profile.client_id)
-          .like('task_number', `TSK-${year}-%`)
-          .order('created_at', { ascending: false })
-          .limit(1)
-        let seq = 1
-        if (latest && latest.length > 0) {
-          const parts = latest[0].task_number.split('-')
-          if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
+      // Recreate Assignments
+      await supabase
+        .from('audit_assignments' as any)
+        .delete()
+        .eq('audit_id', auditId!)
+      const assignmentsToInsert = assignments.map((a) => ({
+        audit_id: auditId!,
+        plant_id: a.plant_id,
+        assignee_id: a.assignee_id,
+      }))
+      await supabase.from('audit_assignments' as any).insert(assignmentsToInsert)
+
+      // If new, generate initial tasks if date is within advance notice
+      if (!id) {
+        const start = new Date(`${startDate}T12:00:00Z`)
+        const today = new Date()
+        const advance = parseInt(advanceNotice) || 0
+        const triggerDate = new Date(start)
+        triggerDate.setDate(triggerDate.getDate() - advance)
+
+        if (today >= triggerDate) {
+          const { data: typeRes } = await supabase
+            .from('task_types')
+            .select('id')
+            .eq('client_id', profile.client_id)
+            .ilike('name', '%Auditoria%')
+            .limit(1)
+          let typeId = typeRes?.[0]?.id
+
+          const { data: statusRes } = await supabase
+            .from('task_statuses')
+            .select('id')
+            .eq('client_id', profile.client_id)
+            .eq('is_terminal', false)
+            .limit(1)
+          let statusId = statusRes?.[0]?.id
+
+          if (typeId && statusId) {
+            for (const assign of assignments) {
+              const year = new Date().getFullYear()
+              const { data: latest } = await supabase
+                .from('tasks')
+                .select('task_number')
+                .eq('client_id', profile.client_id)
+                .like('task_number', `TSK-${year}-%`)
+                .order('created_at', { ascending: false })
+                .limit(1)
+
+              let seq = 1
+              if (latest && latest.length > 0) {
+                const parts = latest[0].task_number.split('-')
+                if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
+              }
+              const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
+
+              const { data: newTask } = await supabase
+                .from('tasks')
+                .insert({
+                  client_id: profile.client_id,
+                  plant_id: assign.plant_id,
+                  type_id: typeId,
+                  status_id: statusId,
+                  requester_id: profile.id,
+                  assignee_id: assign.assignee_id,
+                  task_number: taskNumber,
+                  title: `Auditoria: ${title}`,
+                  description: `Por favor, realize a auditoria "${title}" agendada para ${startDate.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`,
+                  due_date: new Date(`${startDate}T23:59:59.999Z`).toISOString(),
+                  status_updated_at: new Date().toISOString(),
+                } as any)
+                .select()
+                .single()
+
+              if (newTask) {
+                await supabase.from('audit_executions').insert({
+                  audit_id: auditId!,
+                  task_id: newTask.id,
+                  assignee_id: assign.assignee_id,
+                  plant_id: assign.plant_id,
+                  status: 'Pendente',
+                })
+              }
+            }
+          }
         }
-        const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-
-        // Insert Task with SLA linked to start_date
-        const { data: newTask, error: taskErr } = await supabase
-          .from('tasks')
-          .insert({
-            client_id: profile.client_id,
-            plant_id: assign.plant_id,
-            type_id: typeId,
-            status_id: pendingStatus,
-            requester_id: profile.id,
-            assignee_id: assign.assignee_id,
-            task_number: taskNumber,
-            title: `Auditoria: ${title}`,
-            description: `Por favor, realize a auditoria "${title}" agendada para iniciar em ${startDate.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`,
-            due_date: new Date(`${startDate}T23:59:59.999Z`).toISOString(),
-            status_updated_at: new Date().toISOString(),
-          } as any)
-          .select()
-          .single()
-        if (taskErr) throw taskErr
-
-        // Insert Execution
-        const { error: execErr } = await supabase.from('audit_executions').insert({
-          audit_id: newAudit.id,
-          task_id: newTask.id,
-          assignee_id: assign.assignee_id,
-          plant_id: assign.plant_id,
-          status: 'Pendente',
-        })
-        if (execErr) throw execErr
       }
 
       toast({
-        title: 'Auditoria criada com sucesso!',
+        title: id ? 'Auditoria atualizada!' : 'Auditoria criada com sucesso!',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
-      navigate('/auditoria-checklist/realizadas')
+      navigate('/auditoria-checklist/criadas')
     } catch (err: any) {
-      toast({ title: 'Erro ao criar auditoria', description: err.message, variant: 'destructive' })
+      toast({ title: 'Erro ao salvar auditoria', description: err.message, variant: 'destructive' })
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  if (isLoadingAudit) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-deepBlue" />
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-fade-in">
-      <div className="flex items-center gap-3">
-        <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
-          <ClipboardCheck className="h-6 w-6 text-brand-deepBlue" />
-        </div>
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Nova Auditoria
-          </h2>
-          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-            Crie templates, defina ações e distribua responsáveis.
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" asChild className="h-10 w-10 shrink-0">
+            <Link to="/auditoria-checklist/criadas">
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </Link>
+          </Button>
+          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm shrink-0">
+            <ClipboardCheck className="h-6 w-6 text-brand-deepBlue" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              {id ? 'Editar Auditoria' : 'Nova Auditoria'}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+              Crie templates, defina ações, regras e frequência.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -240,13 +317,42 @@ export default function AuditoriaConfig() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-700">Data Limite (SLA) *</Label>
+                <Label className="text-slate-700">Frequência</Label>
+                <Select value={frequency} onValueChange={setFrequency}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Única">Única</SelectItem>
+                    <SelectItem value="Diária">Diária</SelectItem>
+                    <SelectItem value="Semanal">Semanal</SelectItem>
+                    <SelectItem value="Mensal">Mensal</SelectItem>
+                    <SelectItem value="Semestral">Semestral</SelectItem>
+                    <SelectItem value="Anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-700">Data de Início *</Label>
                 <Input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
                   className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-700">
+                  Antecedência (dias antes para abrir tarefa)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={advanceNotice}
+                  onChange={(e) => setAdvanceNotice(e.target.value)}
+                  className="bg-white"
+                  placeholder="Ex: 5"
                 />
               </div>
             </div>
@@ -420,7 +526,7 @@ export default function AuditoriaConfig() {
             ) : (
               <Save className="w-5 h-5 mr-2" />
             )}
-            Criar Auditoria e Disparar Tarefas
+            {id ? 'Salvar Alterações' : 'Criar Auditoria e Agendar'}
           </Button>
         </div>
       </form>
