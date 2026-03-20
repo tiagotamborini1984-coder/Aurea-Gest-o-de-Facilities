@@ -1,4 +1,4 @@
-DO $
+DO $$
 BEGIN
   -- Add freeze_sla to task_statuses
   ALTER TABLE public.task_statuses ADD COLUMN IF NOT EXISTS freeze_sla BOOLEAN NOT NULL DEFAULT false;
@@ -9,11 +9,11 @@ BEGIN
 
   -- Backfill status_updated_at for any existing rows where it might be null
   UPDATE public.tasks SET status_updated_at = created_at WHERE status_updated_at IS NULL OR status_updated_at > NOW();
-END $;
+END $$;
 
 -- Create or replace trigger function to handle SLA pausing automatically
 CREATE OR REPLACE FUNCTION public.handle_task_status_change()
-RETURNS trigger AS $
+RETURNS trigger AS $$
 DECLARE
   v_old_status_freeze BOOLEAN;
 BEGIN
@@ -33,7 +33,7 @@ BEGIN
   
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_task_status_change ON public.tasks;
 
