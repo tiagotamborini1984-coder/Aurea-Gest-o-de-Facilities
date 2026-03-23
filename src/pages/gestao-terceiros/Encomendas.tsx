@@ -23,6 +23,12 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Package,
   Search,
   Plus,
@@ -35,6 +41,7 @@ import {
   Edit,
   Paperclip,
   FileText,
+  ChevronDown,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -61,7 +68,7 @@ export default function Encomendas() {
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPlant, setFilterPlant] = useState('all')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatuses, setFilterStatuses] = useState<string[]>(['Aguardando Retirada'])
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -357,14 +364,14 @@ export default function Encomendas() {
   const filteredPackages = useMemo(() => {
     return packages.filter((p) => {
       const matchPlant = filterPlant === 'all' || p.plant_id === filterPlant
-      const matchStatus = filterStatus === 'all' || p.status === filterStatus
+      const matchStatus = filterStatuses.length === 0 || filterStatuses.includes(p.status)
       const matchSearch =
         p.recipient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.protocol_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.sender.toLowerCase().includes(searchTerm.toLowerCase())
       return matchPlant && matchStatus && matchSearch
     })
-  }, [packages, filterPlant, filterStatus, searchTerm])
+  }, [packages, filterPlant, filterStatuses, searchTerm])
 
   const metrics = useMemo(() => {
     let totalDeliveredLead = 0
@@ -499,18 +506,40 @@ export default function Encomendas() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full sm:w-56 border-t sm:border-t-0 sm:border-l border-gray-200 pl-0 sm:pl-4">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="border-0 shadow-none bg-transparent text-slate-700 font-medium">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Status</SelectItem>
-                  <SelectItem value="Aguardando Retirada">Aguardando Retirada</SelectItem>
-                  <SelectItem value="Entregue">Entregue</SelectItem>
-                  <SelectItem value="Devolvido">Devolvido</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="w-full sm:w-64 border-t sm:border-t-0 sm:border-l border-gray-200 pl-0 sm:pl-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between border-0 shadow-none hover:bg-slate-50 font-medium text-slate-700 h-10 px-3"
+                  >
+                    <span className="truncate">
+                      {filterStatuses.length === 0
+                        ? 'Status'
+                        : filterStatuses.length === 3
+                          ? 'Todos os Status'
+                          : filterStatuses.join(', ')}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-white">
+                  {['Aguardando Retirada', 'Entregue', 'Devolvido'].map((status) => (
+                    <DropdownMenuCheckboxItem
+                      key={status}
+                      checked={filterStatuses.includes(status)}
+                      onCheckedChange={(checked) => {
+                        setFilterStatuses((prev) =>
+                          checked ? [...prev, status] : prev.filter((s) => s !== status),
+                        )
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {status}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
