@@ -101,9 +101,8 @@ export default function PainelChamados() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const initializedStatuses = useRef(false)
 
-  const isManager =
-    profile?.role === 'Administrador' || profile?.role === 'Master' || profile?.role === 'Gestor'
-  const [activeTab, setActiveTab] = useState(isManager ? 'todos' : 'recebidos')
+  const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'todos' : 'recebidos')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -143,12 +142,16 @@ export default function PainelChamados() {
       .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
 
-    if (!isManager) {
+    if (!isSuperAdmin) {
       query = query.or(`requester_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
     }
 
     const { data } = await query
     setTasks(data || [])
+    setSelectedTask((prev: any) => {
+      if (!prev) return null
+      return data?.find((t: any) => t.id === prev.id) || prev
+    })
     setLoading(false)
   }
 
@@ -295,7 +298,7 @@ export default function PainelChamados() {
   })
 
   const tabs = [
-    ...(isManager ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
+    ...(isSuperAdmin ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
     { id: 'enviados', label: 'Enviados', icon: Send },
     { id: 'recebidos', label: 'Recebidos', icon: Inbox },
   ]
@@ -412,7 +415,7 @@ export default function PainelChamados() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          {isManager && (
+          {isSuperAdmin && (
             <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
               <Select value={filterAssignee} onValueChange={setFilterAssignee}>
                 <SelectTrigger className="border-0 shadow-none bg-transparent h-10">

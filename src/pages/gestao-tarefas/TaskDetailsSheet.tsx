@@ -155,6 +155,37 @@ export function TaskDetailsSheet({
     loadTimeline()
   }
 
+  const handleDelegate = async (newAssigneeId: string) => {
+    if (!profile || newAssigneeId === task.assignee_id) return
+    const newAssignee = users.find((u: any) => u.id === newAssigneeId)
+
+    try {
+      await supabase.from('tasks').update({ assignee_id: newAssigneeId }).eq('id', task.id)
+
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile.id,
+        content: `Tarefa delegada para: ${newAssignee?.name}`,
+        action_type: 'delegation',
+      })
+
+      toast({
+        title: 'Tarefa delegada com sucesso!',
+        description: `Responsabilidade transferida para ${newAssignee?.name}`,
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+
+      onTaskUpdated()
+      loadTimeline()
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao delegar tarefa',
+        description: error.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleEvidenceUpload = async (actionId: string, file: File | undefined) => {
     if (!file || !profile) return
     setAuditAnswers((prev) => ({ ...prev, [actionId]: { ...prev[actionId], uploading: true } }))
@@ -365,6 +396,11 @@ export function TaskDetailsSheet({
     : task?.attachment_url
       ? [task.attachment_url]
       : []
+
+  const canDelegate =
+    profile?.role === 'Administrador' ||
+    profile?.role === 'Master' ||
+    profile?.id === task?.assignee_id
 
   const renderWizard = () => {
     if (wizardStep === 0) {
@@ -647,32 +683,58 @@ export function TaskDetailsSheet({
           </div>
 
           <div className="p-4 bg-white border-t border-gray-200 space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-                Alterar Status:
-              </span>
-              <Select
-                value={task?.status_id}
-                onValueChange={handleStatusChange}
-                disabled={auditExecution && auditExecution.status !== 'Finalizado'}
-              >
-                <SelectTrigger className="bg-slate-50 border-slate-200">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {taskStatuses.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: s.color }}
-                        ></span>
-                        {s.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                  Alterar Status:
+                </span>
+                <Select
+                  value={task?.status_id}
+                  onValueChange={handleStatusChange}
+                  disabled={auditExecution && auditExecution.status !== 'Finalizado'}
+                >
+                  <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {taskStatuses.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: s.color }}
+                          ></span>
+                          {s.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {canDelegate && (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                    Delegar para:
+                  </span>
+                  <Select
+                    value={task?.assignee_id}
+                    onValueChange={handleDelegate}
+                    disabled={auditExecution && auditExecution.status !== 'Finalizado'}
+                  >
+                    <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px] max-w-[200px]">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((u: any) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <Textarea
