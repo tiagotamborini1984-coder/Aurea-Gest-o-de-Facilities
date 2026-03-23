@@ -46,18 +46,22 @@ export default function AreasLJ() {
         }
         columns={
           [
-            { accessorKey: 'name', header: 'Nome' },
+            { accessor: 'name', header: 'Nome' },
             {
-              accessorKey: 'plant_id',
+              accessor: 'plant_id',
               header: 'Planta',
               render: (item: any) => plants.find((p) => p.id === item.plant_id)?.name || '-',
             },
             {
-              accessorKey: 'type',
+              accessor: 'type',
               header: 'Tipo',
               render: (item: any) => (item.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'),
             },
-            { accessorKey: 'description', header: 'Descrição' },
+            {
+              accessor: 'description',
+              header: 'Descrição',
+              render: (item: any) => item.description || '-',
+            },
           ] as ColumnDef[]
         }
         plantField="plant_id"
