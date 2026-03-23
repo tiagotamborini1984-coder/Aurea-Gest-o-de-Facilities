@@ -78,6 +78,8 @@ export function EditUserDialog({
     authorized_plants: [] as string[],
   })
 
+  const [newPassword, setNewPassword] = useState('')
+
   useEffect(() => {
     if (userToEdit) {
       setForm({
@@ -90,11 +92,26 @@ export function EditUserDialog({
     }
   }, [userToEdit])
 
+  useEffect(() => {
+    if (!open) {
+      setNewPassword('')
+    }
+  }, [open])
+
+  const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!userToEdit?.id) return
     setIsSubmitting(true)
     try {
+      if (isAdmin && newPassword.trim().length > 0) {
+        const { error: pwError } = await supabase.functions.invoke('update-user-password', {
+          body: { userId: userToEdit.id, password: newPassword },
+        })
+        if (pwError) throw new Error(`Erro ao alterar senha: ${pwError.message || 'Desconhecido'}`)
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -106,6 +123,7 @@ export function EditUserDialog({
         .eq('id', userToEdit.id)
 
       if (error) throw error
+
       toast({
         title: 'Usuário atualizado com sucesso',
         className: 'bg-green-50 text-green-900 border-green-200',
@@ -115,7 +133,7 @@ export function EditUserDialog({
           profile.client_id,
           authUser.id,
           'Edição de Usuário',
-          `Email: ${form.email} | Nível: ${form.role}`,
+          `Email: ${form.email} | Nível: ${form.role}${newPassword ? ' | Senha Alterada' : ''}`,
         )
 
       onOpenChange(false)
@@ -206,8 +224,27 @@ export function EditUserDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {isAdmin && (
+            <div className="space-y-2 mt-4 pt-4 border-t border-slate-100">
+              <Label className="text-brand-vividBlue font-semibold block">
+                Alterar Senha (Apenas Administrador)
+              </Label>
+              <Input
+                type="password"
+                placeholder="Deixe em branco para manter a senha atual"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Preencha este campo apenas se desejar forçar a redefinição de senha para o usuário.
+              </p>
+            </div>
+          )}
+
           {['Gestor', 'Operacional'].includes(form.role) && (
-            <div className="pt-2 animate-in fade-in space-y-4">
+            <div className="pt-4 mt-4 border-t border-slate-100 animate-in fade-in space-y-4">
               <div>
                 <Label className="mb-2 block">Menus Principais Acessíveis</Label>
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
