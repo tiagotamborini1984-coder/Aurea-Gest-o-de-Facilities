@@ -26,6 +26,7 @@ import {
   X,
   Paperclip,
   ChevronDown,
+  Users,
 } from 'lucide-react'
 import {
   Select,
@@ -143,7 +144,9 @@ export default function PainelChamados() {
       .order('created_at', { ascending: false })
 
     if (!isSuperAdmin) {
-      query = query.or(`requester_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
+      query = query.or(
+        `requester_id.eq.${profile.id},assignee_id.eq.${profile.id},participants_ids.cs.{${profile.id}}`,
+      )
     }
 
     const { data } = await query
@@ -254,6 +257,7 @@ export default function PainelChamados() {
           attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
           attachment_urls,
           status_updated_at: new Date().toISOString(),
+          participants_ids: [],
         } as any)
         .select()
         .single()
@@ -293,6 +297,7 @@ export default function PainelChamados() {
     let matchTab = true
     if (activeTab === 'enviados') matchTab = t.requester_id === profile.id
     if (activeTab === 'recebidos') matchTab = t.assignee_id === profile.id
+    if (activeTab === 'participando') matchTab = (t.participants_ids || []).includes(profile.id)
 
     return matchPlant && matchStatus && matchAssignee && matchSearch && matchTab
   })
@@ -301,6 +306,7 @@ export default function PainelChamados() {
     ...(isSuperAdmin ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
     { id: 'enviados', label: 'Enviados', icon: Send },
     { id: 'recebidos', label: 'Recebidos', icon: Inbox },
+    ...(!isSuperAdmin ? [{ id: 'participando', label: 'Participando', icon: Users }] : []),
   ]
 
   return (

@@ -12,7 +12,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Send, User, Paperclip, CheckCircle, ArrowRight, ChevronLeft } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Loader2,
+  Send,
+  User,
+  Paperclip,
+  CheckCircle,
+  ArrowRight,
+  ChevronLeft,
+  Plus,
+  X,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
@@ -43,6 +61,7 @@ export function TaskDetailsSheet({
   const [loading, setLoading] = useState(false)
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
 
   // Audit Wizard specific state
   const [auditExecution, setAuditExecution] = useState<any>(null)
@@ -327,6 +346,7 @@ export function TaskDetailsSheet({
                 description: `Foi identificada uma Não Conformidade durante a auditoria "${auditExecution.audits?.title}".\n\nAção Avaliada: ${nc.title}\nNota: ${ans.score}\nObservações: ${ans.observations || 'Nenhuma'}\n\nFavor providenciar correção até a data limite.`,
                 due_date: dueDate.toISOString(),
                 status_updated_at: new Date().toISOString(),
+                participants_ids: [],
               } as any)
               .select()
               .single()
@@ -388,14 +408,96 @@ export function TaskDetailsSheet({
     }
   }
 
+  const attachmentUrls: string[] = []
+  if (task?.attachment_url) attachmentUrls.push(task.attachment_url)
+  if (task?.attachment_urls?.length) {
+    task.attachment_urls.forEach((url: string) => {
+      if (!attachmentUrls.includes(url)) attachmentUrls.push(url)
+    })
+  }
+
+  const handleAddNewAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !profile) return
+    setIsUploadingAttachment(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `${profile.client_id}/${fileName}`
+      const { error: uploadError } = await supabase.storage
+        .from('task-attachments')
+        .upload(filePath, file)
+      if (uploadError) throw uploadError
+      const { data: publicUrlData } = supabase.storage
+        .from('task-attachments')
+        .getPublicUrl(filePath)
+
+      const newUrls = [...attachmentUrls, publicUrlData.publicUrl]
+
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ attachment_urls: newUrls })
+        .eq('id', task.id)
+      if (updateError) throw updateError
+
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile.id,
+        content: `Adicionou um novo anexo: ${file.name}`,
+        action_type: 'attachment',
+      })
+
+      toast({
+        title: 'Anexo adicionado com sucesso',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      onTaskUpdated()
+    } catch (err: any) {
+      toast({ title: 'Erro ao anexar arquivo', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsUploadingAttachment(false)
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  const handleParticipantChange = async (userId: string, isAdding: boolean) => {
+    if (!profile || !task) return
+    let current = task.participants_ids || []
+    if (isAdding) {
+      if (!current.includes(userId)) current = [...current, userId]
+    } else {
+      current = current.filter((id: string) => id !== userId)
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ participants_ids: current })
+        .eq('id', task.id)
+      if (error) throw error
+
+      const user = users.find((u: any) => u.id === userId)
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile.id,
+        content: isAdding
+          ? `Adicionou ${user?.name} como participante.`
+          : `Removeu ${user?.name} dos participantes.`,
+        action_type: 'participant_change',
+      })
+
+      toast({
+        title: 'Participantes atualizados',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      onTaskUpdated()
+    } catch (e: any) {
+      toast({ title: 'Erro ao atualizar', description: e.message, variant: 'destructive' })
+    }
+  }
+
   const getAssigneeName = (id: string) =>
     users.find((u: any) => u.id === id)?.name || 'Desconhecido'
-
-  const attachmentUrls: string[] = task?.attachment_urls?.length
-    ? task.attachment_urls
-    : task?.attachment_url
-      ? [task.attachment_url]
-      : []
 
   const canDelegate =
     profile?.role === 'Administrador' ||
@@ -592,25 +694,131 @@ export function TaskDetailsSheet({
               <h4 className="font-semibold text-slate-800 mb-2">Descrição</h4>
               <p className="text-slate-600 text-sm whitespace-pre-wrap">{task?.description}</p>
 
-              {attachmentUrls.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                  <h5 className="text-sm font-medium text-slate-700 mb-3">Anexos Iniciais</h5>
-                  <div className="flex flex-col gap-2">
-                    {attachmentUrls.map((url, i) => (
-                      <a
-                        key={i}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center p-2 rounded-md bg-slate-50 border border-slate-200 text-sm text-brand-deepBlue hover:bg-slate-100 transition-colors w-fit"
+              {/* Participantes Section */}
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-sm font-medium text-slate-700">Participantes</h5>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs border-dashed"
+                        disabled={auditExecution && auditExecution.status === 'Finalizado'}
                       >
-                        <Paperclip className="w-4 h-4 mr-2" />
-                        Anexo {i + 1}
-                      </a>
-                    ))}
+                        <Plus className="w-3 h-3 mr-1" /> Adicionar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-[200px] max-h-[300px] overflow-y-auto"
+                    >
+                      <DropdownMenuLabel className="text-xs">
+                        Selecionar participantes
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {users
+                        .filter(
+                          (u: any) => u.id !== task?.requester_id && u.id !== task?.assignee_id,
+                        )
+                        .map((u: any) => (
+                          <DropdownMenuCheckboxItem
+                            key={u.id}
+                            checked={(task?.participants_ids || []).includes(u.id)}
+                            onCheckedChange={(checked) => handleParticipantChange(u.id, checked)}
+                          >
+                            {u.name}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {!task?.participants_ids || task.participants_ids.length === 0 ? (
+                    <span className="text-xs text-slate-500">Nenhum participante adicionado.</span>
+                  ) : (
+                    task.participants_ids.map((id: string) => {
+                      const user = users.find((u: any) => u.id === id)
+                      if (!user) return null
+                      return (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="pl-1.5 pr-1 py-0.5 flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                        >
+                          <User className="w-3 h-3 text-slate-400" />
+                          {user.name}
+                          <button
+                            onClick={() => handleParticipantChange(id, false)}
+                            className="ml-1 rounded-full p-0.5 hover:bg-slate-300 transition-colors text-slate-500"
+                            disabled={auditExecution && auditExecution.status === 'Finalizado'}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Anexos Section */}
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-sm font-medium text-slate-700">Anexos</h5>
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 file:cursor-pointer"
+                      onChange={handleAddNewAttachment}
+                      disabled={
+                        isUploadingAttachment ||
+                        (auditExecution && auditExecution.status === 'Finalizado')
+                      }
+                      title="Adicionar novo anexo"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-dashed pointer-events-none"
+                      disabled={
+                        isUploadingAttachment ||
+                        (auditExecution && auditExecution.status === 'Finalizado')
+                      }
+                    >
+                      {isUploadingAttachment ? (
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <Plus className="w-3 h-3 mr-1" />
+                      )}
+                      {isUploadingAttachment ? 'Enviando...' : 'Novo Anexo'}
+                    </Button>
                   </div>
                 </div>
-              )}
+
+                {attachmentUrls.length === 0 && !isUploadingAttachment ? (
+                  <span className="text-xs text-slate-500">Nenhum anexo adicionado.</span>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {attachmentUrls.map((url, i) => {
+                      const fileName =
+                        url.split('/').pop()?.split('_').slice(1).join('_') || `Anexo ${i + 1}`
+                      return (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center p-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-brand-deepBlue hover:bg-slate-100 transition-colors w-full group"
+                        >
+                          <Paperclip className="w-4 h-4 mr-3 shrink-0 text-slate-400 group-hover:text-brand-deepBlue" />
+                          <span className="truncate flex-1">{fileName}</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {auditExecution && wizardStep >= 0 && (
