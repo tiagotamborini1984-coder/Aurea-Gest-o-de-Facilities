@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
@@ -25,6 +25,7 @@ import {
   PauseCircle,
   X,
   Paperclip,
+  ChevronDown,
 } from 'lucide-react'
 import {
   Select,
@@ -33,6 +34,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -87,8 +96,10 @@ export default function PainelChamados() {
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPlant, setFilterPlant] = useState('all')
-  const [filterStatus, setFilterStatus] = useState('all')
   const [filterAssignee, setFilterAssignee] = useState('all')
+
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const initializedStatuses = useRef(false)
 
   const isManager =
     profile?.role === 'Administrador' || profile?.role === 'Master' || profile?.role === 'Gestor'
@@ -114,7 +125,11 @@ export default function PainelChamados() {
 
     const [tRes, sRes, uRes] = await Promise.all([
       supabase.from('task_types').select('*').eq('client_id', profile.client_id),
-      supabase.from('task_statuses').select('*').eq('client_id', profile.client_id),
+      supabase
+        .from('task_statuses')
+        .select('*')
+        .eq('client_id', profile.client_id)
+        .order('created_at', { ascending: true }),
       supabase.from('profiles').select('id, name, email, role').eq('client_id', profile.client_id),
     ])
 
@@ -140,6 +155,13 @@ export default function PainelChamados() {
   useEffect(() => {
     loadData()
   }, [profile])
+
+  useEffect(() => {
+    if (taskStatuses.length > 0 && !initializedStatuses.current) {
+      setSelectedStatuses(taskStatuses.filter((s) => !s.is_terminal).map((s) => s.id))
+      initializedStatuses.current = true
+    }
+  }, [taskStatuses])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -258,7 +280,7 @@ export default function PainelChamados() {
 
   const filteredTasks = tasks.filter((t) => {
     const matchPlant = filterPlant === 'all' || t.plant_id === filterPlant
-    const matchStatus = filterStatus === 'all' || t.status_id === filterStatus
+    const matchStatus = selectedStatuses.includes(t.status_id)
     const matchAssignee = filterAssignee === 'all' || t.assignee_id === filterAssignee
     const matchSearch =
       t.task_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -330,7 +352,7 @@ export default function PainelChamados() {
           </div>
           <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
             <Select value={filterPlant} onValueChange={setFilterPlant}>
-              <SelectTrigger className="border-0 shadow-none bg-transparent">
+              <SelectTrigger className="border-0 shadow-none bg-transparent h-10">
                 <SelectValue placeholder="Plantas" />
               </SelectTrigger>
               <SelectContent>
@@ -343,25 +365,57 @@ export default function PainelChamados() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="border-0 shadow-none bg-transparent">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
+          <div className="w-full xl:w-64 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0 flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between px-3 h-10 font-normal text-slate-600 bg-transparent hover:bg-transparent hover:text-slate-900 border-0 shadow-none focus-visible:ring-0"
+                >
+                  <span className="truncate mr-2">
+                    {selectedStatuses.length === taskStatuses.length
+                      ? 'Todos os Status'
+                      : selectedStatuses.length === 0
+                        ? 'Nenhum Status'
+                        : `${selectedStatuses.length} Selecionados`}
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64" align="start">
+                <DropdownMenuLabel className="text-xs text-slate-500 uppercase tracking-wider">
+                  Filtrar por Status
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 {taskStatuses.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
+                  <DropdownMenuCheckboxItem
+                    key={s.id}
+                    checked={selectedStatuses.includes(s.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedStatuses((prev) => [...prev, s.id])
+                      } else {
+                        setSelectedStatuses((prev) => prev.filter((id) => id !== s.id))
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0 shadow-sm border border-slate-200"
+                        style={{ backgroundColor: s.color || '#94a3b8' }}
+                      ></span>
+                      <span className="truncate">{s.name}</span>
+                    </div>
+                  </DropdownMenuCheckboxItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           {isManager && (
             <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
               <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-                <SelectTrigger className="border-0 shadow-none bg-transparent">
+                <SelectTrigger className="border-0 shadow-none bg-transparent h-10">
                   <SelectValue placeholder="Responsável" />
                 </SelectTrigger>
                 <SelectContent>
