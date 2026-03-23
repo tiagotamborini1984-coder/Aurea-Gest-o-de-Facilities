@@ -139,9 +139,20 @@ export function AppSidebar() {
         } else if (item.title === 'Limpeza e Jardinagem') {
           filteredSubItems = userMenus.includes('Limpeza e Jardinagem') ? item.subItems : []
         } else if (item.title === 'Gestão de Tarefas') {
-          filteredSubItems = userMenus.includes('Gestão de Tarefas') ? item.subItems : []
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Gestão de Tarefas') ||
+              userMenus.includes(`Gestão de Tarefas:${sub.title}`) ||
+              (sub.title === 'Painel de Chamados' &&
+                userMenus.includes('Gestão de Tarefas:Painel')) ||
+              (sub.title === 'Tipos de Chamado' && userMenus.includes('Gestão de Tarefas:Tipos')),
+          )
         } else if (item.title === 'Auditoria e Checklist') {
-          filteredSubItems = userMenus.includes('Auditoria e Checklist') ? item.subItems : []
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Auditoria e Checklist') ||
+              userMenus.includes(`Auditoria e Checklist:${sub.title}`),
+          )
         } else if (item.title === 'Gestão de Terceiros') {
           filteredSubItems = item.subItems.filter((sub) => userMenus.includes(sub.title))
         }

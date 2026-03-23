@@ -19,6 +19,20 @@ export function useHasAccess(menuName: string) {
     ]
   }
 
+  // legacy mapping for old 'Painel' and 'Tipos' keys
+  if (
+    menuName === 'Gestão de Tarefas:Painel de Chamados' &&
+    userMenus.includes('Gestão de Tarefas:Painel')
+  ) {
+    return true
+  }
+  if (
+    menuName === 'Gestão de Tarefas:Tipos de Chamado' &&
+    userMenus.includes('Gestão de Tarefas:Tipos')
+  ) {
+    return true
+  }
+
   if (menuName === 'Gestão de Encomendas' && userMenus.includes('Encomendas')) {
     return true
   }
@@ -32,8 +46,22 @@ export function useHasAccess(menuName: string) {
   }
 
   if (
+    menuName.startsWith('Auditoria e Checklist:') &&
+    userMenus.includes('Auditoria e Checklist')
+  ) {
+    return true
+  }
+
+  if (
     menuName === 'Gestão de Tarefas' &&
     userMenus.some((m) => m.startsWith('Gestão de Tarefas'))
+  ) {
+    return true
+  }
+
+  if (
+    menuName === 'Auditoria e Checklist' &&
+    userMenus.some((m) => m.startsWith('Auditoria e Checklist'))
   ) {
     return true
   }

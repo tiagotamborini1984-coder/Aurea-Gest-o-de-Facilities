@@ -45,7 +45,13 @@ const CADASTROS_SUBMENUS = [
   'Book de Metas',
 ]
 
-const GESTAO_TAREFAS_SUBMENUS = ['Painel', 'Tipos', 'Status', 'Relatórios']
+const GESTAO_TAREFAS_SUBMENUS = ['Painel de Chamados', 'Relatórios', 'Tipos de Chamado', 'Status']
+const AUDITORIA_SUBMENUS = [
+  'Nova Auditoria',
+  'Auditorias Criadas',
+  'Auditorias Realizadas',
+  'Dashboard',
+]
 
 export function EditUserDialog({
   userToEdit,
@@ -137,6 +143,14 @@ export function EditUserDialog({
         next = next.filter((m) => m !== 'Gestão de Tarefas')
         GESTAO_TAREFAS_SUBMENUS.forEach((sub) => {
           if (`Gestão de Tarefas:${sub}` !== menu) next.push(`Gestão de Tarefas:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (menu.startsWith('Auditoria e Checklist:') && next.includes('Auditoria e Checklist')) {
+        next = next.filter((m) => m !== 'Auditoria e Checklist')
+        AUDITORIA_SUBMENUS.forEach((sub) => {
+          if (`Auditoria e Checklist:${sub}` !== menu) next.push(`Auditoria e Checklist:${sub}`)
         })
         return { ...p, accessible_menus: next }
       }
@@ -247,6 +261,29 @@ export function EditUserDialog({
                             : 'outline'
                         }
                         className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Tarefas') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Auditoria e Checklist</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {AUDITORIA_SUBMENUS.map((menu) => {
+                    const key = `Auditoria e Checklist:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Auditoria e Checklist')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Auditoria e Checklist') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}
