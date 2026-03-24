@@ -25,6 +25,8 @@ export function useMasterData() {
     if (!profile?.client_id) return
     setLoading(true)
     const cid = profile.client_id
+    const isAdmin = profile.role === 'Administrador' || profile.role === 'Master'
+    const authorizedPlants = profile.authorized_plants || []
 
     const [pRes, fRes, eRes, gRes, empRes, cRes, lRes, tRes, frtRes, etrRes, compRes, ptRes] =
       await Promise.all([
@@ -57,21 +59,44 @@ export function useMasterData() {
           .eq('client_id', cid),
       ])
 
-    setPlants(pRes.data || [])
+    let plantsData = pRes.data || []
+    if (!isAdmin) {
+      plantsData = plantsData.filter((p: any) => authorizedPlants.includes(p.id))
+    }
+    const validPlantIds = plantsData.map((p: any) => p.id)
+
+    const filterByPlant = (data: any[]) => {
+      if (isAdmin) return data
+      return data.filter((item: any) => !item.plant_id || validPlantIds.includes(item.plant_id))
+    }
+
+    setPlants(plantsData)
     setFunctions(fRes.data || [])
-    setEquipment(eRes.data || [])
+
+    const equipmentData = filterByPlant(eRes.data || [])
+    setEquipment(equipmentData)
     setGoals(gRes.data || [])
-    setEmployees(empRes.data || [])
-    setContracted(cRes.data || [])
-    setLocations(lRes.data || [])
+
+    const employeesData = filterByPlant(empRes.data || [])
+    setEmployees(employeesData)
+
+    setContracted(filterByPlant(cRes.data || []))
+    setLocations(filterByPlant(lRes.data || []))
+
     setTrainings(tRes.data || [])
     setFunctionRequiredTrainings(frtRes.data || [])
-    setEmployeeTrainingRecords(etrRes.data || [])
+
+    const validEmployeeIds = employeesData.map((e: any) => e.id)
+    const filteredTrainingRecords = isAdmin
+      ? etrRes.data || []
+      : (etrRes.data || []).filter((r: any) => validEmployeeIds.includes(r.employee_id))
+    setEmployeeTrainingRecords(filteredTrainingRecords)
+
     setCompanies(compRes.data || [])
     setPackageTypes(ptRes.data || [])
 
     setLoading(false)
-  }, [profile?.client_id])
+  }, [profile])
 
   useEffect(() => {
     fetchData()

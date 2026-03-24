@@ -43,12 +43,22 @@ export default function AuditoriaRealizadas() {
         .eq('client_id', profile.client_id)
       setUsers(pData || [])
 
-      const { data: eData } = await supabase
+      let query = supabase
         .from('audit_executions')
         .select('*, audits!inner(*)')
         .eq('audits.client_id', profile.client_id)
         .order('created_at', { ascending: false })
 
+      if (profile.role !== 'Administrador' && profile.role !== 'Master') {
+        const authPlants = profile.authorized_plants || []
+        if (authPlants.length > 0) {
+          query = query.in('plant_id', authPlants)
+        } else {
+          query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+        }
+      }
+
+      const { data: eData } = await query
       setExecutions(eData || [])
       setLoading(false)
     }
@@ -73,8 +83,13 @@ export default function AuditoriaRealizadas() {
       .from('audit_execution_answers')
       .select('*, audit_actions(*)')
       .eq('execution_id', exec.id)
-      .order('audit_actions(order_index)' as any)
-    setViewAnswers(data || [])
+
+    const sortedData = (data || []).sort((a: any, b: any) => {
+      const orderA = a.audit_actions?.order_index || 0
+      const orderB = b.audit_actions?.order_index || 0
+      return orderA - orderB
+    })
+    setViewAnswers(sortedData)
   }
 
   const handlePrint = () => {

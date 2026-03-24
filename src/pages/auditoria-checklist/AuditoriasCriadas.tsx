@@ -51,18 +51,29 @@ export default function AuditoriasCriadas() {
       .eq('client_id', profile.client_id)
     setUsers(pData || [])
 
-    const { data } = await supabase
+    let query = supabase
       .from('audits')
       .select('*, audit_assignments(*)')
       .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
 
-    setAudits(data || [])
+    const { data } = await query
+
+    let filteredAudits = data || []
+    if (profile.role !== 'Administrador' && profile.role !== 'Master') {
+      const authPlants = profile.authorized_plants || []
+      filteredAudits = filteredAudits.filter((audit) => {
+        const assignments = audit.audit_assignments || []
+        return assignments.some((a: any) => authPlants.includes(a.plant_id))
+      })
+    }
+
+    setAudits(filteredAudits)
     setLoading(false)
 
     // Simulate cron job to generate pending tasks if needed
-    if (data && data.length > 0) {
-      checkAndGenerateTasks(data, pData || [])
+    if (filteredAudits.length > 0) {
+      checkAndGenerateTasks(filteredAudits, pData || [])
     }
   }
 

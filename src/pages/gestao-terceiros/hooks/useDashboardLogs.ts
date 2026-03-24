@@ -12,12 +12,17 @@ export function useDashboardLogs(
 
   useEffect(() => {
     const fetchLogs = async () => {
-      if (plants.length === 0) return
+      if (plants.length === 0) {
+        setLogs([])
+        return
+      }
+      const plantIds = plants.map((p: any) => p.id)
       const { data } = await supabase
         .from('daily_logs')
         .select('*')
         .gte('date', dateFrom)
         .lte('date', dateTo)
+        .in('plant_id', plantIds)
       setLogs(data || [])
     }
     fetchLogs()
@@ -25,7 +30,11 @@ export function useDashboardLogs(
 
   useEffect(() => {
     const fetchGoals = async () => {
-      if (plants.length === 0) return
+      if (plants.length === 0) {
+        setMonthlyGoals([])
+        return
+      }
+      const plantIds = plants.map((p: any) => p.id)
       const mFrom = `${referenceMonth}-01`
       const y = parseInt(referenceMonth.split('-')[0])
       const m = parseInt(referenceMonth.split('-')[1])
@@ -37,6 +46,7 @@ export function useDashboardLogs(
         .select('*')
         .gte('reference_month', mFrom)
         .lte('reference_month', mTo)
+        .in('plant_id', plantIds)
       setMonthlyGoals(mg || [])
     }
     fetchGoals()

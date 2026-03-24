@@ -43,10 +43,21 @@ export default function AuditoriaDashboard() {
     if (!profile) return
     const load = async () => {
       setLoading(true)
-      const { data } = await supabase
+      let query = supabase
         .from('audit_executions')
         .select('*, audits!inner(*)')
         .eq('audits.client_id', profile.client_id)
+
+      if (profile.role !== 'Administrador' && profile.role !== 'Master') {
+        const authPlants = profile.authorized_plants || []
+        if (authPlants.length > 0) {
+          query = query.in('plant_id', authPlants)
+        } else {
+          query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+        }
+      }
+
+      const { data } = await query
       setExecutions(data || [])
       setLoading(false)
     }

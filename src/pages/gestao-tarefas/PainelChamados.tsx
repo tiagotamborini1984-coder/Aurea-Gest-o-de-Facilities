@@ -103,7 +103,8 @@ export default function PainelChamados() {
   const initializedStatuses = useRef(false)
 
   const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
-  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'todos' : 'recebidos')
+  const showTodos = isSuperAdmin || profile?.role === 'Gestor'
+  const [activeTab, setActiveTab] = useState(showTodos ? 'todos' : 'recebidos')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -144,9 +145,18 @@ export default function PainelChamados() {
       .order('created_at', { ascending: false })
 
     if (!isSuperAdmin) {
-      query = query.or(
-        `requester_id.eq.${profile.id},assignee_id.eq.${profile.id},participants_ids.cs.{${profile.id}}`,
-      )
+      const authPlants = profile.authorized_plants || []
+      if (authPlants.length > 0) {
+        query = query.in('plant_id', authPlants)
+      } else {
+        query = query.eq('id', '00000000-0000-0000-0000-000000000000') // force empty
+      }
+
+      if (profile.role === 'Operacional') {
+        query = query.or(
+          `requester_id.eq.${profile.id},assignee_id.eq.${profile.id},participants_ids.cs.{${profile.id}}`,
+        )
+      }
     }
 
     const { data } = await query
@@ -303,10 +313,10 @@ export default function PainelChamados() {
   })
 
   const tabs = [
-    ...(isSuperAdmin ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
+    ...(showTodos ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
     { id: 'enviados', label: 'Enviados', icon: Send },
     { id: 'recebidos', label: 'Recebidos', icon: Inbox },
-    ...(!isSuperAdmin ? [{ id: 'participando', label: 'Participando', icon: Users }] : []),
+    { id: 'participando', label: 'Participando', icon: Users },
   ]
 
   return (
