@@ -357,4 +357,19 @@ export function useDashboardCalculations(
     }
   }, [
     logs,
-    monthl
+    monthlyGoals,
+    contracted,
+    selectedPlants,
+    selectedCompanies,
+    plants,
+    activeTab,
+    dateFrom,
+    dateTo,
+    employees,
+    locations,
+    equipment,
+    goals,
+    nonWorkingDays,
+    absenteeismTarget,
+  ])
+}
