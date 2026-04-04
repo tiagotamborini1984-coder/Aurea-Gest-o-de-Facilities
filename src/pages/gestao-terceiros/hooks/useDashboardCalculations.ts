@@ -95,13 +95,15 @@ export function useDashboardCalculations(
     })
 
     const excludedDaysCount = allUniqueDates.size - globalValidDates.size
-    const totalPeriodDays = Math.max(1, globalValidDates.size)
+    const totalPeriodDays = globalValidDates.size
 
     const globalValidLogs = activeLogs.filter((l) => globalValidDates.has(l.date))
 
-    const avgLancado = globalValidLogs.length / totalPeriodDays
-    const avgPresente = globalValidLogs.filter((l) => l.status).length / totalPeriodDays
-    const avgAusente = globalValidLogs.filter((l) => !l.status).length / totalPeriodDays
+    const avgLancado = totalPeriodDays > 0 ? globalValidLogs.length / totalPeriodDays : 0
+    const avgPresente =
+      totalPeriodDays > 0 ? globalValidLogs.filter((l) => l.status).length / totalPeriodDays : 0
+    const avgAusente =
+      totalPeriodDays > 0 ? globalValidLogs.filter((l) => !l.status).length / totalPeriodDays : 0
 
     const validContracted = contracted.filter((c) => {
       if (!validPlants.includes(c.plant_id)) return false
@@ -122,7 +124,11 @@ export function useDashboardCalculations(
 
     const contratado = validContracted.reduce((a, b) => a + b.quantity, 0)
     const absenteismo =
-      contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
+      totalPeriodDays === 0
+        ? 0
+        : contratado > 0
+          ? Math.max(0, ((contratado - avgPresente) / contratado) * 100)
+          : 0
 
     const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
 
@@ -133,9 +139,9 @@ export function useDashboardCalculations(
         const { valid: pValidDates } = getValidDatesForPlant(plant.id, pLogs)
         const pValidLogs = pLogs.filter((l) => pValidDates.has(l.date))
 
-        const pDays = Math.max(1, pValidDates.size)
-        const pPres = pValidLogs.filter((l) => l.status).length / pDays
-        const pAbs = pValidLogs.filter((l) => !l.status).length / pDays
+        const pDays = pValidDates.size
+        const pPres = pDays > 0 ? pValidLogs.filter((l) => l.status).length / pDays : 0
+        const pAbs = pDays > 0 ? pValidLogs.filter((l) => !l.status).length / pDays : 0
         const pCont = validContracted
           .filter((c) => c.plant_id === plant.id)
           .reduce((sum, c) => sum + c.quantity, 0)
@@ -145,7 +151,8 @@ export function useDashboardCalculations(
           presentes: formatStr(pPres),
           ausentes: formatStr(pAbs),
           contratado: pCont,
-          absenteismo: Math.max(0, pCont > 0 ? ((pCont - pPres) / pCont) * 100 : 0),
+          absenteismo:
+            pDays === 0 ? 0 : Math.max(0, pCont > 0 ? ((pCont - pPres) / pCont) * 100 : 0),
         }
       })
 
@@ -169,10 +176,10 @@ export function useDashboardCalculations(
         const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
 
         const lLogs = lLogsRaw.filter((l) => pValidDates.has(l.date))
-        const lDays = Math.max(1, pValidDates.size)
+        const lDays = pValidDates.size
 
-        const lPres = lLogs.filter((l) => l.status).length / lDays
-        const lAbs = lLogs.filter((l) => !l.status).length / lDays
+        const lPres = lDays > 0 ? lLogs.filter((l) => l.status).length / lDays : 0
+        const lAbs = lDays > 0 ? lLogs.filter((l) => !l.status).length / lDays : 0
         const lCont = validContracted
           .filter((c) => c.location_id === loc.id)
           .reduce((sum, c) => sum + c.quantity, 0)
@@ -183,7 +190,8 @@ export function useDashboardCalculations(
           presentes: formatStr(lPres),
           ausentes: formatStr(lAbs),
           contratado: lCont,
-          absenteismo: Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
+          absenteismo:
+            lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
         }
       })
       .filter((l) => l.contratado > 0 || parseFloat(l.presentes) > 0)
@@ -210,17 +218,17 @@ export function useDashboardCalculations(
                 )
                 .sort((a, b) => a.date.localeCompare(b.date))
 
-              const eqDays = Math.max(1, pValidDates.size)
+              const eqDays = pValidDates.size
               const pres = eqLogs.filter((l) => l.status).length
               const abs = eqLogs.filter((l) => !l.status).length
-              const mPres = (pres / eqDays) * eqCont
+              const mPres = eqDays > 0 ? (pres / eqDays) * eqCont : 0
               return {
                 id: eq.id,
                 name: eq.name,
                 contratado: eqCont,
                 mediaPresenca: mPres,
-                mediaFalta: (abs / eqDays) * eqCont,
-                taxaDisp: eqCont > 0 ? (mPres / eqCont) * 100 : 0,
+                mediaFalta: eqDays > 0 ? (abs / eqDays) * eqCont : 0,
+                taxaDisp: eqDays === 0 ? 0 : eqCont > 0 ? (mPres / eqCont) * 100 : 0,
                 history: eqLogs.map((log) => ({ date: log.date, status: log.status })),
               }
             })
