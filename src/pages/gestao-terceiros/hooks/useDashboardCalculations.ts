@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { isWeekend, parseISO } from 'date-fns'
+import { isWeekend, parseISO, eachDayOfInterval, format } from 'date-fns'
 
 export function useDashboardCalculations(
   logs: any[],
@@ -66,36 +66,33 @@ export function useDashboardCalculations(
       return true
     })
 
-    const getValidDatesForPlant = (pid: string, plantLogs: any[]) => {
-      const dates = new Set(plantLogs.map((l) => l.date))
+    const allDatesInPeriod = eachDayOfInterval({
+      start: parseISO(dateFrom),
+      end: parseISO(dateTo),
+    }).map((d) => format(d, 'yyyy-MM-dd'))
+
+    const getValidDatesForPlant = (pid: string) => {
       const valid = new Set<string>()
-      dates.forEach((date) => {
+      allDatesInPeriod.forEach((date) => {
         const isWeekendDate = isWeekend(parseISO(date))
         const isNWD = nonWorkingDays[`${pid}_${date}`]
-        const hasPresences = plantLogs.some((l) => l.date === date && l.status === true)
-        if ((isWeekendDate || isNWD) && !hasPresences) {
-          // exclude
-        } else {
+        if (!isWeekendDate && !isNWD) {
           valid.add(date)
         }
       })
-      return { valid, allCount: dates.size }
+      return valid
     }
 
-    const allUniqueDates = new Set(activeLogs.map((l) => l.date))
     const globalValidDates = new Set<string>()
-    allUniqueDates.forEach((date) => {
+    allDatesInPeriod.forEach((date) => {
       const isWeekendDate = isWeekend(parseISO(date))
       const isNWDForAnyPlant = validPlants.some((pid) => nonWorkingDays[`${pid}_${date}`])
-      const hasPresences = activeLogs.some((l) => l.date === date && l.status === true)
-      if ((isWeekendDate || isNWDForAnyPlant) && !hasPresences) {
-        // exclude
-      } else {
+      if (!isWeekendDate && !isNWDForAnyPlant) {
         globalValidDates.add(date)
       }
     })
 
-    const excludedDaysCount = allUniqueDates.size - globalValidDates.size
+    const excludedDaysCount = allDatesInPeriod.length - globalValidDates.size
     const totalPeriodDays = globalValidDates.size
 
     const globalValidLogs = activeLogs.filter((l) => globalValidDates.has(l.date))
@@ -137,7 +134,7 @@ export function useDashboardCalculations(
       .filter((p) => validPlants.includes(p.id))
       .map((plant) => {
         const pLogs = activeLogs.filter((l) => l.plant_id === plant.id)
-        const { valid: pValidDates } = getValidDatesForPlant(plant.id, pLogs)
+        const pValidDates = getValidDatesForPlant(plant.id)
         const pValidLogs = pLogs.filter((l) => pValidDates.has(l.date))
 
         const pDays = pValidDates.size
@@ -173,8 +170,7 @@ export function useDashboardCalculations(
         const lLogsRaw = activeLogs.filter((l) => refIds.includes(l.reference_id))
         const plantId = loc.plant_id
 
-        const pLogs = activeLogs.filter((l) => l.plant_id === plantId)
-        const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
+        const pValidDates = getValidDatesForPlant(plantId)
 
         const lLogs = lLogsRaw.filter((l) => pValidDates.has(l.date))
         const lDays = pValidDates.size
@@ -204,8 +200,7 @@ export function useDashboardCalculations(
             .filter((e) => validPlants.includes(e.plant_id))
             .map((eq) => {
               const plantId = eq.plant_id
-              const pLogs = activeLogs.filter((l) => l.plant_id === plantId)
-              const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
+              const pValidDates = getValidDatesForPlant(plantId)
 
               const eqCont =
                 validContracted
@@ -246,8 +241,7 @@ export function useDashboardCalculations(
             )
             .map((emp) => {
               const plantId = emp.plant_id
-              const pLogs = activeLogs.filter((l) => l.plant_id === plantId)
-              const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
+              const pValidDates = getValidDatesForPlant(plantId)
 
               const empLogs = logs
                 .filter(
