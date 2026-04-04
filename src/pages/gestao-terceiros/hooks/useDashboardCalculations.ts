@@ -16,6 +16,7 @@ export function useDashboardCalculations(
   activeTab: 'colaboradores' | 'equipamentos' | 'metas',
   dateFrom: string,
   dateTo: string,
+  absenteeismTarget: number = 4,
 ) {
   const [nonWorkingDays, setNonWorkingDays] = useState<Record<string, boolean>>({})
 
@@ -264,8 +265,23 @@ export function useDashboardCalculations(
             })
             .filter((c) => c.history.length > 0)
 
+    const dailyTrend = Array.from(globalValidDates)
+      .sort()
+      .map((date) => {
+        const dayLogs = globalValidLogs.filter((l) => l.date === date)
+        const pPres = dayLogs.filter((l) => l.status).length
+        const abs = contratado > 0 ? Math.max(0, ((contratado - pPres) / contratado) * 100) : 0
+        return {
+          date,
+          absenteismo: Number(abs.toFixed(1)),
+          presentes: pPres,
+          contratado,
+        }
+      })
+
     const equipDisp = Math.max(0, 100 - absenteismo)
-    let sum = (absenteismo < 4 ? 100 : 0) + equipDisp
+    const absAchieved = absenteismo <= absenteeismTarget ? 100 : 0
+    let sum = absAchieved + equipDisp
     let count = 2
     const manualGoals = goals
       .filter((g) => g.is_active)
@@ -295,11 +311,13 @@ export function useDashboardCalculations(
       locationStats,
       equipmentStats,
       collaboratorStats,
+      dailyTrend,
       goalsData: {
-        absAchieved: absenteismo < 4 ? 100 : 0,
+        absAchieved,
         equipDisp,
         manualGoals,
         notaGeral: count > 0 ? (sum / count).toFixed(1) : '0.0',
+        absenteeismTarget,
       },
     }
   }, [
@@ -317,5 +335,6 @@ export function useDashboardCalculations(
     equipment,
     goals,
     nonWorkingDays,
+    absenteeismTarget,
   ])
 }

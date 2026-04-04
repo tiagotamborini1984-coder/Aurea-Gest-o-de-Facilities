@@ -1,17 +1,20 @@
 import { cn } from '@/lib/utils'
 
 export default function DashboardGoals({ goalsData, metrics, brandSecondary }: any) {
+  const target = goalsData.absenteeismTarget ?? 4
+  const abs = Number(metrics.absenteismo)
+
   return (
     <div className="space-y-4 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500 mt-6">
       <div
         className="flex items-center justify-between bg-card border border-border rounded-lg p-4 shadow-sm border-l-4"
-        style={{ borderLeftColor: brandSecondary }}
+        style={{ borderLeftColor: abs <= target ? '#22c55e' : '#ef4444' }}
       >
         <div>
           <h3 className="font-bold text-foreground text-base lg:text-lg">Absenteísmo</h3>
           <p className="text-[10px] lg:text-xs text-muted-foreground mt-1">
-            Automático — absenteísmo &lt; 4% = 100% | ≥ 4% = 0% | Calc:{' '}
-            {Number(metrics.absenteismo).toFixed(1)}%
+            Automático — absenteísmo &le; {target}% = 100% | &gt; {target}% = 0% | Calc:{' '}
+            {abs.toFixed(1)}%
           </p>
         </div>
         <div
