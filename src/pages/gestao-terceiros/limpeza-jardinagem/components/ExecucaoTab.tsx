@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Loader2, CheckCircle2, XCircle, FileText, Download, Printer, FileDown } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, FileText, Printer, FileDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -37,13 +37,23 @@ import { cn } from '@/lib/utils'
 import { exportToCSV } from '@/lib/export'
 import { isExpiredPendente } from '@/lib/business-days'
 
-export function ExecucaoTab() {
+interface ExecucaoTabProps {
+  plantId: string
+  setPlantId: (id: string) => void
+  serviceType: string
+  setServiceType: (type: string) => void
+}
+
+export function ExecucaoTab({
+  plantId,
+  setPlantId,
+  serviceType,
+  setServiceType,
+}: ExecucaoTabProps) {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
   const { toast } = useToast()
 
-  const [plantId, setPlantId] = useState('')
-  const [serviceType, setServiceType] = useState('all')
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [schedules, setSchedules] = useState<any[]>([])
@@ -56,10 +66,6 @@ export function ExecucaoTab() {
   const [file, setFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isViewMode, setIsViewMode] = useState(false)
-
-  useEffect(() => {
-    if (plants.length > 0 && !plantId) setPlantId(plants[0].id)
-  }, [plants, plantId])
 
   const fetchSchedules = async () => {
     if (!profile || !plantId) return

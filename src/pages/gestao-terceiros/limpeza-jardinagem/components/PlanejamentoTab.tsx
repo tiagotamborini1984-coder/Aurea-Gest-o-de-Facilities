@@ -33,7 +33,16 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, Loader2, Trash2, Plus, Printer, FileDown } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Trash2,
+  Plus,
+  Printer,
+  FileDown,
+  AlertCircle,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/hooks/use-toast'
@@ -47,13 +56,23 @@ const getStatusColor = (status: string) => {
   return 'bg-[#fef9c3] border-[#fde047] text-[#854d0e]'
 }
 
-export function PlanejamentoTab() {
+interface PlanejamentoTabProps {
+  plantId: string
+  setPlantId: (id: string) => void
+  serviceType: string
+  setServiceType: (type: string) => void
+}
+
+export function PlanejamentoTab({
+  plantId,
+  setPlantId,
+  serviceType,
+  setServiceType,
+}: PlanejamentoTabProps) {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
   const { toast } = useToast()
 
-  const [plantId, setPlantId] = useState('')
-  const [serviceType, setServiceType] = useState('cleaning')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [extraSlots, setExtraSlots] = useState<string[]>([])
 
@@ -76,9 +95,8 @@ export function PlanejamentoTab() {
   })
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    if (plants.length > 0 && !plantId) setPlantId(plants[0].id)
-  }, [plants, plantId])
+  // PlanejamentoTab only uses 'cleaning' or 'gardening'. Fallback to cleaning if 'all' is passed from ExecucaoTab.
+  const effectiveServiceType = serviceType === 'all' ? 'cleaning' : serviceType
 
   const fetchWeekData = async () => {
     if (!profile || !plantId) return
@@ -88,7 +106,7 @@ export function PlanejamentoTab() {
         .from('cleaning_gardening_areas')
         .select('*')
         .eq('plant_id', plantId)
-        .eq('type', serviceType),
+        .eq('type', effectiveServiceType),
       supabase
         .from('cleaning_gardening_schedules')
         .select('*, areas:area_id(name, type)')
@@ -97,13 +115,13 @@ export function PlanejamentoTab() {
         .lte('activity_date', format(addDays(weekStart, 6), 'yyyy-MM-dd')),
     ])
     setAreas(areasRes.data || [])
-    setSchedules((schedRes.data || []).filter((s: any) => s.areas?.type === serviceType))
+    setSchedules((schedRes.data || []).filter((s: any) => s.areas?.type === effectiveServiceType))
     setLoading(false)
   }
 
   useEffect(() => {
     fetchWeekData()
-  }, [plantId, serviceType, weekStart, profile])
+  }, [plantId, effectiveServiceType, weekStart, profile])
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -112,13 +130,20 @@ export function PlanejamentoTab() {
 
   const allSlots = useMemo(() => {
     const base = Array.from({ length: 13 }, (_, i) => `${(i + 6).toString().padStart(2, '0')}:00`)
-    const combined = [...base, ...extraSlots].sort()
+    // Dynamically add all start times from actual schedules so nothing is hidden from the grid
+    const scheduleTimes = schedules.map((s) => s.start_time.substring(0, 5))
+    const combined = Array.from(new Set([...base, ...extraSlots, ...scheduleTimes])).sort()
+
     return combined.map((time, idx) => {
       const occurrenceIndex = combined.slice(0, idx).filter((t) => t === time).length
       const totalOccurrences = combined.filter((t) => t === time).length
       return { time, occurrenceIndex, isLastOccurrence: occurrenceIndex === totalOccurrences - 1 }
     })
-  }, [extraSlots])
+  }, [extraSlots, schedules])
+
+  const unmappedSchedules = useMemo(() => {
+    return schedules.filter((s) => !allSlots.some((slot) => s.start_time.startsWith(slot.time)))
+  }, [schedules, allSlots])
 
   const handleSave = async () => {
     if (!modalData.area_id || !modalData.description || !modalData.end_time || modalData.readonly)
@@ -244,7 +269,7 @@ export function PlanejamentoTab() {
           </Select>
           <div className="flex bg-slate-100 p-1 rounded-lg">
             <Button
-              variant={serviceType === 'cleaning' ? 'default' : 'ghost'}
+              variant={effectiveServiceType === 'cleaning' ? 'default' : 'ghost'}
               size="lg"
               onClick={() => setServiceType('cleaning')}
               className="font-bold"
@@ -252,7 +277,7 @@ export function PlanejamentoTab() {
               Limpeza
             </Button>
             <Button
-              variant={serviceType === 'gardening' ? 'default' : 'ghost'}
+              variant={effectiveServiceType === 'gardening' ? 'default' : 'ghost'}
               size="lg"
               onClick={() => setServiceType('gardening')}
               className="font-bold"
@@ -474,6 +499,39 @@ export function PlanejamentoTab() {
           </TableBody>
         </Table>
       </div>
+
+      {unmappedSchedules.length > 0 && !loading && (
+        <div className="mt-8 bg-red-50 border-2 border-red-200 p-5 rounded-2xl animate-fade-in print:hidden">
+          <h3 className="text-lg font-bold text-red-900 mb-4 flex items-center gap-2">
+            <AlertCircle className="h-6 w-6" /> Atividades Pendentes de Ajuste (Fora da Grade)
+          </h3>
+          <p className="text-sm text-red-800 font-medium mb-4">
+            As atividades abaixo não puderam ser posicionadas automaticamente na grade de horários.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {unmappedSchedules.map((cs) => (
+              <div
+                key={cs.id}
+                className={cn(
+                  'p-4 border-2 rounded-xl shadow-sm flex flex-col break-words whitespace-normal',
+                  getStatusColor(cs.status),
+                )}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <p className="font-extrabold text-sm">{cs.areas?.name}</p>
+                  <Badge variant="outline" className="bg-white/50 text-xs">
+                    {cs.activity_date.split('-').reverse().join('/')}
+                  </Badge>
+                </div>
+                <p className="text-xs font-bold opacity-80 mt-0.5">
+                  {cs.start_time.substring(0, 5)} - {cs.end_time?.substring(0, 5)}
+                </p>
+                <p className="text-sm font-medium mt-2 leading-tight flex-1">{cs.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="sm:max-w-xl">

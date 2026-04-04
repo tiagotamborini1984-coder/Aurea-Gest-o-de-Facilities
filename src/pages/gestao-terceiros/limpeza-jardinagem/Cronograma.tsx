@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Leaf } from 'lucide-react'
 import { PlanejamentoTab } from './components/PlanejamentoTab'
@@ -6,11 +6,23 @@ import { ExecucaoTab } from './components/ExecucaoTab'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { useAppStore } from '@/store/AppContext'
+import { useMasterData } from '@/hooks/use-master-data'
 
 export default function Cronograma() {
   const [activeTab, setActiveTab] = useState('planejamento')
   const { profile } = useAppStore()
   const hasAccess = useHasAccess('Limpeza e Jardinagem')
+  const { plants } = useMasterData()
+
+  // Lifted state to synchronize filters between Planejamento and Execucao
+  const [plantId, setPlantId] = useState('')
+  const [serviceType, setServiceType] = useState('cleaning')
+
+  useEffect(() => {
+    if (plants.length > 0 && !plantId) {
+      setPlantId(plants[0].id)
+    }
+  }, [plants, plantId])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -47,10 +59,20 @@ export default function Cronograma() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="planejamento" className="mt-6 print:m-0">
-          <PlanejamentoTab />
+          <PlanejamentoTab
+            plantId={plantId}
+            setPlantId={setPlantId}
+            serviceType={serviceType}
+            setServiceType={setServiceType}
+          />
         </TabsContent>
         <TabsContent value="execucao" className="mt-6 print:m-0">
-          <ExecucaoTab />
+          <ExecucaoTab
+            plantId={plantId}
+            setPlantId={setPlantId}
+            serviceType={serviceType}
+            setServiceType={setServiceType}
+          />
         </TabsContent>
       </Tabs>
     </div>
