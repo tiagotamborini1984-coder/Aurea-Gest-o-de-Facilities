@@ -83,25 +83,16 @@ export function useDashboardCalculations(
       return valid
     }
 
-    const globalValidDates = new Set<string>()
-    allDatesInPeriod.forEach((date) => {
-      const isWeekendDate = isWeekend(parseISO(date))
-      const isNWDForAnyPlant = validPlants.some((pid) => nonWorkingDays[`${pid}_${date}`])
-      if (!isWeekendDate && !isNWDForAnyPlant) {
-        globalValidDates.add(date)
-      }
+    const allValidDatesSet = new Set<string>()
+    const plantValidDatesMap: Record<string, Set<string>> = {}
+
+    validPlants.forEach((pid) => {
+      const pDates = getValidDatesForPlant(pid)
+      plantValidDatesMap[pid] = pDates
+      pDates.forEach((d) => allValidDatesSet.add(d))
     })
 
-    const excludedDaysCount = allDatesInPeriod.length - globalValidDates.size
-    const totalPeriodDays = globalValidDates.size
-
-    const globalValidLogs = activeLogs.filter((l) => globalValidDates.has(l.date))
-
-    const avgLancado = totalPeriodDays > 0 ? globalValidLogs.length / totalPeriodDays : 0
-    const avgPresente =
-      totalPeriodDays > 0 ? globalValidLogs.filter((l) => l.status).length / totalPeriodDays : 0
-    const avgAusente =
-      totalPeriodDays > 0 ? globalValidLogs.filter((l) => !l.status).length / totalPeriodDays : 0
+    const excludedDaysCount = allDatesInPeriod.length - allValidDatesSet.size
 
     const validContracted = contracted.filter((c) => {
       if (!validPlants.includes(c.plant_id)) return false
@@ -120,13 +111,40 @@ export function useDashboardCalculations(
       return true
     })
 
-    const contratado = validContracted.reduce((a, b) => a + b.quantity, 0)
+    // Compute averages per plant
+    let totalAvgContracted = 0
+    let totalAvgPresent = 0
+    let totalAvgAbsent = 0
+    let totalAvgLancado = 0
+
+    validPlants.forEach((pid) => {
+      const pValidDates = plantValidDatesMap[pid]
+      const pDays = pValidDates.size
+
+      const pContracted = validContracted
+        .filter((c) => c.plant_id === pid)
+        .reduce((sum, c) => sum + c.quantity, 0)
+
+      const pLogs = activeLogs.filter((l) => l.plant_id === pid && pValidDates.has(l.date))
+
+      if (pDays > 0) {
+        totalAvgContracted += pContracted
+        const pPresent = pLogs.filter((l) => l.status).length
+        const pAbsent = pLogs.filter((l) => !l.status).length
+
+        totalAvgPresent += pPresent / pDays
+        totalAvgAbsent += pAbsent / pDays
+        totalAvgLancado += pLogs.length / pDays
+      }
+    })
+
+    const contratado = totalAvgContracted
+    const avgPresente = totalAvgPresent
+    const avgAusente = totalAvgAbsent
+    const avgLancado = totalAvgLancado
+
     const absenteismo =
-      totalPeriodDays === 0
-        ? 0
-        : contratado > 0
-          ? Math.max(0, ((contratado - avgPresente) / contratado) * 100)
-          : 0
+      contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
 
     const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
 
@@ -134,7 +152,7 @@ export function useDashboardCalculations(
       .filter((p) => validPlants.includes(p.id))
       .map((plant) => {
         const pLogs = activeLogs.filter((l) => l.plant_id === plant.id)
-        const pValidDates = getValidDatesForPlant(plant.id)
+        const pValidDates = plantValidDatesMap[plant.id]
         const pValidLogs = pLogs.filter((l) => pValidDates.has(l.date))
 
         const pDays = pValidDates.size
@@ -170,7 +188,7 @@ export function useDashboardCalculations(
         const lLogsRaw = activeLogs.filter((l) => refIds.includes(l.reference_id))
         const plantId = loc.plant_id
 
-        const pValidDates = getValidDatesForPlant(plantId)
+        const pValidDates = plantValidDatesMap[plantId]
 
         const lLogs = lLogsRaw.filter((l) => pValidDates.has(l.date))
         const lDays = pValidDates.size
@@ -200,7 +218,7 @@ export function useDashboardCalculations(
             .filter((e) => validPlants.includes(e.plant_id))
             .map((eq) => {
               const plantId = eq.plant_id
-              const pValidDates = getValidDatesForPlant(plantId)
+              const pValidDates = plantValidDatesMap[plantId]
 
               const eqCont =
                 validContracted
@@ -241,7 +259,7 @@ export function useDashboardCalculations(
             )
             .map((emp) => {
               const plantId = emp.plant_id
-              const pValidDates = getValidDatesForPlant(plantId)
+              const pValidDates = plantValidDatesMap[plantId]
 
               const empLogs = logs
                 .filter(
@@ -259,17 +277,34 @@ export function useDashboardCalculations(
             })
             .filter((c) => c.history.length > 0)
 
-    const dailyTrend = Array.from(globalValidDates)
+    const dailyTrend = Array.from(allValidDatesSet)
       .sort()
       .map((date) => {
-        const dayLogs = globalValidLogs.filter((l) => l.date === date)
-        const pPres = dayLogs.filter((l) => l.status).length
-        const abs = contratado > 0 ? Math.max(0, ((contratado - pPres) / contratado) * 100) : 0
+        let dContracted = 0
+        let dPresentes = 0
+
+        validPlants.forEach((pid) => {
+          if (plantValidDatesMap[pid].has(date)) {
+            const pCont = validContracted
+              .filter((c) => c.plant_id === pid)
+              .reduce((sum, c) => sum + c.quantity, 0)
+            dContracted += pCont
+
+            const pPres = activeLogs.filter(
+              (l) => l.plant_id === pid && l.date === date && l.status,
+            ).length
+            dPresentes += pPres
+          }
+        })
+
+        const abs =
+          dContracted > 0 ? Math.max(0, ((dContracted - dPresentes) / dContracted) * 100) : 0
+
         return {
           date,
           absenteismo: Number(abs.toFixed(1)),
-          presentes: pPres,
-          contratado,
+          presentes: dPresentes,
+          contratado: dContracted,
         }
       })
 
