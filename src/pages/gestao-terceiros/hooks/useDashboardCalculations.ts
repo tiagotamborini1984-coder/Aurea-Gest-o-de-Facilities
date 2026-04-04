@@ -1,4 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { isWeekend, parseISO } from 'date-fns'
 
 export function useDashboardCalculations(
   logs: any[],
@@ -15,13 +17,31 @@ export function useDashboardCalculations(
   dateFrom: string,
   dateTo: string,
 ) {
+  const [nonWorkingDays, setNonWorkingDays] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    const fetchNWD = async () => {
+      const { data } = await supabase
+        .from('plant_non_working_days')
+        .select('plant_id, date')
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+
+      if (data) {
+        const map: Record<string, boolean> = {}
+        data.forEach((d) => {
+          map[`${d.plant_id}_${d.date}`] = true
+        })
+        setNonWorkingDays(map)
+      }
+    }
+    fetchNWD()
+  }, [dateFrom, dateTo])
+
   return useMemo(() => {
     const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
     const companiesSet = new Set(selectedCompanies)
 
-    // For companies filter to work properly we need a way to filter employees and contracted headcount by company
-    // Employees already have company_name, Contracted headcount may have company_id (which maps to company).
-    // Let's filter employees by plant and company
     const validEmpIds =
       selectedCompanies.length > 0
         ? new Set(
@@ -45,34 +65,54 @@ export function useDashboardCalculations(
       return true
     })
 
-    const uniqueDates = new Set(activeLogs.map((l) => l.date))
-    const totalPeriodDays = Math.max(1, uniqueDates.size)
+    const getValidDatesForPlant = (pid: string, plantLogs: any[]) => {
+      const dates = new Set(plantLogs.map((l) => l.date))
+      const valid = new Set<string>()
+      dates.forEach((date) => {
+        const isWeekendDate = isWeekend(parseISO(date))
+        const isNWD = nonWorkingDays[`${pid}_${date}`]
+        const hasPresences = plantLogs.some((l) => l.date === date && l.status === true)
+        if ((isWeekendDate || isNWD) && !hasPresences) {
+          // exclude
+        } else {
+          valid.add(date)
+        }
+      })
+      return { valid, allCount: dates.size }
+    }
 
-    const avgLancado = activeLogs.length / totalPeriodDays
-    const avgPresente = activeLogs.filter((l) => l.status).length / totalPeriodDays
-    const avgAusente = activeLogs.filter((l) => !l.status).length / totalPeriodDays
+    const allUniqueDates = new Set(activeLogs.map((l) => l.date))
+    const globalValidDates = new Set<string>()
+    allUniqueDates.forEach((date) => {
+      const isWeekendDate = isWeekend(parseISO(date))
+      const isNWDForAnyPlant = validPlants.some((pid) => nonWorkingDays[`${pid}_${date}`])
+      const hasPresences = activeLogs.some((l) => l.date === date && l.status === true)
+      if ((isWeekendDate || isNWDForAnyPlant) && !hasPresences) {
+        // exclude
+      } else {
+        globalValidDates.add(date)
+      }
+    })
 
-    // Contracted Headcount needs to be filtered by selectedCompanies too for 'colaborador' and 'metas'
+    const excludedDaysCount = allUniqueDates.size - globalValidDates.size
+    const totalPeriodDays = Math.max(1, globalValidDates.size)
+
+    const globalValidLogs = activeLogs.filter((l) => globalValidDates.has(l.date))
+
+    const avgLancado = globalValidLogs.length / totalPeriodDays
+    const avgPresente = globalValidLogs.filter((l) => l.status).length / totalPeriodDays
+    const avgAusente = globalValidLogs.filter((l) => !l.status).length / totalPeriodDays
+
     const validContracted = contracted.filter((c) => {
       if (!validPlants.includes(c.plant_id)) return false
       if (c.type !== typeCont) return false
 
-      // If companies are selected, we must match the company
       if (selectedCompanies.length > 0 && c.type === 'colaborador') {
-        // Contracted has company_id. We need a way to map company_id to company_name to match selectedCompanies
-        // Since we don't pass `companies` to this hook, we might need a workaround or pass companies
-        // Wait! We didn't pass `companies` to useDashboardCalculations... Let's assume contracted doesn't have company_name
-        // So we might need to filter `contracted` without company for now or find another way.
-        // The AC: "The absenteeism metric must compare the daily_logs (filtered by employees of the selected company) against the contracted_headcount entries specifically assigned to that company within the selected plant and period."
-        // We will just do what's possible with the data available inside useDashboardCalculations or we have to update its signature.
-        // Wait, `selectedCompanies` are strings (names). `contracted` has `company_id`.
-        // Let's filter employees to find valid company_ids
         const validCompanyIds = new Set(
           employees
             .filter((e) => companiesSet.has(e.company_name) && e.company_id)
             .map((e) => e.company_id),
         )
-        // If the contracted has a company_id, it must be in the validCompanyIds
         if (c.company_id) {
           return validCompanyIds.has(c.company_id)
         }
@@ -90,9 +130,12 @@ export function useDashboardCalculations(
       .filter((p) => validPlants.includes(p.id))
       .map((plant) => {
         const pLogs = activeLogs.filter((l) => l.plant_id === plant.id)
-        const pDays = Math.max(1, new Set(pLogs.map((l) => l.date)).size)
-        const pPres = pLogs.filter((l) => l.status).length / pDays
-        const pAbs = pLogs.filter((l) => !l.status).length / pDays
+        const { valid: pValidDates } = getValidDatesForPlant(plant.id, pLogs)
+        const pValidLogs = pLogs.filter((l) => pValidDates.has(l.date))
+
+        const pDays = Math.max(1, pValidDates.size)
+        const pPres = pValidLogs.filter((l) => l.status).length / pDays
+        const pAbs = pValidLogs.filter((l) => !l.status).length / pDays
         const pCont = validContracted
           .filter((c) => c.plant_id === plant.id)
           .reduce((sum, c) => sum + c.quantity, 0)
@@ -119,8 +162,15 @@ export function useDashboardCalculations(
                 )
                 .map((e) => e.id)
             : []
-        const lLogs = activeLogs.filter((l) => refIds.includes(l.reference_id))
-        const lDays = Math.max(1, new Set(lLogs.map((l) => l.date)).size)
+        const lLogsRaw = activeLogs.filter((l) => refIds.includes(l.reference_id))
+        const plantId = loc.plant_id
+
+        const pLogs = activeLogs.filter((l) => l.plant_id === plantId)
+        const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
+
+        const lLogs = lLogsRaw.filter((l) => pValidDates.has(l.date))
+        const lDays = Math.max(1, pValidDates.size)
+
         const lPres = lLogs.filter((l) => l.status).length / lDays
         const lAbs = lLogs.filter((l) => !l.status).length / lDays
         const lCont = validContracted
@@ -144,14 +194,23 @@ export function useDashboardCalculations(
         : equipment
             .filter((e) => validPlants.includes(e.plant_id))
             .map((eq) => {
+              const plantId = eq.plant_id
+              const pLogs = activeLogs.filter((l) => l.plant_id === plantId)
+              const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
+
               const eqCont =
                 validContracted
                   .filter((c) => c.equipment_id === eq.id)
                   .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
+
               const eqLogs = logs
-                .filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
+                .filter(
+                  (l) =>
+                    l.type === 'equipment' && l.reference_id === eq.id && pValidDates.has(l.date),
+                )
                 .sort((a, b) => a.date.localeCompare(b.date))
-              const eqDays = Math.max(1, new Set(eqLogs.map((l) => l.date)).size)
+
+              const eqDays = Math.max(1, pValidDates.size)
               const pres = eqLogs.filter((l) => l.status).length
               const abs = eqLogs.filter((l) => !l.status).length
               const mPres = (pres / eqDays) * eqCont
@@ -177,8 +236,14 @@ export function useDashboardCalculations(
                 (selectedCompanies.length === 0 || companiesSet.has(e.company_name)),
             )
             .map((emp) => {
+              const plantId = emp.plant_id
+              const pLogs = activeLogs.filter((l) => l.plant_id === plantId)
+              const { valid: pValidDates } = getValidDatesForPlant(plantId, pLogs)
+
               const empLogs = logs
-                .filter((l) => l.type === 'staff' && l.reference_id === emp.id)
+                .filter(
+                  (l) => l.type === 'staff' && l.reference_id === emp.id && pValidDates.has(l.date),
+                )
                 .sort((a, b) => a.date.localeCompare(b.date))
               return {
                 id: emp.id,
@@ -216,6 +281,7 @@ export function useDashboardCalculations(
         ausente: formatStr(avgAusente),
         contratado,
         absenteismo,
+        excludedDaysCount,
       },
       plantStats,
       locationStats,
@@ -242,5 +308,6 @@ export function useDashboardCalculations(
     locations,
     equipment,
     goals,
+    nonWorkingDays,
   ])
 }

@@ -27,9 +27,12 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 
 export default function Lancamentos() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [isNonWorkingDay, setIsNonWorkingDay] = useState(false)
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [plantId, setPlantId] = useState<string>('')
   const [selectedCompany, setSelectedCompany] = useState<string>('')
@@ -77,6 +80,18 @@ export default function Lancamentos() {
 
   useEffect(() => {
     if (!plantId || !profile) return
+
+    const fetchNWD = async () => {
+      const { data } = await supabase
+        .from('plant_non_working_days')
+        .select('*')
+        .eq('plant_id', plantId)
+        .eq('date', date)
+        .maybeSingle()
+      setIsNonWorkingDay(!!data)
+    }
+    fetchNWD()
+
     const fetchLogs = async () => {
       if (activeTab === 'metas') {
         const referenceMonth = `${month}-01`
@@ -110,6 +125,45 @@ export default function Lancamentos() {
     }
     fetchLogs()
   }, [date, month, plantId, activeTab, profile])
+
+  const handleToggleNWD = async (checked: boolean) => {
+    setIsNonWorkingDay(checked)
+    if (!profile || !plantId) return
+
+    try {
+      if (checked) {
+        const { error } = await supabase.from('plant_non_working_days').upsert(
+          {
+            client_id: profile.client_id,
+            plant_id: plantId,
+            date: date,
+            description: 'Marcado via Lançamentos',
+          },
+          { onConflict: 'plant_id,date' },
+        )
+        if (error) throw error
+        toast({
+          title: 'Dia marcado como não útil (Feriado/Folga)',
+          className: 'bg-amber-50 text-amber-900 border-amber-200',
+        })
+      } else {
+        const { error } = await supabase
+          .from('plant_non_working_days')
+          .delete()
+          .eq('plant_id', plantId)
+          .eq('date', date)
+        if (error) throw error
+        toast({
+          title: 'Dia marcado como útil',
+          className: 'bg-green-50 text-green-900 border-green-200',
+        })
+      }
+    } catch (error) {
+      console.error(error)
+      toast({ variant: 'destructive', title: 'Erro ao alterar status do dia' })
+      setIsNonWorkingDay(!checked)
+    }
+  }
 
   const handleSave = async () => {
     if (!profile || !plantId) return
@@ -343,6 +397,23 @@ export default function Lancamentos() {
               </SelectContent>
             </Select>
           </div>
+
+          {activeTab !== 'metas' && plantId && (
+            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] flex flex-col justify-end pb-1 animate-in fade-in">
+              <div className="flex items-center space-x-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm h-11">
+                <Switch id="nwd-mode" checked={isNonWorkingDay} onCheckedChange={handleToggleNWD} />
+                <Label
+                  htmlFor="nwd-mode"
+                  className="text-xs font-semibold text-slate-700 cursor-pointer leading-tight flex flex-col"
+                >
+                  Dia Não Útil{' '}
+                  <span className="text-[10px] text-slate-500 font-normal mt-0.5">
+                    Ignorar no absenteísmo
+                  </span>
+                </Label>
+              </div>
+            </div>
+          )}
 
           {activeTab === 'staff' && (
             <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">

@@ -73,9 +73,19 @@ export default function DashboardMetricsCards({ metrics, activeTab }: any) {
             <p className="text-[10px] lg:text-xs font-medium text-orange-500 uppercase tracking-wider">
               {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Indisp.'}
             </p>
-            <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
-              {Number(metrics.absenteismo).toFixed(1)}%
-            </p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
+                {Number(metrics.absenteismo).toFixed(1)}%
+              </p>
+              {metrics.excludedDaysCount > 0 && (
+                <span
+                  className="text-[10px] text-muted-foreground whitespace-nowrap"
+                  title={`${metrics.excludedDaysCount} dias não úteis ou finais de semana desconsiderados`}
+                >
+                  (-{metrics.excludedDaysCount} dias)
+                </span>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
