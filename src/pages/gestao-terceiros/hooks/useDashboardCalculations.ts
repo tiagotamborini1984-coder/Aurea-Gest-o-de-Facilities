@@ -80,9 +80,7 @@ export function useDashboardCalculations(
       const valid = new Set<string>()
       allDatesInPeriod.forEach((date) => {
         const hasLogs = plantDateHasLogs[`${pid}_${date}`]
-        const isWeekendDate = isWeekend(parseISO(date))
-        const isNWD = nonWorkingDays[`${pid}_${date}`]
-        if (hasLogs || (!isWeekendDate && !isNWD)) {
+        if (hasLogs) {
           valid.add(date)
         }
       })
