@@ -71,12 +71,18 @@ export function useDashboardCalculations(
       end: parseISO(dateTo),
     }).map((d) => format(d, 'yyyy-MM-dd'))
 
+    const plantDateHasLogs: Record<string, boolean> = {}
+    activeLogs.forEach((l) => {
+      plantDateHasLogs[`${l.plant_id}_${l.date}`] = true
+    })
+
     const getValidDatesForPlant = (pid: string) => {
       const valid = new Set<string>()
       allDatesInPeriod.forEach((date) => {
+        const hasLogs = plantDateHasLogs[`${pid}_${date}`]
         const isWeekendDate = isWeekend(parseISO(date))
         const isNWD = nonWorkingDays[`${pid}_${date}`]
-        if (!isWeekendDate && !isNWD) {
+        if (hasLogs || (!isWeekendDate && !isNWD)) {
           valid.add(date)
         }
       })
