@@ -45,12 +45,8 @@ export function useDashboardCalculations(
 
     const validEmpIds =
       selectedCompanies.length > 0
-        ? new Set(
-            employees
-              .filter((e) => validPlants.includes(e.plant_id) && companiesSet.has(e.company_name))
-              .map((e) => e.id),
-          )
-        : new Set(employees.filter((e) => validPlants.includes(e.plant_id)).map((e) => e.id))
+        ? new Set(employees.filter((e) => companiesSet.has(e.company_name)).map((e) => e.id))
+        : new Set(employees.map((e) => e.id))
 
     const filteredLogs = logs.filter(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
@@ -189,8 +185,10 @@ export function useDashboardCalculations(
                 )
                 .map((e) => e.id)
             : []
-        const lLogsRaw = activeLogs.filter((l) => refIds.includes(l.reference_id))
         const plantId = loc.plant_id
+        const lLogsRaw = activeLogs.filter(
+          (l) => l.plant_id === plantId && refIds.includes(l.reference_id),
+        )
 
         const pValidDates = plantValidDatesMap[plantId]
 
@@ -256,18 +254,11 @@ export function useDashboardCalculations(
       activeTab !== 'colaboradores'
         ? []
         : employees
-            .filter(
-              (e) =>
-                validPlants.includes(e.plant_id) &&
-                (selectedCompanies.length === 0 || companiesSet.has(e.company_name)),
-            )
+            .filter((e) => selectedCompanies.length === 0 || companiesSet.has(e.company_name))
             .map((emp) => {
-              const plantId = emp.plant_id
-              const pValidDates = plantValidDatesMap[plantId]
-
-              const empLogs = logs
+              const empLogs = activeLogs
                 .filter(
-                  (l) => l.type === 'staff' && l.reference_id === emp.id && pValidDates.has(l.date),
+                  (l) => l.reference_id === emp.id && plantValidDatesMap[l.plant_id]?.has(l.date),
                 )
                 .sort((a, b) => a.date.localeCompare(b.date))
               return {
