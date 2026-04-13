@@ -1,38 +1,75 @@
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Wrench, ChevronRight, TrendingDown, Download } from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import {
+  Users,
+  Wrench,
+  ChevronRight,
+  TrendingDown,
+  Download,
+  FileSpreadsheet,
+  List,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { exportToCSV } from '@/lib/export'
 
-const HistoryPills = ({ history }: { history: any[] }) => (
-  <div className="px-5 lg:px-6 py-4 bg-muted/20 border-t border-border/50 shadow-inner">
-    <h4 className="text-[10px] lg:text-xs font-semibold text-muted-foreground uppercase mb-2.5 flex items-center gap-1.5">
-      <TrendingDown className="w-3.5 h-3.5" /> Histórico
-    </h4>
-    <div className="flex flex-wrap gap-2">
-      {history.length === 0 ? (
-        <span className="text-xs text-muted-foreground/80">Sem lançamentos.</span>
-      ) : (
-        history.map((day: any, idx: number) => (
-          <div
-            key={idx}
-            className="flex flex-col items-center justify-center bg-background py-1 px-2 border border-border rounded shadow-sm min-w-[50px]"
-          >
-            <span className="text-[9px] text-muted-foreground/80 font-medium mb-0.5">
-              {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
-            </span>
+const HistoryPills = ({ history, item, isEq }: { history: any[]; item: any; isEq: boolean }) => {
+  const handleExportItem = () => {
+    const rows = history.map((day: any) => ({
+      Nome: item.name,
+      Local: item.location || '-',
+      Tipo: isEq ? 'Equipamento' : 'Colaborador',
+      Data: format(new Date(day.date + 'T12:00:00Z'), 'dd/MM/yyyy'),
+      Status: day.status ? (isEq ? 'Disponível' : 'Presente') : isEq ? 'Indisponível' : 'Falta',
+    }))
+    exportToCSV(
+      `auditoria_${item.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
+      rows,
+    )
+  }
+
+  return (
+    <div className="px-5 lg:px-6 py-4 bg-muted/20 border-t border-border/50 shadow-inner">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-[10px] lg:text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+          <TrendingDown className="w-3.5 h-3.5" /> Detalhes (Logs de {item.name})
+        </h4>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportItem}
+          className="h-6 text-[10px] gap-1.5 bg-background"
+        >
+          <FileSpreadsheet className="w-3 h-3" />
+          Exportar Excel
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {history.length === 0 ? (
+          <span className="text-xs text-muted-foreground/80">Sem lançamentos.</span>
+        ) : (
+          history.map((day: any, idx: number) => (
             <div
-              className={cn('w-2 h-2 rounded-full', day.status ? 'bg-green-500' : 'bg-red-500')}
-            />
-          </div>
-        ))
-      )}
+              key={idx}
+              className="flex flex-col items-center justify-center bg-background py-1 px-2 border border-border rounded shadow-sm min-w-[50px]"
+            >
+              <span className="text-[9px] text-muted-foreground/80 font-medium mb-0.5">
+                {format(new Date(day.date + 'T12:00:00Z'), 'dd/MM')}
+              </span>
+              <div
+                className={cn('w-2 h-2 rounded-full', day.status ? 'bg-green-500' : 'bg-red-500')}
+              />
+            </div>
+          ))
+        )}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 export default function DashboardDetails({ activeTab, equipmentStats, collaboratorStats }: any) {
   if (activeTab === 'metas') return null
@@ -67,9 +104,25 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
       }))
     })
 
-    const fileName = `auditoria_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`
+    const fileName = `auditoria_geral_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`
     exportToCSV(fileName, rows)
   }
+
+  const allLogs = useMemo(() => {
+    if (!data) return []
+    return data
+      .flatMap((item: any) => {
+        if (!item.history) return []
+        return item.history.map((day: any) => ({
+          id: item.id,
+          name: item.name,
+          location: item.location || '-',
+          date: day.date,
+          status: day.status,
+        }))
+      })
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [data])
 
   return (
     <Card className="shadow-subtle border-border bg-card animate-in fade-in slide-in-from-bottom-4">
@@ -77,11 +130,110 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
         <CardTitle className="text-sm lg:text-base font-semibold flex items-center gap-2 text-foreground/90">
           <Icon className="h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground/80" /> {title}
         </CardTitle>
-        <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-2">
-          <Download className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Exportar CSV</span>
-          <span className="sm:hidden">Exportar</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="secondary" size="sm" className="h-8 gap-2 font-medium">
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Auditar Logs</span>
+                <span className="sm:hidden">Logs</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-full sm:max-w-xl md:max-w-2xl flex flex-col p-0"
+            >
+              <SheetHeader className="p-6 pb-4 border-b border-border/50 flex flex-row items-center justify-between">
+                <div>
+                  <SheetTitle className="flex items-center gap-2 text-left">
+                    <TrendingDown className="w-5 h-5 text-primary" />
+                    Auditoria - {isEq ? 'Equipamentos' : 'Colaboradores'}
+                  </SheetTitle>
+                  <p className="text-sm text-muted-foreground mt-1 text-left">
+                    Lista bruta dos registros diários
+                  </p>
+                </div>
+                <Button
+                  onClick={handleExport}
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white mr-8 shadow-sm"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="hidden sm:inline">Exportar Excel</span>
+                  <span className="sm:hidden">Exportar</span>
+                </Button>
+              </SheetHeader>
+
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-muted/10">
+                {allLogs.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-12 bg-background rounded-lg border border-dashed">
+                    Nenhum log encontrado para os filtros atuais.
+                  </div>
+                ) : (
+                  <div className="border border-border/50 rounded-lg overflow-hidden bg-background shadow-sm">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 border-b border-border/50">
+                        <tr>
+                          <th className="p-3 text-left font-medium text-muted-foreground">Data</th>
+                          <th className="p-3 text-left font-medium text-muted-foreground">
+                            {isEq ? 'Equipamento' : 'Colaborador'}
+                          </th>
+                          {!isEq && (
+                            <th className="p-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
+                              Local
+                            </th>
+                          )}
+                          <th className="p-3 text-center font-medium text-muted-foreground">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {allLogs.map((log: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                            <td className="p-3 text-foreground font-medium">
+                              {format(new Date(log.date + 'T12:00:00Z'), 'dd/MM/yyyy')}
+                            </td>
+                            <td className="p-3 text-foreground">{log.name}</td>
+                            {!isEq && (
+                              <td className="p-3 text-muted-foreground hidden sm:table-cell">
+                                {log.location}
+                              </td>
+                            )}
+                            <td className="p-3 text-center">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'uppercase text-[10px]',
+                                  log.status
+                                    ? 'bg-green-500/10 text-green-700 border-green-500/20'
+                                    : 'bg-red-500/10 text-red-700 border-red-500/20',
+                                )}
+                              >
+                                {log.status
+                                  ? isEq
+                                    ? 'Disp.'
+                                    : 'Presente'
+                                  : isEq
+                                    ? 'Indisp.'
+                                    : 'Falta'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-2">
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Exportar Excel</span>
+            <span className="sm:hidden">Exportar</span>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="px-4 lg:px-5 py-2.5 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30">
@@ -144,7 +296,7 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <HistoryPills history={item.history} />
+                    <HistoryPills history={item.history} item={item} isEq={isEq} />
                   </CollapsibleContent>
                 </Collapsible>
               )
