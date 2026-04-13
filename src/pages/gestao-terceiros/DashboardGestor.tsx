@@ -138,7 +138,15 @@ export default function DashboardGestor() {
         </div>
       ) : activeTab !== 'metas' ? (
         <div className="space-y-4 lg:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-          <DashboardMetricsCards metrics={metrics} activeTab={activeTab} />
+          <DashboardMetricsCards
+            metrics={metrics}
+            activeTab={activeTab}
+            logs={logs}
+            employees={employees}
+            equipment={equipment}
+            selectedPlants={selectedPlants}
+            selectedCompanies={selectedCompanies}
+          />
 
           {activeTab === 'colaboradores' && (
             <DashboardTrendChart data={dailyTrend} target={absenteeismTarget} />
