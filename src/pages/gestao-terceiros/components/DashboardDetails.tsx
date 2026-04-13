@@ -145,16 +145,16 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
               className="w-full sm:max-w-xl md:max-w-2xl flex flex-col p-0"
             >
               <SheetHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative">
-                <div className="pr-8 sm:pr-0">
-                  <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg">
-                    <TrendingDown className="w-5 h-5 text-primary shrink-0" />
-                    Auditoria de Logs - {isEq ? 'Equipamentos' : 'Colaboradores'}
-                  </SheetTitle>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">
-                    Lista bruta dos registros diários
-                  </p>
-                </div>
-                <div className="w-full sm:w-auto flex sm:block mt-2 sm:mt-0 sm:pr-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full pr-8 gap-4">
+                  <div>
+                    <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg">
+                      <TrendingDown className="w-5 h-5 text-primary shrink-0" />
+                      Registro de Presença - {isEq ? 'Equipamentos' : 'Colaboradores'}
+                    </SheetTitle>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">
+                      Lista bruta dos registros diários
+                    </p>
+                  </div>
                   <Button
                     onClick={() => {
                       if (!allLogs || allLogs.length === 0) return
@@ -174,14 +174,14 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
                         return base
                       })
                       exportToCSV(
-                        `auditoria_logs_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
+                        `registro_presenca_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
                         rows,
                       )
                     }}
                     className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm"
                   >
                     <FileSpreadsheet className="w-4 h-4" />
-                    <span>Exportar para CSV</span>
+                    <span>Exportar para Excel</span>
                   </Button>
                 </div>
               </SheetHeader>
