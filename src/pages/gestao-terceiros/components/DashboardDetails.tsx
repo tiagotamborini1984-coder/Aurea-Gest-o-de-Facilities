@@ -136,15 +136,15 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
             <SheetTrigger asChild>
               <Button variant="secondary" size="sm" className="h-8 gap-2 font-medium">
                 <List className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Auditar Logs</span>
-                <span className="sm:hidden">Logs</span>
+                <span className="hidden sm:inline">Ver Detalhes</span>
+                <span className="sm:hidden">Detalhes</span>
               </Button>
             </SheetTrigger>
             <SheetContent
               side="right"
               className="w-full sm:max-w-xl md:max-w-2xl flex flex-col p-0"
             >
-              <SheetHeader className="p-6 pb-4 border-b border-border/50 flex flex-row items-center justify-between">
+              <SheetHeader className="p-6 pb-4 border-b border-border/50 flex flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <SheetTitle className="flex items-center gap-2 text-left">
                     <TrendingDown className="w-5 h-5 text-primary" />
@@ -156,7 +156,7 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
                 </div>
                 <Button
                   onClick={handleExport}
-                  className="gap-2 bg-green-600 hover:bg-green-700 text-white mr-8 shadow-sm"
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white mr-8 shadow-sm shrink-0"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span className="hidden sm:inline">Exportar Excel</span>
