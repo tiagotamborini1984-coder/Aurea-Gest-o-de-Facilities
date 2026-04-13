@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
-import { Users, Wrench, ChevronRight, TrendingDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Users, Wrench, ChevronRight, TrendingDown, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { exportToCSV } from '@/lib/export'
 
 const HistoryPills = ({ history }: { history: any[] }) => (
   <div className="px-5 lg:px-6 py-4 bg-muted/20 border-t border-border/50 shadow-inner">
@@ -39,12 +41,47 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
   const Icon = isEq ? Wrench : Users
   const data = isEq ? equipmentStats : collaboratorStats
 
+  const handleExport = () => {
+    if (!data || data.length === 0) return
+
+    const rows = data.flatMap((item: any) => {
+      const baseRow = {
+        Nome: item.name,
+        Local: item.location || '-',
+        Tipo: isEq ? 'Equipamento' : 'Colaborador',
+        'Presenças/Disp Totais': isEq ? item.mediaPresenca?.toFixed(1) : item.presencas,
+        'Faltas/Indisp Totais': isEq ? item.mediaFalta?.toFixed(1) : item.faltas,
+        'Taxa (%)': isEq
+          ? item.taxaDisp?.toFixed(1)
+          : ((item.presencas / (item.presencas + item.faltas || 1)) * 100).toFixed(1),
+      }
+
+      if (!item.history || item.history.length === 0) {
+        return [{ ...baseRow, Data: '-', Status: '-' }]
+      }
+
+      return item.history.map((day: any) => ({
+        ...baseRow,
+        Data: format(new Date(day.date + 'T12:00:00Z'), 'dd/MM/yyyy'),
+        Status: day.status ? (isEq ? 'Disponível' : 'Presente') : isEq ? 'Indisponível' : 'Falta',
+      }))
+    })
+
+    const fileName = `auditoria_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`
+    exportToCSV(fileName, rows)
+  }
+
   return (
     <Card className="shadow-subtle border-border bg-card animate-in fade-in slide-in-from-bottom-4">
-      <CardHeader className="pb-2 lg:pb-3 border-b border-border/50 px-4 lg:px-5">
+      <CardHeader className="pb-2 lg:pb-3 border-b border-border/50 px-4 lg:px-5 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm lg:text-base font-semibold flex items-center gap-2 text-foreground/90">
           <Icon className="h-4 w-4 lg:h-5 lg:w-5 text-muted-foreground/80" /> {title}
         </CardTitle>
+        <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-2">
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Exportar CSV</span>
+          <span className="sm:hidden">Exportar</span>
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <div className="px-4 lg:px-5 py-2.5 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30">
