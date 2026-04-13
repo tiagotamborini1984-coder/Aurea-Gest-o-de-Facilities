@@ -72,11 +72,28 @@ const HistoryPills = ({ history, item, isEq }: { history: any[]; item: any; isEq
 }
 
 export default function DashboardDetails({ activeTab, equipmentStats, collaboratorStats }: any) {
-  if (activeTab === 'metas') return null
   const isEq = activeTab === 'equipamentos'
   const title = isEq ? 'Por Equipamento' : 'Por Colaborador'
   const Icon = isEq ? Wrench : Users
   const data = isEq ? equipmentStats : collaboratorStats
+
+  const allLogs = useMemo(() => {
+    if (!data) return []
+    return data
+      .flatMap((item: any) => {
+        if (!item.history) return []
+        return item.history.map((day: any) => ({
+          id: item.id,
+          name: item.name,
+          location: item.location || '-',
+          date: day.date,
+          status: day.status,
+        }))
+      })
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [data])
+
+  if (activeTab === 'metas') return null
 
   const handleExport = () => {
     if (!data || data.length === 0) return
@@ -107,22 +124,6 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
     const fileName = `auditoria_geral_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`
     exportToCSV(fileName, rows)
   }
-
-  const allLogs = useMemo(() => {
-    if (!data) return []
-    return data
-      .flatMap((item: any) => {
-        if (!item.history) return []
-        return item.history.map((day: any) => ({
-          id: item.id,
-          name: item.name,
-          location: item.location || '-',
-          date: day.date,
-          status: day.status,
-        }))
-      })
-      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [data])
 
   return (
     <Card className="shadow-subtle border-border bg-card animate-in fade-in slide-in-from-bottom-4">
