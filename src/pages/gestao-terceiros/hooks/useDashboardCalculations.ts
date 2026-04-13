@@ -58,7 +58,12 @@ export function useDashboardCalculations(
 
     const activeLogs = filteredLogs.filter((l) => {
       if (l.type !== typeLog) return false
-      if (typeLog === 'staff') return validEmpIds.has(l.reference_id)
+      if (typeLog === 'staff') {
+        if (selectedCompanies.length > 0) {
+          return validEmpIds.has(l.reference_id)
+        }
+        return true
+      }
       return true
     })
 
@@ -111,37 +116,35 @@ export function useDashboardCalculations(
       return true
     })
 
-    // Compute averages per plant
-    let totalAvgContracted = 0
-    let totalAvgPresent = 0
-    let totalAvgAbsent = 0
-    let totalAvgLancado = 0
+    // Compute global metrics using a unified denominator (global valid days)
+    const globalDays = allValidDatesSet.size
+    let totalPresentCount = 0
+    let totalAbsentCount = 0
+    let totalLancadoCount = 0
+    let totalContractedSum = 0
 
-    validPlants.forEach((pid) => {
-      const pValidDates = plantValidDatesMap[pid]
-      const pDays = pValidDates.size
+    Array.from(allValidDatesSet).forEach((date) => {
+      let dailyContracted = 0
+      validPlants.forEach((pid) => {
+        if (plantValidDatesMap[pid].has(date)) {
+          const pCont = validContracted
+            .filter((c) => c.plant_id === pid)
+            .reduce((sum, c) => sum + c.quantity, 0)
+          dailyContracted += pCont
 
-      const pContracted = validContracted
-        .filter((c) => c.plant_id === pid)
-        .reduce((sum, c) => sum + c.quantity, 0)
-
-      const pLogs = activeLogs.filter((l) => l.plant_id === pid && pValidDates.has(l.date))
-
-      if (pDays > 0) {
-        totalAvgContracted += pContracted
-        const pPresent = pLogs.filter((l) => l.status).length
-        const pAbsent = pLogs.filter((l) => !l.status).length
-
-        totalAvgPresent += pPresent / pDays
-        totalAvgAbsent += pAbsent / pDays
-        totalAvgLancado += pLogs.length / pDays
-      }
+          const pLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
+          totalPresentCount += pLogs.filter((l) => l.status).length
+          totalAbsentCount += pLogs.filter((l) => !l.status).length
+          totalLancadoCount += pLogs.length
+        }
+      })
+      totalContractedSum += dailyContracted
     })
 
-    const contratado = totalAvgContracted
-    const avgPresente = totalAvgPresent
-    const avgAusente = totalAvgAbsent
-    const avgLancado = totalAvgLancado
+    const contratado = globalDays > 0 ? totalContractedSum / globalDays : 0
+    const avgPresente = globalDays > 0 ? totalPresentCount / globalDays : 0
+    const avgAusente = globalDays > 0 ? totalAbsentCount / globalDays : 0
+    const avgLancado = globalDays > 0 ? totalLancadoCount / globalDays : 0
 
     const absenteismo =
       contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
