@@ -144,45 +144,46 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
               side="right"
               className="w-full sm:max-w-xl md:max-w-2xl flex flex-col p-0"
             >
-              <SheetHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full pr-8 gap-4">
-                  <div>
+              <SheetHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 flex flex-col items-start gap-4 relative">
+                <div className="flex flex-col w-full pr-8">
+                  <div className="flex flex-wrap items-center gap-3">
                     <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg">
                       <TrendingDown className="w-5 h-5 text-primary shrink-0" />
                       Registro de Presença - {isEq ? 'Equipamentos' : 'Colaboradores'}
                     </SheetTitle>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">
-                      Lista bruta dos registros diários
-                    </p>
+                    <Button
+                      onClick={() => {
+                        if (!allLogs || allLogs.length === 0) return
+                        const rows = allLogs.map((log: any) => {
+                          const base: Record<string, string> = {
+                            Data: format(new Date(log.date + 'T12:00:00Z'), 'dd/MM/yyyy'),
+                            [isEq ? 'Equipamento' : 'Colaborador']: log.name,
+                          }
+                          if (!isEq) base['Local'] = log.location || '-'
+                          base['Status'] = log.status
+                            ? isEq
+                              ? 'Disponível'
+                              : 'Presente'
+                            : isEq
+                              ? 'Indisponível'
+                              : 'Falta'
+                          return base
+                        })
+                        exportToCSV(
+                          `registro_presenca_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
+                          rows,
+                        )
+                      }}
+                      size="sm"
+                      className="gap-1.5 bg-green-600 hover:bg-green-700 text-white shadow-sm h-8"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>Exportar para Excel (CSV)</span>
+                    </Button>
                   </div>
-                  <Button
-                    onClick={() => {
-                      if (!allLogs || allLogs.length === 0) return
-                      const rows = allLogs.map((log: any) => {
-                        const base: Record<string, string> = {
-                          Data: format(new Date(log.date + 'T12:00:00Z'), 'dd/MM/yyyy'),
-                          [isEq ? 'Equipamento' : 'Colaborador']: log.name,
-                        }
-                        if (!isEq) base['Local'] = log.location || '-'
-                        base['Status'] = log.status
-                          ? isEq
-                            ? 'Disponível'
-                            : 'Presente'
-                          : isEq
-                            ? 'Indisponível'
-                            : 'Falta'
-                        return base
-                      })
-                      exportToCSV(
-                        `registro_presenca_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
-                        rows,
-                      )
-                    }}
-                    className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    <span>Exportar para Excel</span>
-                  </Button>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">
+                    Lista bruta dos registros diários
+                  </p>
                 </div>
               </SheetHeader>
 

@@ -17,13 +17,33 @@ export function useDashboardLogs(
         return
       }
       const plantIds = plants.map((p: any) => p.id)
-      const { data } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
-        .in('plant_id', plantIds)
-      setLogs(data || [])
+
+      let allData: any[] = []
+      let from = 0
+      const step = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('daily_logs')
+          .select('*')
+          .gte('date', dateFrom)
+          .lte('date', dateTo)
+          .in('plant_id', plantIds)
+          .range(from, from + step - 1)
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data]
+          if (data.length < step) {
+            hasMore = false
+          } else {
+            from += step
+          }
+        } else {
+          hasMore = false
+        }
+      }
+      setLogs(allData)
     }
     fetchLogs()
   }, [dateFrom, dateTo, plants])
@@ -41,13 +61,32 @@ export function useDashboardLogs(
       const lastDay = new Date(y, m, 0).getDate()
       const mTo = `${referenceMonth}-${lastDay}`
 
-      const { data: mg } = await supabase
-        .from('monthly_goals_data')
-        .select('*')
-        .gte('reference_month', mFrom)
-        .lte('reference_month', mTo)
-        .in('plant_id', plantIds)
-      setMonthlyGoals(mg || [])
+      let allData: any[] = []
+      let from = 0
+      const step = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: mg } = await supabase
+          .from('monthly_goals_data')
+          .select('*')
+          .gte('reference_month', mFrom)
+          .lte('reference_month', mTo)
+          .in('plant_id', plantIds)
+          .range(from, from + step - 1)
+
+        if (mg && mg.length > 0) {
+          allData = [...allData, ...mg]
+          if (mg.length < step) {
+            hasMore = false
+          } else {
+            from += step
+          }
+        } else {
+          hasMore = false
+        }
+      }
+      setMonthlyGoals(allData)
     }
     fetchGoals()
   }, [referenceMonth, plants])
