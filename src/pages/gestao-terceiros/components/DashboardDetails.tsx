@@ -146,10 +146,12 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
             >
               <SheetHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 flex flex-col items-start gap-4 relative">
                 <div className="flex flex-col w-full pr-8">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg">
+                  <div className="flex flex-row items-center justify-between w-full gap-4">
+                    <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg truncate">
                       <TrendingDown className="w-5 h-5 text-primary shrink-0" />
-                      Registro de Presença - {isEq ? 'Equipamentos' : 'Colaboradores'}
+                      <span className="truncate">
+                        Registro de Presença - {isEq ? 'Equipamentos' : 'Colaboradores'}
+                      </span>
                     </SheetTitle>
                     <Button
                       onClick={() => {
@@ -175,10 +177,11 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
                         )
                       }}
                       size="sm"
-                      className="gap-1.5 bg-green-600 hover:bg-green-700 text-white shadow-sm h-8"
+                      className="gap-1.5 bg-green-600 hover:bg-green-700 text-white shadow-sm h-8 shrink-0"
                     >
-                      <FileSpreadsheet className="w-3.5 h-3.5" />
-                      <span>Exportar para Excel (CSV)</span>
+                      <FileSpreadsheet className="w-4 h-4 shrink-0" />
+                      <span className="hidden sm:inline">Exportar para CSV</span>
+                      <span className="sm:hidden">Exportar</span>
                     </Button>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">

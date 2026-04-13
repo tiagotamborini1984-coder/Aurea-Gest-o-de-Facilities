@@ -18,6 +18,20 @@ export function useDashboardLogs(
       }
       const plantIds = plants.map((p: any) => p.id)
 
+      const { data: nwdData } = await supabase
+        .from('plant_non_working_days')
+        .select('plant_id, date')
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .in('plant_id', plantIds)
+
+      const nonWorkingMap: Record<string, boolean> = {}
+      if (nwdData) {
+        nwdData.forEach((nwd) => {
+          nonWorkingMap[`${nwd.plant_id}_${nwd.date}`] = true
+        })
+      }
+
       let allData: any[] = []
       let from = 0
       const step = 1000
@@ -43,7 +57,10 @@ export function useDashboardLogs(
           hasMore = false
         }
       }
-      setLogs(allData)
+
+      const validLogs = allData.filter((log) => !nonWorkingMap[`${log.plant_id}_${log.date}`])
+
+      setLogs(validLogs)
     }
     fetchLogs()
   }, [dateFrom, dateTo, plants])
