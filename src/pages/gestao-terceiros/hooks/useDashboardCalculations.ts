@@ -1,6 +1,5 @@
-import { useMemo, useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
-import { isWeekend, parseISO, eachDayOfInterval, format } from 'date-fns'
+import { useMemo } from 'react'
+import { parseISO, eachDayOfInterval, format } from 'date-fns'
 
 export function useDashboardCalculations(
   logs: any[],
@@ -18,28 +17,10 @@ export function useDashboardCalculations(
   dateTo: string,
   absenteeismTarget: number = 4,
 ) {
-  const [nonWorkingDays, setNonWorkingDays] = useState<Record<string, boolean>>({})
-
-  useEffect(() => {
-    const fetchNWD = async () => {
-      const { data } = await supabase
-        .from('plant_non_working_days')
-        .select('plant_id, date')
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
-
-      if (data) {
-        const map: Record<string, boolean> = {}
-        data.forEach((d) => {
-          map[`${d.plant_id}_${d.date}`] = true
-        })
-        setNonWorkingDays(map)
-      }
-    }
-    fetchNWD()
-  }, [dateFrom, dateTo])
-
   return useMemo(() => {
+    // Normaliza datas para garantir que logs com timestamp sejam considerados corretamente
+    const normalizeDate = (d: string) => d.split('T')[0]
+
     const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
     const companiesSet = new Set(selectedCompanies)
 
@@ -48,7 +29,9 @@ export function useDashboardCalculations(
         ? new Set(employees.filter((e) => companiesSet.has(e.company_name)).map((e) => e.id))
         : new Set(employees.map((e) => e.id))
 
-    const filteredLogs = logs.filter(
+    const processedLogs = logs.map((l) => ({ ...l, date: normalizeDate(l.date) }))
+
+    const filteredLogs = processedLogs.filter(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
     )
 
@@ -117,28 +100,24 @@ export function useDashboardCalculations(
     })
 
     // Compute global metrics using a unified denominator (global valid days)
+    // O divisor do cálculo será composto exclusivamente pelo número de dias em que houve lançamentos salvos
     const globalDays = allValidDatesSet.size
-    let totalPresentCount = 0
-    let totalAbsentCount = 0
-    let totalLancadoCount = 0
-    let totalContractedSum = 0
 
+    // Conta total bruto de logs ativos (sem perder registros em loops de intersecção)
+    const totalPresentCount = activeLogs.filter((l) => l.status).length
+    const totalAbsentCount = activeLogs.filter((l) => !l.status).length
+    const totalLancadoCount = activeLogs.length
+
+    let totalContractedSum = 0
     Array.from(allValidDatesSet).forEach((date) => {
-      let dailyContracted = 0
       validPlants.forEach((pid) => {
         if (plantValidDatesMap[pid].has(date)) {
           const pCont = validContracted
             .filter((c) => c.plant_id === pid)
             .reduce((sum, c) => sum + c.quantity, 0)
-          dailyContracted += pCont
-
-          const pLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
-          totalPresentCount += pLogs.filter((l) => l.status).length
-          totalAbsentCount += pLogs.filter((l) => !l.status).length
-          totalLancadoCount += pLogs.length
+          totalContractedSum += pCont
         }
       })
-      totalContractedSum += dailyContracted
     })
 
     const contratado = globalDays > 0 ? totalContractedSum / globalDays : 0
@@ -230,7 +209,7 @@ export function useDashboardCalculations(
                   .filter((c) => c.equipment_id === eq.id)
                   .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
 
-              const eqLogs = logs
+              const eqLogs = processedLogs
                 .filter(
                   (l) =>
                     l.type === 'equipment' && l.reference_id === eq.id && pValidDates.has(l.date),
@@ -361,7 +340,6 @@ export function useDashboardCalculations(
     locations,
     equipment,
     goals,
-    nonWorkingDays,
     absenteeismTarget,
   ])
 }
