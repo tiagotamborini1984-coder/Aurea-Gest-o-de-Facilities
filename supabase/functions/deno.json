@@ -1,8 +1,8 @@
 {
   "_versions": {
-    "create-user": 1,
+    "create-user": 2,
     "email-reports": 2,
     "package-notifications": 2,
-    "update-user-password": 1
+    "update-user-password": 2
   }
 }
