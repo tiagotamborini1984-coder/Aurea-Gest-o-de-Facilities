@@ -276,8 +276,9 @@ export function CreateUserDialog({
                   <SelectItem value="Operacional">Operacional</SelectItem>
                   <SelectItem value="Gestor">Gestor</SelectItem>
                   {(isSuperAdmin || profile?.role === 'Administrador') && (
-                    <SelectItem value="Administrador">Administrador</SelectItem>
+                    <SelectItem value="Administrador">Administrador de Cliente</SelectItem>
                   )}
+                  {isSuperAdmin && <SelectItem value="Master">Master</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -372,12 +373,18 @@ export function CreateUserDialog({
           )}
           {form.role === 'Administrador' && (
             <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
-              <strong>Acesso Total:</strong> Administradores têm acesso irrestrito a todos os
-              módulos da empresa selecionada.
+              <strong>Acesso Total:</strong> Administradores de Cliente têm acesso irrestrito a
+              todos os módulos da empresa selecionada.
+            </div>
+          )}
+          {form.role === 'Master' && (
+            <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
+              <strong>Acesso Global:</strong> Usuários Master têm acesso irrestrito a todos os
+              módulos e empresas do sistema.
             </div>
           )}
 
-          {form.role !== 'Administrador' && (
+          {!['Administrador', 'Master'].includes(form.role) && (
             <div className="pt-2">
               <Label className="mb-2 block">Plantas Autorizadas</Label>
               <div className="flex flex-wrap gap-2">

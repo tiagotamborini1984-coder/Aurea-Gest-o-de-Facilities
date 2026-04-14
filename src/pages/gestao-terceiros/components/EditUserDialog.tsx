@@ -220,7 +220,8 @@ export function EditUserDialog({
               <SelectContent>
                 <SelectItem value="Operacional">Operacional</SelectItem>
                 <SelectItem value="Gestor">Gestor</SelectItem>
-                <SelectItem value="Administrador">Administrador</SelectItem>
+                <SelectItem value="Administrador">Administrador de Cliente</SelectItem>
+                {profile?.role === 'Master' && <SelectItem value="Master">Master</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -333,26 +334,34 @@ export function EditUserDialog({
           )}
           {form.role === 'Administrador' && (
             <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
-              <strong>Acesso Total:</strong> Administradores têm acesso irrestrito a todos os
-              módulos.
+              <strong>Acesso Total:</strong> Administradores de Cliente têm acesso irrestrito a
+              todos os módulos da empresa selecionada.
+            </div>
+          )}
+          {form.role === 'Master' && (
+            <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
+              <strong>Acesso Global:</strong> Usuários Master têm acesso irrestrito a todos os
+              módulos e empresas do sistema.
             </div>
           )}
 
-          <div className="pt-2">
-            <Label className="mb-2 block">Plantas Autorizadas</Label>
-            <div className="flex flex-wrap gap-2">
-              {plants.map((p) => (
-                <Badge
-                  key={p.id}
-                  variant={form.authorized_plants.includes(p.id) ? 'default' : 'outline'}
-                  className={`cursor-pointer ${form.authorized_plants.includes(p.id) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
-                  onClick={() => togglePlant(p.id)}
-                >
-                  {p.name}
-                </Badge>
-              ))}
+          {!['Administrador', 'Master'].includes(form.role) && (
+            <div className="pt-2">
+              <Label className="mb-2 block">Plantas Autorizadas</Label>
+              <div className="flex flex-wrap gap-2">
+                {plants.map((p) => (
+                  <Badge
+                    key={p.id}
+                    variant={form.authorized_plants.includes(p.id) ? 'default' : 'outline'}
+                    className={`cursor-pointer ${form.authorized_plants.includes(p.id) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                    onClick={() => togglePlant(p.id)}
+                  >
+                    {p.name}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <Button
             type="submit"
             className="w-full mt-4 bg-brand-vividBlue hover:bg-brand-vividBlue/90 text-white"
