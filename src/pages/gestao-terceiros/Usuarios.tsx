@@ -28,7 +28,10 @@ export default function Usuarios() {
   const hasAccess = useHasAccess('Usuários')
 
   const fetchUsers = async () => {
-    let query = supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    let query = supabase
+      .from('profiles')
+      .select('*, clients(name)')
+      .order('created_at', { ascending: false })
 
     if (profile?.role !== 'Master') {
       if (!profile?.client_id) return
@@ -74,6 +77,9 @@ export default function Usuarios() {
             <TableRow className="hover:bg-transparent">
               <TableHead className="font-semibold text-slate-800">Nome</TableHead>
               <TableHead className="font-semibold text-slate-800">E-mail</TableHead>
+              {profile?.role === 'Master' && (
+                <TableHead className="font-semibold text-slate-800">Empresa</TableHead>
+              )}
               <TableHead className="font-semibold text-slate-800">Nível de Acesso</TableHead>
               <TableHead className="font-semibold text-slate-800 text-right pr-6">Ações</TableHead>
             </TableRow>
@@ -81,13 +87,19 @@ export default function Usuarios() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell
+                  colSpan={profile?.role === 'Master' ? 5 : 4}
+                  className="text-center py-8"
+                >
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-vividBlue" />
                 </TableCell>
               </TableRow>
             ) : usersList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-slate-600">
+                <TableCell
+                  colSpan={profile?.role === 'Master' ? 5 : 4}
+                  className="text-center py-8 text-slate-600"
+                >
                   Nenhum usuário encontrado.
                 </TableCell>
               </TableRow>
@@ -96,6 +108,9 @@ export default function Usuarios() {
                 <TableRow key={u.id} className="hover:bg-slate-50 border-gray-100">
                   <TableCell className="font-medium text-brand-graphite">{u.name}</TableCell>
                   <TableCell className="text-slate-600">{u.email}</TableCell>
+                  {profile?.role === 'Master' && (
+                    <TableCell className="text-slate-600">{u.clients?.name || '-'}</TableCell>
+                  )}
                   <TableCell>
                     <Badge
                       variant="outline"

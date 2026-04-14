@@ -19,10 +19,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Faltando userId ou password na requisição.')
     }
 
-    const { data, error } = await supabaseClient.auth.admin.updateUserById(
-      userId,
-      { password }
-    )
+    const { data, error } = await supabaseClient.auth.admin.updateUserById(userId, { password })
 
     if (error) throw error
 

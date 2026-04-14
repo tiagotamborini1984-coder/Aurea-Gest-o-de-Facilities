@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -69,22 +69,52 @@ export function CreateUserDialog({
   const { plants } = useMasterData()
   const { toast } = useToast()
 
+  const [clients, setClients] = useState<any[]>([])
+
+  useEffect(() => {
+    if (profile?.role === 'Master') {
+      supabase
+        .from('clients')
+        .select('id, name')
+        .order('name')
+        .then(({ data }) => {
+          if (data) setClients(data)
+        })
+    }
+  }, [profile])
+
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     role: 'Operacional',
+    client_id: profile?.client_id || '',
     accessible_menus: [] as string[],
     authorized_plants: [] as string[],
     force_password_change: true,
   })
 
+  useEffect(() => {
+    if (profile?.client_id && form.client_id === '') {
+      setForm((prev) => ({ ...prev, client_id: profile.client_id! }))
+    }
+  }, [profile])
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.client_id) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Selecione uma empresa para o usuário.',
+      })
+      return
+    }
+
     setIsAdding(true)
     try {
       const { error } = await supabase.functions.invoke('create-user', {
-        body: { ...form, client_id: profile?.client_id },
+        body: { ...form },
       })
       if (error) throw error
       toast({
@@ -105,6 +135,7 @@ export function CreateUserDialog({
         email: '',
         password: '',
         role: 'Operacional',
+        client_id: profile?.client_id || '',
         accessible_menus: [],
         authorized_plants: [],
         force_password_change: true,
@@ -169,6 +200,26 @@ export function CreateUserDialog({
           <DialogTitle>Cadastrar Usuário</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleAddUser} className="space-y-4 mt-4">
+          {profile?.role === 'Master' && (
+            <div className="space-y-2">
+              <Label>Empresa (Cliente)</Label>
+              <Select
+                value={form.client_id}
+                onValueChange={(v) => setForm({ ...form, client_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nome Completo</Label>
