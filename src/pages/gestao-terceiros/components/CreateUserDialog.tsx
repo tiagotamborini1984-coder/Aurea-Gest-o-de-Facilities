@@ -16,7 +16,6 @@ import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useAuth } from '@/hooks/use-auth'
-import { useMasterData } from '@/hooks/use-master-data'
 import { useToast } from '@/hooks/use-toast'
 import { logAudit } from '@/services/audit'
 
@@ -66,13 +65,15 @@ export function CreateUserDialog({
   const [isAdding, setIsAdding] = useState(false)
   const { profile } = useAppStore()
   const { user } = useAuth()
-  const { plants } = useMasterData()
   const { toast } = useToast()
 
   const [clients, setClients] = useState<any[]>([])
+  const [clientPlants, setClientPlants] = useState<any[]>([])
+
+  const isSuperAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
 
   useEffect(() => {
-    if (profile?.role === 'Master') {
+    if (isSuperAdmin) {
       supabase
         .from('clients')
         .select('id, name')
@@ -81,7 +82,7 @@ export function CreateUserDialog({
           if (data) setClients(data)
         })
     }
-  }, [profile])
+  }, [isSuperAdmin])
 
   const [form, setForm] = useState({
     name: '',
@@ -99,6 +100,21 @@ export function CreateUserDialog({
       setForm((prev) => ({ ...prev, client_id: profile.client_id! }))
     }
   }, [profile])
+
+  useEffect(() => {
+    if (form.client_id) {
+      supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', form.client_id)
+        .order('name')
+        .then(({ data }) => {
+          if (data) setClientPlants(data)
+        })
+    } else {
+      setClientPlants([])
+    }
+  }, [form.client_id])
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,7 +139,7 @@ export function CreateUserDialog({
       })
       if (user && profile)
         logAudit(
-          profile.client_id,
+          profile.client_id || form.client_id,
           user.id,
           'Criação de Usuário',
           `Email: ${form.email} | Nível: ${form.role}`,
@@ -200,12 +216,12 @@ export function CreateUserDialog({
           <DialogTitle>Cadastrar Usuário</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleAddUser} className="space-y-4 mt-4">
-          {profile?.role === 'Master' && (
+          {isSuperAdmin && (
             <div className="space-y-2">
               <Label>Empresa (Cliente)</Label>
               <Select
-                value={form.client_id}
-                onValueChange={(v) => setForm({ ...form, client_id: v })}
+                value={form.client_id || undefined}
+                onValueChange={(v) => setForm({ ...form, client_id: v, authorized_plants: [] })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma empresa" />
@@ -355,25 +371,31 @@ export function CreateUserDialog({
           {form.role === 'Administrador' && (
             <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
               <strong>Acesso Total:</strong> Administradores têm acesso irrestrito a todos os
-              módulos.
+              módulos da empresa selecionada.
             </div>
           )}
 
-          <div className="pt-2">
-            <Label className="mb-2 block">Plantas Autorizadas</Label>
-            <div className="flex flex-wrap gap-2">
-              {plants.map((p) => (
-                <Badge
-                  key={p.id}
-                  variant={form.authorized_plants.includes(p.id) ? 'default' : 'outline'}
-                  className={`cursor-pointer ${form.authorized_plants.includes(p.id) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
-                  onClick={() => togglePlant(p.id)}
-                >
-                  {p.name}
-                </Badge>
-              ))}
+          {form.role !== 'Administrador' && (
+            <div className="pt-2">
+              <Label className="mb-2 block">Plantas Autorizadas</Label>
+              <div className="flex flex-wrap gap-2">
+                {clientPlants.length === 0 ? (
+                  <span className="text-sm text-slate-500">Nenhuma planta encontrada.</span>
+                ) : (
+                  clientPlants.map((p) => (
+                    <Badge
+                      key={p.id}
+                      variant={form.authorized_plants.includes(p.id) ? 'default' : 'outline'}
+                      className={`cursor-pointer ${form.authorized_plants.includes(p.id) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                      onClick={() => togglePlant(p.id)}
+                    >
+                      {p.name}
+                    </Badge>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex items-center justify-between pt-2 border-t mt-4">
             <span className="text-sm font-medium">Forçar troca de senha no primeiro login</span>
             <Switch
