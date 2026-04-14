@@ -25,7 +25,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Building2, Plus, Search, Shield, Settings2, MoreVertical, Edit2 } from 'lucide-react'
+import {
+  Building2,
+  Plus,
+  Search,
+  Shield,
+  Settings2,
+  MoreVertical,
+  Edit2,
+  ArrowRightLeft,
+} from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +62,13 @@ export default function Clientes() {
   const [search, setSearch] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingClient, setEditingClient] = useState<any>(null)
+
+  const [isMigrationDialogOpen, setIsMigrationDialogOpen] = useState(false)
+  const [migrationData, setMigrationData] = useState({
+    source_client_id: '',
+    target_client_id: '',
+  })
+  const [isMigrating, setIsMigrating] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -133,8 +149,13 @@ export default function Clientes() {
       }
     } else {
       const { error } = await supabase.from('clients').insert([payload])
-      if (error) toast.error('Erro ao criar cliente')
-      else {
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Este Slug (URL) já está em uso.')
+        } else {
+          toast.error(error.message || 'Erro ao criar cliente. Verifique suas permissões.')
+        }
+      } else {
         toast.success('Cliente criado com sucesso')
         setIsDialogOpen(false)
         fetchClients()
@@ -149,6 +170,36 @@ export default function Clientes() {
         ? prev.modules.filter((m) => m !== moduleName)
         : [...prev.modules, moduleName],
     }))
+  }
+
+  const handleMigrate = async () => {
+    if (!migrationData.source_client_id || !migrationData.target_client_id) {
+      toast.error('Selecione as duas empresas.')
+      return
+    }
+    if (migrationData.source_client_id === migrationData.target_client_id) {
+      toast.error('A empresa de origem e destino não podem ser a mesma.')
+      return
+    }
+
+    setIsMigrating(true)
+    try {
+      const { error } = await supabase.rpc('migrate_client_data', {
+        source_client_id: migrationData.source_client_id,
+        target_client_id: migrationData.target_client_id,
+      })
+
+      if (error) throw error
+
+      toast.success('Dados migrados com sucesso!')
+      setIsMigrationDialogOpen(false)
+      setMigrationData({ source_client_id: '', target_client_id: '' })
+      fetchClients()
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao migrar dados.')
+    } finally {
+      setIsMigrating(false)
+    }
   }
 
   const filteredClients = clients.filter(
@@ -170,13 +221,23 @@ export default function Clientes() {
           </p>
         </div>
 
-        <Button
-          onClick={() => handleOpenDialog()}
-          className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 shadow-lg"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Cliente
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsMigrationDialogOpen(true)}
+            className="shadow-sm"
+          >
+            <ArrowRightLeft className="h-4 w-4 mr-2" />
+            Migrar Dados
+          </Button>
+          <Button
+            onClick={() => handleOpenDialog()}
+            className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 shadow-lg"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       <Card className="border-border/50 shadow-sm">
@@ -400,6 +461,76 @@ export default function Clientes() {
             </Button>
             <Button onClick={handleSave} className="bg-brand-vividBlue hover:bg-brand-vividBlue/90">
               Salvar Cliente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMigrationDialogOpen} onOpenChange={setIsMigrationDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-brand-vividBlue" />
+              Migrar Dados entre Empresas
+            </DialogTitle>
+            <DialogDescription>
+              Transfira todos os dados (plantas, tarefas, funcionários, etc.) de uma empresa para
+              outra. Essa ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Empresa de Origem (Onde os dados estão)</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={migrationData.source_client_id}
+                onChange={(e) =>
+                  setMigrationData({ ...migrationData, source_client_id: e.target.value })
+                }
+              >
+                <option value="" disabled>
+                  Selecione a empresa de origem
+                </option>
+                {clients.map((c) => (
+                  <option key={`src-${c.id}`} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Empresa de Destino (Para onde os dados vão)</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={migrationData.target_client_id}
+                onChange={(e) =>
+                  setMigrationData({ ...migrationData, target_client_id: e.target.value })
+                }
+              >
+                <option value="" disabled>
+                  Selecione a empresa de destino
+                </option>
+                {clients.map((c) => (
+                  <option key={`tgt-${c.id}`} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMigrationDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleMigrate}
+              disabled={isMigrating}
+              className="bg-brand-vividBlue hover:bg-brand-vividBlue/90"
+            >
+              {isMigrating ? 'Migrando...' : 'Confirmar Migração'}
             </Button>
           </DialogFooter>
         </DialogContent>

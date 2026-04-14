@@ -63,7 +63,11 @@ export function CreateClientDialog({
       onOpenChange(false)
       setFormData({ name: '', url_slug: '', admin_name: '', status: 'Ativo', modules: [] })
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao cadastrar cliente')
+      if (error?.code === '23505') {
+        toast.error('Este Slug (URL) já está em uso.')
+      } else {
+        toast.error(error.message || 'Erro ao cadastrar cliente. Verifique suas permissões.')
+      }
     } finally {
       setLoading(false)
     }
