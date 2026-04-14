@@ -9,6 +9,7 @@ import {
   Leaf,
   CheckSquare,
   ClipboardCheck,
+  Globe,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -32,6 +33,11 @@ export function AppSidebar() {
   const accessibleMenus = profile?.accessible_menus || []
 
   const navItems = [
+    {
+      title: 'Gestão de Clientes',
+      icon: Globe,
+      path: '/admin/clientes',
+    },
     {
       title: 'Gestão de Terceiros',
       icon: Briefcase,
@@ -107,6 +113,11 @@ export function AppSidebar() {
 
   const visibleItems = navItems
     .map((item) => {
+      if (item.title === 'Gestão de Clientes') {
+        if (role !== 'Master') return null
+        return item
+      }
+
       if (role === 'Administrador' || role === 'Master') return item
 
       let userMenus = accessibleMenus

@@ -13,6 +13,7 @@ import BIDashboard from './pages/gestao-terceiros/BIDashboard'
 import Auditoria from './pages/gestao-terceiros/Auditoria'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
 import EmailReports from './pages/gestao-terceiros/EmailReports'
+import Clientes from './pages/admin/Clientes'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -53,6 +54,7 @@ const App = () => (
               <Route element={<Layout />}>
                 <Route element={<AccessGuard />}>
                   <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
+                  <Route path="/admin/clientes" element={<Clientes />} />
                   <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                   <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
 
