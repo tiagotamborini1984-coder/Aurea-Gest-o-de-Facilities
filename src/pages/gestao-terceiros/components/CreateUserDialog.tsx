@@ -70,7 +70,7 @@ export function CreateUserDialog({
   const [clients, setClients] = useState<any[]>([])
   const [clientPlants, setClientPlants] = useState<any[]>([])
 
-  const isSuperAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
+  const isSuperAdmin = profile?.role === 'Master'
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -275,7 +275,9 @@ export function CreateUserDialog({
                 <SelectContent>
                   <SelectItem value="Operacional">Operacional</SelectItem>
                   <SelectItem value="Gestor">Gestor</SelectItem>
-                  <SelectItem value="Administrador">Administrador</SelectItem>
+                  {(isSuperAdmin || profile?.role === 'Administrador') && (
+                    <SelectItem value="Administrador">Administrador</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
