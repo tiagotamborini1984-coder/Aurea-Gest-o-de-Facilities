@@ -95,7 +95,7 @@ DECLARE
   tables_with_plant_id text[] := ARRAY[
     'cleaning_gardening_areas', 'cleaning_gardening_schedules', 'contracted_headcount',
     'daily_logs', 'employees', 'equipment', 'locations', 'monthly_goals_data',
-    'packages', 'plant_non_working_days', 'plants', 'tasks', 'audit_assignments', 'audit_executions'
+    'packages', 'plant_non_working_days', 'tasks', 'audit_assignments', 'audit_executions'
   ];
 BEGIN
   FOREACH t IN ARRAY tables_with_plant_id
@@ -118,6 +118,16 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- Plants table specifically (uses id instead of plant_id)
+DROP POLICY IF EXISTS "plant_isolation_plants" ON public.plants;
+CREATE POLICY "plant_isolation_plants" ON public.plants FOR ALL TO authenticated USING (
+  (public.get_user_role() = 'Master' OR client_id = public.get_user_client_id()) AND
+  public.is_plant_authorized(id)
+) WITH CHECK (
+  (public.get_user_role() = 'Master' OR client_id = public.get_user_client_id()) AND
+  public.is_plant_authorized(id)
+);
 
 -- Generic access for other tables
 DO $$
