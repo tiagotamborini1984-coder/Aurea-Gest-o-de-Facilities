@@ -275,7 +275,7 @@ export function CreateUserDialog({
                 <SelectContent>
                   <SelectItem value="Operacional">Operacional</SelectItem>
                   <SelectItem value="Gestor">Gestor</SelectItem>
-                  {(isSuperAdmin || profile?.role === 'Administrador') && (
+                  {isSuperAdmin && (
                     <SelectItem value="Administrador">Administrador de Cliente</SelectItem>
                   )}
                   {isSuperAdmin && <SelectItem value="Master">Master</SelectItem>}

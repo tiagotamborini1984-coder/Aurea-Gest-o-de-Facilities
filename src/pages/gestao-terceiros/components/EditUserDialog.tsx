@@ -220,7 +220,9 @@ export function EditUserDialog({
               <SelectContent>
                 <SelectItem value="Operacional">Operacional</SelectItem>
                 <SelectItem value="Gestor">Gestor</SelectItem>
-                <SelectItem value="Administrador">Administrador de Cliente</SelectItem>
+                {(profile?.role === 'Master' || form.role === 'Administrador') && (
+                  <SelectItem value="Administrador">Administrador de Cliente</SelectItem>
+                )}
                 {profile?.role === 'Master' && <SelectItem value="Master">Master</SelectItem>}
               </SelectContent>
             </Select>

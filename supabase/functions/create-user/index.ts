@@ -17,7 +17,10 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error('Missing Authorization header')
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser(token)
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: creatorProfile } = await supabaseClient
@@ -32,7 +35,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json()
-    const finalClientId = creatorProfile.role === 'Master' ? body.client_id : creatorProfile.client_id
+    const finalClientId =
+      creatorProfile.role === 'Master' ? body.client_id : creatorProfile.client_id
 
     const {
       email,
@@ -44,7 +48,7 @@ Deno.serve(async (req: Request) => {
       force_password_change,
     } = body
 
-    if (creatorProfile.role !== 'Master' && role === 'Master') {
+    if (creatorProfile.role !== 'Master' && (role === 'Master' || role === 'Administrador')) {
       throw new Error('Cannot create a user with a higher role')
     }
 

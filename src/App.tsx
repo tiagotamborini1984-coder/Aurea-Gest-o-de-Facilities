@@ -19,6 +19,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AccessGuard } from './components/AccessGuard'
+import { MasterGuard } from './components/MasterGuard'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
 
@@ -52,7 +53,9 @@ const App = () => (
 
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
-                <Route path="/admin/clientes" element={<Clientes />} />
+                <Route element={<MasterGuard />}>
+                  <Route path="/admin/clientes" element={<Clientes />} />
+                </Route>
                 <Route element={<AccessGuard />}>
                   <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
                   <Route path="/gestao-terceiros" element={<DashboardGestor />} />

@@ -114,7 +114,7 @@ export function AppSidebar() {
   const visibleItems = navItems
     .map((item) => {
       if (item.title === 'Gestão de Clientes') {
-        if (role !== 'Master' && role !== 'Administrador') return null
+        if (role !== 'Master') return null
         return item
       }
 
