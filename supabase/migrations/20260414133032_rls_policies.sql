@@ -1,37 +1,34 @@
-DO $$
+-- 1. Create secure helper functions for RLS
+CREATE OR REPLACE FUNCTION public.get_user_client_id() RETURNS uuid AS $$
+  SELECT client_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.get_user_role() RETURNS text AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.get_user_authorized_plants() RETURNS jsonb AS $$
+  SELECT authorized_plants FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.is_plant_authorized(p_id uuid) RETURNS boolean AS $$
+DECLARE
+  v_role text;
+  v_plants jsonb;
 BEGIN
-  -- 1. Create secure helper functions for RLS
-  CREATE OR REPLACE FUNCTION public.get_user_client_id() RETURNS uuid AS $$
-    SELECT client_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
-  $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+  v_role := public.get_user_role();
+  IF v_role IN ('Master', 'Administrador') THEN
+    RETURN true;
+  END IF;
+  
+  v_plants := public.get_user_authorized_plants();
+  IF v_plants IS NULL OR jsonb_typeof(v_plants) != 'array' OR jsonb_array_length(v_plants) = 0 THEN
+    RETURN false;
+  END IF;
 
-  CREATE OR REPLACE FUNCTION public.get_user_role() RETURNS text AS $$
-    SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
-  $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
-
-  CREATE OR REPLACE FUNCTION public.get_user_authorized_plants() RETURNS jsonb AS $$
-    SELECT authorized_plants FROM public.profiles WHERE id = auth.uid() LIMIT 1;
-  $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
-
-  CREATE OR REPLACE FUNCTION public.is_plant_authorized(p_id uuid) RETURNS boolean AS $$
-  DECLARE
-    v_role text;
-    v_plants jsonb;
-  BEGIN
-    v_role := public.get_user_role();
-    IF v_role IN ('Master', 'Administrador') THEN
-      RETURN true;
-    END IF;
-    
-    v_plants := public.get_user_authorized_plants();
-    IF v_plants IS NULL OR jsonb_typeof(v_plants) != 'array' OR jsonb_array_length(v_plants) = 0 THEN
-      RETURN false;
-    END IF;
-
-    RETURN v_plants @> to_jsonb(p_id::text);
-  END;
-  $$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
-END $$;
+  RETURN v_plants @> to_jsonb(p_id::text);
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
 
 DO $$
 DECLARE
