@@ -28,12 +28,14 @@ export default function Usuarios() {
   const hasAccess = useHasAccess('Usuários')
 
   const fetchUsers = async () => {
-    if (!profile?.client_id) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .order('created_at', { ascending: false })
+    let query = supabase.from('profiles').select('*').order('created_at', { ascending: false })
+
+    if (profile?.role !== 'Master') {
+      if (!profile?.client_id) return
+      query = query.eq('client_id', profile.client_id)
+    }
+
+    const { data } = await query
     setUsersList(data || [])
     setLoading(false)
   }

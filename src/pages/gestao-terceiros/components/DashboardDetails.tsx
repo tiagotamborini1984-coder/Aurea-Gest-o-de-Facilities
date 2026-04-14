@@ -144,49 +144,46 @@ export default function DashboardDetails({ activeTab, equipmentStats, collaborat
               side="right"
               className="w-full sm:max-w-xl md:max-w-2xl flex flex-col p-0"
             >
-              <SheetHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 flex flex-col items-start gap-4 relative">
-                <div className="flex flex-col w-full pr-8">
-                  <div className="flex flex-row items-center justify-between w-full gap-4">
-                    <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg truncate">
+              <SheetHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 flex flex-col w-full">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full gap-4 pr-6">
+                  <div>
+                    <SheetTitle className="flex items-center gap-2 text-left text-base sm:text-lg">
                       <TrendingDown className="w-5 h-5 text-primary shrink-0" />
-                      <span className="truncate">
-                        Registro de Presença - {isEq ? 'Equipamentos' : 'Colaboradores'}
-                      </span>
+                      <span>Registro de Presença - {isEq ? 'Equipamentos' : 'Colaboradores'}</span>
                     </SheetTitle>
-                    <Button
-                      onClick={() => {
-                        if (!allLogs || allLogs.length === 0) return
-                        const rows = allLogs.map((log: any) => {
-                          const base: Record<string, string> = {
-                            Data: format(new Date(log.date + 'T12:00:00Z'), 'dd/MM/yyyy'),
-                            [isEq ? 'Equipamento' : 'Colaborador']: log.name,
-                          }
-                          if (!isEq) base['Local'] = log.location || '-'
-                          base['Status'] = log.status
-                            ? isEq
-                              ? 'Disponível'
-                              : 'Presente'
-                            : isEq
-                              ? 'Indisponível'
-                              : 'Falta'
-                          return base
-                        })
-                        exportToCSV(
-                          `registro_presenca_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
-                          rows,
-                        )
-                      }}
-                      size="sm"
-                      className="gap-1.5 bg-green-600 hover:bg-green-700 text-white shadow-sm h-8 shrink-0"
-                    >
-                      <FileSpreadsheet className="w-4 h-4 shrink-0" />
-                      <span className="hidden sm:inline">Exportar para CSV</span>
-                      <span className="sm:hidden">Exportar</span>
-                    </Button>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">
+                      Lista bruta dos registros diários
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 text-left">
-                    Lista bruta dos registros diários
-                  </p>
+                  <Button
+                    onClick={() => {
+                      if (!allLogs || allLogs.length === 0) return
+                      const rows = allLogs.map((log: any) => {
+                        const base: Record<string, string> = {
+                          Data: format(new Date(log.date + 'T12:00:00Z'), 'dd/MM/yyyy'),
+                          [isEq ? 'Equipamento' : 'Colaborador']: log.name,
+                        }
+                        if (!isEq) base['Local'] = log.location || '-'
+                        base['Status'] = log.status
+                          ? isEq
+                            ? 'Disponível'
+                            : 'Presente'
+                          : isEq
+                            ? 'Indisponível'
+                            : 'Falta'
+                        return base
+                      })
+                      exportToCSV(
+                        `registro_presenca_${isEq ? 'equipamentos' : 'colaboradores'}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`,
+                        rows,
+                      )
+                    }}
+                    size="sm"
+                    className="gap-1.5 bg-green-600 hover:bg-green-700 text-white shadow-sm h-9 px-4 shrink-0 w-full sm:w-auto z-10"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 shrink-0" />
+                    <span>Exportar para CSV</span>
+                  </Button>
                 </div>
               </SheetHeader>
 

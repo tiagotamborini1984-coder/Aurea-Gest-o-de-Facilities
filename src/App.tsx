@@ -17,6 +17,7 @@ import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { AccessGuard } from './components/AccessGuard'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
 
@@ -50,43 +51,48 @@ const App = () => (
 
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
-                <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
-                <Route path="/gestao-terceiros" element={<DashboardGestor />} />
-                <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
+                <Route element={<AccessGuard />}>
+                  <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
+                  <Route path="/gestao-terceiros" element={<DashboardGestor />} />
+                  <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
 
-                {/* Limpeza e Jardinagem */}
-                <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
-                <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
-                <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
-                <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
+                  {/* Limpeza e Jardinagem */}
+                  <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
+                  <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
+                  <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
+                  <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
 
-                {/* Gestão de Tarefas */}
-                <Route path="/gestao-tarefas" element={<PainelChamados />} />
-                <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
-                <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
-                <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
+                  {/* Gestão de Tarefas */}
+                  <Route path="/gestao-tarefas" element={<PainelChamados />} />
+                  <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
+                  <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
+                  <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
 
-                {/* Auditoria e Checklist */}
-                <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
-                <Route path="/auditoria-checklist/configuracao/:id" element={<AuditoriaConfig />} />
-                <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
-                <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
-                <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+                  {/* Auditoria e Checklist */}
+                  <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
+                  <Route
+                    path="/auditoria-checklist/configuracao/:id"
+                    element={<AuditoriaConfig />}
+                  />
+                  <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
+                  <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
+                  <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
 
-                {/* Gestão de Encomendas */}
-                <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
-                <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
-                <Route
-                  path="/gestao-terceiros/encomendas/configuracoes"
-                  element={<ConfiguracoesEncomendas />}
-                />
+                  {/* Gestão de Encomendas */}
+                  <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
+                  <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
+                  <Route
+                    path="/gestao-terceiros/encomendas/configuracoes"
+                    element={<ConfiguracoesEncomendas />}
+                  />
 
-                <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
-                <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
-                <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
-                <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
-                <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
-                <Route path="/usuarios" element={<Usuarios />} />
+                  <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
+                  <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
+                  <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
+                  <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
+                  <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
+                  <Route path="/usuarios" element={<Usuarios />} />
+                </Route>
               </Route>
             </Route>
 

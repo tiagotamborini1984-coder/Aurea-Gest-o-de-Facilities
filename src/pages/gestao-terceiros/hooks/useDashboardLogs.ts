@@ -28,7 +28,8 @@ export function useDashboardLogs(
       const nonWorkingMap: Record<string, boolean> = {}
       if (nwdData) {
         nwdData.forEach((nwd) => {
-          nonWorkingMap[`${nwd.plant_id}_${nwd.date}`] = true
+          const dateKey = nwd.date.split('T')[0]
+          nonWorkingMap[`${nwd.plant_id}_${dateKey}`] = true
         })
       }
 
@@ -58,7 +59,10 @@ export function useDashboardLogs(
         }
       }
 
-      const validLogs = allData.filter((log) => !nonWorkingMap[`${log.plant_id}_${log.date}`])
+      const validLogs = allData.filter((log) => {
+        const logDateKey = log.date.split('T')[0]
+        return !nonWorkingMap[`${log.plant_id}_${logDateKey}`]
+      })
 
       setLogs(validLogs)
     }
