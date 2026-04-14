@@ -52,9 +52,9 @@ const App = () => (
 
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
+                <Route path="/admin/clientes" element={<Clientes />} />
                 <Route element={<AccessGuard />}>
                   <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
-                  <Route path="/admin/clientes" element={<Clientes />} />
                   <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                   <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
 
