@@ -11,8 +11,14 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Plus, Trash2 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
@@ -81,6 +87,24 @@ export default function OcupacaoImoveis() {
         new Date(r.check_in_date).setHours(0, 0, 0, 0) <= date.getTime() &&
         new Date(r.check_out_date).setHours(0, 0, 0, 0) >= date.getTime(),
     )
+  }
+
+  async function handleDeleteReservation() {
+    if (!selectedReservation) return
+    if (!window.confirm('Tem certeza que deseja excluir esta reserva?')) return
+
+    const { error } = await supabase
+      .from('property_reservations')
+      .delete()
+      .eq('id', selectedReservation.id)
+
+    if (error) {
+      toast.error('Erro ao excluir reserva')
+    } else {
+      toast.success('Reserva excluída com sucesso')
+      setDetailsOpen(false)
+      loadData()
+    }
   }
 
   async function handleBook(e: React.FormEvent) {
@@ -204,6 +228,8 @@ export default function OcupacaoImoveis() {
                   </td>
                   {days.map((d) => {
                     const reservation = getReservationForDate(r.id, d)
+                    const isPast = d.getTime() < startOfToday().getTime()
+
                     return (
                       <td
                         key={d.toISOString()}
@@ -212,7 +238,9 @@ export default function OcupacaoImoveis() {
                         <div
                           className={`h-10 w-full rounded-md transition-all duration-200 flex items-center justify-center text-[10px] font-bold ${
                             reservation
-                              ? 'bg-red-500 text-white shadow-sm cursor-pointer hover:bg-red-600'
+                              ? isPast
+                                ? 'bg-emerald-500 text-white shadow-sm cursor-pointer hover:bg-emerald-600'
+                                : 'bg-red-500 text-white shadow-sm cursor-pointer hover:bg-red-600'
                               : 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                           }`}
                           onClick={() => {
@@ -297,6 +325,14 @@ export default function OcupacaoImoveis() {
               </div>
             </div>
           )}
+          <DialogFooter className="mt-4 flex flex-row justify-between w-full">
+            <Button type="button" variant="destructive" onClick={handleDeleteReservation}>
+              <Trash2 className="mr-2 h-4 w-4" /> Excluir Reserva
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setDetailsOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
