@@ -20,8 +20,10 @@ import { exportToCSV } from '@/lib/export'
 import { format, subDays, addMonths, differenceInDays, startOfDay } from 'date-fns'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store/AppContext'
 
 export default function Relatorios() {
+  const { profile, selectedMasterClient } = useAppStore()
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [selectedPlants, setSelectedPlants] = useState<string[]>([])
@@ -44,16 +46,20 @@ export default function Relatorios() {
   useEffect(() => {
     const fetchLogs = async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
+      let query = supabase.from('daily_logs').select('*').gte('date', dateFrom).lte('date', dateTo)
+
+      if (profile?.role === 'Master' && selectedMasterClient !== 'all') {
+        query = query.eq('client_id', selectedMasterClient)
+      } else if (profile?.role !== 'Master' && profile?.client_id) {
+        query = query.eq('client_id', profile.client_id)
+      }
+
+      const { data } = await query
       setLogs(data || [])
       setLoading(false)
     }
     if (plants.length > 0 && activeTab !== 'treinamentos') fetchLogs()
-  }, [dateFrom, dateTo, plants, activeTab])
+  }, [dateFrom, dateTo, plants, activeTab, profile, selectedMasterClient])
 
   const availableCompanies = useMemo(() => {
     const empsInPlants = employees.filter(

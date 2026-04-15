@@ -103,14 +103,23 @@ export default function Encomendas() {
   }, [plants, profile])
 
   const loadPackages = async () => {
-    if (!profile?.client_id) return
+    if (!profile) return
+    if (profile.role !== 'Master' && !profile.client_id) return
+
     setLoading(true)
 
     let query = supabase
       .from('packages' as any)
       .select('*')
-      .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
+
+    if (profile.role === 'Master') {
+      if (selectedMasterClient !== 'all') {
+        query = query.eq('client_id', selectedMasterClient)
+      }
+    } else {
+      query = query.eq('client_id', profile.client_id)
+    }
 
     if (profile.role !== 'Administrador' && profile.role !== 'Master') {
       const authIds = Array.isArray(profile.authorized_plants) ? profile.authorized_plants : []
@@ -131,7 +140,7 @@ export default function Encomendas() {
 
   useEffect(() => {
     loadPackages()
-  }, [profile?.client_id])
+  }, [profile])
 
   const openAdd = () => {
     setEditingPackageId(null)
@@ -254,10 +263,13 @@ export default function Encomendas() {
       } else {
         const year = new Date(form.arrival_date).getFullYear()
 
+        const targetClientId =
+          plants.find((p) => p.id === form.plant_id)?.client_id || profile!.client_id
+
         const { data: latest } = await supabase
           .from('packages' as any)
           .select('protocol_number')
-          .eq('client_id', profile!.client_id)
+          .eq('client_id', targetClientId)
           .like('protocol_number', `ENC-${year}-%`)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -272,7 +284,7 @@ export default function Encomendas() {
         const protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
 
         const payload = {
-          client_id: profile!.client_id,
+          client_id: targetClientId,
           plant_id: form.plant_id,
           package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
           protocol_number: protocol,

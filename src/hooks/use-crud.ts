@@ -5,31 +5,50 @@ import { useAppStore } from '@/store/AppContext'
 
 export function useCrud<T>(tableName: string, defaultSelect = '*') {
   const { user } = useAuth()
-  const { profile } = useAppStore()
+  const { profile, selectedMasterClient } = useAppStore()
   const [data, setData] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
 
   const fetchAll = useCallback(async () => {
-    if (!user || !profile?.client_id) return
+    if (!user || !profile) return
+    if (profile.role !== 'Master' && !profile.client_id) return
+
     setLoading(true)
-    const { data: result, error } = await supabase
-      .from(tableName)
-      .select(defaultSelect)
-      .eq('client_id', profile.client_id)
-      .order('created_at', { ascending: false })
+    let q = supabase.from(tableName).select(defaultSelect).order('created_at', { ascending: false })
+
+    if (profile.role === 'Master') {
+      if (selectedMasterClient !== 'all') {
+        q = q.eq('client_id', selectedMasterClient)
+      }
+    } else {
+      q = q.eq('client_id', profile.client_id)
+    }
+
+    const { data: result, error } = await q
 
     if (!error && result) setData(result as T[])
     setLoading(false)
-  }, [tableName, user, profile, defaultSelect])
+  }, [tableName, user, profile, selectedMasterClient, defaultSelect])
 
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
 
   const add = async (record: Partial<T>) => {
-    if (!profile?.client_id) return { success: false, error: 'No client' }
-    const payload = { ...record, client_id: profile.client_id }
+    if (!profile) return { success: false, error: 'No profile' }
+
+    let targetClientId = profile.client_id
+    if (profile.role === 'Master' && selectedMasterClient !== 'all') {
+      targetClientId = selectedMasterClient
+    }
+
+    if (!targetClientId && profile.role !== 'Master' && !(record as any).client_id) {
+      return { success: false, error: 'No client' }
+    }
+
+    const payload = { ...record, client_id: (record as any).client_id || targetClientId }
     const { data: result, error } = await supabase.from(tableName).insert(payload).select().single()
+
     if (!error && result) {
       setData((prev) => [result as T, ...prev])
       return { success: true, data: result as T }

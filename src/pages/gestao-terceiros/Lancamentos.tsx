@@ -132,9 +132,10 @@ export default function Lancamentos() {
 
     try {
       if (checked) {
+        const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
         const { error } = await supabase.from('plant_non_working_days').upsert(
           {
-            client_id: profile.client_id,
+            client_id: targetClientId,
             plant_id: plantId,
             date: date,
             description: 'Marcado via Lançamentos',
@@ -172,8 +173,9 @@ export default function Lancamentos() {
     try {
       if (activeTab === 'metas') {
         const activeGoals = goals.filter((g) => g.is_active)
+        const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
         const payload = activeGoals.map((g) => ({
-          client_id: profile.client_id,
+          client_id: targetClientId,
           plant_id: plantId,
           goal_id: g.id,
           reference_month: `${month}-01`,
@@ -196,8 +198,9 @@ export default function Lancamentos() {
             ? employees.filter((e) => e.plant_id === plantId && e.company_name === selectedCompany)
             : equipment.filter((e) => e.plant_id === plantId)
 
+        const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
         const payload = list.map((item) => ({
-          client_id: profile.client_id,
+          client_id: targetClientId,
           plant_id: plantId,
           date,
           type: activeTab,

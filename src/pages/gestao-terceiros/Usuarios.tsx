@@ -50,7 +50,11 @@ export default function Usuarios() {
       .select('*, clients(name)')
       .order('created_at', { ascending: false })
 
-    if (profile?.role !== 'Master') {
+    if (profile?.role === 'Master') {
+      if (selectedMasterClient !== 'all') {
+        query = query.eq('client_id', selectedMasterClient)
+      }
+    } else {
       if (!profile?.client_id) return
       query = query.eq('client_id', profile.client_id)
     }

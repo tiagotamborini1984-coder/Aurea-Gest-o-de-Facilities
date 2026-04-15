@@ -29,7 +29,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 
 export default function QuadroContratado() {
-  const { profile } = useAppStore()
+  const { profile, selectedMasterClient } = useAppStore()
   const { plants, locations, functions, equipment, goals, companies, refetch } = useMasterData()
   const { toast } = useToast()
 
@@ -57,34 +57,34 @@ export default function QuadroContratado() {
     value: '',
   })
 
-  useEffect(() => {
-    if (!profile?.client_id || !hasAccess) return
-    const loadData = async () => {
-      setLoading(true)
-      const { data: res } = await supabase
-        .from('contracted_headcount')
-        .select('*')
-        .eq('client_id', profile.client_id)
-        .order('created_at', { ascending: false })
-      setData(res || [])
-      setLoading(false)
-    }
-    loadData()
-  }, [profile, hasAccess])
-
-  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
-
   const loadData = async () => {
-    if (!profile?.client_id) return
+    if (!profile) return
+    if (profile.role !== 'Master' && !profile.client_id) return
     setLoading(true)
-    const { data: res } = await supabase
+
+    let q = supabase
       .from('contracted_headcount')
       .select('*')
-      .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
+
+    if (profile.role === 'Master') {
+      if (selectedMasterClient !== 'all') {
+        q = q.eq('client_id', selectedMasterClient)
+      }
+    } else {
+      q = q.eq('client_id', profile.client_id)
+    }
+
+    const { data: res } = await q
     setData(res || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (hasAccess) loadData()
+  }, [profile, hasAccess, selectedMasterClient])
+
+  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const openAdd = () => {
     setEditingId(null)
@@ -129,8 +129,10 @@ export default function QuadroContratado() {
         if (!form.plant_id || !form.goal_id || !form.reference_month || !form.value) {
           throw new Error('Preencha todos os campos obrigatórios de Metas.')
         }
+        const targetClientId =
+          plants.find((p) => p.id === form.plant_id)?.client_id || profile!.client_id
         const { error } = await supabase.from('monthly_goals_data').insert({
-          client_id: profile!.client_id,
+          client_id: targetClientId,
           plant_id: form.plant_id,
           goal_id: form.goal_id,
           reference_month: `${form.reference_month}-01`,
@@ -147,8 +149,10 @@ export default function QuadroContratado() {
         }
         const isStaff = entryType === 'colaboradores'
 
+        const targetClientId =
+          plants.find((p) => p.id === form.plant_id)?.client_id || profile!.client_id
         const payload = {
-          client_id: profile!.client_id,
+          client_id: targetClientId,
           type: isStaff ? 'colaborador' : 'equipamento',
           plant_id: form.plant_id,
           company_id: form.company_id !== 'none' ? form.company_id : null,

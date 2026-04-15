@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 
 export function useMasterData() {
-  const { profile } = useAppStore()
+  const { profile, selectedMasterClient } = useAppStore()
   const [plants, setPlants] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
   const [functions, setFunctions] = useState<any[]>([])
@@ -22,41 +22,39 @@ export function useMasterData() {
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
-    if (!profile?.client_id) return
+    if (!profile) return
+    if (profile.role !== 'Master' && !profile.client_id) return
+
     setLoading(true)
-    const cid = profile.client_id
     const isAdmin = profile.role === 'Administrador' || profile.role === 'Master'
     const authorizedPlants = profile.authorized_plants || []
 
+    const query = (tableName: string) => {
+      let q = supabase.from(tableName as any).select('*')
+      if (profile.role === 'Master') {
+        if (selectedMasterClient !== 'all') {
+          q = q.eq('client_id', selectedMasterClient)
+        }
+      } else {
+        q = q.eq('client_id', profile.client_id)
+      }
+      return q
+    }
+
     const [pRes, fRes, eRes, gRes, empRes, cRes, lRes, tRes, frtRes, etrRes, compRes, ptRes] =
       await Promise.all([
-        supabase.from('plants').select('*').eq('client_id', cid),
-        supabase.from('functions').select('*').eq('client_id', cid),
-        supabase.from('equipment').select('*').eq('client_id', cid),
-        supabase.from('goals_book').select('*').eq('client_id', cid),
-        supabase.from('employees').select('*').eq('client_id', cid),
-        supabase.from('contracted_headcount').select('*').eq('client_id', cid),
-        supabase.from('locations').select('*').eq('client_id', cid),
-        supabase
-          .from('trainings' as any)
-          .select('*')
-          .eq('client_id', cid),
-        supabase
-          .from('function_required_trainings' as any)
-          .select('*')
-          .eq('client_id', cid),
-        supabase
-          .from('employee_training_records' as any)
-          .select('*')
-          .eq('client_id', cid),
-        supabase
-          .from('companies' as any)
-          .select('*')
-          .eq('client_id', cid),
-        supabase
-          .from('package_types' as any)
-          .select('*')
-          .eq('client_id', cid),
+        query('plants'),
+        query('functions'),
+        query('equipment'),
+        query('goals_book'),
+        query('employees'),
+        query('contracted_headcount'),
+        query('locations'),
+        query('trainings'),
+        query('function_required_trainings'),
+        query('employee_training_records'),
+        query('companies'),
+        query('package_types'),
       ])
 
     let plantsData = pRes.data || []
@@ -96,7 +94,7 @@ export function useMasterData() {
     setPackageTypes(ptRes.data || [])
 
     setLoading(false)
-  }, [profile])
+  }, [profile, selectedMasterClient])
 
   useEffect(() => {
     fetchData()
