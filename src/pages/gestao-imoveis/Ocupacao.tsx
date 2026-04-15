@@ -45,6 +45,7 @@ export default function OcupacaoImoveis() {
     id: '',
     property_id: '',
     room_id: '',
+    bed_number: 1,
     guest_id: '',
     check_in: '',
     check_out: '',
@@ -83,15 +84,15 @@ export default function OcupacaoImoveis() {
     if (gRes.data) setGuests(gRes.data)
   }
 
-  function getReservationForDate(roomId: string, date: Date) {
+  function getReservationForDate(roomId: string, bedNumber: number, date: Date) {
     const dateStr = format(date, 'yyyy-MM-dd')
-    return reservations.find(
-      (r) =>
-        r.room_id === roomId &&
-        r.status !== 'Cancelada' &&
-        r.check_in_date <= dateStr &&
-        r.check_out_date >= dateStr,
-    )
+    return reservations.find((r) => {
+      if (r.room_id !== roomId || r.bed_number !== bedNumber || r.status === 'Cancelada')
+        return false
+      const isSameDayBooking = r.check_in_date === r.check_out_date
+      if (isSameDayBooking) return r.check_in_date === dateStr
+      return r.check_in_date <= dateStr && r.check_out_date > dateStr
+    })
   }
 
   async function handleDeleteReservation() {
@@ -124,6 +125,7 @@ export default function OcupacaoImoveis() {
     const hasRoomConflict = reservations.some((r) => {
       if (isEditing && r.id === booking.id) return false
       if (r.room_id !== booking.room_id) return false
+      if (r.bed_number !== booking.bed_number) return false
       if (r.status === 'Cancelada') return false
 
       const rCheckIn = r.check_in_date
@@ -131,12 +133,18 @@ export default function OcupacaoImoveis() {
       const bCheckIn = booking.check_in
       const bCheckOut = booking.check_out
 
-      return bCheckIn <= rCheckOut && rCheckIn <= bCheckOut
+      const isSameDayR = rCheckIn === rCheckOut
+      const isSameDayB = bCheckIn === bCheckOut
+
+      if (isSameDayR || isSameDayB) {
+        return bCheckIn <= rCheckOut && bCheckOut >= rCheckIn
+      }
+      return bCheckIn < rCheckOut && bCheckOut > rCheckIn
     })
 
     if (hasRoomConflict) {
       toast.error(
-        'Não é possível realizar a reserva para esse período, pois o quarto já está ocupado.',
+        'Não é possível realizar a reserva para esse período, pois o leito já está ocupado.',
       )
       return
     }
@@ -151,7 +159,13 @@ export default function OcupacaoImoveis() {
       const bCheckIn = booking.check_in
       const bCheckOut = booking.check_out
 
-      return bCheckIn <= rCheckOut && rCheckIn <= bCheckOut
+      const isSameDayR = rCheckIn === rCheckOut
+      const isSameDayB = bCheckIn === bCheckOut
+
+      if (isSameDayR || isSameDayB) {
+        return bCheckIn <= rCheckOut && bCheckOut >= rCheckIn
+      }
+      return bCheckIn < rCheckOut && bCheckOut > rCheckIn
     })
 
     if (guestConflict) {
@@ -161,7 +175,7 @@ export default function OcupacaoImoveis() {
       )
 
       toast.error(
-        `O hóspede já possui uma reserva para este período em: ${conflictProp?.city || '-'} - Imóvel: ${conflictProp?.name || '-'} - Quarto: ${conflictRoom?.name || '-'}`,
+        `O hóspede já possui uma reserva ativa para este período em: ${conflictProp?.city || '-'} - Imóvel: ${conflictProp?.name || '-'} - Quarto: ${conflictRoom?.name || '-'} - Leito: ${guestConflict.bed_number || 1}`,
       )
       return
     }
@@ -180,6 +194,7 @@ export default function OcupacaoImoveis() {
       client_id: activeClient.id,
       property_id: booking.property_id,
       room_id: booking.room_id,
+      bed_number: booking.bed_number,
       guest_id: booking.guest_id,
       check_in_date: booking.check_in,
       check_out_date: booking.check_out,
@@ -223,6 +238,7 @@ export default function OcupacaoImoveis() {
               id: '',
               property_id: '',
               room_id: '',
+              bed_number: 1,
               guest_id: '',
               check_in: '',
               check_out: '',
@@ -285,7 +301,7 @@ export default function OcupacaoImoveis() {
           <thead>
             <tr className="border-b bg-slate-50/80">
               <th className="p-4 text-left font-semibold text-slate-700 min-w-[220px] sticky left-0 bg-slate-50/80 z-10 shadow-[1px_0_0_0_#e2e8f0]">
-                Imóvel / Quarto
+                Imóvel / Quarto / Leito
               </th>
               {days.map((d) => (
                 <th
@@ -302,62 +318,67 @@ export default function OcupacaoImoveis() {
           </thead>
           <tbody>
             {filteredProperties.map((p) =>
-              p.property_rooms?.map((r: any) => (
-                <tr
-                  key={r.id}
-                  className="border-b last:border-0 hover:bg-slate-50 transition-colors group"
-                >
-                  <td className="p-4 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 transition-colors">
-                    <div className="font-semibold text-slate-800">{p.name}</div>
-                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span> {r.name}
-                    </div>
-                  </td>
-                  {days.map((d) => {
-                    const reservation = getReservationForDate(r.id, d)
-                    const isPast = d.getTime() < startOfToday().getTime()
+              p.property_rooms?.map((r: any) => {
+                const bedsCount = r.beds_quantity || 1
+                return Array.from({ length: bedsCount }, (_, i) => i + 1).map((bedNumber) => (
+                  <tr
+                    key={`${r.id}-${bedNumber}`}
+                    className="border-b last:border-0 hover:bg-slate-50 transition-colors group"
+                  >
+                    <td className="p-4 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 transition-colors">
+                      <div className="font-semibold text-slate-800">{p.name}</div>
+                      <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span> {r.name}
+                        {bedsCount > 1 ? ` - Leito ${bedNumber}` : ''}
+                      </div>
+                    </td>
+                    {days.map((d) => {
+                      const reservation = getReservationForDate(r.id, bedNumber, d)
+                      const isPast = d.getTime() < startOfToday().getTime()
 
-                    return (
-                      <td
-                        key={d.toISOString()}
-                        className="p-1 border-l border-slate-200 text-center"
-                      >
-                        <div
-                          className={`h-10 w-full rounded-md transition-all duration-200 flex items-center justify-center text-[10px] font-bold ${
-                            reservation
-                              ? isPast
-                                ? 'bg-emerald-500 text-white shadow-sm cursor-pointer hover:bg-emerald-600'
-                                : 'bg-red-500 text-white shadow-sm cursor-pointer hover:bg-red-600'
-                              : 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
-                          }`}
-                          onClick={() => {
-                            if (!reservation) {
-                              setIsEditing(false)
-                              setBooking({
-                                id: '',
-                                property_id: p.id,
-                                room_id: r.id,
-                                guest_id: '',
-                                check_in: format(d, 'yyyy-MM-dd'),
-                                check_out: '',
-                                voucher: '',
-                              })
-                              setOpen(true)
-                            } else {
-                              setSelectedReservation(reservation)
-                              setDetailsOpen(true)
-                            }
-                          }}
-                          title={reservation ? 'Ocupado' : 'Clique para reservar'}
+                      return (
+                        <td
+                          key={d.toISOString()}
+                          className="p-1 border-l border-slate-200 text-center"
                         >
-                          {reservation &&
-                            (reservation.voucher || reservation.id.substring(0, 6).toUpperCase())}
-                        </div>
-                      </td>
-                    )
-                  })}
-                </tr>
-              )),
+                          <div
+                            className={`h-10 w-full rounded-md transition-all duration-200 flex items-center justify-center text-[10px] font-bold ${
+                              reservation
+                                ? isPast
+                                  ? 'bg-emerald-500 text-white shadow-sm cursor-pointer hover:bg-emerald-600'
+                                  : 'bg-red-500 text-white shadow-sm cursor-pointer hover:bg-red-600'
+                                : 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
+                            }`}
+                            onClick={() => {
+                              if (!reservation) {
+                                setIsEditing(false)
+                                setBooking({
+                                  id: '',
+                                  property_id: p.id,
+                                  room_id: r.id,
+                                  bed_number: bedNumber,
+                                  guest_id: '',
+                                  check_in: format(d, 'yyyy-MM-dd'),
+                                  check_out: '',
+                                  voucher: '',
+                                })
+                                setOpen(true)
+                              } else {
+                                setSelectedReservation(reservation)
+                                setDetailsOpen(true)
+                              }
+                            }}
+                            title={reservation ? 'Ocupado' : 'Clique para reservar'}
+                          >
+                            {reservation &&
+                              (reservation.voucher || reservation.id.substring(0, 6).toUpperCase())}
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))
+              }),
             )}
             {filteredProperties.length === 0 && (
               <tr>
@@ -377,11 +398,19 @@ export default function OcupacaoImoveis() {
           </DialogHeader>
           {selectedReservation && (
             <div className="space-y-4">
-              <div>
-                <Label className="text-slate-500">Voucher</Label>
-                <div className="font-medium text-lg">
-                  {selectedReservation.voucher ||
-                    selectedReservation.id.substring(0, 8).toUpperCase()}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-500">Voucher</Label>
+                  <div className="font-medium text-lg">
+                    {selectedReservation.voucher ||
+                      selectedReservation.id.substring(0, 8).toUpperCase()}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-slate-500">Leito Reservado</Label>
+                  <div className="font-medium text-lg">
+                    Leito {selectedReservation.bed_number || 1}
+                  </div>
                 </div>
               </div>
               <div>
@@ -433,6 +462,7 @@ export default function OcupacaoImoveis() {
                     id: selectedReservation.id,
                     property_id: selectedReservation.property_id,
                     room_id: selectedReservation.room_id,
+                    bed_number: selectedReservation.bed_number || 1,
                     guest_id: selectedReservation.guest_id,
                     check_in: selectedReservation.check_in_date,
                     check_out: selectedReservation.check_out_date,
@@ -460,7 +490,7 @@ export default function OcupacaoImoveis() {
               <Label>Imóvel</Label>
               <Select
                 value={booking.property_id}
-                onValueChange={(v) => setBooking({ ...booking, property_id: v })}
+                onValueChange={(v) => setBooking({ ...booking, property_id: v, room_id: '' })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
@@ -475,25 +505,56 @@ export default function OcupacaoImoveis() {
               </Select>
             </div>
             {booking.property_id && (
-              <div className="space-y-2">
-                <Label>Quarto</Label>
-                <Select
-                  value={booking.room_id}
-                  onValueChange={(v) => setBooking({ ...booking, room_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {properties
-                      .find((p) => p.id === booking.property_id)
-                      ?.property_rooms.map((r: any) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quarto</Label>
+                  <Select
+                    value={booking.room_id}
+                    onValueChange={(v) => setBooking({ ...booking, room_id: v, bed_number: 1 })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {properties
+                        .find((p) => p.id === booking.property_id)
+                        ?.property_rooms.map((r: any) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            {r.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {booking.room_id && (
+                  <div className="space-y-2">
+                    <Label>Leito</Label>
+                    <Select
+                      value={String(booking.bed_number)}
+                      onValueChange={(v) => setBooking({ ...booking, bed_number: Number(v) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o leito..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from(
+                          {
+                            length:
+                              properties
+                                .find((p) => p.id === booking.property_id)
+                                ?.property_rooms.find((r: any) => r.id === booking.room_id)
+                                ?.beds_quantity || 1,
+                          },
+                          (_, i) => i + 1,
+                        ).map((bed) => (
+                          <SelectItem key={bed} value={String(bed)}>
+                            Leito {bed}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
             <div className="space-y-2">
