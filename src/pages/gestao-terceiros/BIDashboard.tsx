@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useMasterData } from '@/hooks/use-master-data'
+import { useAppStore } from '@/store/AppContext'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -54,9 +55,59 @@ const initialWidgets = [
 ]
 
 export default function BIDashboard() {
+  const { profile, selectedMasterClient } = useAppStore()
   const { plants, contracted, employees, equipment, locations, goals } = useMasterData()
-  const biData = useBIDashboard(plants, contracted, employees, equipment, locations, goals)
+
+  const filteredPlants = useMemo(() => {
+    const p = plants || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return p
+    return p.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [plants, profile?.role, selectedMasterClient])
+
+  const filteredContracted = useMemo(() => {
+    const c = contracted || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return c
+    return c.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [contracted, profile?.role, selectedMasterClient])
+
+  const filteredEmployees = useMemo(() => {
+    const e = employees || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return e
+    return e.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [employees, profile?.role, selectedMasterClient])
+
+  const filteredEquipment = useMemo(() => {
+    const e = equipment || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return e
+    return e.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [equipment, profile?.role, selectedMasterClient])
+
+  const filteredLocations = useMemo(() => {
+    const l = locations || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return l
+    return l.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [locations, profile?.role, selectedMasterClient])
+
+  const filteredGoals = useMemo(() => {
+    const g = goals || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return g
+    return g.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [goals, profile?.role, selectedMasterClient])
+
+  const biData = useBIDashboard(
+    filteredPlants,
+    filteredContracted,
+    filteredEmployees,
+    filteredEquipment,
+    filteredLocations,
+    filteredGoals,
+  )
   const [widgets, setWidgets] = useState(initialWidgets.map((w) => ({ ...w, visible: true })))
+
+  useEffect(() => {
+    biData.setSelectedPlantId('all')
+    biData.setCompSelectedLocs([])
+  }, [selectedMasterClient])
 
   const toggleWidget = (id: string) =>
     setWidgets((prev) => prev.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w)))

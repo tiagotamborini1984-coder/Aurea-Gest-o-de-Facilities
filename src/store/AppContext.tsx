@@ -31,6 +31,8 @@ interface AppContextType {
   isLoadingClients: boolean
   profile: Profile | null
   activeClient: Client | null
+  selectedMasterClient: string | 'all'
+  setSelectedMasterClient: (id: string | 'all') => void
   addClient: (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => Promise<boolean>
   updateClient: (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => Promise<boolean>
   deleteClient: (id: string) => Promise<boolean>
@@ -44,6 +46,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingClients, setIsLoadingClients] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activeClient, setActiveClient] = useState<Client | null>(null)
+  const [selectedMasterClient, setSelectedMasterClient] = useState<string | 'all'>('all')
 
   useEffect(() => {
     if (user) {
@@ -63,11 +66,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [user])
 
   useEffect(() => {
-    if (profile?.client_id) {
+    const clientIdToFetch =
+      profile?.role === 'Master' && selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : profile?.client_id
+
+    if (clientIdToFetch) {
       supabase
         .from('clients')
         .select('*')
-        .eq('id', profile.client_id)
+        .eq('id', clientIdToFetch)
         .single()
         .then(({ data }) => {
           if (data) {
@@ -86,8 +94,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             })
           }
         })
+    } else {
+      setActiveClient(null)
     }
-  }, [profile])
+  }, [profile, selectedMasterClient])
 
   const fetchClients = async () => {
     setIsLoadingClients(true)
@@ -180,6 +190,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isLoadingClients,
         profile,
         activeClient,
+        selectedMasterClient,
+        setSelectedMasterClient,
         addClient,
         updateClient,
         deleteClient,

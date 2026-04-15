@@ -15,12 +15,19 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { useAppStore } from '@/store/AppContext'
 import { AccountSettingsDialog } from './AccountSettingsDialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export function AppHeader() {
   const navigate = useNavigate()
   const { isMobile } = useSidebar()
   const { signOut } = useAuth()
-  const { profile } = useAppStore()
+  const { profile, clients, selectedMasterClient, setSelectedMasterClient } = useAppStore()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -38,6 +45,23 @@ export function AppHeader() {
           <h1 className="text-base lg:text-lg font-semibold tracking-tight hidden sm:block text-brand-graphite">
             Gestão de Facilities
           </h1>
+          {profile?.role === 'Master' && (
+            <div className="hidden md:flex items-center ml-4">
+              <Select value={selectedMasterClient} onValueChange={setSelectedMasterClient}>
+                <SelectTrigger className="w-[200px] h-8 text-xs bg-slate-100/50 border-border rounded-full focus:ring-1 focus:ring-brand-deepBlue">
+                  <SelectValue placeholder="Selecione um cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Visão Consolidada</SelectItem>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-3 lg:gap-4">

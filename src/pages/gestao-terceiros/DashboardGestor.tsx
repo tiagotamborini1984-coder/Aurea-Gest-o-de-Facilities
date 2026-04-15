@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { format, subDays } from 'date-fns'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -17,7 +17,7 @@ import DashboardDetails from './components/DashboardDetails'
 import DashboardGoals from './components/DashboardGoals'
 
 export default function DashboardGestor() {
-  const { activeClient, profile } = useAppStore()
+  const { activeClient, profile, selectedMasterClient } = useAppStore()
   const brandSecondary = activeClient?.secondaryColor || '#1e3a8a'
 
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
@@ -38,7 +38,49 @@ export default function DashboardGestor() {
   }, [absenteeismTarget])
 
   const { plants, contracted, locations, goals, employees, equipment } = useMasterData()
-  const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, plants)
+
+  const filteredPlants = useMemo(() => {
+    const p = plants || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return p
+    return p.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [plants, profile?.role, selectedMasterClient])
+
+  const filteredContracted = useMemo(() => {
+    const c = contracted || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return c
+    return c.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [contracted, profile?.role, selectedMasterClient])
+
+  const filteredLocations = useMemo(() => {
+    const l = locations || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return l
+    return l.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [locations, profile?.role, selectedMasterClient])
+
+  const filteredGoals = useMemo(() => {
+    const g = goals || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return g
+    return g.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [goals, profile?.role, selectedMasterClient])
+
+  const filteredEmployees = useMemo(() => {
+    const e = employees || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return e
+    return e.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [employees, profile?.role, selectedMasterClient])
+
+  const filteredEquipment = useMemo(() => {
+    const e = equipment || []
+    if (profile?.role !== 'Master' || selectedMasterClient === 'all') return e
+    return e.filter((x: any) => x.client_id === selectedMasterClient)
+  }, [equipment, profile?.role, selectedMasterClient])
+
+  useEffect(() => {
+    setSelectedPlants([])
+    setSelectedCompanies([])
+  }, [selectedMasterClient])
+
+  const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
 
   const {
     metrics,
@@ -51,12 +93,12 @@ export default function DashboardGestor() {
   } = useDashboardCalculations(
     logs,
     monthlyGoals,
-    contracted,
-    plants,
-    locations,
-    employees,
-    equipment,
-    goals,
+    filteredContracted,
+    filteredPlants,
+    filteredLocations,
+    filteredEmployees,
+    filteredEquipment,
+    filteredGoals,
     selectedPlants,
     selectedCompanies,
     activeTab,
@@ -79,8 +121,8 @@ export default function DashboardGestor() {
       </div>
 
       <DashboardFilters
-        plants={plants}
-        employees={employees}
+        plants={filteredPlants}
+        employees={filteredEmployees}
         selectedPlants={selectedPlants}
         setSelectedPlants={setSelectedPlants}
         selectedCompanies={selectedCompanies}
@@ -142,8 +184,8 @@ export default function DashboardGestor() {
             metrics={metrics}
             activeTab={activeTab}
             logs={logs}
-            employees={employees}
-            equipment={equipment}
+            employees={filteredEmployees}
+            equipment={filteredEquipment}
             selectedPlants={selectedPlants}
             selectedCompanies={selectedCompanies}
           />

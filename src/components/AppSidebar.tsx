@@ -28,7 +28,7 @@ import { useAppStore } from '@/store/AppContext'
 
 export function AppSidebar() {
   const location = useLocation()
-  const { profile, activeClient } = useAppStore()
+  const { profile, activeClient, selectedMasterClient } = useAppStore()
   const role = profile?.role || 'Operacional'
   const accessibleMenus = profile?.accessible_menus || []
 
@@ -116,6 +116,19 @@ export function AppSidebar() {
       if (item.title === 'Gestão de Clientes') {
         if (role !== 'Master') return null
         return item
+      }
+
+      const isFilteredByModules =
+        (role === 'Administrador' || (role === 'Master' && selectedMasterClient !== 'all')) &&
+        activeClient
+      if (
+        isFilteredByModules &&
+        item.title !== 'Usuários' &&
+        item.title !== 'Cadastros' &&
+        item.title !== 'Gestão de Clientes'
+      ) {
+        const hasModule = activeClient?.modules?.includes(item.title)
+        if (!hasModule) return null
       }
 
       if (role === 'Administrador' || role === 'Master') return item
