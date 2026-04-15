@@ -394,4 +394,7 @@ export function EditUserDialog({
             Alterações
           </Button>
         </form>
-      </DialogCont
+      </DialogContent>
+    </Dialog>
+  )
+}
