@@ -137,9 +137,12 @@ export default function DashboardImoveis() {
       properties.flatMap((p) => p.property_rooms?.map((r: any) => r.id) || []),
     )
 
-    // Apply filters to reservations
+    // Apply filters to reservations and deduplicate
+    const uniqueResIds = new Set()
     const filteredRes = reservations.filter((r) => {
-      if (r.status === 'Cancelada') return false
+      if (uniqueResIds.has(r.id)) return false
+
+      if (r.status === 'Cancelada' || r.status === 'Pendente') return false
       if (!validRooms.has(r.room_id)) return false
 
       const resStart = parseISO(r.check_in_date)
@@ -152,9 +155,15 @@ export default function DashboardImoveis() {
       if (occupiedNights < 0) return false
       if (occupiedNights === 0 && r.check_in_date !== r.check_out_date) return false
 
-      const cityMatch = selectedCity === 'all' || r.properties?.city === selectedCity
+      const propCity = Array.isArray(r.properties) ? r.properties[0]?.city : r.properties?.city
+      const cityMatch = selectedCity === 'all' || propCity === selectedCity
       const propMatch = selectedProperty === 'all' || r.property_id === selectedProperty
-      return cityMatch && propMatch
+
+      if (cityMatch && propMatch) {
+        uniqueResIds.add(r.id)
+        return true
+      }
+      return false
     })
 
     // Active rooms count based on filters for occupancy calculation
@@ -205,14 +214,21 @@ export default function DashboardImoveis() {
       const occupiedNights = Math.max(0, differenceInDays(validEnd, validStart))
       totalOccupiedNights += occupiedNights
 
-      const city = r.properties?.city || 'Outros'
+      const propCity = Array.isArray(r.properties) ? r.properties[0]?.city : r.properties?.city
+      const propName = Array.isArray(r.properties) ? r.properties[0]?.name : r.properties?.name
+      const city = propCity || 'Outros'
+
       if (cityStats[city]) {
         cityStats[city].faturamento += Number(r.total_amount || 0)
         cityStats[city].occupiedNights += occupiedNights
       }
 
-      const costCenterId = r.property_guests?.cost_center_id
-      const costCenterName = r.property_guests?.property_cost_centers?.name || 'Sem Centro de Custo'
+      const guestData = Array.isArray(r.property_guests) ? r.property_guests[0] : r.property_guests
+      const costCenterId = guestData?.cost_center_id
+      const ccData = Array.isArray(guestData?.property_cost_centers)
+        ? guestData?.property_cost_centers[0]
+        : guestData?.property_cost_centers
+      const costCenterName = ccData?.name || 'Sem Centro de Custo'
 
       const ccKey = costCenterId || 'unassigned'
       if (!costCenterStats[ccKey]) {
@@ -221,7 +237,7 @@ export default function DashboardImoveis() {
       costCenterStats[ccKey].occupiedNights += occupiedNights
 
       // Dynamic Chart Stats
-      const chartKey = isShowingProperties ? r.properties?.name || 'Desconhecido' : city
+      const chartKey = isShowingProperties ? propName || 'Desconhecido' : city
       chartStats[chartKey] = (chartStats[chartKey] || 0) + Number(r.total_amount || 0)
     })
 
