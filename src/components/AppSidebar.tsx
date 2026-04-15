@@ -89,6 +89,7 @@ export function AppSidebar() {
         { title: 'Mapa de Ocupação', path: '/gestao-imoveis/ocupacao' },
         { title: 'Imóveis', path: '/gestao-imoveis/imoveis' },
         { title: 'Hóspedes', path: '/gestao-imoveis/hospedes' },
+        { title: 'Centros de Custo', path: '/gestao-imoveis/centros-custo' },
         { title: 'Relatórios', path: '/gestao-imoveis/relatorios' },
       ],
     },

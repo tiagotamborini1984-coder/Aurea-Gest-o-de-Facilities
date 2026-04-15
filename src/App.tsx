@@ -20,6 +20,7 @@ import DashboardImoveis from './pages/gestao-imoveis/Dashboard'
 import OcupacaoImoveis from './pages/gestao-imoveis/Ocupacao'
 import Imoveis from './pages/gestao-imoveis/Imoveis'
 import Hospedes from './pages/gestao-imoveis/Hospedes'
+import CentrosCustoImoveis from './pages/gestao-imoveis/CentrosCusto'
 import RelatoriosImoveis from './pages/gestao-imoveis/Relatorios'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
@@ -95,6 +96,7 @@ const App = () => (
                   <Route path="/gestao-imoveis/ocupacao" element={<OcupacaoImoveis />} />
                   <Route path="/gestao-imoveis/imoveis" element={<Imoveis />} />
                   <Route path="/gestao-imoveis/hospedes" element={<Hospedes />} />
+                  <Route path="/gestao-imoveis/centros-custo" element={<CentrosCustoImoveis />} />
                   <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
 
                   {/* Gestão de Encomendas */}
