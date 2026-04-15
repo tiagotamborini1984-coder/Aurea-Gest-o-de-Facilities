@@ -1,6 +1,44 @@
 import { differenceInSeconds } from 'date-fns'
 
-export function calculateSLA(task: any, currentStatus?: any) {
+export function getBusinessSeconds(start: Date, end: Date, nonWorkingDays: string[]) {
+  let isNegative = false
+  let s = start
+  let e = end
+  if (start > end) {
+    isNegative = true
+    s = end
+    e = start
+  }
+
+  let totalSeconds = 0
+  let current = new Date(s)
+
+  while (current < e) {
+    const nextDay = new Date(current)
+    nextDay.setHours(24, 0, 0, 0)
+
+    let chunkEnd = nextDay < e ? nextDay : e
+
+    const dayOfWeek = current.getDay()
+    const year = current.getFullYear()
+    const month = String(current.getMonth() + 1).padStart(2, '0')
+    const day = String(current.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+    const isHoliday = nonWorkingDays.includes(dateStr)
+
+    if (!isWeekend && !isHoliday) {
+      totalSeconds += differenceInSeconds(chunkEnd, current)
+    }
+
+    current = chunkEnd
+  }
+
+  return isNegative ? -totalSeconds : totalSeconds
+}
+
+export function calculateSLA(task: any, currentStatus?: any, nonWorkingDays: string[] = []) {
   if (!task || !currentStatus)
     return { text: '-', color: 'bg-slate-100 text-slate-600', percentage: 0, isLate: false }
 
@@ -31,9 +69,9 @@ export function calculateSLA(task: any, currentStatus?: any) {
 
   if (task.due_date) {
     const due = new Date(task.due_date)
-    remainingSecs = differenceInSeconds(due, end)
-    const totalDuration = differenceInSeconds(due, new Date(task.created_at))
-    slaSecs = totalDuration > 0 ? totalDuration : 86400 // fallback to 1 day if invalid
+    remainingSecs = getBusinessSeconds(end, due, nonWorkingDays)
+    const totalDuration = getBusinessSeconds(new Date(task.created_at), due, nonWorkingDays)
+    slaSecs = totalDuration > 0 ? totalDuration : 86400
     elapsedSecs = totalDuration - remainingSecs
     if (elapsedSecs < 0) elapsedSecs = 0
   } else {
@@ -41,7 +79,7 @@ export function calculateSLA(task: any, currentStatus?: any) {
     if (slaDays <= 0)
       return { text: 'N/A', color: 'bg-slate-100 text-slate-600', percentage: 0, isLate: false }
     slaSecs = slaDays * 24 * 60 * 60
-    elapsedSecs = differenceInSeconds(end, start)
+    elapsedSecs = getBusinessSeconds(start, end, nonWorkingDays)
     if (elapsedSecs < 0) elapsedSecs = 0
     remainingSecs = slaSecs - elapsedSecs
   }

@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Loader2,
   Send,
@@ -30,6 +31,7 @@ import {
   ChevronLeft,
   Plus,
   X,
+  Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
@@ -63,6 +65,11 @@ export function TaskDetailsSheet({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
 
+  // Soft delete state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteJustification, setDeleteJustification] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+
   // Audit Wizard specific state
   const [auditExecution, setAuditExecution] = useState<any>(null)
   const [auditActions, setAuditActions] = useState<any[]>([])
@@ -78,6 +85,7 @@ export function TaskDetailsSheet({
     if (isOpen && task) {
       loadTimeline()
       checkAudit()
+      setDeleteJustification('')
     } else {
       setWizardStep(-1)
       setAuditAnswers({})
@@ -202,6 +210,65 @@ export function TaskDetailsSheet({
         description: error.message,
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleDeleteTask = async () => {
+    if (!deleteJustification.trim()) {
+      toast({ title: 'Justificativa obrigatória', variant: 'destructive' })
+      return
+    }
+    setIsDeleting(true)
+    try {
+      let deletedStatus = taskStatuses.find(
+        (s: any) => s.name.toLowerCase() === 'excluída' || s.name.toLowerCase() === 'excluida',
+      )
+
+      if (!deletedStatus) {
+        const { data, error } = await supabase
+          .from('task_statuses')
+          .insert({
+            client_id: profile?.client_id,
+            name: 'Excluída',
+            color: '#ef4444',
+            is_terminal: true,
+            freeze_sla: true,
+            sla_days: 0,
+          })
+          .select()
+          .single()
+        if (error) throw error
+        deletedStatus = data
+      }
+
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({
+          status_id: deletedStatus.id,
+          closed_at: new Date().toISOString(),
+        })
+        .eq('id', task.id)
+
+      if (updateError) throw updateError
+
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile?.id,
+        content: `Tarefa Excluída. Justificativa: ${deleteJustification}`,
+        action_type: 'status_change',
+      })
+
+      toast({
+        title: 'Tarefa excluída com sucesso',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      setIsDeleteDialogOpen(false)
+      onClose()
+      onTaskUpdated()
+    } catch (e: any) {
+      toast({ title: 'Erro ao excluir tarefa', description: e.message, variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -417,22 +484,61 @@ export function TaskDetailsSheet({
   }
 
   const handleAddNewAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !profile) return
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0 || !profile) return
     setIsUploadingAttachment(true)
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `${profile.client_id}/${fileName}`
-      const { error: uploadError } = await supabase.storage
-        .from('task-attachments')
-        .upload(filePath, file)
-      if (uploadError) throw uploadError
-      const { data: publicUrlData } = supabase.storage
-        .from('task-attachments')
-        .getPublicUrl(filePath)
+      const newUrls = [...attachmentUrls]
 
-      const newUrls = [...attachmentUrls, publicUrlData.publicUrl]
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+        const filePath = `${profile.client_id}/${fileName}`
+        const { error: uploadError } = await supabase.storage
+          .from('task-attachments')
+          .upload(filePath, file)
+        if (uploadError) throw uploadError
+        const { data: publicUrlData } = supabase.storage
+          .from('task-attachments')
+          .getPublicUrl(filePath)
+
+        newUrls.push(publicUrlData.publicUrl)
+
+        await supabase.from('task_timeline').insert({
+          task_id: task.id,
+          user_id: profile.id,
+          content: `Adicionou um novo anexo: ${file.name}`,
+          action_type: 'attachment',
+        })
+      }
+
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ attachment_urls: newUrls })
+        .eq('id', task.id)
+      if (updateError) throw updateError
+
+      toast({
+        title: 'Anexo(s) adicionado(s) com sucesso',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      onTaskUpdated()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao anexar arquivo(s)',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUploadingAttachment(false)
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  const handleDeleteAttachment = async (urlToDelete: string) => {
+    if (!profile) return
+    try {
+      const newUrls = attachmentUrls.filter((u) => u !== urlToDelete)
 
       const { error: updateError } = await supabase
         .from('tasks')
@@ -443,20 +549,17 @@ export function TaskDetailsSheet({
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
-        content: `Adicionou um novo anexo: ${file.name}`,
+        content: `Removeu um anexo.`,
         action_type: 'attachment',
       })
 
       toast({
-        title: 'Anexo adicionado com sucesso',
+        title: 'Anexo removido com sucesso',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
       onTaskUpdated()
     } catch (err: any) {
-      toast({ title: 'Erro ao anexar arquivo', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsUploadingAttachment(false)
-      if (e.target) e.target.value = ''
+      toast({ title: 'Erro ao remover anexo', description: err.message, variant: 'destructive' })
     }
   }
 
@@ -503,6 +606,20 @@ export function TaskDetailsSheet({
     profile?.role === 'Administrador' ||
     profile?.role === 'Master' ||
     profile?.id === task?.assignee_id
+
+  const canDeleteTask = profile?.role === 'Master' || profile?.role === 'Administrador'
+
+  const canAddAttachment =
+    profile?.id === task?.requester_id ||
+    profile?.id === task?.assignee_id ||
+    (task?.participants_ids || []).includes(profile?.id) ||
+    profile?.role === 'Master' ||
+    profile?.role === 'Administrador'
+
+  const canDeleteAttachment =
+    profile?.id === task?.requester_id ||
+    profile?.role === 'Master' ||
+    profile?.role === 'Administrador'
 
   const renderWizard = () => {
     if (wizardStep === 0) {
@@ -766,34 +883,37 @@ export function TaskDetailsSheet({
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-3">
                   <h5 className="text-sm font-medium text-slate-700">Anexos</h5>
-                  <div className="relative">
-                    <Input
-                      type="file"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 file:cursor-pointer"
-                      onChange={handleAddNewAttachment}
-                      disabled={
-                        isUploadingAttachment ||
-                        (auditExecution && auditExecution.status === 'Finalizado')
-                      }
-                      title="Adicionar novo anexo"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs border-dashed pointer-events-none"
-                      disabled={
-                        isUploadingAttachment ||
-                        (auditExecution && auditExecution.status === 'Finalizado')
-                      }
-                    >
-                      {isUploadingAttachment ? (
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      ) : (
-                        <Plus className="w-3 h-3 mr-1" />
-                      )}
-                      {isUploadingAttachment ? 'Enviando...' : 'Novo Anexo'}
-                    </Button>
-                  </div>
+                  {canAddAttachment && (
+                    <div className="relative">
+                      <Input
+                        type="file"
+                        multiple
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 file:cursor-pointer"
+                        onChange={handleAddNewAttachment}
+                        disabled={
+                          isUploadingAttachment ||
+                          (auditExecution && auditExecution.status === 'Finalizado')
+                        }
+                        title="Adicionar novos anexos"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs border-dashed pointer-events-none"
+                        disabled={
+                          isUploadingAttachment ||
+                          (auditExecution && auditExecution.status === 'Finalizado')
+                        }
+                      >
+                        {isUploadingAttachment ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <Plus className="w-3 h-3 mr-1" />
+                        )}
+                        {isUploadingAttachment ? 'Enviando...' : 'Novo Anexo'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {attachmentUrls.length === 0 && !isUploadingAttachment ? (
@@ -804,16 +924,31 @@ export function TaskDetailsSheet({
                       const fileName =
                         url.split('/').pop()?.split('_').slice(1).join('_') || `Anexo ${i + 1}`
                       return (
-                        <a
+                        <div
                           key={i}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center p-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-brand-deepBlue hover:bg-slate-100 transition-colors w-full group"
+                          className="flex items-center p-2 rounded-lg bg-slate-50 border border-slate-200 group"
                         >
-                          <Paperclip className="w-4 h-4 mr-3 shrink-0 text-slate-400 group-hover:text-brand-deepBlue" />
-                          <span className="truncate flex-1">{fileName}</span>
-                        </a>
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center flex-1 text-sm text-brand-deepBlue hover:underline"
+                          >
+                            <Paperclip className="w-4 h-4 mr-3 shrink-0 text-slate-400 group-hover:text-brand-deepBlue" />
+                            <span className="truncate">{fileName}</span>
+                          </a>
+                          {canDeleteAttachment && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0 ml-2"
+                              onClick={() => handleDeleteAttachment(url)}
+                              title="Excluir anexo"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
@@ -891,57 +1026,69 @@ export function TaskDetailsSheet({
           </div>
 
           <div className="p-4 bg-white border-t border-gray-200 space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-                  Alterar Status:
-                </span>
-                <Select
-                  value={task?.status_id}
-                  onValueChange={handleStatusChange}
-                  disabled={auditExecution && auditExecution.status !== 'Finalizado'}
-                >
-                  <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {taskStatuses.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: s.color }}
-                          ></span>
-                          {s.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {canDelegate && (
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-                    Delegar para:
+                    Alterar Status:
                   </span>
                   <Select
-                    value={task?.assignee_id}
-                    onValueChange={handleDelegate}
+                    value={task?.status_id}
+                    onValueChange={handleStatusChange}
                     disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                   >
-                    <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px] max-w-[200px]">
-                      <SelectValue placeholder="Selecione..." />
+                    <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px]">
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((u: any) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name}
+                      {taskStatuses.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: s.color }}
+                            ></span>
+                            {s.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {canDelegate && (
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                      Delegar para:
+                    </span>
+                    <Select
+                      value={task?.assignee_id}
+                      onValueChange={handleDelegate}
+                      disabled={auditExecution && auditExecution.status !== 'Finalizado'}
+                    >
+                      <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px] max-w-[200px]">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((u: any) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              {canDeleteTask && (
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={auditExecution && auditExecution.status !== 'Finalizado'}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Excluir Tarefa
+                </Button>
               )}
             </div>
             <div className="flex gap-2">
@@ -995,6 +1142,39 @@ export function TaskDetailsSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir Tarefa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Justificativa da exclusão *</Label>
+              <Textarea
+                value={deleteJustification}
+                onChange={(e) => setDeleteJustification(e.target.value)}
+                placeholder="Informe o motivo detalhado para a exclusão desta tarefa..."
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Confirmar Exclusão
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -53,21 +53,29 @@ import { cn } from '@/lib/utils'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 
-function SLACountdown({ task, status }: { task: any; status: any }) {
-  const [sla, setSla] = useState(() => calculateSLA(task, status))
+function SLACountdown({
+  task,
+  status,
+  nonWorkingDays,
+}: {
+  task: any
+  status: any
+  nonWorkingDays: string[]
+}) {
+  const [sla, setSla] = useState(() => calculateSLA(task, status, nonWorkingDays))
 
   useEffect(() => {
     if (status?.is_terminal || status?.freeze_sla || task.closed_at) {
-      setSla(calculateSLA(task, status))
+      setSla(calculateSLA(task, status, nonWorkingDays))
       return
     }
 
     const interval = setInterval(() => {
-      setSla(calculateSLA(task, status))
+      setSla(calculateSLA(task, status, nonWorkingDays))
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [task, status])
+  }, [task, status, nonWorkingDays])
 
   return (
     <Badge
@@ -93,6 +101,7 @@ export default function PainelChamados() {
   const [taskTypes, setTaskTypes] = useState<any[]>([])
   const [taskStatuses, setTaskStatuses] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [nonWorkingDays, setNonWorkingDays] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -124,7 +133,7 @@ export default function PainelChamados() {
     if (!profile?.client_id) return
     setLoading(true)
 
-    const [tRes, sRes, uRes] = await Promise.all([
+    const [tRes, sRes, uRes, nwdRes] = await Promise.all([
       supabase.from('task_types').select('*').eq('client_id', profile.client_id),
       supabase
         .from('task_statuses')
@@ -132,11 +141,13 @@ export default function PainelChamados() {
         .eq('client_id', profile.client_id)
         .order('created_at', { ascending: true }),
       supabase.from('profiles').select('id, name, email, role').eq('client_id', profile.client_id),
+      supabase.from('plant_non_working_days').select('date').eq('client_id', profile.client_id),
     ])
 
     setTaskTypes(tRes.data || [])
     setTaskStatuses(sRes.data || [])
     setUsers(uRes.data || [])
+    setNonWorkingDays(nwdRes.data?.map((n) => n.date) || [])
 
     let query = supabase
       .from('tasks')
@@ -506,7 +517,7 @@ export default function PainelChamados() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <SLACountdown task={task} status={status} />
+                      <SLACountdown task={task} status={status} nonWorkingDays={nonWorkingDays} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
