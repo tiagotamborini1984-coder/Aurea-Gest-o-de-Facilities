@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/hooks/use-auth'
+import logoUrl from '@/assets/logo_aurea_hd-d19bc.png'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
 
@@ -140,11 +141,7 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           <div className="flex flex-col items-center justify-center text-center space-y-4">
             <div className="bg-white/5 p-4 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl mb-2">
-              <img
-                src="https://img.usecurling.com/i?q=aurea+luxury+logo&shape=outline&color=azure"
-                alt="Aurea Logo"
-                className="h-16 w-auto object-contain"
-              />
+              <img src={logoUrl} alt="Aurea Logo" className="h-16 w-auto object-contain" />
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl sm:text-4xl font-light tracking-[0.2em] text-white drop-shadow-sm uppercase">
