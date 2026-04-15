@@ -84,7 +84,11 @@ export default function OcupacaoImoveis() {
   function getReservationForDate(roomId: string, date: Date) {
     const dateStr = format(date, 'yyyy-MM-dd')
     return reservations.find(
-      (r) => r.room_id === roomId && r.check_in_date <= dateStr && r.check_out_date >= dateStr,
+      (r) =>
+        r.room_id === roomId &&
+        r.status !== 'Cancelada' &&
+        r.check_in_date <= dateStr &&
+        r.check_out_date >= dateStr,
     )
   }
 

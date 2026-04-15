@@ -20,9 +20,9 @@ import {
 import { useAppStore } from '@/store/AppContext'
 
 const CHART_COLORS = [
-  '#556b2f', // Verde Musgo
-  '#005f6a', // Azul Petróleo
-  '#f26419', // Laranja
+  '#4d7c0f', // Verde Musgo
+  '#0e7490', // Azul Petróleo
+  '#f97316', // Laranja
   '#d4af37', // Dourado
   '#8b0000', // Vermelho Escuro
   '#008080', // Teal
@@ -87,7 +87,7 @@ export default function DashboardImoveis() {
 
   useEffect(() => {
     calculateMetrics()
-  }, [reservations, selectedCity, selectedProperty])
+  }, [reservations, selectedCity, selectedProperty, properties, dateRange])
 
   async function loadBaseData() {
     if (!activeClient) return
@@ -133,8 +133,25 @@ export default function DashboardImoveis() {
     const periodEnd = dateRange.to
     const periodDays = Math.max(1, differenceInDays(periodEnd, periodStart) + 1)
 
+    const validRooms = new Set(
+      properties.flatMap((p) => p.property_rooms?.map((r: any) => r.id) || []),
+    )
+
     // Apply filters to reservations
     const filteredRes = reservations.filter((r) => {
+      if (r.status === 'Cancelada') return false
+      if (!validRooms.has(r.room_id)) return false
+
+      const resStart = parseISO(r.check_in_date)
+      const resEnd = parseISO(r.check_out_date)
+      const validStart = max([resStart, periodStart])
+      const validEnd = min([resEnd, periodEnd])
+
+      const occupiedNights = differenceInDays(validEnd, validStart)
+
+      if (occupiedNights < 0) return false
+      if (occupiedNights === 0 && r.check_in_date !== r.check_out_date) return false
+
       const cityMatch = selectedCity === 'all' || r.properties?.city === selectedCity
       const propMatch = selectedProperty === 'all' || r.property_id === selectedProperty
       return cityMatch && propMatch
