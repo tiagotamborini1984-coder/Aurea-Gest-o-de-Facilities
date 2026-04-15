@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '@/store/AppContext'
-import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -93,7 +92,6 @@ function SLACountdown({
 
 export default function PainelChamados() {
   const { profile } = useAppStore()
-  const { plants } = useMasterData()
   const hasAccess = useHasAccess('Gestão de Tarefas')
   const { toast } = useToast()
 
@@ -102,17 +100,22 @@ export default function PainelChamados() {
   const [taskStatuses, setTaskStatuses] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [nonWorkingDays, setNonWorkingDays] = useState<string[]>([])
+  const [localPlants, setLocalPlants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  const [clients, setClients] = useState<any[]>([])
+  const [activeClientId, setActiveClientId] = useState<string>('')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterAssignee, setFilterAssignee] = useState('all')
 
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
-  const initializedStatuses = useRef(false)
 
+  const isMaster = profile?.role === 'Master'
   const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
-  const showTodos = isSuperAdmin || profile?.role === 'Gestor'
+  const showTodos = isSuperAdmin
+
   const [activeTab, setActiveTab] = useState(showTodos ? 'todos' : 'recebidos')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -120,6 +123,11 @@ export default function PainelChamados() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
   const [selectedTask, setSelectedTask] = useState<any>(null)
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<any>(null)
+  const [deleteJustification, setDeleteJustification] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -129,19 +137,53 @@ export default function PainelChamados() {
     description: '',
   })
 
+  useEffect(() => {
+    if (profile) {
+      if (isMaster) {
+        supabase
+          .from('clients')
+          .select('id, name')
+          .order('name')
+          .then(({ data }) => {
+            setClients(data || [])
+            if (data && data.length > 0) {
+              setActiveClientId((prev) => (prev ? prev : data[0].id))
+            }
+          })
+      } else {
+        setActiveClientId(profile.client_id || '')
+      }
+    }
+  }, [profile, isMaster])
+
+  useEffect(() => {
+    if (!showTodos && activeTab === 'todos') {
+      setActiveTab('recebidos')
+    }
+  }, [showTodos, activeTab])
+
+  useEffect(() => {
+    if (taskStatuses.length > 0) {
+      setSelectedStatuses(taskStatuses.filter((s) => !s.is_terminal).map((s) => s.id))
+    } else {
+      setSelectedStatuses([])
+    }
+  }, [taskStatuses])
+
   const loadData = async () => {
-    if (!profile?.client_id) return
+    if (!activeClientId) return
     setLoading(true)
 
-    const [tRes, sRes, uRes, nwdRes] = await Promise.all([
-      supabase.from('task_types').select('*').eq('client_id', profile.client_id),
+    const [tRes, sRes, uRes, nwdRes, pRes] = await Promise.all([
+      supabase.from('task_types').select('*').eq('client_id', activeClientId),
       supabase
         .from('task_statuses')
         .select('*')
-        .eq('client_id', profile.client_id)
+        .eq('client_id', activeClientId)
         .order('created_at', { ascending: true }),
-      supabase.from('profiles').select('id, name, email, role').eq('client_id', profile.client_id),
-      supabase.from('plant_non_working_days').select('date').eq('client_id', profile.client_id),
+      supabase.from('profiles').select('id, name, email, role').eq('client_id', activeClientId),
+      supabase.from('plant_non_working_days').select('date').eq('client_id', activeClientId),
+      supabase.from('plants').select('*').eq('client_id', activeClientId),
     ])
 
     setTaskTypes(tRes.data || [])
@@ -149,24 +191,28 @@ export default function PainelChamados() {
     setUsers(uRes.data || [])
     setNonWorkingDays(nwdRes.data?.map((n) => n.date) || [])
 
+    let plantsData = pRes.data || []
+    if (!isSuperAdmin && profile?.authorized_plants) {
+      plantsData = plantsData.filter((p: any) => profile.authorized_plants.includes(p.id))
+    }
+    setLocalPlants(plantsData)
+
     let query = supabase
       .from('tasks')
       .select('*')
-      .eq('client_id', profile.client_id)
+      .eq('client_id', activeClientId)
       .order('created_at', { ascending: false })
 
     if (!isSuperAdmin) {
-      const authPlants = profile.authorized_plants || []
+      query = query.or(
+        `requester_id.eq.${profile?.id},assignee_id.eq.${profile?.id},participants_ids.cs.{${profile?.id}}`,
+      )
+
+      const authPlants = profile?.authorized_plants || []
       if (authPlants.length > 0) {
         query = query.in('plant_id', authPlants)
       } else {
-        query = query.eq('id', '00000000-0000-0000-0000-000000000000') // force empty
-      }
-
-      if (profile.role === 'Operacional') {
-        query = query.or(
-          `requester_id.eq.${profile.id},assignee_id.eq.${profile.id},participants_ids.cs.{${profile.id}}`,
-        )
+        query = query.eq('id', '00000000-0000-0000-0000-000000000000')
       }
     }
 
@@ -180,15 +226,10 @@ export default function PainelChamados() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [profile])
-
-  useEffect(() => {
-    if (taskStatuses.length > 0 && !initializedStatuses.current) {
-      setSelectedStatuses(taskStatuses.filter((s) => !s.is_terminal).map((s) => s.id))
-      initializedStatuses.current = true
+    if (activeClientId) {
+      loadData()
     }
-  }, [taskStatuses])
+  }, [activeClientId, profile])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -230,7 +271,7 @@ export default function PainelChamados() {
         for (const file of selectedFiles) {
           const fileExt = file.name.split('.').pop()
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-          const filePath = `${profile.client_id}/${fileName}`
+          const filePath = `${activeClientId}/${fileName}`
 
           const { error: uploadError } = await supabase.storage
             .from('task-attachments')
@@ -249,7 +290,7 @@ export default function PainelChamados() {
       const { data: latest } = await supabase
         .from('tasks')
         .select('task_number')
-        .eq('client_id', profile.client_id)
+        .eq('client_id', activeClientId)
         .like('task_number', `TSK-${year}-%`)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -266,7 +307,7 @@ export default function PainelChamados() {
       const { data: newTask, error } = await supabase
         .from('tasks')
         .insert({
-          client_id: profile.client_id,
+          client_id: activeClientId,
           plant_id: form.plant_id,
           type_id: form.type_id,
           status_id: initialStatus,
@@ -303,6 +344,70 @@ export default function PainelChamados() {
       toast({ title: 'Erro ao criar chamado', description: err.message, variant: 'destructive' })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteClick = (task: any) => {
+    setTaskToDelete(task)
+    setDeleteJustification('')
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteJustification.trim() || !taskToDelete) {
+      toast({
+        title: 'Atenção',
+        description: 'A justificativa é obrigatória.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      let deletedStatus = taskStatuses.find(
+        (s) => s.name.toLowerCase() === 'excluída' || s.name.toLowerCase() === 'excluida',
+      )
+
+      if (!deletedStatus) {
+        const { data: newStatus, error: createErr } = await supabase
+          .from('task_statuses')
+          .insert({
+            client_id: activeClientId,
+            name: 'Excluída',
+            color: '#ef4444',
+            is_terminal: true,
+            freeze_sla: true,
+          })
+          .select()
+          .single()
+
+        if (createErr) throw createErr
+        deletedStatus = newStatus
+        setTaskStatuses((prev) => [...prev, newStatus])
+      }
+
+      const { error: updateErr } = await supabase
+        .from('tasks')
+        .update({ status_id: deletedStatus.id, closed_at: new Date().toISOString() })
+        .eq('id', taskToDelete.id)
+
+      if (updateErr) throw updateErr
+
+      await supabase.from('task_timeline').insert({
+        task_id: taskToDelete.id,
+        user_id: profile.id,
+        content: `Tarefa excluída. Justificativa: ${deleteJustification}`,
+        action_type: 'comment',
+      })
+
+      toast({ title: 'Sucesso', description: 'Tarefa excluída com sucesso.' })
+      setIsDeleteModalOpen(false)
+      loadData()
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -346,9 +451,32 @@ export default function PainelChamados() {
             </p>
           </div>
         </div>
-        <Button onClick={handleOpenAdd} variant="tech" className="w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" /> Novo Chamado
-        </Button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {isMaster && (
+            <Select
+              value={activeClientId}
+              onValueChange={(val) => {
+                setActiveClientId(val)
+                setFilterPlant('all')
+                setFilterAssignee('all')
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-56 bg-white h-10">
+                <SelectValue placeholder="Selecione o Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={handleOpenAdd} variant="tech" className="w-full sm:w-auto h-10">
+            <Plus className="w-4 h-4 mr-2" /> Novo Chamado
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -387,7 +515,7 @@ export default function PainelChamados() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Plantas</SelectItem>
-                {plants.map((p) => (
+                {localPlants.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
@@ -474,7 +602,7 @@ export default function PainelChamados() {
               <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
               <TableHead className="font-semibold text-slate-800">Status</TableHead>
               <TableHead className="font-semibold text-slate-800">SLA</TableHead>
-              <TableHead className="font-semibold text-slate-800 text-right">Ação</TableHead>
+              <TableHead className="font-semibold text-slate-800 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -496,7 +624,7 @@ export default function PainelChamados() {
                 const status = taskStatuses.find((s) => s.id === task.status_id)
                 const requester = users.find((u) => u.id === task.requester_id)
                 const assignee = users.find((u) => u.id === task.assignee_id)
-                const plant = plants.find((p) => p.id === task.plant_id)
+                const plant = localPlants.find((p) => p.id === task.plant_id)
 
                 return (
                   <TableRow key={task.id} className="hover:bg-slate-50">
@@ -520,14 +648,26 @@ export default function PainelChamados() {
                       <SLACountdown task={task} status={status} nonWorkingDays={nonWorkingDays} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedTask(task)}
-                        className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
-                      >
-                        Ver Detalhes
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedTask(task)}
+                          className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
+                        >
+                          Detalhes
+                        </Button>
+                        {isSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(task)}
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            Excluir
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -564,7 +704,7 @@ export default function PainelChamados() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {plants.map((p) => (
+                    {localPlants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
                       </SelectItem>
@@ -667,6 +807,40 @@ export default function PainelChamados() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir Tarefa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-slate-600">
+              Você está prestes a excluir a tarefa <strong>{taskToDelete?.task_number}</strong>.
+              Esta ação não pode ser desfeita e registrará uma alteração de status para "Excluída".
+            </p>
+            <div className="space-y-2">
+              <Label>Justificativa da Exclusão *</Label>
+              <Textarea
+                value={deleteJustification}
+                onChange={(e) => setDeleteJustification(e.target.value)}
+                placeholder="Informe o motivo da exclusão..."
+                required
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar
+              Exclusão
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
