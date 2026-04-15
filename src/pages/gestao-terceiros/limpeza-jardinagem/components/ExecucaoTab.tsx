@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Loader2, CheckCircle2, XCircle, FileText, Printer, FileDown } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, FileText, Printer, FileDown, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -533,23 +533,68 @@ export function ExecucaoTab({
                       <Label className="text-base font-bold text-[#166534]">
                         Anexar Evidência (Obrigatório)
                       </Label>
-                      <div className="border-2 border-dashed border-[#86efac] bg-white rounded-xl p-6 text-center hover:bg-[#f8fafc] transition-colors">
+                      <div className="border-2 border-dashed border-[#86efac] bg-white rounded-xl p-6 text-center hover:bg-[#f8fafc] transition-colors relative">
                         <Input
                           type="file"
                           accept="image/*,.pdf"
                           multiple
-                          onChange={(e) => setFiles(Array.from(e.target.files || []))}
-                          className="max-w-[300px] mx-auto text-base"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+                            }
+                            e.target.value = ''
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
-                        <p className="text-sm font-semibold text-slate-500 mt-3">
-                          Formatos aceitos: JPG, PNG, PDF. Você pode selecionar múltiplos arquivos.
-                        </p>
-                        {files.length > 0 && (
-                          <p className="text-sm font-bold text-brand-deepBlue mt-2">
-                            {files.length} arquivo(s) selecionado(s)
+                        <div className="pointer-events-none">
+                          <FileText className="h-8 w-8 mx-auto text-[#166534] mb-2" />
+                          <span className="text-base font-bold text-slate-700">
+                            Clique para selecionar ou arraste os arquivos
+                          </span>
+                          <p className="text-sm font-semibold text-slate-500 mt-1">
+                            Formatos aceitos: JPG, PNG, PDF. Você pode selecionar múltiplos
+                            arquivos.
                           </p>
-                        )}
+                        </div>
                       </div>
+
+                      {files.length > 0 && (
+                        <div className="mt-4 p-3 bg-white border border-[#86efac] rounded-lg">
+                          <p className="text-sm font-bold text-slate-600 mb-2">
+                            Arquivos prontos para envio:
+                          </p>
+                          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                            {files.map((file, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-200"
+                              >
+                                <div className="flex items-center space-x-2 overflow-hidden">
+                                  <FileText className="h-4 w-4 text-[#166534] shrink-0" />
+                                  <span
+                                    className="text-sm font-medium text-slate-700 truncate"
+                                    title={file.name}
+                                  >
+                                    {file.name}
+                                  </span>
+                                  <span className="text-xs text-slate-400 shrink-0">
+                                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                  </span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setFiles(files.filter((_, index) => index !== i))}
+                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {((selectedSched.evidence_urls && selectedSched.evidence_urls.length > 0) ||
                         selectedSched.evidence_url) && (
                         <div className="mt-4 p-3 bg-white border border-[#86efac] rounded-lg">
