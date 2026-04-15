@@ -138,7 +138,8 @@ export function AppSidebar() {
         isFilteredByModules &&
         item.title !== 'Usuários' &&
         item.title !== 'Cadastros' &&
-        item.title !== 'Gestão de Clientes'
+        item.title !== 'Gestão de Clientes' &&
+        item.title !== 'Gestão de Imóveis'
       ) {
         const hasModule = activeClient?.modules?.includes(item.title)
         if (!hasModule) return null
