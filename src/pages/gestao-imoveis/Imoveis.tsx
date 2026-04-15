@@ -21,6 +21,7 @@ export default function Imoveis() {
   const [properties, setProperties] = useState<any[]>([])
   const { activeClient } = useAppStore()
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [managingProperty, setManagingProperty] = useState<any>(null)
 
   const [formData, setFormData] = useState({
@@ -55,7 +56,26 @@ export default function Imoveis() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!activeClient) return
+    if (!activeClient) {
+      toast.error('Cliente não identificado.')
+      return
+    }
+
+    if (!formData.name || !formData.city || !formData.address || !formData.daily_rate) {
+      toast.error('Preencha os dados básicos do imóvel (Nome, Cidade, Diária e Endereço).')
+      return
+    }
+
+    for (let i = 0; i < formData.rooms.length; i++) {
+      const r = formData.rooms[i]
+      if (!r.name || !r.bed_type || !r.beds_quantity) {
+        toast.error(`Preencha todos os dados do quarto: ${r.name || `Quarto ${i + 1}`}`)
+        return
+      }
+    }
+
+    setLoading(true)
+
     const photos =
       formData.photos.length > 0
         ? formData.photos
@@ -75,7 +95,10 @@ export default function Imoveis() {
       .select()
       .single()
 
-    if (propError) return toast.error('Erro ao salvar imóvel')
+    if (propError) {
+      setLoading(false)
+      return toast.error('Erro ao salvar imóvel')
+    }
 
     if (formData.rooms.length > 0) {
       const roomsToInsert = formData.rooms.map((r) => ({
@@ -92,6 +115,7 @@ export default function Imoveis() {
 
     toast.success('Imóvel cadastrado com sucesso!')
     setOpen(false)
+    setLoading(false)
     loadProperties()
     setFormData({
       name: '',
@@ -107,6 +131,12 @@ export default function Imoveis() {
   async function handleAddExistingRoom(e: React.FormEvent) {
     e.preventDefault()
     if (!managingProperty || !activeClient) return
+
+    if (!newRoom.name || !newRoom.bed_type || !newRoom.beds_quantity) {
+      toast.error('Preencha todos os campos do quarto.')
+      return
+    }
+
     const { error } = await supabase.from('property_rooms').insert({
       client_id: activeClient.id,
       property_id: managingProperty.id,
@@ -191,7 +221,6 @@ export default function Imoveis() {
                   <div className="space-y-2">
                     <Label>Nome do Imóvel</Label>
                     <Input
-                      required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
@@ -200,7 +229,6 @@ export default function Imoveis() {
                     <div className="space-y-2">
                       <Label>Cidade</Label>
                       <Input
-                        required
                         value={formData.city}
                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                       />
@@ -209,7 +237,6 @@ export default function Imoveis() {
                       <Label>Valor Diária (R$)</Label>
                       <Input
                         type="number"
-                        required
                         value={formData.daily_rate}
                         onChange={(e) => setFormData({ ...formData, daily_rate: e.target.value })}
                       />
@@ -218,7 +245,6 @@ export default function Imoveis() {
                   <div className="space-y-2">
                     <Label>Endereço</Label>
                     <Input
-                      required
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     />
@@ -285,7 +311,6 @@ export default function Imoveis() {
                             <Input
                               value={r.name}
                               onChange={(e) => updateRoom(idx, 'name', e.target.value)}
-                              required
                             />
                           </div>
                           <div>
@@ -293,7 +318,6 @@ export default function Imoveis() {
                             <Input
                               value={r.bed_type}
                               onChange={(e) => updateRoom(idx, 'bed_type', e.target.value)}
-                              required
                             />
                           </div>
                           <div>
@@ -303,7 +327,6 @@ export default function Imoveis() {
                               min="1"
                               value={r.beds_quantity}
                               onChange={(e) => updateRoom(idx, 'beds_quantity', e.target.value)}
-                              required
                             />
                           </div>
                           <div className="flex items-center justify-between mt-6">
@@ -341,8 +364,8 @@ export default function Imoveis() {
                 </TabsContent>
               </Tabs>
               <div className="mt-6 border-t pt-4">
-                <Button type="submit" className="w-full">
-                  Salvar Imóvel Completo
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Salvando...' : 'Salvar Imóvel Completo'}
                 </Button>
               </div>
             </form>
@@ -451,7 +474,6 @@ export default function Imoveis() {
                   <Input
                     value={newRoom.name}
                     onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
-                    required
                   />
                 </div>
                 <div>
@@ -459,7 +481,6 @@ export default function Imoveis() {
                   <Input
                     value={newRoom.bed_type}
                     onChange={(e) => setNewRoom({ ...newRoom, bed_type: e.target.value })}
-                    required
                   />
                 </div>
                 <div>
@@ -471,7 +492,6 @@ export default function Imoveis() {
                     onChange={(e) =>
                       setNewRoom({ ...newRoom, beds_quantity: Number(e.target.value) })
                     }
-                    required
                   />
                 </div>
                 <div className="flex items-center justify-between mt-6">
