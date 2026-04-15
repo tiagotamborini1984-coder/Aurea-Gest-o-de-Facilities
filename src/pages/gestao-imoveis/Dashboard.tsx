@@ -1,57 +1,322 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
-import { Building, DollarSign, Users, Percent } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts'
+import { Building, DollarSign, Users, Percent, CalendarIcon, MapPin, Home } from 'lucide-react'
+import { format, differenceInDays, startOfMonth, endOfMonth, parseISO, max, min } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
+
+type DateRange = {
+  from: Date | undefined
+  to?: Date | undefined
+}
 
 export default function DashboardImoveis() {
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  })
+
+  const [selectedCity, setSelectedCity] = useState<string>('all')
+  const [selectedProperty, setSelectedProperty] = useState<string>('all')
+
+  const [properties, setProperties] = useState<any[]>([])
+  const [reservations, setReservations] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
   const [metrics, setMetrics] = useState({
     faturamento: 0,
     reservas: 0,
     ocupacao: 0,
     ticketMedio: 0,
   })
-  const [chartData, setChartData] = useState<any[]>([])
+
+  const [chartDataCity, setChartDataCity] = useState<any[]>([])
+  const [rankingCity, setRankingCity] = useState<any[]>([])
+  const [rankingCostCenter, setRankingCostCenter] = useState<any[]>([])
+
+  // Derived state for filters
+  const cities = useMemo(() => {
+    const uniqueCities = new Set(properties.map((p) => p.city).filter(Boolean))
+    return Array.from(uniqueCities).sort()
+  }, [properties])
+
+  const filteredProperties = useMemo(() => {
+    if (selectedCity === 'all') return properties
+    return properties.filter((p) => p.city === selectedCity)
+  }, [properties, selectedCity])
 
   useEffect(() => {
-    loadData()
+    loadBaseData()
   }, [])
 
-  async function loadData() {
-    const { data: reservations } = await supabase
-      .from('property_reservations')
-      .select('*, properties(city)')
-    if (reservations) {
-      const total = reservations.reduce((acc, r) => acc + Number(r.total_amount), 0)
-      const count = reservations.length
+  useEffect(() => {
+    if (dateRange.from && dateRange.to) {
+      loadReservations()
+    }
+  }, [dateRange])
 
-      // Cálculo simulado de ocupação base
-      const ocupacaoTaxa = count > 0 ? Math.min(100, 45 + count * 5) : 0
+  useEffect(() => {
+    calculateMetrics()
+  }, [reservations, selectedCity, selectedProperty])
 
-      setMetrics({
-        faturamento: total,
-        reservas: count,
-        ocupacao: ocupacaoTaxa,
-        ticketMedio: count > 0 ? total / count : 0,
-      })
+  async function loadBaseData() {
+    const { data: userClient } = await supabase.rpc('get_user_client_id')
+    const clientId = userClient
 
-      // Agrupar por cidade
-      const cityMap: Record<string, number> = {}
-      reservations.forEach((r) => {
-        const city = r.properties?.city || 'Outros'
-        cityMap[city] = (cityMap[city] || 0) + Number(r.total_amount)
-      })
-      const data = Object.entries(cityMap).map(([city, value]) => ({ city, value }))
-      setChartData(data)
+    if (!clientId) return
+
+    const { data: propsData } = await supabase
+      .from('properties')
+      .select('id, name, city')
+      .eq('client_id', clientId)
+
+    if (propsData) {
+      setProperties(propsData)
     }
   }
 
-  return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-800">Dashboard de Imóveis</h1>
+  async function loadReservations() {
+    if (!dateRange.from || !dateRange.to) return
+    setLoading(true)
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    const startDateStr = format(dateRange.from, 'yyyy-MM-dd')
+    const endDateStr = format(dateRange.to, 'yyyy-MM-dd')
+
+    const { data: resData } = await supabase
+      .from('property_reservations')
+      .select(`
+        *,
+        properties(id, city, name),
+        property_guests(id, cost_center_id, property_cost_centers(id, name))
+      `)
+      // Find reservations that overlap with the selected period
+      .lte('check_in_date', endDateStr)
+      .gte('check_out_date', startDateStr)
+
+    if (resData) {
+      setReservations(resData)
+    }
+    setLoading(false)
+  }
+
+  function calculateMetrics() {
+    if (!dateRange.from || !dateRange.to) return
+
+    const periodStart = dateRange.from
+    const periodEnd = dateRange.to
+    const periodDays = Math.max(1, differenceInDays(periodEnd, periodStart) + 1)
+
+    // Apply filters to reservations
+    const filteredRes = reservations.filter((r) => {
+      const cityMatch = selectedCity === 'all' || r.properties?.city === selectedCity
+      const propMatch = selectedProperty === 'all' || r.property_id === selectedProperty
+      return cityMatch && propMatch
+    })
+
+    // Active properties count based on filters
+    const activePropsCount =
+      selectedProperty !== 'all'
+        ? 1
+        : selectedCity !== 'all'
+          ? properties.filter((p) => p.city === selectedCity).length
+          : properties.length
+
+    const totalPossibleNights = Math.max(1, activePropsCount * periodDays)
+
+    let totalFaturamento = 0
+    let totalOccupiedNights = 0
+
+    const cityStats: Record<
+      string,
+      { faturamento: number; occupiedNights: number; propCount: number }
+    > = {}
+    const costCenterStats: Record<string, { occupiedNights: number; name: string }> = {}
+
+    // Initialize city stats for correct denominator
+    properties.forEach((p) => {
+      if (
+        (selectedCity === 'all' || p.city === selectedCity) &&
+        (selectedProperty === 'all' || p.id === selectedProperty)
+      ) {
+        if (!cityStats[p.city]) {
+          cityStats[p.city] = { faturamento: 0, occupiedNights: 0, propCount: 0 }
+        }
+        cityStats[p.city].propCount += 1
+      }
+    })
+
+    filteredRes.forEach((r) => {
+      totalFaturamento += Number(r.total_amount || 0)
+
+      // Calculate exact occupied days within the selected period
+      const resStart = parseISO(r.check_in_date)
+      const resEnd = parseISO(r.check_out_date)
+      const validStart = max([resStart, periodStart])
+      const validEnd = min([resEnd, periodEnd])
+
+      const occupiedNights = Math.max(0, differenceInDays(validEnd, validStart))
+      totalOccupiedNights += occupiedNights
+
+      const city = r.properties?.city || 'Outros'
+      if (cityStats[city]) {
+        cityStats[city].faturamento += Number(r.total_amount || 0)
+        cityStats[city].occupiedNights += occupiedNights
+      }
+
+      const costCenterId = r.property_guests?.cost_center_id
+      const costCenterName = r.property_guests?.property_cost_centers?.name || 'Sem Centro de Custo'
+
+      const ccKey = costCenterId || 'unassigned'
+      if (!costCenterStats[ccKey]) {
+        costCenterStats[ccKey] = { occupiedNights: 0, name: costCenterName }
+      }
+      costCenterStats[ccKey].occupiedNights += occupiedNights
+    })
+
+    // Set Main Metrics
+    setMetrics({
+      faturamento: totalFaturamento,
+      reservas: filteredRes.length,
+      ocupacao: Math.min(100, Math.round((totalOccupiedNights / totalPossibleNights) * 100)),
+      ticketMedio: filteredRes.length > 0 ? totalFaturamento / filteredRes.length : 0,
+    })
+
+    // Process Chart Data (Faturamento por Cidade)
+    const chartCity = Object.entries(cityStats)
+      .map(([city, stats]) => ({ city, value: stats.faturamento }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+    setChartDataCity(chartCity)
+
+    // Process Ranking Cidade
+    const rankCity = Object.entries(cityStats)
+      .map(([city, stats]) => {
+        const possibleNights = Math.max(1, stats.propCount * periodDays)
+        const rate = Math.min(100, Math.round((stats.occupiedNights / possibleNights) * 100))
+        return { name: city, rate }
+      })
+      .filter((item) => item.rate > 0)
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 5) // Top 5
+    setRankingCity(rankCity)
+
+    // Process Ranking Centro de Custo
+    // Rate here is relative to the total occupied nights to show the share
+    const totalNightsForCC = Object.values(costCenterStats).reduce(
+      (acc, curr) => acc + curr.occupiedNights,
+      0,
+    )
+    const rankCC = Object.values(costCenterStats)
+      .map((stats) => {
+        const rate =
+          totalNightsForCC > 0 ? Math.round((stats.occupiedNights / totalNightsForCC) * 100) : 0
+        return { name: stats.name, rate, nights: stats.occupiedNights }
+      })
+      .filter((item) => item.rate > 0)
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 5) // Top 5
+    setRankingCostCenter(rankCC)
+  }
+
+  return (
+    <div className="p-6 space-y-6 animate-fade-in pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Dashboard de Imóveis</h1>
+
+        {/* Filtros */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-[260px] justify-start text-left font-normal bg-white',
+                  !dateRange.from && 'text-muted-foreground',
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 text-slate-500" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
+                    </>
+                  ) : (
+                    format(dateRange.from, 'dd/MM/yyyy')
+                  )
+                ) : (
+                  <span>Selecione o período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={(range) => {
+                  if (range) setDateRange(range)
+                }}
+                numberOfMonths={2}
+                locale={ptBR}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Select
+            value={selectedCity}
+            onValueChange={(val) => {
+              setSelectedCity(val)
+              setSelectedProperty('all') // Reset property when city changes
+            }}
+          >
+            <SelectTrigger className="w-[180px] bg-white">
+              <MapPin className="w-4 h-4 mr-2 text-slate-500" />
+              <SelectValue placeholder="Todas as Cidades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Cidades</SelectItem>
+              {cities.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+            <SelectTrigger className="w-[200px] bg-white">
+              <Home className="w-4 h-4 mr-2 text-slate-500" />
+              <SelectValue placeholder="Todos os Imóveis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Imóveis</SelectItem>
+              {filteredProperties.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Métricas Principais */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-blue-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Faturamento Total</CardTitle>
@@ -66,7 +331,7 @@ export default function DashboardImoveis() {
 
         <Card className="border-l-4 border-l-indigo-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Reservas Ativas</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-600">Reservas (Período)</CardTitle>
             <Users className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
@@ -88,7 +353,9 @@ export default function DashboardImoveis() {
 
         <Card className="border-l-4 border-l-amber-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Taxa de Ocupação</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-600">
+              Taxa de Ocupação Global
+            </CardTitle>
             <Percent className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
@@ -97,32 +364,121 @@ export default function DashboardImoveis() {
         </Card>
       </div>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-slate-800">Faturamento por Cidade</CardTitle>
-        </CardHeader>
-        <CardContent className="h-[350px]">
-          {chartData.length > 0 ? (
-            <ChartContainer
-              config={{ value: { label: 'Faturamento', color: 'hsl(var(--primary))' } }}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="city" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              Sem dados financeiros suficientes para o gráfico.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Gráfico Principal */}
+        <Card className="lg:col-span-2 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-slate-800">Faturamento por Cidade</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[350px]">
+            {chartDataCity.length > 0 ? (
+              <ChartContainer
+                config={{ value: { label: 'Faturamento', color: 'hsl(var(--primary))' } }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={chartDataCity}
+                    margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis
+                      dataKey="city"
+                      tick={{ fill: '#64748b' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tickFormatter={(val) => `R$ ${val}`}
+                      tick={{ fill: '#64748b' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar
+                      dataKey="value"
+                      fill="hsl(var(--primary))"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={60}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-slate-50/50 rounded-lg border border-dashed">
+                <Building className="w-10 h-10 mb-2 opacity-20" />
+                <p>Sem dados financeiros para o período e filtros selecionados.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Rankings */}
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-slate-800">
+                Top Ocupação por Cidade
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {rankingCity.length > 0 ? (
+                rankingCity.map((item, idx) => (
+                  <div key={item.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-700 flex items-center gap-2">
+                        <span className="text-xs text-slate-400 font-mono">{idx + 1}º</span>
+                        {item.name}
+                      </span>
+                      <span className="text-slate-600 font-semibold">{item.rate}%</span>
+                    </div>
+                    <Progress
+                      value={item.rate}
+                      className="h-2 bg-slate-100"
+                      indicatorClassName="bg-blue-500"
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-center text-slate-500 py-4">
+                  Nenhum dado disponível
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-slate-800">
+                Top Ocupação por Centro de Custo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {rankingCostCenter.length > 0 ? (
+                rankingCostCenter.map((item, idx) => (
+                  <div key={item.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-700 flex items-center gap-2 truncate pr-2">
+                        <span className="text-xs text-slate-400 font-mono">{idx + 1}º</span>
+                        <span className="truncate">{item.name}</span>
+                      </span>
+                      <span className="text-slate-600 font-semibold shrink-0">{item.rate}%</span>
+                    </div>
+                    <Progress
+                      value={item.rate}
+                      className="h-2 bg-slate-100"
+                      indicatorClassName="bg-indigo-500"
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-center text-slate-500 py-4">
+                  Nenhum dado disponível
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
