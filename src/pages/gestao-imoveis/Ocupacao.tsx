@@ -113,6 +113,31 @@ export default function OcupacaoImoveis() {
   async function handleBook(e: React.FormEvent) {
     e.preventDefault()
     if (!activeClient) return
+
+    if (booking.check_out < booking.check_in) {
+      toast.error('A data de check-out deve ser igual ou posterior à data de check-in.')
+      return
+    }
+
+    const hasConflict = reservations.some((r) => {
+      if (r.room_id !== booking.room_id) return false
+      if (r.status === 'Cancelada') return false
+
+      const rCheckIn = r.check_in_date
+      const rCheckOut = r.check_out_date
+      const bCheckIn = booking.check_in
+      const bCheckOut = booking.check_out
+
+      return bCheckIn <= rCheckOut && rCheckIn <= bCheckOut
+    })
+
+    if (hasConflict) {
+      toast.error(
+        'Não é possível realizar a reserva para esse período, pois o quarto já está ocupado.',
+      )
+      return
+    }
+
     const property = properties.find((p) => p.id === booking.property_id)
     const dailyRate = property ? Number(property.daily_rate) : 0
     const startDate = new Date(booking.check_in)
