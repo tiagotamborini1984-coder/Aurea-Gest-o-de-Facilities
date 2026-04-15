@@ -91,7 +91,7 @@ function SLACountdown({
 }
 
 export default function PainelChamados() {
-  const { profile } = useAppStore()
+  const { profile, selectedMasterClient } = useAppStore()
   const hasAccess = useHasAccess('Gestão de Tarefas')
   const { toast } = useToast()
 
@@ -102,9 +102,6 @@ export default function PainelChamados() {
   const [nonWorkingDays, setNonWorkingDays] = useState<string[]>([])
   const [localPlants, setLocalPlants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-
-  const [clients, setClients] = useState<any[]>([])
-  const [activeClientId, setActiveClientId] = useState<string>('')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPlant, setFilterPlant] = useState('all')
@@ -137,24 +134,7 @@ export default function PainelChamados() {
     description: '',
   })
 
-  useEffect(() => {
-    if (profile) {
-      if (isMaster) {
-        supabase
-          .from('clients')
-          .select('id, name')
-          .order('name')
-          .then(({ data }) => {
-            setClients(data || [])
-            if (data && data.length > 0) {
-              setActiveClientId((prev) => (prev ? prev : data[0].id))
-            }
-          })
-      } else {
-        setActiveClientId(profile.client_id || '')
-      }
-    }
-  }, [profile, isMaster])
+  const effectiveClientId = isMaster ? selectedMasterClient : profile?.client_id
 
   useEffect(() => {
     if (!showTodos && activeTab === 'todos') {
@@ -171,70 +151,101 @@ export default function PainelChamados() {
   }, [taskStatuses])
 
   const loadData = async () => {
-    if (!activeClientId) return
+    if (!effectiveClientId) return
     setLoading(true)
 
-    const [tRes, sRes, uRes, nwdRes, pRes] = await Promise.all([
-      supabase.from('task_types').select('*').eq('client_id', activeClientId),
-      supabase
-        .from('task_statuses')
-        .select('*')
-        .eq('client_id', activeClientId)
-        .order('created_at', { ascending: true }),
-      supabase.from('profiles').select('id, name, email, role').eq('client_id', activeClientId),
-      supabase.from('plant_non_working_days').select('date').eq('client_id', activeClientId),
-      supabase.from('plants').select('*').eq('client_id', activeClientId),
-    ])
+    try {
+      let tRes, sRes, uRes, nwdRes, pRes
 
-    setTaskTypes(tRes.data || [])
-    setTaskStatuses(sRes.data || [])
-    setUsers(uRes.data || [])
-    setNonWorkingDays(nwdRes.data?.map((n) => n.date) || [])
-
-    let plantsData = pRes.data || []
-    if (!isSuperAdmin && profile?.authorized_plants) {
-      plantsData = plantsData.filter((p: any) => profile.authorized_plants.includes(p.id))
-    }
-    setLocalPlants(plantsData)
-
-    let query = supabase
-      .from('tasks')
-      .select('*')
-      .eq('client_id', activeClientId)
-      .order('created_at', { ascending: false })
-
-    if (!isSuperAdmin) {
-      query = query.or(
-        `requester_id.eq.${profile?.id},assignee_id.eq.${profile?.id},participants_ids.cs.{${profile?.id}}`,
-      )
-
-      const authPlants = profile?.authorized_plants || []
-      if (authPlants.length > 0) {
-        query = query.in('plant_id', authPlants)
+      if (effectiveClientId === 'all') {
+        ;[tRes, sRes, uRes, nwdRes, pRes] = await Promise.all([
+          supabase.from('task_types').select('*'),
+          supabase.from('task_statuses').select('*').order('created_at', { ascending: true }),
+          supabase.from('profiles').select('id, name, email, role, client_id'),
+          supabase.from('plant_non_working_days').select('date'),
+          supabase.from('plants').select('*'),
+        ])
       } else {
-        query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+        ;[tRes, sRes, uRes, nwdRes, pRes] = await Promise.all([
+          supabase.from('task_types').select('*').eq('client_id', effectiveClientId),
+          supabase
+            .from('task_statuses')
+            .select('*')
+            .eq('client_id', effectiveClientId)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('profiles')
+            .select('id, name, email, role, client_id')
+            .eq('client_id', effectiveClientId),
+          supabase.from('plant_non_working_days').select('date').eq('client_id', effectiveClientId),
+          supabase.from('plants').select('*').eq('client_id', effectiveClientId),
+        ])
       }
-    }
 
-    const { data } = await query
-    setTasks(data || [])
-    setSelectedTask((prev: any) => {
-      if (!prev) return null
-      return data?.find((t: any) => t.id === prev.id) || prev
-    })
-    setLoading(false)
+      setTaskTypes(tRes.data || [])
+      setTaskStatuses(sRes.data || [])
+      setUsers(uRes.data || [])
+      setNonWorkingDays(nwdRes.data?.map((n) => n.date) || [])
+
+      let plantsData = pRes.data || []
+      if (!isSuperAdmin && profile?.authorized_plants) {
+        plantsData = plantsData.filter((p: any) => profile.authorized_plants.includes(p.id))
+      }
+      setLocalPlants(plantsData)
+
+      let query = supabase.from('tasks').select('*').order('created_at', { ascending: false })
+
+      if (effectiveClientId !== 'all') {
+        query = query.eq('client_id', effectiveClientId)
+      }
+
+      if (!isSuperAdmin) {
+        query = query.or(
+          `requester_id.eq.${profile?.id},assignee_id.eq.${profile?.id},participants_ids.cs.{${profile?.id}}`,
+        )
+
+        const authPlants = profile?.authorized_plants || []
+        if (authPlants.length > 0) {
+          query = query.in('plant_id', authPlants)
+        } else {
+          query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+        }
+      }
+
+      const { data } = await query
+      setTasks(data || [])
+      setSelectedTask((prev: any) => {
+        if (!prev) return null
+        return data?.find((t: any) => t.id === prev.id) || prev
+      })
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    if (activeClientId) {
+    if (effectiveClientId) {
+      setFilterPlant('all')
+      setFilterAssignee('all')
       loadData()
     }
-  }, [activeClientId, profile])
+  }, [effectiveClientId, profile])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const handleOpenAdd = () => {
+    if (effectiveClientId === 'all') {
+      toast({
+        title: 'Selecione um cliente',
+        description:
+          'Para abrir um chamado, selecione um cliente específico no filtro do topo da página.',
+        variant: 'destructive',
+      })
+      return
+    }
     if (taskTypes.length === 0 || taskStatuses.length === 0) {
       toast({
         title: 'Configuração Incompleta',
@@ -271,7 +282,7 @@ export default function PainelChamados() {
         for (const file of selectedFiles) {
           const fileExt = file.name.split('.').pop()
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-          const filePath = `${activeClientId}/${fileName}`
+          const filePath = `${effectiveClientId}/${fileName}`
 
           const { error: uploadError } = await supabase.storage
             .from('task-attachments')
@@ -290,7 +301,7 @@ export default function PainelChamados() {
       const { data: latest } = await supabase
         .from('tasks')
         .select('task_number')
-        .eq('client_id', activeClientId)
+        .eq('client_id', effectiveClientId)
         .like('task_number', `TSK-${year}-%`)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -302,12 +313,16 @@ export default function PainelChamados() {
       }
       const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
-      const initialStatus = taskStatuses[0]?.id
+      // Filter statuses for this specific client to ensure we pick a valid one
+      const clientStatuses = taskStatuses.filter((s) => s.client_id === effectiveClientId)
+      const initialStatus = clientStatuses[0]?.id
+
+      if (!initialStatus) throw new Error('Nenhum status configurado para este cliente.')
 
       const { data: newTask, error } = await supabase
         .from('tasks')
         .insert({
-          client_id: activeClientId,
+          client_id: effectiveClientId as string,
           plant_id: form.plant_id,
           type_id: form.type_id,
           status_id: initialStatus,
@@ -365,15 +380,18 @@ export default function PainelChamados() {
 
     setIsDeleting(true)
     try {
+      const taskClientId = taskToDelete.client_id
       let deletedStatus = taskStatuses.find(
-        (s) => s.name.toLowerCase() === 'excluída' || s.name.toLowerCase() === 'excluida',
+        (s) =>
+          s.client_id === taskClientId &&
+          (s.name.toLowerCase() === 'excluída' || s.name.toLowerCase() === 'excluida'),
       )
 
       if (!deletedStatus) {
         const { data: newStatus, error: createErr } = await supabase
           .from('task_statuses')
           .insert({
-            client_id: activeClientId,
+            client_id: taskClientId,
             name: 'Excluída',
             color: '#ef4444',
             is_terminal: true,
@@ -452,27 +470,6 @@ export default function PainelChamados() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {isMaster && (
-            <Select
-              value={activeClientId}
-              onValueChange={(val) => {
-                setActiveClientId(val)
-                setFilterPlant('all')
-                setFilterAssignee('all')
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-56 bg-white h-10">
-                <SelectValue placeholder="Selecione o Cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <Button onClick={handleOpenAdd} variant="tech" className="w-full sm:w-auto h-10">
             <Plus className="w-4 h-4 mr-2" /> Novo Chamado
           </Button>
@@ -723,11 +720,13 @@ export default function PainelChamados() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {taskTypes.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
+                    {taskTypes
+                      .filter((t) => t.client_id === effectiveClientId)
+                      .map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -742,11 +741,13 @@ export default function PainelChamados() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name} ({u.role})
-                      </SelectItem>
-                    ))}
+                    {users
+                      .filter((u) => u.client_id === effectiveClientId)
+                      .map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
