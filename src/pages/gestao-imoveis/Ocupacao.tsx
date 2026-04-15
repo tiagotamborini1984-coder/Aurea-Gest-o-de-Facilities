@@ -11,7 +11,7 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Edit } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -39,8 +39,10 @@ export default function OcupacaoImoveis() {
   const [open, setOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState<any>(null)
+  const [isEditing, setIsEditing] = useState(false)
 
   const [booking, setBooking] = useState({
+    id: '',
     property_id: '',
     room_id: '',
     guest_id: '',
@@ -120,6 +122,7 @@ export default function OcupacaoImoveis() {
     }
 
     const hasRoomConflict = reservations.some((r) => {
+      if (isEditing && r.id === booking.id) return false
       if (r.room_id !== booking.room_id) return false
       if (r.status === 'Cancelada') return false
 
@@ -139,6 +142,7 @@ export default function OcupacaoImoveis() {
     }
 
     const guestConflict = reservations.find((r) => {
+      if (isEditing && r.id === booking.id) return false
       if (r.guest_id !== booking.guest_id) return false
       if (r.status === 'Cancelada') return false
 
@@ -172,7 +176,7 @@ export default function OcupacaoImoveis() {
     )
     const totalAmount = dailyRate * duration
 
-    const { error } = await supabase.from('property_reservations').insert({
+    const payload = {
       client_id: activeClient.id,
       property_id: booking.property_id,
       room_id: booking.room_id,
@@ -182,13 +186,29 @@ export default function OcupacaoImoveis() {
       voucher: booking.voucher,
       total_amount: totalAmount,
       status: 'Confirmada',
-    })
+    }
 
-    if (error) toast.error('Erro ao salvar reserva')
-    else {
-      toast.success('Reserva confirmada!')
-      setOpen(false)
-      loadData()
+    if (isEditing) {
+      const { error } = await supabase
+        .from('property_reservations')
+        .update(payload)
+        .eq('id', booking.id)
+
+      if (error) toast.error('Erro ao atualizar reserva')
+      else {
+        toast.success('Reserva atualizada com sucesso!')
+        setOpen(false)
+        loadData()
+      }
+    } else {
+      const { error } = await supabase.from('property_reservations').insert(payload)
+
+      if (error) toast.error('Erro ao salvar reserva')
+      else {
+        toast.success('Reserva confirmada!')
+        setOpen(false)
+        loadData()
+      }
     }
   }
 
@@ -196,7 +216,21 @@ export default function OcupacaoImoveis() {
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-slate-800">Mapa de Ocupação</h1>
-        <Button onClick={() => setOpen(true)}>
+        <Button
+          onClick={() => {
+            setIsEditing(false)
+            setBooking({
+              id: '',
+              property_id: '',
+              room_id: '',
+              guest_id: '',
+              check_in: '',
+              check_out: '',
+              voucher: '',
+            })
+            setOpen(true)
+          }}
+        >
           <Plus className="mr-2 h-4 w-4" /> Nova Reserva
         </Button>
       </div>
@@ -298,11 +332,14 @@ export default function OcupacaoImoveis() {
                           }`}
                           onClick={() => {
                             if (!reservation) {
+                              setIsEditing(false)
                               setBooking({
-                                ...booking,
+                                id: '',
                                 property_id: p.id,
                                 room_id: r.id,
+                                guest_id: '',
                                 check_in: format(d, 'yyyy-MM-dd'),
+                                check_out: '',
                                 voucher: '',
                               })
                               setOpen(true)
@@ -383,11 +420,32 @@ export default function OcupacaoImoveis() {
           )}
           <DialogFooter className="mt-4 flex flex-row justify-between w-full">
             <Button type="button" variant="destructive" onClick={handleDeleteReservation}>
-              <Trash2 className="mr-2 h-4 w-4" /> Excluir Reserva
+              <Trash2 className="mr-2 h-4 w-4" /> Excluir
             </Button>
-            <Button type="button" variant="outline" onClick={() => setDetailsOpen(false)}>
-              Fechar
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setDetailsOpen(false)}>
+                Fechar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setBooking({
+                    id: selectedReservation.id,
+                    property_id: selectedReservation.property_id,
+                    room_id: selectedReservation.room_id,
+                    guest_id: selectedReservation.guest_id,
+                    check_in: selectedReservation.check_in_date,
+                    check_out: selectedReservation.check_out_date,
+                    voucher: selectedReservation.voucher || '',
+                  })
+                  setIsEditing(true)
+                  setDetailsOpen(false)
+                  setOpen(true)
+                }}
+              >
+                <Edit className="mr-2 h-4 w-4" /> Editar
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -395,7 +453,7 @@ export default function OcupacaoImoveis() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Fazer Reserva</DialogTitle>
+            <DialogTitle>{isEditing ? 'Editar Reserva' : 'Fazer Reserva'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleBook} className="space-y-4">
             <div className="space-y-2">
@@ -486,7 +544,7 @@ export default function OcupacaoImoveis() {
               </div>
             </div>
             <Button type="submit" className="w-full">
-              Confirmar Reserva
+              {isEditing ? 'Salvar Alterações' : 'Confirmar Reserva'}
             </Button>
           </form>
         </DialogContent>
