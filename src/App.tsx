@@ -14,6 +14,13 @@ import Auditoria from './pages/gestao-terceiros/Auditoria'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
 import EmailReports from './pages/gestao-terceiros/EmailReports'
 import Clientes from './pages/admin/Clientes'
+
+// Gestão de Imóveis Pages
+import DashboardImoveis from './pages/gestao-imoveis/Dashboard'
+import OcupacaoImoveis from './pages/gestao-imoveis/Ocupacao'
+import Imoveis from './pages/gestao-imoveis/Imoveis'
+import Hospedes from './pages/gestao-imoveis/Hospedes'
+import RelatoriosImoveis from './pages/gestao-imoveis/Relatorios'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -82,6 +89,13 @@ const App = () => (
                   <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
                   <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
                   <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+
+                  {/* Gestão de Imóveis */}
+                  <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
+                  <Route path="/gestao-imoveis/ocupacao" element={<OcupacaoImoveis />} />
+                  <Route path="/gestao-imoveis/imoveis" element={<Imoveis />} />
+                  <Route path="/gestao-imoveis/hospedes" element={<Hospedes />} />
+                  <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
 
                   {/* Gestão de Encomendas */}
                   <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />

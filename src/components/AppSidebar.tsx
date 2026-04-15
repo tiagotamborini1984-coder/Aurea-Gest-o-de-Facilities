@@ -10,6 +10,7 @@ import {
   CheckSquare,
   ClipboardCheck,
   Globe,
+  Home,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -81,6 +82,17 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Gestão de Imóveis',
+      icon: Home,
+      subItems: [
+        { title: 'Dashboard', path: '/gestao-imoveis/dashboard' },
+        { title: 'Mapa de Ocupação', path: '/gestao-imoveis/ocupacao' },
+        { title: 'Imóveis e Quartos', path: '/gestao-imoveis/imoveis' },
+        { title: 'Hóspedes', path: '/gestao-imoveis/hospedes' },
+        { title: 'Relatórios', path: '/gestao-imoveis/relatorios' },
+      ],
+    },
+    {
       title: 'Gestão de Encomendas',
       icon: Package,
       subItems: [
@@ -144,6 +156,7 @@ export function AppSidebar() {
           'Limpeza e Jardinagem',
           'Gestão de Tarefas',
           'Auditoria e Checklist',
+          'Gestão de Imóveis',
         ]
       }
 
@@ -171,6 +184,8 @@ export function AppSidebar() {
                 userMenus.includes('Gestão de Tarefas:Painel')) ||
               (sub.title === 'Tipos de Chamado' && userMenus.includes('Gestão de Tarefas:Tipos')),
           )
+        } else if (item.title === 'Gestão de Imóveis') {
+          filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
         } else if (item.title === 'Auditoria e Checklist') {
           filteredSubItems = item.subItems.filter(
             (sub) =>
