@@ -46,6 +46,7 @@ export default function OcupacaoImoveis() {
     guest_id: '',
     check_in: '',
     check_out: '',
+    voucher: '',
   })
 
   const [selectedMonth, setSelectedMonth] = useState(format(startOfToday(), 'yyyy-MM'))
@@ -81,11 +82,9 @@ export default function OcupacaoImoveis() {
   }
 
   function getReservationForDate(roomId: string, date: Date) {
+    const dateStr = format(date, 'yyyy-MM-dd')
     return reservations.find(
-      (r) =>
-        r.room_id === roomId &&
-        new Date(r.check_in_date).setHours(0, 0, 0, 0) <= date.getTime() &&
-        new Date(r.check_out_date).setHours(0, 0, 0, 0) >= date.getTime(),
+      (r) => r.room_id === roomId && r.check_in_date <= dateStr && r.check_out_date >= dateStr,
     )
   }
 
@@ -127,6 +126,7 @@ export default function OcupacaoImoveis() {
       guest_id: booking.guest_id,
       check_in_date: booking.check_in,
       check_out_date: booking.check_out,
+      voucher: booking.voucher,
       total_amount: totalAmount,
       status: 'Confirmada',
     })
@@ -250,6 +250,7 @@ export default function OcupacaoImoveis() {
                                 property_id: p.id,
                                 room_id: r.id,
                                 check_in: format(d, 'yyyy-MM-dd'),
+                                voucher: '',
                               })
                               setOpen(true)
                             } else {
@@ -259,7 +260,8 @@ export default function OcupacaoImoveis() {
                           }}
                           title={reservation ? 'Ocupado' : 'Clique para reservar'}
                         >
-                          {reservation && reservation.id.substring(0, 6).toUpperCase()}
+                          {reservation &&
+                            (reservation.voucher || reservation.id.substring(0, 6).toUpperCase())}
                         </div>
                       </td>
                     )
@@ -288,7 +290,8 @@ export default function OcupacaoImoveis() {
               <div>
                 <Label className="text-slate-500">Voucher</Label>
                 <div className="font-medium text-lg">
-                  {selectedReservation.id.substring(0, 8).toUpperCase()}
+                  {selectedReservation.voucher ||
+                    selectedReservation.id.substring(0, 8).toUpperCase()}
                 </div>
               </div>
               <div>
@@ -399,6 +402,15 @@ export default function OcupacaoImoveis() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Voucher</Label>
+              <Input
+                required
+                value={booking.voucher}
+                onChange={(e) => setBooking({ ...booking, voucher: e.target.value })}
+                placeholder="Número do voucher"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
