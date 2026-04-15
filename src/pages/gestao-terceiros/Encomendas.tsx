@@ -114,8 +114,8 @@ export default function Encomendas() {
       .order('created_at', { ascending: false })
 
     if (profile.role === 'Master') {
-      if (selectedMasterClient !== 'all') {
-        query = query.eq('client_id', selectedMasterClient)
+      if (activeClient?.id && activeClient.id !== ('all' as any)) {
+        query = query.eq('client_id', activeClient.id)
       }
     } else {
       query = query.eq('client_id', profile.client_id)
