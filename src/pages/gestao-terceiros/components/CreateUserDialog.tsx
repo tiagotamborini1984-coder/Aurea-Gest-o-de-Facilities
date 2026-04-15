@@ -116,6 +116,15 @@ export function CreateUserDialog({
     }
   }, [form.client_id])
 
+  const validatePassword = (pwd: string) => {
+    const minLength = 8
+    const hasUpper = /[A-Z]/.test(pwd)
+    const hasLower = /[a-z]/.test(pwd)
+    const hasNumber = /[0-9]/.test(pwd)
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+    return pwd.length >= minLength && hasUpper && hasLower && hasNumber && hasSpecial
+  }
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.client_id && form.role !== 'Master') {
@@ -123,6 +132,16 @@ export function CreateUserDialog({
         variant: 'destructive',
         title: 'Erro',
         description: 'Selecione uma empresa para o usuário.',
+      })
+      return
+    }
+
+    if (!validatePassword(form.password)) {
+      toast({
+        variant: 'destructive',
+        title: 'Senha Inválida',
+        description:
+          'A senha deve conter no mínimo 8 caracteres, maiúsculas, minúsculas, números e caracteres especiais.',
       })
       return
     }
@@ -262,9 +281,11 @@ export function CreateUserDialog({
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                minLength={6}
                 required
               />
+              <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                Mín. 8 caracteres, maiúsculas, minúsculas, números e especiais.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Nível de Acesso</Label>

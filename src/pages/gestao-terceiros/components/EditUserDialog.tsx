@@ -100,9 +100,29 @@ export function EditUserDialog({
 
   const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
 
+  const validatePassword = (pwd: string) => {
+    const minLength = 8
+    const hasUpper = /[A-Z]/.test(pwd)
+    const hasLower = /[a-z]/.test(pwd)
+    const hasNumber = /[0-9]/.test(pwd)
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+    return pwd.length >= minLength && hasUpper && hasLower && hasNumber && hasSpecial
+  }
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!userToEdit?.id) return
+
+    if (isAdmin && newPassword.trim().length > 0 && !validatePassword(newPassword)) {
+      toast({
+        variant: 'destructive',
+        title: 'Senha Inválida',
+        description:
+          'A nova senha deve conter no mínimo 8 caracteres, maiúsculas, minúsculas, números e caracteres especiais.',
+      })
+      return
+    }
+
     setIsSubmitting(true)
     try {
       if (isAdmin && newPassword.trim().length > 0) {
@@ -238,10 +258,10 @@ export function EditUserDialog({
                 placeholder="Deixe em branco para manter a senha atual"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                minLength={6}
               />
               <p className="text-xs text-slate-500 mt-1">
-                Preencha este campo apenas se desejar forçar a redefinição de senha para o usuário.
+                Mín. 8 caracteres, maiúsculas, minúsculas, números e especiais. Preencha apenas para
+                forçar a redefinição.
               </p>
             </div>
           )}

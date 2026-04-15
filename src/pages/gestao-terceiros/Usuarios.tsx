@@ -9,13 +9,26 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { CreateUserDialog } from './components/CreateUserDialog'
 import { EditUserDialog } from './components/EditUserDialog'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { Navigate } from 'react-router-dom'
+import { useToast } from '@/hooks/use-toast'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { logAudit } from '@/services/audit'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Usuarios() {
   const [usersList, setUsersList] = useState<any[]>([])
@@ -23,9 +36,13 @@ export default function Usuarios() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [userToDelete, setUserToDelete] = useState<any>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const { profile } = useAppStore()
+  const { user: authUser } = useAuth()
   const hasAccess = useHasAccess('Usuários')
+  const { toast } = useToast()
 
   const fetchUsers = async () => {
     let query = supabase
@@ -52,6 +69,58 @@ export default function Usuarios() {
   const handleEditClick = (user: any) => {
     setSelectedUser(user)
     setEditOpen(true)
+  }
+
+  const canDeleteUser = (targetUser: any) => {
+    if (!profile) return false
+    if (targetUser.id === profile.id) return false // cannot delete self
+    if (profile.role === 'Master') {
+      return targetUser.role !== 'Master'
+    }
+    if (profile.role === 'Administrador') {
+      return (
+        targetUser.client_id === profile.client_id &&
+        !['Master', 'Administrador'].includes(targetUser.role)
+      )
+    }
+    return false
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: userToDelete.id },
+      })
+      if (error) throw new Error(error.message)
+
+      toast({
+        title: 'Usuário excluído',
+        description: 'O usuário foi removido com sucesso.',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+
+      if (authUser && profile) {
+        logAudit(
+          profile.client_id || userToDelete.client_id,
+          authUser.id,
+          'Exclusão de Usuário',
+          `Usuário excluído: ${userToDelete.email} | Nível: ${userToDelete.role}`,
+        )
+      }
+
+      fetchUsers()
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir',
+        description: err.message || 'Ocorreu um erro ao excluir o usuário.',
+      })
+    } finally {
+      setIsDeleting(false)
+      setUserToDelete(null)
+    }
   }
 
   return (
@@ -126,14 +195,26 @@ export default function Usuarios() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right pr-6">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-brand-vividBlue hover:bg-brand-vividBlue/10 hover:text-brand-vividBlue"
-                      onClick={() => handleEditClick(u)}
-                    >
-                      Editar
-                    </Button>
+                    <div className="flex justify-end items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-brand-vividBlue hover:bg-brand-vividBlue/10 hover:text-brand-vividBlue"
+                        onClick={() => handleEditClick(u)}
+                      >
+                        Editar
+                      </Button>
+                      {canDeleteUser(u) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setUserToDelete(u)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -149,6 +230,35 @@ export default function Usuarios() {
         onOpenChange={setEditOpen}
         onSuccess={fetchUsers}
       />
+
+      <AlertDialog
+        open={!!userToDelete}
+        onOpenChange={(open) => !open && !isDeleting && setUserToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o usuário <strong>{userToDelete?.name}</strong> (
+              {userToDelete?.email})? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteConfirm()
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar Exclusão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

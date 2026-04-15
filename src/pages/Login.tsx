@@ -57,8 +57,27 @@ export default function Login() {
     }
   }
 
+  const validatePassword = (pwd: string) => {
+    const minLength = 8
+    const hasUpper = /[A-Z]/.test(pwd)
+    const hasLower = /[a-z]/.test(pwd)
+    const hasNumber = /[0-9]/.test(pwd)
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+    return pwd.length >= minLength && hasUpper && hasLower && hasNumber && hasSpecial
+  }
+
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!validatePassword(newPassword)) {
+      toast({
+        variant: 'destructive',
+        title: 'Senha Inválida',
+        description: 'A senha não atende aos requisitos de segurança mínimos.',
+      })
+      return
+    }
+
     setIsSubmitting(true)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
 
@@ -119,16 +138,25 @@ export default function Login() {
 
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 z-10 animate-fade-in-up">
         <div className="w-full max-w-md space-y-8">
-          <div className="flex flex-col items-center justify-center text-center space-y-2">
-            <h1 className="text-3xl sm:text-4xl font-light tracking-[0.2em] text-white drop-shadow-sm uppercase">
-              Gestão de <br />
-              <span className="font-bold text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
-                Facilities
-              </span>
-            </h1>
-            <p className="text-[#60a5fa]/80 text-xs tracking-widest font-medium uppercase mt-4">
-              System Authentication
-            </p>
+          <div className="flex flex-col items-center justify-center text-center space-y-4">
+            <div className="bg-white/5 p-4 rounded-2xl backdrop-blur-sm border border-white/10 shadow-xl mb-2">
+              <img
+                src="https://img.usecurling.com/i?q=aurea+luxury+logo&shape=outline&color=azure"
+                alt="Aurea Logo"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-4xl font-light tracking-[0.2em] text-white drop-shadow-sm uppercase">
+                Gestão de <br />
+                <span className="font-bold text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">
+                  Facilities
+                </span>
+              </h1>
+              <p className="text-[#60a5fa]/80 text-xs tracking-widest font-medium uppercase mt-2">
+                System Authentication
+              </p>
+            </div>
           </div>
 
           <Card className="border-white/10 bg-[#1f2937]/80 backdrop-blur-xl shadow-2xl">
@@ -284,10 +312,21 @@ export default function Login() {
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         required
-                        minLength={6}
                       />
                     </div>
                   </div>
+
+                  <div className="p-3 bg-black/30 border border-white/10 rounded-md">
+                    <p className="text-xs text-gray-300 font-medium mb-2">Política de Senha:</p>
+                    <ul className="text-[11px] text-gray-400 space-y-1 list-disc list-inside">
+                      <li>Mínimo de 8 caracteres</li>
+                      <li>Pelo menos uma letra maiúscula</li>
+                      <li>Pelo menos uma letra minúscula</li>
+                      <li>Pelo menos um número</li>
+                      <li>Pelo menos um caractere especial (!@#$%^&*)</li>
+                    </ul>
+                  </div>
+
                   <Button
                     type="submit"
                     variant="tech"
