@@ -442,7 +442,4 @@ export function CreateUserDialog({
             {isAdding ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null} Salvar Usuário
           </Button>
         </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
+      </DialogCont
