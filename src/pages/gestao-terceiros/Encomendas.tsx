@@ -1046,7 +1046,4 @@ export default function Encomendas() {
             </div>
           </form>
         </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+      </Dialog
