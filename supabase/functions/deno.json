@@ -1,6 +1,6 @@
 {
   "_versions": {
-    "create-user": 3,
+    "create-user": 4,
     "email-reports": 2,
     "package-notifications": 2,
     "update-user-password": 2
