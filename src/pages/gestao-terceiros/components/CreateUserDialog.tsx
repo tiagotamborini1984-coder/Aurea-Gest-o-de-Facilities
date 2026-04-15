@@ -27,6 +27,7 @@ const MAIN_MENUS = [
   'Email Reports',
   'Log de Auditoria',
   'Usuários',
+  'Gestão de Imóveis',
   'Gestão de Encomendas',
   'Limpeza e Jardinagem',
   'Gestão de Tarefas',
