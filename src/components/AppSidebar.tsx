@@ -300,4 +300,8 @@ export function AppSidebar() {
               </SidebarMenuItem>
             )
           })}
-        </SidebarMen
+        </SidebarMenu>
+      </SidebarContent>
+    </Sidebar>
+  )
+}
