@@ -21,6 +21,7 @@ const AVAILABLE_MODULES = [
   'Limpeza e Jardinagem',
   'Gestão de Tarefas',
   'Auditoria e Checklist',
+  'Gestão de Terceiros',
   'Gestão de Imóveis',
   'BI Dashboard',
 ]

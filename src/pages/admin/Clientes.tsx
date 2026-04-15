@@ -53,6 +53,8 @@ const AVAILABLE_MODULES = [
   'Gestão de Tarefas',
   'Auditoria e Checklist',
   'Gestão de Terceiros',
+  'Gestão de Imóveis',
+  'BI Dashboard',
 ]
 
 export default function Clientes() {
