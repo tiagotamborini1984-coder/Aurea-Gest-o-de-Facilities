@@ -87,7 +87,7 @@ export function AppSidebar() {
       subItems: [
         { title: 'Dashboard', path: '/gestao-imoveis/dashboard' },
         { title: 'Mapa de Ocupação', path: '/gestao-imoveis/ocupacao' },
-        { title: 'Imóveis e Quartos', path: '/gestao-imoveis/imoveis' },
+        { title: 'Imóveis', path: '/gestao-imoveis/imoveis' },
         { title: 'Hóspedes', path: '/gestao-imoveis/hospedes' },
         { title: 'Relatórios', path: '/gestao-imoveis/relatorios' },
       ],
