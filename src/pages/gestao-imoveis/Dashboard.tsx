@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
 import { Building, DollarSign, Users, Percent, CalendarIcon, MapPin, Home } from 'lucide-react'
 import { format, differenceInDays, startOfMonth, endOfMonth, parseISO, max, min } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -17,8 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/store/AppContext'
+
+const CHART_COLORS = [
+  '#556b2f', // Verde Musgo
+  '#005f6a', // Azul Petróleo
+  '#f26419', // Laranja
+  '#d4af37', // Dourado
+  '#8b0000', // Vermelho Escuro
+  '#008080', // Teal
+  '#4b0082', // Indigo
+  '#2e8b57', // Sea Green
+]
 
 type DateRange = {
   from: Date | undefined
@@ -47,7 +57,8 @@ export default function DashboardImoveis() {
     ticketMedio: 0,
   })
 
-  const [chartDataCity, setChartDataCity] = useState<any[]>([])
+  const [chartData, setChartData] = useState<any[]>([])
+  const [chartTitle, setChartTitle] = useState('Faturamento por Cidade')
   const [rankingCity, setRankingCity] = useState<any[]>([])
   const [rankingCostCenter, setRankingCostCenter] = useState<any[]>([])
 
@@ -136,7 +147,7 @@ export default function DashboardImoveis() {
           (selectedCity === 'all' || p.city === selectedCity) &&
           (selectedProperty === 'all' || p.id === selectedProperty),
       )
-      .reduce((acc, p) => acc + Math.max(1, p.property_rooms?.length || 1), 0)
+      .reduce((acc, p) => acc + (p.property_rooms?.length || 0), 0)
 
     const totalPossibleNights = Math.max(1, activeRoomsCount * periodDays)
 
@@ -148,6 +159,9 @@ export default function DashboardImoveis() {
       { faturamento: number; occupiedNights: number; roomCount: number }
     > = {}
     const costCenterStats: Record<string, { occupiedNights: number; name: string }> = {}
+    const chartStats: Record<string, number> = {}
+
+    const isShowingProperties = selectedCity !== 'all'
 
     // Initialize city stats for correct denominator
     properties.forEach((p) => {
@@ -158,7 +172,7 @@ export default function DashboardImoveis() {
         if (!cityStats[p.city]) {
           cityStats[p.city] = { faturamento: 0, occupiedNights: 0, roomCount: 0 }
         }
-        cityStats[p.city].roomCount += Math.max(1, p.property_rooms?.length || 1)
+        cityStats[p.city].roomCount += p.property_rooms?.length || 0
       }
     })
 
@@ -188,6 +202,10 @@ export default function DashboardImoveis() {
         costCenterStats[ccKey] = { occupiedNights: 0, name: costCenterName }
       }
       costCenterStats[ccKey].occupiedNights += occupiedNights
+
+      // Dynamic Chart Stats
+      const chartKey = isShowingProperties ? r.properties?.name || 'Desconhecido' : city
+      chartStats[chartKey] = (chartStats[chartKey] || 0) + Number(r.total_amount || 0)
     })
 
     // Set Main Metrics
@@ -198,12 +216,14 @@ export default function DashboardImoveis() {
       ticketMedio: filteredRes.length > 0 ? totalFaturamento / filteredRes.length : 0,
     })
 
-    // Process Chart Data (Faturamento por Cidade)
-    const chartCity = Object.entries(cityStats)
-      .map(([city, stats]) => ({ city, value: stats.faturamento }))
+    // Process Chart Data
+    const chart = Object.entries(chartStats)
+      .map(([name, value]) => ({ name, value }))
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value)
-    setChartDataCity(chartCity)
+
+    setChartData(chart)
+    setChartTitle(isShowingProperties ? 'Faturamento por Imóvel' : 'Faturamento por Cidade')
 
     // Process Ranking Cidade
     const rankCity = Object.entries(cityStats)
@@ -218,15 +238,9 @@ export default function DashboardImoveis() {
     setRankingCity(rankCity)
 
     // Process Ranking Centro de Custo
-    // Rate here is relative to the total occupied nights to show the share
-    const totalNightsForCC = Object.values(costCenterStats).reduce(
-      (acc, curr) => acc + curr.occupiedNights,
-      0,
-    )
     const rankCC = Object.values(costCenterStats)
       .map((stats) => {
-        const rate =
-          totalNightsForCC > 0 ? Math.round((stats.occupiedNights / totalNightsForCC) * 100) : 0
+        const rate = Math.min(100, Math.round((stats.occupiedNights / totalPossibleNights) * 100))
         return { name: stats.name, rate, nights: stats.occupiedNights }
       })
       .filter((item) => item.rate > 0)
@@ -371,21 +385,18 @@ export default function DashboardImoveis() {
         {/* Gráfico Principal */}
         <Card className="lg:col-span-2 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-slate-800">Faturamento por Cidade</CardTitle>
+            <CardTitle className="text-slate-800">{chartTitle}</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px]">
-            {chartDataCity.length > 0 ? (
+            {chartData.length > 0 ? (
               <ChartContainer
                 config={{ value: { label: 'Faturamento', color: 'hsl(var(--primary))' } }}
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartDataCity}
-                    margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
-                  >
+                  <BarChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
-                      dataKey="city"
+                      dataKey="name"
                       tick={{ fill: '#64748b' }}
                       axisLine={false}
                       tickLine={false}
@@ -397,12 +408,14 @@ export default function DashboardImoveis() {
                       tickLine={false}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="value"
-                      fill="hsl(var(--primary))"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={60}
-                    />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                      {chartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -429,16 +442,23 @@ export default function DashboardImoveis() {
                   <div key={item.name} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-slate-700 flex items-center gap-2">
-                        <span className="text-xs text-slate-400 font-mono">{idx + 1}º</span>
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                        />
                         {item.name}
                       </span>
                       <span className="text-slate-600 font-semibold">{item.rate}%</span>
                     </div>
-                    <Progress
-                      value={item.rate}
-                      className="h-2 bg-slate-100"
-                      indicatorClassName="bg-blue-500"
-                    />
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full transition-all duration-500"
+                        style={{
+                          width: `${item.rate}%`,
+                          backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                        }}
+                      />
+                    </div>
                   </div>
                 ))
               ) : (
@@ -461,16 +481,23 @@ export default function DashboardImoveis() {
                   <div key={item.name} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-slate-700 flex items-center gap-2 truncate pr-2">
-                        <span className="text-xs text-slate-400 font-mono">{idx + 1}º</span>
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                        />
                         <span className="truncate">{item.name}</span>
                       </span>
                       <span className="text-slate-600 font-semibold shrink-0">{item.rate}%</span>
                     </div>
-                    <Progress
-                      value={item.rate}
-                      className="h-2 bg-slate-100"
-                      indicatorClassName="bg-indigo-500"
-                    />
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full transition-all duration-500"
+                        style={{
+                          width: `${item.rate}%`,
+                          backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                        }}
+                      />
+                    </div>
                   </div>
                 ))
               ) : (
