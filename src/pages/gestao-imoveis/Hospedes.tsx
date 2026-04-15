@@ -19,17 +19,34 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Plus, Users, Briefcase } from 'lucide-react'
 
 export default function Hospedes() {
   const [guests, setGuests] = useState<any[]>([])
+  const [costCenters, setCostCenters] = useState<any[]>([])
   const { activeClient } = useAppStore()
   const [open, setOpen] = useState(false)
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '' })
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    cost_center_id: 'none',
+    department: '',
+  })
 
   useEffect(() => {
-    if (activeClient) loadData()
+    if (activeClient) {
+      loadData()
+      loadCostCenters()
+    }
   }, [activeClient])
 
   async function loadData() {
@@ -42,18 +59,38 @@ export default function Hospedes() {
     if (data) setGuests(data)
   }
 
+  async function loadCostCenters() {
+    const { data } = await supabase
+      .from('property_cost_centers')
+      .select('*')
+      .eq('client_id', activeClient?.id)
+      .order('name')
+
+    if (data) setCostCenters(data)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!activeClient) return
-    const { error } = await supabase.from('property_guests').insert({
+
+    const payload = {
       client_id: activeClient.id,
-      ...formData,
-    })
-    if (error) toast.error('Erro ao cadastrar hóspede')
-    else {
+      name: formData.name,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      cost_center_id: formData.cost_center_id !== 'none' ? formData.cost_center_id : null,
+      department: formData.department || null,
+    }
+
+    const { error } = await supabase.from('property_guests').insert(payload)
+
+    if (error) {
+      toast.error('Erro ao cadastrar hóspede')
+      console.error(error)
+    } else {
       toast.success('Hóspede cadastrado com sucesso!')
       setOpen(false)
-      setFormData({ name: '', email: '', phone: '' })
+      setFormData({ name: '', email: '', phone: '', cost_center_id: 'none', department: '' })
       loadData()
     }
   }
@@ -70,7 +107,7 @@ export default function Hospedes() {
               <Plus className="mr-2 h-4 w-4" /> Novo Hóspede
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Cadastrar Hóspede</DialogTitle>
             </DialogHeader>
@@ -84,21 +121,50 @@ export default function Hospedes() {
                   placeholder="João da Silva"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="joao@empresa.com"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>E-mail</Label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="joao@empresa.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Telefone</Label>
+                <Label>Centro de Custo</Label>
+                <Select
+                  value={formData.cost_center_id}
+                  onValueChange={(val) => setFormData({ ...formData, cost_center_id: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um centro de custo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {costCenters.map((cc) => (
+                      <SelectItem key={cc.id} value={cc.id}>
+                        {cc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Departamento</Label>
                 <Input
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="(11) 99999-9999"
+                  value={formData.department}
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  placeholder="Ex: Recursos Humanos, TI"
                 />
               </div>
               <Button type="submit" className="w-full mt-4">
@@ -117,6 +183,7 @@ export default function Hospedes() {
               <TableHead className="font-semibold text-slate-700">E-mail</TableHead>
               <TableHead className="font-semibold text-slate-700">Telefone</TableHead>
               <TableHead className="font-semibold text-slate-700">Centro de Custo</TableHead>
+              <TableHead className="font-semibold text-slate-700">Departamento</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,11 +202,12 @@ export default function Hospedes() {
                     <span className="text-slate-400 text-sm">Não vinculado</span>
                   )}
                 </TableCell>
+                <TableCell className="text-slate-600">{g.department || '-'}</TableCell>
               </TableRow>
             ))}
             {guests.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={5} className="text-center py-12 text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <Users className="h-10 w-10 text-slate-300 mb-3" />
                     <p>Nenhum hóspede cadastrado.</p>
