@@ -4,8 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -23,10 +22,7 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error('Missing Authorization header')
 
     const token = authHeader.replace('Bearer ', '')
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser(token)
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: creatorProfile } = await supabaseClient
@@ -41,8 +37,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json()
-    const finalClientId =
-      creatorProfile.role === 'Master' ? body.client_id : creatorProfile.client_id
+    const finalClientId = creatorProfile.role === 'Master' ? body.client_id : creatorProfile.client_id
 
     const {
       email,
