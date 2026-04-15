@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { addDays, format, startOfToday } from 'date-fns'
+import {
+  format,
+  startOfToday,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  parseISO,
+} from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -24,6 +31,9 @@ export default function OcupacaoImoveis() {
   const { activeClient } = useAppStore()
 
   const [open, setOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectedReservation, setSelectedReservation] = useState<any>(null)
+
   const [booking, setBooking] = useState({
     property_id: '',
     room_id: '',
@@ -32,7 +42,19 @@ export default function OcupacaoImoveis() {
     check_out: '',
   })
 
-  const days = Array.from({ length: 14 }).map((_, i) => addDays(startOfToday(), i))
+  const [selectedMonth, setSelectedMonth] = useState(format(startOfToday(), 'yyyy-MM'))
+  const [selectedCity, setSelectedCity] = useState('all')
+  const [selectedProperty, setSelectedProperty] = useState('all')
+
+  const monthStart = selectedMonth ? parseISO(`${selectedMonth}-01`) : startOfMonth(startOfToday())
+  const days = eachDayOfInterval({ start: monthStart, end: endOfMonth(monthStart) })
+  const cities = Array.from(new Set(properties.map((p) => p.city).filter(Boolean)))
+
+  const filteredProperties = properties.filter((p) => {
+    if (selectedCity !== 'all' && p.city !== selectedCity) return false
+    if (selectedProperty !== 'all' && p.id !== selectedProperty) return false
+    return true
+  })
 
   useEffect(() => {
     if (activeClient) loadData()
@@ -41,7 +63,10 @@ export default function OcupacaoImoveis() {
   async function loadData() {
     const [pRes, rRes, gRes] = await Promise.all([
       supabase.from('properties').select('*, property_rooms(*)').eq('client_id', activeClient?.id),
-      supabase.from('property_reservations').select('*').eq('client_id', activeClient?.id),
+      supabase
+        .from('property_reservations')
+        .select('*, property_guests(*)')
+        .eq('client_id', activeClient?.id),
       supabase.from('property_guests').select('*').eq('client_id', activeClient?.id),
     ])
     if (pRes.data) setProperties(pRes.data)
@@ -49,14 +74,13 @@ export default function OcupacaoImoveis() {
     if (gRes.data) setGuests(gRes.data)
   }
 
-  function getStatus(roomId: string, date: Date) {
-    const res = reservations.find(
+  function getReservationForDate(roomId: string, date: Date) {
+    return reservations.find(
       (r) =>
         r.room_id === roomId &&
         new Date(r.check_in_date).setHours(0, 0, 0, 0) <= date.getTime() &&
         new Date(r.check_out_date).setHours(0, 0, 0, 0) >= date.getTime(),
     )
-    return res ? 'reserved' : 'free'
   }
 
   async function handleBook(e: React.FormEvent) {
@@ -64,7 +88,6 @@ export default function OcupacaoImoveis() {
     if (!activeClient) return
     const property = properties.find((p) => p.id === booking.property_id)
     const dailyRate = property ? Number(property.daily_rate) : 0
-
     const startDate = new Date(booking.check_in)
     const endDate = new Date(booking.check_out)
     const duration = Math.max(
@@ -101,6 +124,182 @@ export default function OcupacaoImoveis() {
         </Button>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-xl border shadow-sm">
+        <div className="space-y-2">
+          <Label>Mês</Label>
+          <Input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Cidade</Label>
+          <Select value={selectedCity} onValueChange={setSelectedCity}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todas as cidades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as cidades</SelectItem>
+              {cities.map((city) => (
+                <SelectItem key={String(city)} value={String(city)}>
+                  {String(city)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Imóvel</Label>
+          <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os imóveis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os imóveis</SelectItem>
+              {properties
+                .filter((p) => selectedCity === 'all' || p.city === selectedCity)
+                .map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto border rounded-xl bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-slate-50/80">
+              <th className="p-4 text-left font-semibold text-slate-700 min-w-[220px] sticky left-0 bg-slate-50/80 z-10 shadow-[1px_0_0_0_#e2e8f0]">
+                Imóvel / Quarto
+              </th>
+              {days.map((d) => (
+                <th
+                  key={d.toISOString()}
+                  className="p-2 text-center font-medium min-w-[70px] border-l border-slate-200"
+                >
+                  <div className="text-xs text-slate-500 uppercase">
+                    {format(d, 'EEE', { locale: ptBR })}
+                  </div>
+                  <div className="text-base font-bold text-slate-800">{format(d, 'dd')}</div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredProperties.map((p) =>
+              p.property_rooms?.map((r: any) => (
+                <tr
+                  key={r.id}
+                  className="border-b last:border-0 hover:bg-slate-50 transition-colors group"
+                >
+                  <td className="p-4 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 transition-colors">
+                    <div className="font-semibold text-slate-800">{p.name}</div>
+                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span> {r.name}
+                    </div>
+                  </td>
+                  {days.map((d) => {
+                    const reservation = getReservationForDate(r.id, d)
+                    return (
+                      <td
+                        key={d.toISOString()}
+                        className="p-1 border-l border-slate-200 text-center"
+                      >
+                        <div
+                          className={`h-10 w-full rounded-md transition-all duration-200 flex items-center justify-center text-[10px] font-bold ${
+                            reservation
+                              ? 'bg-red-500 text-white shadow-sm cursor-pointer hover:bg-red-600'
+                              : 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
+                          }`}
+                          onClick={() => {
+                            if (!reservation) {
+                              setBooking({
+                                ...booking,
+                                property_id: p.id,
+                                room_id: r.id,
+                                check_in: format(d, 'yyyy-MM-dd'),
+                              })
+                              setOpen(true)
+                            } else {
+                              setSelectedReservation(reservation)
+                              setDetailsOpen(true)
+                            }
+                          }}
+                          title={reservation ? 'Ocupado' : 'Clique para reservar'}
+                        >
+                          {reservation && reservation.id.substring(0, 6).toUpperCase()}
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              )),
+            )}
+            {filteredProperties.length === 0 && (
+              <tr>
+                <td colSpan={days.length + 1} className="p-12 text-center text-slate-500">
+                  Nenhum resultado encontrado.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalhes da Reserva</DialogTitle>
+          </DialogHeader>
+          {selectedReservation && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-500">Voucher</Label>
+                <div className="font-medium text-lg">
+                  {selectedReservation.id.substring(0, 8).toUpperCase()}
+                </div>
+              </div>
+              <div>
+                <Label className="text-slate-500">Hóspede</Label>
+                <div className="font-medium">
+                  {selectedReservation.property_guests?.name || 'N/A'}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-500">Check-in</Label>
+                  <div className="font-medium">
+                    {format(parseISO(selectedReservation.check_in_date), 'dd/MM/yyyy')}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-slate-500">Check-out</Label>
+                  <div className="font-medium">
+                    {format(parseISO(selectedReservation.check_out_date), 'dd/MM/yyyy')}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-slate-500">Status</Label>
+                <div className="font-medium">{selectedReservation.status}</div>
+              </div>
+              <div>
+                <Label className="text-slate-500">Valor Total</Label>
+                <div className="font-medium">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    selectedReservation.total_amount,
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -109,7 +308,10 @@ export default function OcupacaoImoveis() {
           <form onSubmit={handleBook} className="space-y-4">
             <div className="space-y-2">
               <Label>Imóvel</Label>
-              <Select onValueChange={(v) => setBooking({ ...booking, property_id: v })}>
+              <Select
+                value={booking.property_id}
+                onValueChange={(v) => setBooking({ ...booking, property_id: v })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
@@ -125,7 +327,10 @@ export default function OcupacaoImoveis() {
             {booking.property_id && (
               <div className="space-y-2">
                 <Label>Quarto</Label>
-                <Select onValueChange={(v) => setBooking({ ...booking, room_id: v })}>
+                <Select
+                  value={booking.room_id}
+                  onValueChange={(v) => setBooking({ ...booking, room_id: v })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
@@ -143,7 +348,10 @@ export default function OcupacaoImoveis() {
             )}
             <div className="space-y-2">
               <Label>Hóspede</Label>
-              <Select onValueChange={(v) => setBooking({ ...booking, guest_id: v })}>
+              <Select
+                value={booking.guest_id}
+                onValueChange={(v) => setBooking({ ...booking, guest_id: v })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
@@ -162,6 +370,7 @@ export default function OcupacaoImoveis() {
                 <Input
                   type="date"
                   required
+                  value={booking.check_in}
                   onChange={(e) => setBooking({ ...booking, check_in: e.target.value })}
                 />
               </div>
@@ -170,6 +379,7 @@ export default function OcupacaoImoveis() {
                 <Input
                   type="date"
                   required
+                  value={booking.check_out}
                   onChange={(e) => setBooking({ ...booking, check_out: e.target.value })}
                 />
               </div>
@@ -180,78 +390,6 @@ export default function OcupacaoImoveis() {
           </form>
         </DialogContent>
       </Dialog>
-
-      <div className="overflow-x-auto border rounded-xl bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-slate-50/80">
-              <th className="p-4 text-left font-semibold text-slate-700 min-w-[220px]">
-                Imóvel / Quarto
-              </th>
-              {days.map((d) => (
-                <th
-                  key={d.toISOString()}
-                  className="p-2 text-center font-medium min-w-[70px] border-l border-slate-200"
-                >
-                  <div className="text-xs text-slate-500 uppercase">
-                    {format(d, 'EEE', { locale: ptBR })}
-                  </div>
-                  <div className="text-base font-bold text-slate-800">{format(d, 'dd')}</div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {properties.map((p) =>
-              p.property_rooms?.map((r: any) => (
-                <tr
-                  key={r.id}
-                  className="border-b last:border-0 hover:bg-slate-50 transition-colors"
-                >
-                  <td className="p-4">
-                    <div className="font-semibold text-slate-800">{p.name}</div>
-                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span> {r.name}
-                    </div>
-                  </td>
-                  {days.map((d) => {
-                    const status = getStatus(r.id, d)
-                    return (
-                      <td
-                        key={d.toISOString()}
-                        className="p-1 border-l border-slate-200 text-center"
-                      >
-                        <div
-                          className={`h-10 w-full rounded-md transition-all duration-200 ${status === 'reserved' ? 'bg-primary shadow-sm cursor-pointer hover:bg-primary/90' : 'bg-slate-100 hover:bg-slate-200 cursor-pointer'}`}
-                          onClick={() => {
-                            if (status === 'free') {
-                              setBooking({
-                                ...booking,
-                                property_id: p.id,
-                                room_id: r.id,
-                                check_in: format(d, 'yyyy-MM-dd'),
-                              })
-                              setOpen(true)
-                            }
-                          }}
-                          title={status === 'reserved' ? 'Ocupado' : 'Clique para reservar'}
-                        />
-                      </td>
-                    )
-                  })}
-                </tr>
-              )),
-            )}
-            {properties.length === 0 && (
-              <tr>
-                <td colSpan={15} className="p-12 text-center text-slate-500">
-                  Nenhum imóvel ou quarto cadastrado.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
     </div>
   )
 }
