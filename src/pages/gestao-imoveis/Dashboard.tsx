@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
+import { useAppStore } from '@/store/AppContext'
 
 type DateRange = {
   from: Date | undefined
@@ -36,6 +37,8 @@ export default function DashboardImoveis() {
   const [properties, setProperties] = useState<any[]>([])
   const [reservations, setReservations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  const { activeClient } = useAppStore()
 
   const [metrics, setMetrics] = useState({
     faturamento: 0,
@@ -60,29 +63,28 @@ export default function DashboardImoveis() {
   }, [properties, selectedCity])
 
   useEffect(() => {
-    loadBaseData()
-  }, [])
+    if (activeClient) {
+      loadBaseData()
+    }
+  }, [activeClient])
 
   useEffect(() => {
-    if (dateRange.from && dateRange.to) {
+    if (dateRange.from && dateRange.to && activeClient) {
       loadReservations()
     }
-  }, [dateRange])
+  }, [dateRange, activeClient])
 
   useEffect(() => {
     calculateMetrics()
   }, [reservations, selectedCity, selectedProperty])
 
   async function loadBaseData() {
-    const { data: userClient } = await supabase.rpc('get_user_client_id')
-    const clientId = userClient
-
-    if (!clientId) return
+    if (!activeClient) return
 
     const { data: propsData } = await supabase
       .from('properties')
-      .select('id, name, city')
-      .eq('client_id', clientId)
+      .select('id, name, city, property_rooms(id)')
+      .eq('client_id', activeClient.id)
 
     if (propsData) {
       setProperties(propsData)
@@ -90,7 +92,7 @@ export default function DashboardImoveis() {
   }
 
   async function loadReservations() {
-    if (!dateRange.from || !dateRange.to) return
+    if (!dateRange.from || !dateRange.to || !activeClient) return
     setLoading(true)
 
     const startDateStr = format(dateRange.from, 'yyyy-MM-dd')
@@ -103,7 +105,7 @@ export default function DashboardImoveis() {
         properties(id, city, name),
         property_guests(id, cost_center_id, property_cost_centers(id, name))
       `)
-      // Find reservations that overlap with the selected period
+      .eq('client_id', activeClient.id)
       .lte('check_in_date', endDateStr)
       .gte('check_out_date', startDateStr)
 
@@ -127,22 +129,23 @@ export default function DashboardImoveis() {
       return cityMatch && propMatch
     })
 
-    // Active properties count based on filters
-    const activePropsCount =
-      selectedProperty !== 'all'
-        ? 1
-        : selectedCity !== 'all'
-          ? properties.filter((p) => p.city === selectedCity).length
-          : properties.length
+    // Active rooms count based on filters for occupancy calculation
+    const activeRoomsCount = properties
+      .filter(
+        (p) =>
+          (selectedCity === 'all' || p.city === selectedCity) &&
+          (selectedProperty === 'all' || p.id === selectedProperty),
+      )
+      .reduce((acc, p) => acc + Math.max(1, p.property_rooms?.length || 1), 0)
 
-    const totalPossibleNights = Math.max(1, activePropsCount * periodDays)
+    const totalPossibleNights = Math.max(1, activeRoomsCount * periodDays)
 
     let totalFaturamento = 0
     let totalOccupiedNights = 0
 
     const cityStats: Record<
       string,
-      { faturamento: number; occupiedNights: number; propCount: number }
+      { faturamento: number; occupiedNights: number; roomCount: number }
     > = {}
     const costCenterStats: Record<string, { occupiedNights: number; name: string }> = {}
 
@@ -153,9 +156,9 @@ export default function DashboardImoveis() {
         (selectedProperty === 'all' || p.id === selectedProperty)
       ) {
         if (!cityStats[p.city]) {
-          cityStats[p.city] = { faturamento: 0, occupiedNights: 0, propCount: 0 }
+          cityStats[p.city] = { faturamento: 0, occupiedNights: 0, roomCount: 0 }
         }
-        cityStats[p.city].propCount += 1
+        cityStats[p.city].roomCount += Math.max(1, p.property_rooms?.length || 1)
       }
     })
 
@@ -205,7 +208,7 @@ export default function DashboardImoveis() {
     // Process Ranking Cidade
     const rankCity = Object.entries(cityStats)
       .map(([city, stats]) => {
-        const possibleNights = Math.max(1, stats.propCount * periodDays)
+        const possibleNights = Math.max(1, stats.roomCount * periodDays)
         const rate = Math.min(100, Math.round((stats.occupiedNights / possibleNights) * 100))
         return { name: city, rate }
       })

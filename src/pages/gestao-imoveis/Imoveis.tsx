@@ -15,13 +15,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { useAppStore } from '@/store/AppContext'
 import { toast } from 'sonner'
-import { Plus, Home, MapPin, BedDouble, Trash2, ImagePlus, Bath } from 'lucide-react'
+import { Plus, Home, MapPin, BedDouble, Trash2, ImagePlus, Bath, Edit } from 'lucide-react'
 
 export default function Imoveis() {
   const [properties, setProperties] = useState<any[]>([])
   const { activeClient } = useAppStore()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [managingProperty, setManagingProperty] = useState<any>(null)
 
   const [formData, setFormData] = useState({
@@ -66,11 +67,13 @@ export default function Imoveis() {
       return
     }
 
-    for (let i = 0; i < formData.rooms.length; i++) {
-      const r = formData.rooms[i]
-      if (!r.name || !r.bed_type || !r.beds_quantity) {
-        toast.error(`Preencha todos os dados do quarto: ${r.name || `Quarto ${i + 1}`}`)
-        return
+    if (!editingId) {
+      for (let i = 0; i < formData.rooms.length; i++) {
+        const r = formData.rooms[i]
+        if (!r.name || !r.bed_type || !r.beds_quantity) {
+          toast.error(`Preencha todos os dados do quarto: ${r.name || `Quarto ${i + 1}`}`)
+          return
+        }
       }
     }
 
@@ -81,39 +84,59 @@ export default function Imoveis() {
         ? formData.photos
         : ['https://img.usecurling.com/p/800/600?q=apartment']
 
-    const { data: newProp, error: propError } = await supabase
-      .from('properties')
-      .insert({
-        client_id: activeClient.id,
-        name: formData.name,
-        city: formData.city,
-        address: formData.address,
-        description: formData.description,
-        daily_rate: Number(formData.daily_rate),
-        photos,
-      })
-      .select()
-      .single()
+    if (editingId) {
+      const { error: propError } = await supabase
+        .from('properties')
+        .update({
+          name: formData.name,
+          city: formData.city,
+          address: formData.address,
+          description: formData.description,
+          daily_rate: Number(formData.daily_rate),
+          photos,
+        })
+        .eq('id', editingId)
 
-    if (propError) {
-      setLoading(false)
-      return toast.error('Erro ao salvar imóvel')
+      if (propError) {
+        setLoading(false)
+        return toast.error('Erro ao atualizar imóvel')
+      }
+      toast.success('Imóvel atualizado com sucesso!')
+    } else {
+      const { data: newProp, error: propError } = await supabase
+        .from('properties')
+        .insert({
+          client_id: activeClient.id,
+          name: formData.name,
+          city: formData.city,
+          address: formData.address,
+          description: formData.description,
+          daily_rate: Number(formData.daily_rate),
+          photos,
+        })
+        .select()
+        .single()
+
+      if (propError) {
+        setLoading(false)
+        return toast.error('Erro ao salvar imóvel')
+      }
+
+      if (formData.rooms.length > 0) {
+        const roomsToInsert = formData.rooms.map((r) => ({
+          client_id: activeClient.id,
+          property_id: newProp.id,
+          name: r.name,
+          capacity: Number(r.beds_quantity),
+          bed_type: r.bed_type,
+          has_bathroom: r.has_bathroom,
+          beds_quantity: Number(r.beds_quantity),
+        }))
+        await supabase.from('property_rooms').insert(roomsToInsert)
+      }
+      toast.success('Imóvel cadastrado com sucesso!')
     }
 
-    if (formData.rooms.length > 0) {
-      const roomsToInsert = formData.rooms.map((r) => ({
-        client_id: activeClient.id,
-        property_id: newProp.id,
-        name: r.name,
-        capacity: Number(r.beds_quantity),
-        bed_type: r.bed_type,
-        has_bathroom: r.has_bathroom,
-        beds_quantity: Number(r.beds_quantity),
-      }))
-      await supabase.from('property_rooms').insert(roomsToInsert)
-    }
-
-    toast.success('Imóvel cadastrado com sucesso!')
     setOpen(false)
     setLoading(false)
     loadProperties()
@@ -195,26 +218,69 @@ export default function Imoveis() {
       return { ...p, rooms: nr }
     })
 
+  function handleEdit(prop: any) {
+    setEditingId(prop.id)
+    setFormData({
+      name: prop.name,
+      city: prop.city,
+      address: prop.address,
+      description: prop.description || '',
+      daily_rate: prop.daily_rate?.toString() || '',
+      photos: prop.photos || [],
+      rooms: [], // Hide rooms in edit mode
+    })
+    setOpen(true)
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Deseja excluir este imóvel? Todas as reservas vinculadas serão perdidas.')) return
+    const { error } = await supabase.from('properties').delete().eq('id', id)
+    if (error) return toast.error('Erro ao excluir imóvel')
+    toast.success('Imóvel excluído')
+    loadProperties()
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-slate-800">Imóveis</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(val) => {
+            setOpen(val)
+            if (!val) setEditingId(null)
+          }}
+        >
           <DialogTrigger asChild>
-            <Button>
+            <Button
+              onClick={() => {
+                setEditingId(null)
+                setFormData({
+                  name: '',
+                  city: '',
+                  address: '',
+                  description: '',
+                  daily_rate: '',
+                  photos: [],
+                  rooms: [],
+                })
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" /> Novo Imóvel
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Cadastrar Imóvel</DialogTitle>
+              <DialogTitle>{editingId ? 'Editar Imóvel' : 'Cadastrar Imóvel'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <Tabs defaultValue="dados">
                 <TabsList className="mb-4">
                   <TabsTrigger value="dados">Dados Básicos</TabsTrigger>
                   <TabsTrigger value="fotos">Fotos</TabsTrigger>
-                  <TabsTrigger value="quartos">Quartos ({formData.rooms.length})</TabsTrigger>
+                  {!editingId && (
+                    <TabsTrigger value="quartos">Quartos ({formData.rooms.length})</TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="dados" className="space-y-4">
@@ -295,77 +361,83 @@ export default function Imoveis() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="quartos" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label>Quartos</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addFormRoom}>
-                      <Plus className="w-4 h-4 mr-2" /> Adicionar Quarto
-                    </Button>
-                  </div>
-                  <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
-                    {formData.rooms.map((r, idx) => (
-                      <Card key={r.id} className="p-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-xs">Nome</Label>
-                            <Input
-                              value={r.name}
-                              onChange={(e) => updateRoom(idx, 'name', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Tipo de Cama</Label>
-                            <Input
-                              value={r.bed_type}
-                              onChange={(e) => updateRoom(idx, 'bed_type', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Qtd de Camas</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={r.beds_quantity}
-                              onChange={(e) => updateRoom(idx, 'beds_quantity', e.target.value)}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between mt-6">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={r.has_bathroom}
-                                onCheckedChange={(v) => updateRoom(idx, 'has_bathroom', v)}
+                {!editingId && (
+                  <TabsContent value="quartos" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label>Quartos</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addFormRoom}>
+                        <Plus className="w-4 h-4 mr-2" /> Adicionar Quarto
+                      </Button>
+                    </div>
+                    <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                      {formData.rooms.map((r, idx) => (
+                        <Card key={r.id} className="p-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">Nome</Label>
+                              <Input
+                                value={r.name}
+                                onChange={(e) => updateRoom(idx, 'name', e.target.value)}
                               />
-                              <Label className="text-xs">Banheiro?</Label>
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive h-8 px-2"
-                              onClick={() =>
-                                setFormData((p) => ({
-                                  ...p,
-                                  rooms: p.rooms.filter((_, i) => i !== idx),
-                                }))
-                              }
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div>
+                              <Label className="text-xs">Tipo de Cama</Label>
+                              <Input
+                                value={r.bed_type}
+                                onChange={(e) => updateRoom(idx, 'bed_type', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Qtd de Camas</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={r.beds_quantity}
+                                onChange={(e) => updateRoom(idx, 'beds_quantity', e.target.value)}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between mt-6">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={r.has_bathroom}
+                                  onCheckedChange={(v) => updateRoom(idx, 'has_bathroom', v)}
+                                />
+                                <Label className="text-xs">Banheiro?</Label>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive h-8 px-2"
+                                onClick={() =>
+                                  setFormData((p) => ({
+                                    ...p,
+                                    rooms: p.rooms.filter((_, i) => i !== idx),
+                                  }))
+                                }
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
+                        </Card>
+                      ))}
+                      {formData.rooms.length === 0 && (
+                        <div className="text-center py-8 border-2 border-dashed rounded-md text-muted-foreground text-sm">
+                          Nenhum quarto. Adicione para detalhar.
                         </div>
-                      </Card>
-                    ))}
-                    {formData.rooms.length === 0 && (
-                      <div className="text-center py-8 border-2 border-dashed rounded-md text-muted-foreground text-sm">
-                        Nenhum quarto. Adicione para detalhar.
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
+                      )}
+                    </div>
+                  </TabsContent>
+                )}
               </Tabs>
               <div className="mt-6 border-t pt-4">
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Salvando...' : 'Salvar Imóvel Completo'}
+                  {loading
+                    ? 'Salvando...'
+                    : editingId
+                      ? 'Atualizar Imóvel'
+                      : 'Salvar Imóvel Completo'}
                 </Button>
               </div>
             </form>
@@ -391,6 +463,24 @@ export default function Imoveis() {
                 />
                 <div className="absolute top-4 right-4 bg-primary text-primary-foreground px-3 py-1 rounded-full font-bold shadow-md">
                   R$ {p.daily_rate}
+                </div>
+                <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-8 w-8 shadow-md"
+                    onClick={() => handleEdit(p)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-8 w-8 shadow-md"
+                    onClick={() => handleDelete(p.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               <CardHeader className="pb-2">

@@ -27,13 +27,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Users, Briefcase } from 'lucide-react'
+import { Plus, Users, Briefcase, Edit, Trash2 } from 'lucide-react'
 
 export default function Hospedes() {
   const [guests, setGuests] = useState<any[]>([])
   const [costCenters, setCostCenters] = useState<any[]>([])
   const { activeClient } = useAppStore()
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -82,15 +83,46 @@ export default function Hospedes() {
       department: formData.department || null,
     }
 
-    const { error } = await supabase.from('property_guests').insert(payload)
-
-    if (error) {
-      toast.error('Erro ao cadastrar hóspede')
-      console.error(error)
+    if (editingId) {
+      const { error } = await supabase.from('property_guests').update(payload).eq('id', editingId)
+      if (error) {
+        toast.error('Erro ao atualizar hóspede')
+      } else {
+        toast.success('Hóspede atualizado com sucesso!')
+        setOpen(false)
+        loadData()
+      }
     } else {
-      toast.success('Hóspede cadastrado com sucesso!')
-      setOpen(false)
-      setFormData({ name: '', email: '', phone: '', cost_center_id: 'none', department: '' })
+      const { error } = await supabase.from('property_guests').insert(payload)
+      if (error) {
+        toast.error('Erro ao cadastrar hóspede')
+      } else {
+        toast.success('Hóspede cadastrado com sucesso!')
+        setOpen(false)
+        loadData()
+      }
+    }
+  }
+
+  function handleEdit(guest: any) {
+    setEditingId(guest.id)
+    setFormData({
+      name: guest.name,
+      email: guest.email || '',
+      phone: guest.phone || '',
+      cost_center_id: guest.cost_center_id || 'none',
+      department: guest.department || '',
+    })
+    setOpen(true)
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Deseja excluir este hóspede?')) return
+    const { error } = await supabase.from('property_guests').delete().eq('id', id)
+    if (error) {
+      toast.error('Erro ao excluir hóspede. Verifique se ele possui reservas vinculadas.')
+    } else {
+      toast.success('Hóspede excluído com sucesso')
       loadData()
     }
   }
@@ -101,15 +133,32 @@ export default function Hospedes() {
         <h1 className="text-3xl font-bold flex items-center gap-3 text-slate-800">
           <Users className="h-8 w-8 text-primary" /> Hóspedes
         </h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(val) => {
+            setOpen(val)
+            if (!val) setEditingId(null)
+          }}
+        >
           <DialogTrigger asChild>
-            <Button>
+            <Button
+              onClick={() => {
+                setEditingId(null)
+                setFormData({
+                  name: '',
+                  email: '',
+                  phone: '',
+                  cost_center_id: 'none',
+                  department: '',
+                })
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" /> Novo Hóspede
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Cadastrar Hóspede</DialogTitle>
+              <DialogTitle>{editingId ? 'Editar Hóspede' : 'Cadastrar Hóspede'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2">
@@ -168,7 +217,7 @@ export default function Hospedes() {
                 />
               </div>
               <Button type="submit" className="w-full mt-4">
-                Salvar Hóspede
+                {editingId ? 'Atualizar Hóspede' : 'Salvar Hóspede'}
               </Button>
             </form>
           </DialogContent>
@@ -184,6 +233,7 @@ export default function Hospedes() {
               <TableHead className="font-semibold text-slate-700">Telefone</TableHead>
               <TableHead className="font-semibold text-slate-700">Centro de Custo</TableHead>
               <TableHead className="font-semibold text-slate-700">Departamento</TableHead>
+              <TableHead className="font-semibold text-slate-700 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -203,11 +253,21 @@ export default function Hospedes() {
                   )}
                 </TableCell>
                 <TableCell className="text-slate-600">{g.department || '-'}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(g)}>
+                      <Edit className="h-4 w-4 text-slate-600" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(g.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
             {guests.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={6} className="text-center py-12 text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <Users className="h-10 w-10 text-slate-300 mb-3" />
                     <p>Nenhum hóspede cadastrado.</p>
