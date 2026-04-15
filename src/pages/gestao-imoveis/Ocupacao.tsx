@@ -89,9 +89,7 @@ export default function OcupacaoImoveis() {
     return reservations.find((r) => {
       if (r.room_id !== roomId || r.bed_number !== bedNumber || r.status === 'Cancelada')
         return false
-      const isSameDayBooking = r.check_in_date === r.check_out_date
-      if (isSameDayBooking) return r.check_in_date === dateStr
-      return r.check_in_date <= dateStr && r.check_out_date > dateStr
+      return r.check_in_date <= dateStr && r.check_out_date >= dateStr
     })
   }
 
@@ -133,13 +131,7 @@ export default function OcupacaoImoveis() {
       const bCheckIn = booking.check_in
       const bCheckOut = booking.check_out
 
-      const isSameDayR = rCheckIn === rCheckOut
-      const isSameDayB = bCheckIn === bCheckOut
-
-      if (isSameDayR || isSameDayB) {
-        return bCheckIn <= rCheckOut && bCheckOut >= rCheckIn
-      }
-      return bCheckIn < rCheckOut && bCheckOut > rCheckIn
+      return bCheckIn <= rCheckOut && bCheckOut >= rCheckIn
     })
 
     if (hasRoomConflict) {
@@ -159,13 +151,7 @@ export default function OcupacaoImoveis() {
       const bCheckIn = booking.check_in
       const bCheckOut = booking.check_out
 
-      const isSameDayR = rCheckIn === rCheckOut
-      const isSameDayB = bCheckIn === bCheckOut
-
-      if (isSameDayR || isSameDayB) {
-        return bCheckIn <= rCheckOut && bCheckOut >= rCheckIn
-      }
-      return bCheckIn < rCheckOut && bCheckOut > rCheckIn
+      return bCheckIn <= rCheckOut && bCheckOut >= rCheckIn
     })
 
     if (guestConflict) {
