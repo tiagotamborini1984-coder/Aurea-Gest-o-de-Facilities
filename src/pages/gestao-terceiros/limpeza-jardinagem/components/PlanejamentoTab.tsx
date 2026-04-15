@@ -91,6 +91,7 @@ export function PlanejamentoTab({
     readonly: false,
     status: '',
     evidence_url: '',
+    evidence_urls: [],
     justification: '',
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -432,6 +433,7 @@ export function PlanejamentoTab({
                                 readonly: false,
                                 status: '',
                                 evidence_url: '',
+                                evidence_urls: [],
                                 justification: '',
                               })
                               setModalOpen(true)
@@ -468,6 +470,7 @@ export function PlanejamentoTab({
                                       readonly: isReadonly,
                                       status: cs.status,
                                       evidence_url: cs.evidence_url,
+                                      evidence_urls: cs.evidence_urls,
                                       justification: cs.justification,
                                     })
                                     setModalOpen(true)
@@ -555,11 +558,16 @@ export function PlanejamentoTab({
                 />
               </div>
               <div className="space-y-2 flex-1">
-                <Label className="text-base font-bold text-slate-700">Horário Início</Label>
+                <Label className="text-base font-bold text-slate-700">Horário Início *</Label>
                 <Input
+                  type="time"
                   value={modalData.time}
-                  disabled
-                  className="bg-slate-100 text-base font-semibold"
+                  onChange={(e) => setModalData({ ...modalData, time: e.target.value })}
+                  disabled={modalData.readonly}
+                  className={cn(
+                    'text-base font-semibold',
+                    modalData.readonly ? 'bg-slate-100' : 'bg-white',
+                  )}
                 />
               </div>
               <div className="space-y-2 flex-1">
@@ -631,21 +639,29 @@ export function PlanejamentoTab({
                     </p>
                   </div>
                 )}
-                {modalData.status === 'Realizado' && modalData.evidence_url && (
-                  <div className="space-y-2 mt-3">
-                    <Label className="text-sm font-bold text-green-700">Anexo / Evidência</Label>
-                    <div>
-                      <a
-                        href={modalData.evidence_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center text-sm font-bold text-brand-deepBlue hover:underline bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm"
-                      >
-                        <FileDown className="h-4 w-4 mr-2" /> Visualizar Arquivo
-                      </a>
+                {modalData.status === 'Realizado' &&
+                  ((modalData.evidence_urls && modalData.evidence_urls.length > 0) ||
+                    modalData.evidence_url) && (
+                    <div className="space-y-2 mt-3">
+                      <Label className="text-sm font-bold text-green-700">Anexo / Evidências</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {(modalData.evidence_urls?.length > 0
+                          ? modalData.evidence_urls
+                          : [modalData.evidence_url]
+                        ).map((url: string, i: number) => (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-sm font-bold text-brand-deepBlue hover:underline bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm"
+                          >
+                            <FileDown className="h-4 w-4 mr-2" /> Visualizar Arquivo {i + 1}
+                          </a>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
           </div>

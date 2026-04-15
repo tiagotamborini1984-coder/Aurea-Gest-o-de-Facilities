@@ -63,7 +63,7 @@ export function ExecucaoTab({
   const [selectedSched, setSelectedSched] = useState<any>(null)
   const [execStatus, setExecStatus] = useState('Realizado')
   const [justification, setJustification] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [isViewMode, setIsViewMode] = useState(false)
 
@@ -112,22 +112,34 @@ export function ExecucaoTab({
     if (!selectedSched || isViewMode) return
     if (execStatus === 'Não Realizado' && !justification)
       return toast({ variant: 'destructive', title: 'Justificativa obrigatória' })
-    if (execStatus === 'Realizado' && !file && !selectedSched.evidence_url)
+    if (
+      execStatus === 'Realizado' &&
+      files.length === 0 &&
+      (!selectedSched.evidence_urls || selectedSched.evidence_urls.length === 0) &&
+      !selectedSched.evidence_url
+    )
       return toast({ variant: 'destructive', title: 'Evidência (Anexo) obrigatória' })
 
     setIsSaving(true)
     try {
-      let evidence_url = selectedSched.evidence_url
-      if (file && execStatus === 'Realizado') {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-        const filePath = `${profile!.client_id}/${fileName}`
-        const { error: upErr } = await supabase.storage
-          .from('cleaning-evidence')
-          .upload(filePath, file)
-        if (upErr) throw upErr
-        const { data } = supabase.storage.from('cleaning-evidence').getPublicUrl(filePath)
-        evidence_url = data.publicUrl
+      let newEvidenceUrls: string[] = selectedSched.evidence_urls || []
+      // back compat
+      if (selectedSched.evidence_url && newEvidenceUrls.length === 0) {
+        newEvidenceUrls.push(selectedSched.evidence_url)
+      }
+
+      if (files.length > 0 && execStatus === 'Realizado') {
+        for (const f of files) {
+          const fileExt = f.name.split('.').pop()
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+          const filePath = `${profile!.client_id}/${fileName}`
+          const { error: upErr } = await supabase.storage
+            .from('cleaning-evidence')
+            .upload(filePath, f)
+          if (upErr) throw upErr
+          const { data } = supabase.storage.from('cleaning-evidence').getPublicUrl(filePath)
+          newEvidenceUrls.push(data.publicUrl)
+        }
       }
 
       const { error } = await supabase
@@ -135,7 +147,9 @@ export function ExecucaoTab({
         .update({
           status: execStatus,
           justification: execStatus === 'Não Realizado' ? justification : null,
-          evidence_url: execStatus === 'Realizado' ? evidence_url : null,
+          evidence_urls: execStatus === 'Realizado' ? newEvidenceUrls : null,
+          evidence_url:
+            execStatus === 'Realizado' && newEvidenceUrls.length > 0 ? newEvidenceUrls[0] : null,
         })
         .eq('id', selectedSched.id)
 
@@ -312,7 +326,7 @@ export function ExecucaoTab({
                       setSelectedSched(s)
                       setExecStatus(s.status === 'Pendente' ? 'Realizado' : s.status)
                       setJustification(s.justification || '')
-                      setFile(null)
+                      setFiles([])
                       setModalOpen(true)
                     }}
                   >
@@ -438,19 +452,31 @@ export function ExecucaoTab({
                       {selectedSched.status}
                     </span>
                   </div>
-                  {selectedSched.status === 'Realizado' && selectedSched.evidence_url && (
-                    <div className="mt-4 p-3 bg-white border-2 border-[#86efac] rounded-lg">
-                      <p className="text-sm font-bold text-slate-600 mb-2">Evidência Anexada:</p>
-                      <a
-                        href={selectedSched.evidence_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center text-base font-bold text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-3 py-2 rounded-md"
-                      >
-                        <FileText className="h-5 w-5 mr-2" /> Visualizar Arquivo
-                      </a>
-                    </div>
-                  )}
+                  {selectedSched.status === 'Realizado' &&
+                    ((selectedSched.evidence_urls && selectedSched.evidence_urls.length > 0) ||
+                      selectedSched.evidence_url) && (
+                      <div className="mt-4 p-3 bg-white border-2 border-[#86efac] rounded-lg">
+                        <p className="text-sm font-bold text-slate-600 mb-2">
+                          Evidências Anexadas:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {(selectedSched.evidence_urls?.length > 0
+                            ? selectedSched.evidence_urls
+                            : [selectedSched.evidence_url]
+                          ).map((url: string, i: number) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center text-base font-bold text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-3 py-2 rounded-md"
+                            >
+                              <FileText className="h-5 w-5 mr-2" /> Arquivo {i + 1}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   {selectedSched.status === 'Não Realizado' && selectedSched.justification && (
                     <div className="space-y-3 bg-[#fef2f2] p-4 rounded-xl border-2 border-[#fca5a5]">
                       <Label className="text-base font-bold text-[#991b1b]">Justificativa</Label>
@@ -511,24 +537,41 @@ export function ExecucaoTab({
                         <Input
                           type="file"
                           accept="image/*,.pdf"
-                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          multiple
+                          onChange={(e) => setFiles(Array.from(e.target.files || []))}
                           className="max-w-[300px] mx-auto text-base"
                         />
                         <p className="text-sm font-semibold text-slate-500 mt-3">
-                          Formatos aceitos: JPG, PNG, PDF
+                          Formatos aceitos: JPG, PNG, PDF. Você pode selecionar múltiplos arquivos.
                         </p>
+                        {files.length > 0 && (
+                          <p className="text-sm font-bold text-brand-deepBlue mt-2">
+                            {files.length} arquivo(s) selecionado(s)
+                          </p>
+                        )}
                       </div>
-                      {selectedSched.evidence_url && !file && (
+                      {((selectedSched.evidence_urls && selectedSched.evidence_urls.length > 0) ||
+                        selectedSched.evidence_url) && (
                         <div className="mt-4 p-3 bg-white border border-[#86efac] rounded-lg">
-                          <p className="text-sm font-bold text-slate-600 mb-2">Evidência Atual:</p>
-                          <a
-                            href={selectedSched.evidence_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center text-base font-bold text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-3 py-2 rounded-md"
-                          >
-                            <FileText className="h-5 w-5 mr-2" /> Visualizar Arquivo
-                          </a>
+                          <p className="text-sm font-bold text-slate-600 mb-2">
+                            Evidências Atuais:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {(selectedSched.evidence_urls?.length > 0
+                              ? selectedSched.evidence_urls
+                              : [selectedSched.evidence_url]
+                            ).map((url: string, i: number) => (
+                              <a
+                                key={i}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center text-sm font-bold text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-3 py-2 rounded-md"
+                              >
+                                <FileText className="h-4 w-4 mr-2" /> Arquivo {i + 1}
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -574,7 +617,10 @@ export function ExecucaoTab({
                   onClick={handleSave}
                   disabled={
                     isSaving ||
-                    (execStatus === 'Realizado' && !file && !selectedSched?.evidence_url) ||
+                    (execStatus === 'Realizado' &&
+                      files.length === 0 &&
+                      (!selectedSched?.evidence_urls || selectedSched.evidence_urls.length === 0) &&
+                      !selectedSched?.evidence_url) ||
                     (execStatus === 'Não Realizado' && !justification)
                   }
                   className="h-12 px-8 font-bold text-base"
