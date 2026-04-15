@@ -119,7 +119,7 @@ export default function OcupacaoImoveis() {
       return
     }
 
-    const hasConflict = reservations.some((r) => {
+    const hasRoomConflict = reservations.some((r) => {
       if (r.room_id !== booking.room_id) return false
       if (r.status === 'Cancelada') return false
 
@@ -131,9 +131,33 @@ export default function OcupacaoImoveis() {
       return bCheckIn <= rCheckOut && rCheckIn <= bCheckOut
     })
 
-    if (hasConflict) {
+    if (hasRoomConflict) {
       toast.error(
         'Não é possível realizar a reserva para esse período, pois o quarto já está ocupado.',
+      )
+      return
+    }
+
+    const guestConflict = reservations.find((r) => {
+      if (r.guest_id !== booking.guest_id) return false
+      if (r.status === 'Cancelada') return false
+
+      const rCheckIn = r.check_in_date
+      const rCheckOut = r.check_out_date
+      const bCheckIn = booking.check_in
+      const bCheckOut = booking.check_out
+
+      return bCheckIn <= rCheckOut && rCheckIn <= bCheckOut
+    })
+
+    if (guestConflict) {
+      const conflictProp = properties.find((p) => p.id === guestConflict.property_id)
+      const conflictRoom = conflictProp?.property_rooms?.find(
+        (r: any) => r.id === guestConflict.room_id,
+      )
+
+      toast.error(
+        `O hóspede já possui uma reserva para este período em: ${conflictProp?.city || '-'} - Imóvel: ${conflictProp?.name || '-'} - Quarto: ${conflictRoom?.name || '-'}`,
       )
       return
     }
