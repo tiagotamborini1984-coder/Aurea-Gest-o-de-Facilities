@@ -118,7 +118,7 @@ export function CreateUserDialog({
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.client_id) {
+    if (!form.client_id && form.role !== 'Master') {
       toast({
         variant: 'destructive',
         title: 'Erro',
@@ -216,7 +216,7 @@ export function CreateUserDialog({
           <DialogTitle>Cadastrar Usuário</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleAddUser} className="space-y-4 mt-4">
-          {isSuperAdmin && (
+          {isSuperAdmin && form.role !== 'Master' && (
             <div className="space-y-2">
               <Label>Empresa (Cliente)</Label>
               <Select
