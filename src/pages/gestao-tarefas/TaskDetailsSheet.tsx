@@ -121,19 +121,25 @@ export function TaskDetailsSheet({
         .order('order_index')
       setAuditActions(actions || [])
 
+      const { data: answers } = await supabase
+        .from('audit_execution_answers')
+        .select('*')
+        .eq('execution_id', exec.id)
+      const ansMap: Record<string, any> = {}
+      answers?.forEach((a) => {
+        ansMap[a.action_id] = a
+      })
+      setAuditAnswers(ansMap)
+
       if (exec.status === 'Finalizado') {
         setWizardStep(-1)
-        const { data: answers } = await supabase
-          .from('audit_execution_answers')
-          .select('*')
-          .eq('execution_id', exec.id)
-        const ansMap: Record<string, any> = {}
-        answers?.forEach((a) => {
-          ansMap[a.action_id] = a
-        })
-        setAuditAnswers(ansMap)
       } else {
-        setWizardStep(0)
+        if (exec.realization_date) {
+          const index = actions?.findIndex((a) => !ansMap[a.id]?.score) ?? -1
+          setWizardStep(index >= 0 ? index + 1 : actions?.length || 1)
+        } else {
+          setWizardStep(0)
+        }
       }
     } else {
       setAuditExecution(null)
@@ -213,6 +219,45 @@ export function TaskDetailsSheet({
     }
   }
 
+  const saveAnswerToDb = async (actionId: string, updatedFields: any) => {
+    if (!auditExecution || auditExecution.status === 'Finalizado') return
+
+    const currentAns = auditAnswers[actionId] || {}
+    const payload = {
+      execution_id: auditExecution.id,
+      action_id: actionId,
+      score: currentAns.score ?? null,
+      evidence_url: currentAns.evidence_url ?? null,
+      observations: currentAns.observations ?? null,
+      ...updatedFields,
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('audit_execution_answers')
+        .upsert(payload, { onConflict: 'execution_id,action_id' })
+        .select()
+        .single()
+
+      if (data && !error) {
+        setAuditAnswers((prev) => ({
+          ...prev,
+          [actionId]: { ...prev[actionId], ...payload, id: data.id },
+        }))
+      }
+    } catch (e) {
+      console.error('Auto-save failed', e)
+    }
+  }
+
+  const handleRemoveEvidence = async (actionId: string) => {
+    setAuditAnswers((prev) => ({
+      ...prev,
+      [actionId]: { ...prev[actionId], evidence_url: null },
+    }))
+    await saveAnswerToDb(actionId, { evidence_url: null })
+  }
+
   const handleDeleteTask = async () => {
     if (!deleteJustification.trim()) {
       toast({ title: 'Justificativa obrigatória', variant: 'destructive' })
@@ -286,6 +331,7 @@ export function TaskDetailsSheet({
         ...prev,
         [actionId]: { ...prev[actionId], evidence_url: data.publicUrl, uploading: false },
       }))
+      await saveAnswerToDb(actionId, { evidence_url: data.publicUrl })
     } catch (e: any) {
       toast({ title: 'Erro no upload', description: e.message, variant: 'destructive' })
       setAuditAnswers((prev) => ({ ...prev, [actionId]: { ...prev[actionId], uploading: false } }))
@@ -299,7 +345,7 @@ export function TaskDetailsSheet({
       let totalScore = 0
       let maxScore = auditActions.length * 5
 
-      const answersToInsert = auditActions.map((action) => {
+      const answersToUpsert = auditActions.map((action) => {
         const ans = auditAnswers[action.id] || {}
         totalScore += ans.score || 0
         return {
@@ -308,10 +354,12 @@ export function TaskDetailsSheet({
           score: ans.score,
           evidence_url: ans.evidence_url || null,
           observations: ans.observations || null,
-        } as any
+        }
       })
 
-      await supabase.from('audit_execution_answers').insert(answersToInsert)
+      await supabase
+        .from('audit_execution_answers')
+        .upsert(answersToUpsert, { onConflict: 'execution_id,action_id' })
 
       await supabase
         .from('audit_executions')
@@ -453,6 +501,16 @@ export function TaskDetailsSheet({
         toast({ title: 'Preencha a data de realização', variant: 'destructive' })
         return
       }
+
+      supabase
+        .from('audit_executions')
+        .update({
+          realization_date: auditRealizationDate,
+          participants: auditParticipants,
+        })
+        .eq('id', auditExecution.id)
+        .then()
+
       setWizardStep(1)
       return
     }
@@ -695,12 +753,13 @@ export function TaskDetailsSheet({
                       ? 'bg-brand-deepBlue text-white scale-[1.02] shadow-md border-transparent'
                       : 'text-slate-600 border-slate-200 hover:border-brand-deepBlue/50 hover:bg-brand-deepBlue/5',
                   )}
-                  onClick={() =>
+                  onClick={() => {
                     setAuditAnswers({
                       ...auditAnswers,
                       [action.id]: { ...ans, score },
                     })
-                  }
+                    saveAnswerToDb(action.id, { score })
+                  }}
                 >
                   {score}
                 </Button>
@@ -732,14 +791,26 @@ export function TaskDetailsSheet({
               </span>
             )}
             {ans.evidence_url && !ans.uploading && (
-              <a
-                href={ans.evidence_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-green-600 text-sm flex items-center mt-3 font-medium hover:underline bg-green-50 w-fit px-3 py-1.5 rounded-lg border border-green-100"
-              >
-                <CheckCircle className="w-4 h-4 mr-2" /> Ver arquivo anexado
-              </a>
+              <div className="flex items-center gap-3 mt-3">
+                <a
+                  href={ans.evidence_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-green-600 text-sm flex items-center font-medium hover:underline bg-green-50 w-fit px-3 py-1.5 rounded-lg border border-green-100"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" /> Ver arquivo anexado
+                </a>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveEvidence(action.id)}
+                  className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Remover
+                </Button>
+              </div>
             )}
           </div>
 
@@ -753,6 +824,7 @@ export function TaskDetailsSheet({
                   [action.id]: { ...ans, observations: e.target.value },
                 })
               }
+              onBlur={(e) => saveAnswerToDb(action.id, { observations: e.target.value })}
               placeholder="Adicione detalhes ou justificativas sobre esta ação..."
               className="resize-none h-24 bg-slate-50 border-slate-200"
             />
