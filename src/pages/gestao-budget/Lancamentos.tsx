@@ -119,10 +119,9 @@ export default function Lancamentos() {
     setEntries((prev) => ({
       ...prev,
       [accId]: {
-        ...prev[accId],
+        budgeted: prev[accId]?.budgeted ?? '',
+        realized: prev[accId]?.realized ?? '',
         [field]: val,
-        budgeted: prev[accId]?.budgeted || '0',
-        realized: prev[accId]?.realized || '0',
       },
     }))
   }
