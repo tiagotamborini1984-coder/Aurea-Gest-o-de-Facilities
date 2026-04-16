@@ -143,6 +143,21 @@ export function useDashboardCalculations(
         const pCont = validContracted
           .filter((c) => c.plant_id === plant.id)
           .reduce((sum, c) => sum + c.quantity, 0)
+
+        const dailyTrend = Array.from(pValidDates)
+          .sort()
+          .map((date) => {
+            const dCont = pCont
+            const dPres = pLogs.filter((l) => l.date === date && l.status).length
+            const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
+            return {
+              date,
+              absenteismo: Number(abs.toFixed(1)),
+              presentes: dPres,
+              contratado: dCont,
+            }
+          })
+
         return {
           id: plant.id,
           name: plant.name,
@@ -151,6 +166,7 @@ export function useDashboardCalculations(
           contratado: pCont,
           absenteismo:
             pDays === 0 ? 0 : Math.max(0, pCont > 0 ? ((pCont - pPres) / pCont) * 100 : 0),
+          dailyTrend,
         }
       })
 
@@ -182,6 +198,21 @@ export function useDashboardCalculations(
         const lCont = validContracted
           .filter((c) => c.location_id === loc.id)
           .reduce((sum, c) => sum + c.quantity, 0)
+
+        const dailyTrend = Array.from(pValidDates || [])
+          .sort()
+          .map((date) => {
+            const dCont = lCont
+            const dPres = lLogsRaw.filter((l) => l.date === date && l.status).length
+            const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
+            return {
+              date,
+              absenteismo: Number(abs.toFixed(1)),
+              presentes: dPres,
+              contratado: dCont,
+            }
+          })
+
         return {
           id: loc.id,
           name: loc.name,
@@ -191,6 +222,7 @@ export function useDashboardCalculations(
           contratado: lCont,
           absenteismo:
             lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
+          dailyTrend,
         }
       })
       .filter((l) => l.contratado > 0 || parseFloat(l.presentes) > 0)

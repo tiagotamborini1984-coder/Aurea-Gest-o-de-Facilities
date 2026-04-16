@@ -170,7 +170,12 @@ export default function DashboardGestor() {
             <DashboardEquipmentTrendChart data={dailyTrend} target={absenteeismTarget} />
           )}
 
-          <DashboardPlantSummary plantStats={plantStats} locationStats={locationStats} />
+          <DashboardPlantSummary
+            plantStats={plantStats}
+            locationStats={locationStats}
+            activeTab={activeTab}
+            absenteeismTarget={absenteeismTarget}
+          />
           <DashboardDetails
             activeTab={activeTab}
             equipmentStats={equipmentStats}
