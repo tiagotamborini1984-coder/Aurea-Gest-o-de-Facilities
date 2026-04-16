@@ -42,36 +42,74 @@ export default function CentrosCusto() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const [form, setForm] = useState({ code: '', name: '' })
 
   const fetchItems = async () => {
-    if (!profile?.client_id) return
+    const clientId = profile?.client_id || (profile?.role === 'Master' ? null : undefined)
+
+    // Evita loop de loading caso os dados do perfil ainda estejam carregando
+    if (clientId === undefined) return
+
     setLoading(true)
-    const { data, error } = await supabase
-      .from('budget_cost_centers')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .order('name')
-    if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
-    else setItems(data || [])
+    let query = supabase.from('budget_cost_centers').select('*').order('name')
+
+    if (clientId) {
+      query = query.eq('client_id', clientId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message })
+    } else {
+      setItems(data || [])
+    }
     setLoading(false)
   }
 
   useEffect(() => {
-    fetchItems()
-  }, [profile?.client_id])
+    if (profile) {
+      fetchItems()
+    }
+  }, [profile])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name || !profile?.client_id) return
-    const payload = { client_id: profile.client_id, code: form.code, name: form.name }
+
+    const clientId = profile?.client_id
+
+    if (!clientId && profile?.role !== 'Master') {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Cliente não identificado.' })
+      return
+    }
+
+    if (!form.name) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'O nome é obrigatório.' })
+      return
+    }
+
+    if (!clientId) {
+      toast({
+        variant: 'destructive',
+        title: 'Atenção',
+        description: 'Você precisa estar vinculado a um cliente para salvar centros de custo.',
+      })
+      return
+    }
+
+    setIsSaving(true)
+    const payload = { client_id: clientId, code: form.code, name: form.name }
 
     if (selectedItem) {
       const { error } = await supabase
         .from('budget_cost_centers')
         .update(payload)
         .eq('id', selectedItem.id)
+
+      setIsSaving(false)
+
       if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
       else {
         toast({ title: 'Centro de Custo atualizado' })
@@ -80,6 +118,9 @@ export default function CentrosCusto() {
       }
     } else {
       const { error } = await supabase.from('budget_cost_centers').insert([payload])
+
+      setIsSaving(false)
+
       if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
       else {
         toast({ title: 'Centro de Custo cadastrado' })
@@ -226,10 +267,17 @@ export default function CentrosCusto() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+                disabled={isSaving}
+              >
                 Cancelar
               </Button>
-              <Button type="submit">Salvar</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? 'Salvando...' : 'Salvar'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
