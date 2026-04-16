@@ -44,42 +44,28 @@ export default function ContasContabeis() {
   const { profile } = useAppStore()
   const { toast } = useToast()
   const [items, setItems] = useState<any[]>([])
-  const [costCenters, setCostCenters] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<any>(null)
 
-  const [form, setForm] = useState({ code: '', name: '', cost_center_id: '', type: 'Despesa' })
+  const [form, setForm] = useState({ code: '', name: '', type: 'Despesa' })
 
   const fetchData = async () => {
     if (!profile?.client_id) return
     setLoading(true)
 
-    const [accountsRes, costCentersRes] = await Promise.all([
-      supabase
-        .from('budget_accounts')
-        .select('*, budget_cost_centers(name)')
-        .eq('client_id', profile.client_id)
-        .order('name'),
-      supabase
-        .from('budget_cost_centers')
-        .select('*')
-        .eq('client_id', profile.client_id)
-        .order('name'),
-    ])
+    const accountsRes = await supabase
+      .from('budget_accounts')
+      .select('*')
+      .eq('client_id', profile.client_id)
+      .order('name')
 
     if (accountsRes.error) {
       toast({ variant: 'destructive', title: 'Erro', description: accountsRes.error.message })
     } else {
       setItems(accountsRes.data || [])
-    }
-
-    if (costCentersRes.error) {
-      toast({ variant: 'destructive', title: 'Erro', description: costCentersRes.error.message })
-    } else {
-      setCostCenters(costCentersRes.data || [])
     }
 
     setLoading(false)
@@ -91,7 +77,7 @@ export default function ContasContabeis() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name || !form.cost_center_id || !form.type || !profile?.client_id) {
+    if (!form.name || !form.type || !profile?.client_id) {
       toast({
         variant: 'destructive',
         title: 'Campos obrigatórios',
@@ -104,7 +90,6 @@ export default function ContasContabeis() {
       client_id: profile.client_id,
       code: form.code,
       name: form.name,
-      cost_center_id: form.cost_center_id,
       type: form.type,
     }
 
@@ -149,7 +134,6 @@ export default function ContasContabeis() {
     setForm({
       code: item.code || '',
       name: item.name,
-      cost_center_id: item.cost_center_id || '',
       type: item.type || 'Despesa',
     })
     setIsDialogOpen(true)
@@ -158,8 +142,7 @@ export default function ContasContabeis() {
   const filtered = items.filter(
     (i) =>
       i.name.toLowerCase().includes(search.toLowerCase()) ||
-      i.code?.toLowerCase().includes(search.toLowerCase()) ||
-      i.budget_cost_centers?.name?.toLowerCase().includes(search.toLowerCase()),
+      i.code?.toLowerCase().includes(search.toLowerCase()),
   )
 
   return (
@@ -171,13 +154,13 @@ export default function ContasContabeis() {
             Contas Contábeis (Budget)
           </h1>
           <p className="text-gray-500 mt-1">
-            Gerencie as contas para lançamento de orçado e realizado.
+            Gerencie as contas globalmente para uso em todos os centros de custo.
           </p>
         </div>
         <Button
           onClick={() => {
             setSelectedItem(null)
-            setForm({ code: '', name: '', cost_center_id: '', type: 'Despesa' })
+            setForm({ code: '', name: '', type: 'Despesa' })
             setIsDialogOpen(true)
           }}
         >
@@ -206,7 +189,6 @@ export default function ContasContabeis() {
               <TableRow>
                 <TableHead>Código</TableHead>
                 <TableHead>Nome da Conta</TableHead>
-                <TableHead>Centro de Custo</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -214,13 +196,13 @@ export default function ContasContabeis() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={4} className="text-center py-8">
                     Carregando...
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={4} className="text-center py-8 text-gray-500">
                     Nenhum registro encontrado.
                   </TableCell>
                 </TableRow>
@@ -229,7 +211,6 @@ export default function ContasContabeis() {
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.code || '-'}</TableCell>
                     <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.budget_cost_centers?.name || '-'}</TableCell>
                     <TableCell>{item.type}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
@@ -286,24 +267,6 @@ export default function ContasContabeis() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Centro de Custo *</Label>
-              <Select
-                value={form.cost_center_id}
-                onValueChange={(value) => setForm({ ...form, cost_center_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o centro de custo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {costCenters.map((cc) => (
-                    <SelectItem key={cc.id} value={cc.id}>
-                      {cc.code ? `${cc.code} - ${cc.name}` : cc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label>Nome da Conta *</Label>
