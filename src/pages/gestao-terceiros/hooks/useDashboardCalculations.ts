@@ -309,7 +309,7 @@ export function useDashboardCalculations(
         lancado: formatStr(avgLancado),
         presente: formatStr(avgPresente),
         ausente: formatStr(avgAusente),
-        contratado,
+        contratado: formatStr(contratado),
         absenteismo,
         excludedDaysCount,
       },
