@@ -7,7 +7,7 @@ BEGIN
     WHERE code IS NOT NULL AND code != ''
   )
   UPDATE public.budget_accounts
-  SET code = code || '-' || duplicates.rn
+  SET code = public.budget_accounts.code || '-' || duplicates.rn
   FROM duplicates
   WHERE public.budget_accounts.id = duplicates.id AND duplicates.rn > 1;
 
