@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FileText, Save, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -22,10 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 export default function Lancamentos() {
   const { profile } = useAppStore()
   const { toast } = useToast()
+
+  const isReadOnly = profile?.role !== 'Master' && profile?.role !== 'Administrador'
 
   const [costCenters, setCostCenters] = useState<any[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
@@ -84,7 +87,7 @@ export default function Lancamentos() {
   }
 
   const handleSave = async () => {
-    if (!profile?.client_id || !selectedCC || !selectedMonth) return
+    if (isReadOnly || !profile?.client_id || !selectedCC || !selectedMonth) return
     setSaving(true)
     const referenceDate = `${selectedMonth}-01`
 
@@ -116,6 +119,7 @@ export default function Lancamentos() {
   }
 
   const updateEntry = (accId: string, field: 'budgeted' | 'realized', val: string) => {
+    if (isReadOnly) return
     setEntries((prev) => ({
       ...prev,
       [accId]: {
@@ -126,16 +130,33 @@ export default function Lancamentos() {
     }))
   }
 
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+
+  const totals = useMemo(() => {
+    return accounts.reduce(
+      (acc, curr) => {
+        const vals = entries[curr.id]
+        acc.budgeted += parseFloat(vals?.budgeted || '0')
+        acc.realized += parseFloat(vals?.realized || '0')
+        return acc
+      },
+      { budgeted: 0, realized: 0 },
+    )
+  }, [accounts, entries])
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6 animate-fade-in-up">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
             <FileText className="h-6 w-6 text-brand-vividBlue" />
-            Lançamentos (Orçado vs Realizado)
+            {isReadOnly ? 'Painel de Lançamentos' : 'Lançamentos (Orçado vs Realizado)'}
           </h1>
           <p className="text-gray-500 mt-1">
-            Insira os valores previstos e gastos por conta em cada centro de custo.
+            {isReadOnly
+              ? 'Visualize os valores previstos e gastos por conta em cada centro de custo.'
+              : 'Insira os valores previstos e gastos por conta em cada centro de custo.'}
           </p>
         </div>
       </div>
@@ -172,7 +193,7 @@ export default function Lancamentos() {
         <CardContent className="p-0">
           {!selectedCC ? (
             <div className="py-12 text-center text-gray-500">
-              Selecione um Centro de Custo para iniciar os lançamentos.
+              Selecione um Centro de Custo para visualizar os lançamentos.
             </div>
           ) : loading ? (
             <div className="py-12 text-center flex justify-center">
@@ -185,46 +206,90 @@ export default function Lancamentos() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-6">Conta Contábil</TableHead>
-                  <TableHead className="w-[200px]">Orçado (R$)</TableHead>
-                  <TableHead className="w-[200px] pr-6">Realizado (R$)</TableHead>
+                <TableRow className="bg-gray-50/80">
+                  <TableHead className="pl-6 font-semibold">Conta Contábil</TableHead>
+                  <TableHead className="w-[200px] text-right font-semibold">
+                    <div className="mb-1 text-gray-800">Orçado (R$)</div>
+                    <div className="text-sm font-bold text-gray-600">
+                      {formatCurrency(totals.budgeted)}
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[200px] pr-6 text-right font-semibold">
+                    <div className="mb-1 text-gray-800">Realizado (R$)</div>
+                    <div className="text-sm font-bold text-gray-600">
+                      {formatCurrency(totals.realized)}
+                    </div>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {accounts.map((acc) => (
-                  <TableRow key={acc.id}>
-                    <TableCell className="pl-6 font-medium text-gray-700">
-                      {acc.code ? `${acc.code} - ` : ''}
-                      {acc.name}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={entries[acc.id]?.budgeted || ''}
-                        onChange={(e) => updateEntry(acc.id, 'budgeted', e.target.value)}
-                        placeholder="0.00"
-                        className="text-right font-mono"
-                      />
-                    </TableCell>
-                    <TableCell className="pr-6">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={entries[acc.id]?.realized || ''}
-                        onChange={(e) => updateEntry(acc.id, 'realized', e.target.value)}
-                        placeholder="0.00"
-                        className="text-right font-mono"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {accounts.map((acc, idx) => {
+                  const budgeted = parseFloat(entries[acc.id]?.budgeted || '0')
+                  const realized = parseFloat(entries[acc.id]?.realized || '0')
+                  const isOverBudget = realized > budgeted
+
+                  return (
+                    <TableRow
+                      key={acc.id}
+                      className={cn(
+                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50',
+                        isOverBudget && 'bg-red-50/60 hover:bg-red-50/80',
+                      )}
+                    >
+                      <TableCell className="pl-6 font-medium text-gray-700">
+                        {acc.code ? `${acc.code} - ` : ''}
+                        {acc.name}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isReadOnly ? (
+                          <span className="font-mono text-gray-600 block py-2">
+                            {formatCurrency(budgeted)}
+                          </span>
+                        ) : (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={entries[acc.id]?.budgeted ?? ''}
+                            onChange={(e) => updateEntry(acc.id, 'budgeted', e.target.value)}
+                            placeholder="0.00"
+                            className="text-right font-mono h-9 bg-white/50 focus:bg-white"
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell className="pr-6 text-right">
+                        {isReadOnly ? (
+                          <span
+                            className={cn(
+                              'font-mono block py-2',
+                              isOverBudget ? 'text-red-700 font-bold' : 'text-gray-600',
+                            )}
+                          >
+                            {formatCurrency(realized)}
+                          </span>
+                        ) : (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={entries[acc.id]?.realized ?? ''}
+                            onChange={(e) => updateEntry(acc.id, 'realized', e.target.value)}
+                            placeholder="0.00"
+                            className={cn(
+                              'text-right font-mono h-9 focus:bg-white',
+                              isOverBudget
+                                ? 'bg-red-100/50 border-red-200 text-red-900'
+                                : 'bg-white/50',
+                            )}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
-        {selectedCC && accounts.length > 0 && (
+        {selectedCC && accounts.length > 0 && !isReadOnly && (
           <div className="p-6 bg-gray-50 border-t flex justify-end">
             <Button
               onClick={handleSave}

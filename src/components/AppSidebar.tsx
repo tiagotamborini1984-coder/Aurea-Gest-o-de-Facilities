@@ -87,7 +87,12 @@ export function AppSidebar() {
       icon: DollarSign,
       subItems: [
         { title: 'Dashboard', path: '/gestao-budget/dashboard' },
-        { title: 'Lançamentos', path: '/gestao-budget/lancamentos' },
+        {
+          title: 'Lançamentos',
+          label:
+            role === 'Master' || role === 'Administrador' ? 'Lançamentos' : 'Painel de Lançamentos',
+          path: '/gestao-budget/lancamentos',
+        },
         { title: 'Centros de Custo', path: '/gestao-budget/centros-custo' },
         { title: 'Contas Contábeis', path: '/gestao-budget/contas' },
       ],
@@ -284,7 +289,7 @@ export function AppSidebar() {
                                     'bg-brand-vividBlue text-white font-medium shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
                                 )}
                               >
-                                <Link to={sub.path}>{sub.title}</Link>
+                                <Link to={sub.path}>{sub.label || sub.title}</Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           )
