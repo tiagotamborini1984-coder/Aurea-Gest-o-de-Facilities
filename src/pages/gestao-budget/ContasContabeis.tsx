@@ -86,9 +86,27 @@ export default function ContasContabeis() {
       return
     }
 
+    if (form.code) {
+      const { data: existing } = await supabase
+        .from('budget_accounts')
+        .select('id')
+        .eq('client_id', profile.client_id)
+        .eq('code', form.code)
+        .maybeSingle()
+
+      if (existing && existing.id !== selectedItem?.id) {
+        toast({
+          variant: 'destructive',
+          title: 'Código duplicado',
+          description: 'Já existe uma conta contábil com este código.',
+        })
+        return
+      }
+    }
+
     const payload = {
       client_id: profile.client_id,
-      code: form.code,
+      code: form.code || null,
       name: form.name,
       type: form.type,
     }
