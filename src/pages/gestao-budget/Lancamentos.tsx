@@ -8,6 +8,7 @@ import {
   X,
   AlertTriangle,
   CalendarIcon,
+  Building2,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
@@ -34,6 +35,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 export default function Lancamentos() {
@@ -41,6 +49,9 @@ export default function Lancamentos() {
   const { toast } = useToast()
 
   const isReadOnlyProfile = profile?.role !== 'Master' && profile?.role !== 'Administrador'
+
+  const [clients, setClients] = useState<any[]>([])
+  const [selectedClient, setSelectedClient] = useState<string>('')
 
   const [costCenters, setCostCenters] = useState<any[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
@@ -57,36 +68,65 @@ export default function Lancamentos() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  const activeClientId = profile?.role === 'Master' ? selectedClient : profile?.client_id
+
   // Desabilita edição quando seleciona mais de 1 centro de custo ou mais de 1 mês
   const isMultiSelection = selectedCCs.length > 1 || selectedMonths.length > 1
   const isReadOnly = isReadOnlyProfile || isMultiSelection
 
   useEffect(() => {
-    if (!profile?.client_id) return
+    if (profile?.role === 'Master') {
+      supabase
+        .from('clients')
+        .select('id, name')
+        .eq('status', 'Ativo')
+        .order('name')
+        .then(({ data }) => {
+          if (data) {
+            setClients(data)
+            if (data.length > 0 && !selectedClient) {
+              setSelectedClient(data[0].id)
+            }
+          }
+        })
+    } else if (profile?.client_id) {
+      setSelectedClient(profile.client_id)
+    }
+  }, [profile, selectedClient])
 
-    // Lista suspensa em ordem crescente
+  useEffect(() => {
+    if (!activeClientId) {
+      setCostCenters([])
+      setAccounts([])
+      setSelectedCCs([])
+      return
+    }
+
     supabase
       .from('budget_cost_centers')
       .select('*')
-      .eq('client_id', profile.client_id)
+      .eq('client_id', activeClientId)
       .order('name', { ascending: true })
       .then(({ data }) => setCostCenters(data || []))
 
     supabase
       .from('budget_accounts')
       .select('*')
-      .eq('client_id', profile.client_id)
+      .eq('client_id', activeClientId)
       .order('name')
       .then(({ data }) => setAccounts(data || []))
-  }, [profile?.client_id])
+
+    setSelectedCCs([])
+    setEntries({})
+  }, [activeClientId])
 
   useEffect(() => {
-    if (!profile?.client_id || selectedCCs.length === 0 || selectedMonths.length === 0) {
+    if (!activeClientId || selectedCCs.length === 0 || selectedMonths.length === 0) {
       setEntries({})
       return
     }
     loadEntries()
-  }, [selectedCCs, selectedMonths, profile?.client_id])
+  }, [selectedCCs, selectedMonths, activeClientId])
 
   const loadEntries = async () => {
     setLoading(true)
@@ -95,7 +135,7 @@ export default function Lancamentos() {
     const { data } = await supabase
       .from('budget_entries')
       .select('*')
-      .eq('client_id', profile!.client_id)
+      .eq('client_id', activeClientId)
       .in('cost_center_id', selectedCCs)
       .in('reference_month', referenceDates)
 
@@ -120,12 +160,7 @@ export default function Lancamentos() {
   }
 
   const handleSave = async () => {
-    if (
-      isReadOnly ||
-      !profile?.client_id ||
-      selectedCCs.length !== 1 ||
-      selectedMonths.length !== 1
-    )
+    if (isReadOnly || !activeClientId || selectedCCs.length !== 1 || selectedMonths.length !== 1)
       return
     setSaving(true)
 
@@ -135,7 +170,7 @@ export default function Lancamentos() {
     const payload = accounts.map((acc) => {
       const vals = entries[acc.id] || { budgeted: '0', realized: '0' }
       return {
-        client_id: profile.client_id,
+        client_id: activeClientId,
         cost_center_id: singleCC,
         account_id: acc.id,
         reference_month: referenceDate,
@@ -197,60 +232,78 @@ export default function Lancamentos() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6 animate-fade-in-up">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in-up">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <FileText className="h-6 w-6 text-brand-vividBlue" />
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+            <FileText className="h-8 w-8 text-brand-vividBlue" />
             {isReadOnlyProfile ? 'Painel de Lançamentos' : 'Lançamentos (Orçado vs Realizado)'}
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-slate-500 mt-2 text-base">
             {isReadOnlyProfile
               ? 'Visualize os valores previstos e executados por conta em cada centro de custo.'
               : 'Insira os valores previstos e executados ou visualize o consolidado.'}
           </p>
         </div>
+
+        {profile?.role === 'Master' && (
+          <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm w-full md:w-auto">
+            <Building2 className="h-5 w-5 text-slate-400 ml-2 shrink-0" />
+            <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <SelectTrigger className="w-full md:w-[280px] border-0 shadow-none focus:ring-0 text-base h-10 bg-transparent">
+                <SelectValue placeholder="Selecione um cliente..." />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id} className="text-base py-2">
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <Card className="shadow-sm border-slate-200">
-        <CardHeader className="pb-4 border-b bg-slate-50/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-slate-700 font-semibold">Mês(es) de Referência</Label>
-              <div className="flex items-center gap-2">
+        <CardHeader className="pb-5 border-b bg-slate-50/50">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-bold text-base">Mês(es) de Referência</Label>
+              <div className="flex items-center gap-3">
                 <Input
                   type="month"
                   value={tempMonth}
                   onChange={(e) => setTempMonth(e.target.value)}
-                  className="w-[160px] bg-white"
+                  className="w-[180px] bg-white h-11 text-base border-slate-300"
                 />
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={addMonth}
                   disabled={!tempMonth || selectedMonths.includes(tempMonth)}
-                  className="bg-white border hover:bg-slate-100 text-slate-700"
+                  className="bg-white border-slate-300 hover:bg-slate-100 text-slate-700 h-11 px-5"
                 >
                   Adicionar
                 </Button>
               </div>
               {selectedMonths.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3 p-3 rounded-md bg-white border shadow-sm min-h-12 items-center">
+                <div className="flex flex-wrap gap-2 mt-4 p-4 rounded-lg bg-white border border-slate-200 shadow-sm min-h-[60px] items-center">
                   {selectedMonths.map((m) => {
                     const [year, month] = m.split('-')
                     return (
                       <Badge
                         key={m}
                         variant="default"
-                        className="flex items-center gap-1.5 bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90 py-1.5 px-3"
+                        className="flex items-center gap-2 bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90 py-2 px-4 text-[15px]"
                       >
-                        <CalendarIcon className="h-3 w-3" />
-                        <span className="text-sm">{`${month}/${year}`}</span>
+                        <CalendarIcon className="h-4 w-4" />
+                        <span>{`${month}/${year}`}</span>
                         <button
                           onClick={() => removeMonth(m)}
-                          className="ml-1 rounded-full p-0.5 hover:bg-white/20 transition-colors"
+                          className="ml-1.5 rounded-full p-1 hover:bg-white/20 transition-colors"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-4 w-4" />
                         </button>
                       </Badge>
                     )
@@ -259,17 +312,17 @@ export default function Lancamentos() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-slate-700 font-semibold">Centros de Custo</Label>
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-bold text-base">Centros de Custo</Label>
               <Popover open={ccPopoverOpen} onOpenChange={setCcPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={ccPopoverOpen}
-                    className="w-full justify-between bg-white h-auto min-h-[42px] py-2"
+                    className="w-full justify-between bg-white h-auto min-h-[60px] py-3 px-4 border-slate-300 text-base"
                   >
-                    <div className="flex flex-wrap gap-1 items-center text-left flex-1">
+                    <div className="flex flex-wrap gap-2 items-center text-left flex-1">
                       {selectedCCs.length === 0 ? (
                         <span className="text-slate-500 font-normal">
                           Selecione os centros de custo...
@@ -281,7 +334,7 @@ export default function Lancamentos() {
                             <Badge
                               variant="secondary"
                               key={id}
-                              className="mr-1 mb-1 font-normal bg-slate-100 text-slate-800 hover:bg-slate-200"
+                              className="font-normal bg-slate-100 text-slate-800 hover:bg-slate-200 py-1.5 px-3 text-[15px]"
                             >
                               {c.code ? `${c.code} - ` : ''}
                               {c.name}
@@ -291,19 +344,22 @@ export default function Lancamentos() {
                       ) : (
                         <Badge
                           variant="secondary"
-                          className="font-normal bg-slate-100 text-slate-800"
+                          className="font-normal bg-slate-100 text-slate-800 py-1.5 px-3 text-[15px]"
                         >
                           {selectedCCs.length} centros selecionados
                         </Badge>
                       )}
                     </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <ChevronsUpDown className="ml-3 h-5 w-5 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
+                <PopoverContent className="w-[450px] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Buscar centro de custo..." className="h-10" />
-                    <CommandList className="max-h-[300px]">
+                    <CommandInput
+                      placeholder="Buscar centro de custo..."
+                      className="h-11 text-base"
+                    />
+                    <CommandList className="max-h-[350px]">
                       <CommandEmpty>Nenhum centro de custo encontrado.</CommandEmpty>
                       <CommandGroup>
                         {costCenters.map((cc) => {
@@ -316,22 +372,22 @@ export default function Lancamentos() {
                                   isSelected ? prev.filter((id) => id !== cc.id) : [...prev, cc.id],
                                 )
                               }}
-                              className="cursor-pointer py-2"
+                              className="cursor-pointer py-3 text-base"
                             >
                               <div
                                 className={cn(
-                                  'mr-3 flex h-4 w-4 items-center justify-center rounded-sm border',
+                                  'mr-4 flex h-5 w-5 items-center justify-center rounded-sm border',
                                   isSelected
                                     ? 'bg-brand-vividBlue border-brand-vividBlue text-white'
                                     : 'border-slate-300 opacity-50 [&_svg]:invisible',
                                 )}
                               >
-                                <Check className="h-3 w-3" />
+                                <Check className="h-4 w-4" />
                               </div>
-                              <span className="font-medium text-slate-700">
+                              <span className="font-medium text-slate-800">
                                 {cc.code ? `${cc.code} - ` : ''}
                               </span>
-                              <span className="text-slate-600">{cc.name}</span>
+                              <span className="text-slate-600 ml-1">{cc.name}</span>
                             </CommandItem>
                           )
                         })}
@@ -345,33 +401,38 @@ export default function Lancamentos() {
         </CardHeader>
 
         <CardContent className="p-0">
-          {selectedCCs.length === 0 || selectedMonths.length === 0 ? (
-            <div className="py-16 text-center text-slate-500 bg-slate-50/30">
-              <FileText className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <p>
+          {!activeClientId ? (
+            <div className="py-20 text-center text-slate-500 bg-slate-50/30">
+              <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-lg">Selecione um cliente para visualizar os lançamentos.</p>
+            </div>
+          ) : selectedCCs.length === 0 || selectedMonths.length === 0 ? (
+            <div className="py-20 text-center text-slate-500 bg-slate-50/30">
+              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-lg">
                 Selecione ao menos um Mês e um Centro de Custo
                 <br />
                 para visualizar os lançamentos.
               </p>
             </div>
           ) : loading ? (
-            <div className="py-16 text-center flex justify-center bg-slate-50/30">
-              <Loader2 className="h-8 w-8 animate-spin text-brand-vividBlue" />
+            <div className="py-20 text-center flex justify-center bg-slate-50/30">
+              <Loader2 className="h-10 w-10 animate-spin text-brand-vividBlue" />
             </div>
           ) : accounts.length === 0 ? (
-            <div className="py-16 text-center text-slate-500 bg-slate-50/30">
-              Nenhuma conta contábil cadastrada.
+            <div className="py-20 text-center text-slate-500 bg-slate-50/30">
+              <p className="text-lg">Nenhuma conta contábil cadastrada.</p>
             </div>
           ) : (
             <div className="flex flex-col">
               {isMultiSelection && !isReadOnlyProfile && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 m-4 rounded-md flex items-start shadow-sm animate-fade-in">
-                  <AlertTriangle className="h-5 w-5 text-blue-600 mr-3 mt-0.5 shrink-0" />
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-5 m-5 rounded-md flex items-start shadow-sm animate-fade-in">
+                  <AlertTriangle className="h-6 w-6 text-blue-600 mr-4 mt-0.5 shrink-0" />
                   <div>
-                    <h3 className="text-blue-900 font-semibold">
+                    <h3 className="text-blue-900 font-bold text-[17px]">
                       Modo de Visualização Consolidada
                     </h3>
-                    <p className="text-blue-800/90 text-sm mt-1">
+                    <p className="text-blue-800/90 text-[15px] mt-1.5">
                       Você selecionou múltiplos centros de custo ou meses. A edição de valores está
                       desabilitada para exibir a soma dos valores agregados.
                     </p>
@@ -381,43 +442,43 @@ export default function Lancamentos() {
 
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-100 border-b-2 border-slate-200">
-                    <TableHead className="pl-6 font-bold text-slate-800 py-4">
+                  <TableRow className="bg-slate-200/60 border-b-2 border-slate-300">
+                    <TableHead className="pl-6 font-bold text-slate-800 py-5 text-[15px]">
                       Conta Contábil
                     </TableHead>
-                    <TableHead className="w-[180px] text-right font-semibold">
-                      <div className="text-slate-800 mb-1.5 text-sm uppercase tracking-wider">
+                    <TableHead className="w-[200px] text-right font-semibold py-5">
+                      <div className="text-slate-800 mb-2 text-[15px] uppercase tracking-wider">
                         Orçado
                       </div>
-                      <div className="text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-md shadow-sm border border-slate-200/60 inline-block">
+                      <div className="text-[15px] font-bold text-slate-800 bg-white px-3 py-1.5 rounded-md shadow-sm border border-slate-300 inline-block">
                         {formatCurrency(totals.budgeted)}
                       </div>
                     </TableHead>
-                    <TableHead className="w-[180px] text-right font-semibold">
-                      <div className="text-slate-800 mb-1.5 text-sm uppercase tracking-wider">
+                    <TableHead className="w-[200px] text-right font-semibold py-5">
+                      <div className="text-slate-800 mb-2 text-[15px] uppercase tracking-wider">
                         Realizado
                       </div>
                       <div
                         className={cn(
-                          'text-xs font-bold px-2.5 py-1 rounded-md shadow-sm border inline-block',
+                          'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
                           totals.realized > totals.budgeted
-                            ? 'text-red-700 bg-red-50 border-red-200'
-                            : 'text-slate-700 bg-white border-slate-200/60',
+                            ? 'text-red-800 bg-red-100 border-red-300'
+                            : 'text-slate-800 bg-white border-slate-300',
                         )}
                       >
                         {formatCurrency(totals.realized)}
                       </div>
                     </TableHead>
-                    <TableHead className="w-[180px] pr-6 text-right font-semibold">
-                      <div className="text-slate-800 mb-1.5 text-sm uppercase tracking-wider">
+                    <TableHead className="w-[200px] pr-6 text-right font-semibold py-5">
+                      <div className="text-slate-800 mb-2 text-[15px] uppercase tracking-wider">
                         Diferença
                       </div>
                       <div
                         className={cn(
-                          'text-xs font-bold px-2.5 py-1 rounded-md shadow-sm border inline-block',
+                          'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
                           totalDifference < 0
-                            ? 'text-red-700 bg-red-50 border-red-200'
-                            : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                            ? 'text-red-800 bg-red-100 border-red-300'
+                            : 'text-emerald-800 bg-emerald-100 border-emerald-300',
                         )}
                       >
                         {formatCurrency(totalDifference)}
@@ -436,31 +497,31 @@ export default function Lancamentos() {
                       <TableRow
                         key={acc.id}
                         className={cn(
-                          'transition-colors border-b border-slate-100',
+                          'transition-colors border-b border-slate-200',
                           isNegative
-                            ? 'bg-red-50/80 hover:bg-red-100' // Destacando em vermelho a linha
+                            ? 'bg-red-50 hover:bg-red-100' // Destacando em vermelho a linha
                             : idx % 2 === 0
                               ? 'bg-white hover:bg-slate-50' // Zebra clara
-                              : 'bg-slate-50/60 hover:bg-slate-100', // Zebra escura
+                              : 'bg-slate-100 hover:bg-slate-200', // Zebra escura
                         )}
                       >
                         <TableCell
                           className={cn(
-                            'pl-6 font-medium',
-                            isNegative ? 'text-red-900 font-bold' : 'text-slate-700',
+                            'pl-6 font-medium text-[15px] py-4',
+                            isNegative ? 'text-red-900 font-bold' : 'text-slate-800',
                           )}
                         >
                           {acc.code && (
-                            <span className="text-slate-400 mr-2 font-normal">{acc.code}</span>
+                            <span className="text-slate-500 mr-2 font-normal">{acc.code}</span>
                           )}
                           {acc.name}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right py-4">
                           {isReadOnly ? (
                             <span
                               className={cn(
-                                'font-mono text-[15px] block py-2',
-                                isNegative ? 'text-red-900/80 font-medium' : 'text-slate-600',
+                                'font-mono text-base block py-2',
+                                isNegative ? 'text-red-900/80 font-medium' : 'text-slate-700',
                               )}
                             >
                               {formatCurrency(budgeted)}
@@ -472,16 +533,16 @@ export default function Lancamentos() {
                               value={entries[acc.id]?.budgeted ?? ''}
                               onChange={(e) => updateEntry(acc.id, 'budgeted', e.target.value)}
                               placeholder="0.00"
-                              className="text-right font-mono h-9 bg-white/70 focus:bg-white shadow-none border-slate-200"
+                              className="text-right font-mono text-base h-11 bg-white/70 focus:bg-white shadow-none border-slate-300"
                             />
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right py-4">
                           {isReadOnly ? (
                             <span
                               className={cn(
-                                'font-mono text-[15px] block py-2',
-                                isNegative ? 'text-red-700 font-bold' : 'text-slate-600',
+                                'font-mono text-base block py-2',
+                                isNegative ? 'text-red-700 font-bold' : 'text-slate-700',
                               )}
                             >
                               {formatCurrency(realized)}
@@ -494,21 +555,21 @@ export default function Lancamentos() {
                               onChange={(e) => updateEntry(acc.id, 'realized', e.target.value)}
                               placeholder="0.00"
                               className={cn(
-                                'text-right font-mono h-9 shadow-none',
+                                'text-right font-mono text-base h-11 shadow-none',
                                 isNegative
                                   ? 'bg-red-100 border-red-300 text-red-900 font-bold placeholder:text-red-400 focus:bg-red-50 focus:border-red-400'
-                                  : 'bg-white/70 border-slate-200 focus:bg-white',
+                                  : 'bg-white/70 border-slate-300 focus:bg-white',
                               )}
                             />
                           )}
                         </TableCell>
-                        <TableCell className="pr-6 text-right">
+                        <TableCell className="pr-6 text-right py-4">
                           <span
                             className={cn(
-                              'font-mono text-[15px] block py-2',
+                              'font-mono text-base block py-2',
                               isNegative
                                 ? 'text-red-700 font-bold'
-                                : 'text-emerald-600 font-semibold',
+                                : 'text-emerald-700 font-semibold',
                             )}
                           >
                             {formatCurrency(difference)}
@@ -526,16 +587,16 @@ export default function Lancamentos() {
           selectedMonths.length > 0 &&
           accounts.length > 0 &&
           !isReadOnly && (
-            <div className="p-5 bg-slate-50 border-t flex justify-end rounded-b-xl">
+            <div className="p-6 bg-slate-50 border-t flex justify-end rounded-b-xl">
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 w-44 shadow-sm"
+                className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 w-52 h-11 text-base shadow-sm"
               >
                 {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
                 ) : (
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-5 w-5 mr-2" />
                 )}
                 Salvar Grade
               </Button>
