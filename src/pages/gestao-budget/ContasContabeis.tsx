@@ -6,6 +6,13 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -37,54 +44,90 @@ export default function ContasContabeis() {
   const { profile } = useAppStore()
   const { toast } = useToast()
   const [items, setItems] = useState<any[]>([])
+  const [costCenters, setCostCenters] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<any>(null)
 
-  const [form, setForm] = useState({ code: '', name: '' })
+  const [form, setForm] = useState({ code: '', name: '', cost_center_id: '', type: 'Despesa' })
 
-  const fetchItems = async () => {
+  const fetchData = async () => {
     if (!profile?.client_id) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('budget_accounts')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .order('name')
-    if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
-    else setItems(data || [])
+
+    const [accountsRes, costCentersRes] = await Promise.all([
+      supabase
+        .from('budget_accounts')
+        .select('*, budget_cost_centers(name)')
+        .eq('client_id', profile.client_id)
+        .order('name'),
+      supabase
+        .from('budget_cost_centers')
+        .select('*')
+        .eq('client_id', profile.client_id)
+        .order('name'),
+    ])
+
+    if (accountsRes.error) {
+      toast({ variant: 'destructive', title: 'Erro', description: accountsRes.error.message })
+    } else {
+      setItems(accountsRes.data || [])
+    }
+
+    if (costCentersRes.error) {
+      toast({ variant: 'destructive', title: 'Erro', description: costCentersRes.error.message })
+    } else {
+      setCostCenters(costCentersRes.data || [])
+    }
+
     setLoading(false)
   }
 
   useEffect(() => {
-    fetchItems()
+    fetchData()
   }, [profile?.client_id])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name || !profile?.client_id) return
-    const payload = { client_id: profile.client_id, code: form.code, name: form.name }
+    if (!form.name || !form.cost_center_id || !form.type || !profile?.client_id) {
+      toast({
+        variant: 'destructive',
+        title: 'Campos obrigatórios',
+        description: 'Preencha todos os campos obrigatórios.',
+      })
+      return
+    }
+
+    const payload = {
+      client_id: profile.client_id,
+      code: form.code,
+      name: form.name,
+      cost_center_id: form.cost_center_id,
+      type: form.type,
+    }
 
     if (selectedItem) {
       const { error } = await supabase
         .from('budget_accounts')
         .update(payload)
         .eq('id', selectedItem.id)
-      if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
-      else {
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message })
+      } else {
         toast({ title: 'Conta Contábil atualizada' })
         setIsDialogOpen(false)
-        fetchItems()
+        fetchData()
       }
     } else {
       const { error } = await supabase.from('budget_accounts').insert([payload])
-      if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
-      else {
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message })
+      } else {
         toast({ title: 'Conta Contábil cadastrada' })
         setIsDialogOpen(false)
-        fetchItems()
+        fetchData()
       }
     }
   }
@@ -92,24 +135,31 @@ export default function ContasContabeis() {
   const handleDelete = async () => {
     if (!selectedItem) return
     const { error } = await supabase.from('budget_accounts').delete().eq('id', selectedItem.id)
-    if (error) toast({ variant: 'destructive', title: 'Erro', description: error.message })
-    else {
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message })
+    } else {
       toast({ title: 'Removida com sucesso' })
       setIsDeleteDialogOpen(false)
-      fetchItems()
+      fetchData()
     }
   }
 
   const openEdit = (item: any) => {
     setSelectedItem(item)
-    setForm({ code: item.code || '', name: item.name })
+    setForm({
+      code: item.code || '',
+      name: item.name,
+      cost_center_id: item.cost_center_id || '',
+      type: item.type || 'Despesa',
+    })
     setIsDialogOpen(true)
   }
 
   const filtered = items.filter(
     (i) =>
       i.name.toLowerCase().includes(search.toLowerCase()) ||
-      i.code?.toLowerCase().includes(search.toLowerCase()),
+      i.code?.toLowerCase().includes(search.toLowerCase()) ||
+      i.budget_cost_centers?.name?.toLowerCase().includes(search.toLowerCase()),
   )
 
   return (
@@ -127,7 +177,7 @@ export default function ContasContabeis() {
         <Button
           onClick={() => {
             setSelectedItem(null)
-            setForm({ code: '', name: '' })
+            setForm({ code: '', name: '', cost_center_id: '', type: 'Despesa' })
             setIsDialogOpen(true)
           }}
         >
@@ -156,19 +206,21 @@ export default function ContasContabeis() {
               <TableRow>
                 <TableHead>Código</TableHead>
                 <TableHead>Nome da Conta</TableHead>
+                <TableHead>Centro de Custo</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8">
+                  <TableCell colSpan={5} className="text-center py-8">
                     Carregando...
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                     Nenhum registro encontrado.
                   </TableCell>
                 </TableRow>
@@ -177,6 +229,8 @@ export default function ContasContabeis() {
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.code || '-'}</TableCell>
                     <TableCell>{item.name}</TableCell>
+                    <TableCell>{item.budget_cost_centers?.name || '-'}</TableCell>
+                    <TableCell>{item.type}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
                         <Edit2 className="h-4 w-4 text-blue-600" />
@@ -208,16 +262,51 @@ export default function ContasContabeis() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Código (Opcional)</Label>
-              <Input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="Ex: 3.1.01"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Código (Opcional)</Label>
+                <Input
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  placeholder="Ex: 3.1.01"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo *</Label>
+                <Select
+                  value={form.type}
+                  onValueChange={(value) => setForm({ ...form, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Receita">Receita</SelectItem>
+                    <SelectItem value="Despesa">Despesa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Nome da Conta</Label>
+              <Label>Centro de Custo *</Label>
+              <Select
+                value={form.cost_center_id}
+                onValueChange={(value) => setForm({ ...form, cost_center_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o centro de custo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {costCenters.map((cc) => (
+                    <SelectItem key={cc.id} value={cc.id}>
+                      {cc.code ? `${cc.code} - ${cc.name}` : cc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nome da Conta *</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
