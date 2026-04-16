@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useDashboardLogs } from './hooks/useDashboardLogs'
 import DashboardTrendChart from './components/DashboardTrendChart'
+import DashboardEquipmentTrendChart from './components/DashboardEquipmentTrendChart'
 import { useDashboardCalculations } from './hooks/useDashboardCalculations'
 import DashboardFilters from './components/DashboardFilters'
 import DashboardMetricsCards from './components/DashboardMetricsCards'
@@ -163,6 +164,10 @@ export default function DashboardGestor() {
 
           {activeTab === 'colaboradores' && (
             <DashboardTrendChart data={dailyTrend} target={absenteeismTarget} />
+          )}
+
+          {activeTab === 'equipamentos' && (
+            <DashboardEquipmentTrendChart data={dailyTrend} target={absenteeismTarget} />
           )}
 
           <DashboardPlantSummary plantStats={plantStats} locationStats={locationStats} />
