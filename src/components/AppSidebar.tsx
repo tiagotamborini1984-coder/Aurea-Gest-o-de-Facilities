@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   Globe,
   Home,
+  DollarSign,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -79,6 +80,16 @@ export function AppSidebar() {
         { title: 'Auditorias Criadas', path: '/auditoria-checklist/criadas' },
         { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
         { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
+      ],
+    },
+    {
+      title: 'Gestão de Budget',
+      icon: DollarSign,
+      subItems: [
+        { title: 'Dashboard', path: '/gestao-budget/dashboard' },
+        { title: 'Lançamentos', path: '/gestao-budget/lancamentos' },
+        { title: 'Centros de Custo', path: '/gestao-budget/centros-custo' },
+        { title: 'Contas Contábeis', path: '/gestao-budget/contas' },
       ],
     },
     {
@@ -165,7 +176,13 @@ export function AppSidebar() {
       if (item.subItems) {
         let filteredSubItems = item.subItems
 
-        if (item.title === 'Cadastros') {
+        if (item.title === 'Gestão de Budget') {
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Gestão de Budget') ||
+              userMenus.includes(`Gestão de Budget:${sub.title}`),
+          )
+        } else if (item.title === 'Cadastros') {
           filteredSubItems = item.subItems.filter(
             (sub) =>
               userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),

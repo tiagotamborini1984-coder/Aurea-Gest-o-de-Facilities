@@ -49,6 +49,12 @@ import AuditoriasCriadas from './pages/auditoria-checklist/AuditoriasCriadas'
 import AuditoriaRealizadas from './pages/auditoria-checklist/Realizadas'
 import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
 
+// Gestão de Budget
+import DashboardBudget from './pages/gestao-budget/Dashboard'
+import CentrosCustoBudget from './pages/gestao-budget/CentrosCusto'
+import ContasContabeisBudget from './pages/gestao-budget/ContasContabeis'
+import LancamentosBudget from './pages/gestao-budget/Lancamentos'
+
 const App = () => (
   <AuthProvider>
     <AppProvider>
@@ -90,6 +96,12 @@ const App = () => (
                   <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
                   <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
                   <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+
+                  {/* Gestão de Budget */}
+                  <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
+                  <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
+                  <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
+                  <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
 
                   {/* Gestão de Imóveis */}
                   <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
