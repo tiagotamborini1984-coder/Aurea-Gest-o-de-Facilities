@@ -206,18 +206,25 @@ export default function Lancamentos() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50/80">
-                  <TableHead className="pl-6 font-semibold">Conta Contábil</TableHead>
+                <TableRow className="bg-gray-200">
+                  <TableHead className="pl-6 font-bold text-gray-800">Conta Contábil</TableHead>
                   <TableHead className="w-[200px] text-right font-semibold">
                     <div className="mb-1 text-gray-800">Orçado (R$)</div>
-                    <div className="text-sm font-bold text-gray-600">
-                      {formatCurrency(totals.budgeted)}
+                    <div className="text-sm font-bold text-gray-600 bg-white/60 px-2 py-1 rounded inline-block shadow-sm">
+                      Total: {formatCurrency(totals.budgeted)}
                     </div>
                   </TableHead>
                   <TableHead className="w-[200px] pr-6 text-right font-semibold">
                     <div className="mb-1 text-gray-800">Realizado (R$)</div>
-                    <div className="text-sm font-bold text-gray-600">
-                      {formatCurrency(totals.realized)}
+                    <div
+                      className={cn(
+                        'text-sm font-bold px-2 py-1 rounded inline-block shadow-sm',
+                        totals.realized > totals.budgeted
+                          ? 'text-red-700 bg-red-100'
+                          : 'text-gray-600 bg-white/60',
+                      )}
+                    >
+                      Total: {formatCurrency(totals.realized)}
                     </div>
                   </TableHead>
                 </TableRow>
@@ -232,17 +239,30 @@ export default function Lancamentos() {
                     <TableRow
                       key={acc.id}
                       className={cn(
-                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50',
-                        isOverBudget && 'bg-red-50/60 hover:bg-red-50/80',
+                        isOverBudget
+                          ? 'bg-red-100 hover:bg-red-200 transition-colors'
+                          : idx % 2 === 0
+                            ? 'bg-white hover:bg-gray-50 transition-colors'
+                            : 'bg-gray-200/60 hover:bg-gray-200/80 transition-colors',
                       )}
                     >
-                      <TableCell className="pl-6 font-medium text-gray-700">
+                      <TableCell
+                        className={cn(
+                          'pl-6 font-medium text-gray-700',
+                          isOverBudget && 'text-red-900 font-bold',
+                        )}
+                      >
                         {acc.code ? `${acc.code} - ` : ''}
                         {acc.name}
                       </TableCell>
                       <TableCell className="text-right">
                         {isReadOnly ? (
-                          <span className="font-mono text-gray-600 block py-2">
+                          <span
+                            className={cn(
+                              'font-mono block py-2',
+                              isOverBudget ? 'text-red-900 font-medium' : 'text-gray-600',
+                            )}
+                          >
                             {formatCurrency(budgeted)}
                           </span>
                         ) : (
@@ -276,7 +296,7 @@ export default function Lancamentos() {
                             className={cn(
                               'text-right font-mono h-9 focus:bg-white',
                               isOverBudget
-                                ? 'bg-red-100/50 border-red-200 text-red-900'
+                                ? 'bg-red-200/80 border-red-300 text-red-900 font-bold placeholder:text-red-400'
                                 : 'bg-white/50',
                             )}
                           />

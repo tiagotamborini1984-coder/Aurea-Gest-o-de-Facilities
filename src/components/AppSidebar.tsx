@@ -185,7 +185,10 @@ export function AppSidebar() {
           filteredSubItems = item.subItems.filter(
             (sub) =>
               userMenus.includes('Gestão de Budget') ||
-              userMenus.includes(`Gestão de Budget:${sub.title}`),
+              userMenus.includes(`Gestão de Budget:${sub.title}`) ||
+              (sub.label && userMenus.includes(`Gestão de Budget:${sub.label}`)) ||
+              userMenus.includes(sub.title) ||
+              (sub.label && userMenus.includes(sub.label)),
           )
         } else if (item.title === 'Cadastros') {
           filteredSubItems = item.subItems.filter(
