@@ -319,7 +319,39 @@ export function useDashboardCalculations(
         }
       })
 
-    const equipDisp = Math.max(0, 100 - absenteismo)
+    // Independent equipment calculation for goals
+    const validEquipContracted = contracted.filter(
+      (c) => validPlants.includes(c.plant_id) && c.type === 'equipamento',
+    )
+
+    let totalEquipContractedSum = 0
+    let totalEquipPresentCount = 0
+
+    Array.from(allValidDatesSet).forEach((date) => {
+      validPlants.forEach((pid) => {
+        if (plantValidDatesMap[pid]?.has(date)) {
+          const eCont = validEquipContracted
+            .filter((c) => c.plant_id === pid)
+            .reduce((sum, c) => sum + c.quantity, 0)
+          totalEquipContractedSum += eCont
+
+          const ePres = processedLogs.filter(
+            (l) => l.type === 'equipment' && l.plant_id === pid && l.date === date && l.status,
+          ).length
+          totalEquipPresentCount += ePres
+        }
+      })
+    })
+
+    const equipIndisp =
+      totalEquipContractedSum > 0
+        ? Math.max(
+            0,
+            ((totalEquipContractedSum - totalEquipPresentCount) / totalEquipContractedSum) * 100,
+          )
+        : 0
+
+    const equipDisp = Math.max(0, 100 - equipIndisp)
     const absAchieved = absenteismo <= absenteeismTarget ? 100 : 0
     let sum = absAchieved + equipDisp
     let count = 2

@@ -12,6 +12,7 @@ import {
   Globe,
   Home,
   DollarSign,
+  Target,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -134,6 +135,11 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Book de Metas',
+      icon: Target,
+      path: '/gestao-terceiros/metas',
+    },
+    {
       title: 'Usuários',
       icon: Users,
       path: '/usuarios',
@@ -175,6 +181,7 @@ export function AppSidebar() {
           'Gestão de Tarefas',
           'Auditoria e Checklist',
           'Gestão de Imóveis',
+          'Book de Metas',
         ]
       }
 

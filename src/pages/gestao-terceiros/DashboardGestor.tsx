@@ -15,8 +15,8 @@ import DashboardFilters from './components/DashboardFilters'
 import DashboardMetricsCards from './components/DashboardMetricsCards'
 import DashboardPlantSummary from './components/DashboardPlantSummary'
 import DashboardDetails from './components/DashboardDetails'
-import DashboardGoals from './components/DashboardGoals'
 import { useDashboardSchedules } from './hooks/useDashboardSchedules'
+import { Link } from 'react-router-dom'
 
 export default function DashboardGestor() {
   const { activeClient, profile, selectedMasterClient } = useAppStore()
@@ -27,9 +27,7 @@ export default function DashboardGestor() {
   const [referenceMonth, setReferenceMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [selectedPlants, setSelectedPlants] = useState<string[]>([])
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<'colaboradores' | 'equipamentos' | 'metas'>(
-    'colaboradores',
-  )
+  const [activeTab, setActiveTab] = useState<'colaboradores' | 'equipamentos'>('colaboradores')
   const [absenteeismTarget, setAbsenteeismTarget] = useState<number>(() => {
     const saved = localStorage.getItem('aurea_absenteeism_target')
     return saved ? Number(saved) : 4
@@ -114,36 +112,6 @@ export default function DashboardGestor() {
         brandSecondary={brandSecondary}
       />
 
-      <div className="flex justify-end mt-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-2">
-              <Settings2 className="w-4 h-4" />
-              Configurar Metas
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80" align="end">
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Configuração de Metas (KPIs)</h4>
-              <div className="space-y-2">
-                <Label htmlFor="abs-target">Meta de Absenteísmo Aceitável (%)</Label>
-                <Input
-                  id="abs-target"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={absenteeismTarget}
-                  onChange={(e) => setAbsenteeismTarget(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  O índice ficará verde se for menor ou igual à meta, e vermelho se ultrapassar.
-                </p>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-
       {selectedPlants.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 lg:p-16 mt-4 bg-card rounded-xl border border-border shadow-sm">
           <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-slate-400 mb-4" />
@@ -154,7 +122,7 @@ export default function DashboardGestor() {
             Selecione uma planta.
           </p>
         </div>
-      ) : activeTab !== 'metas' ? (
+      ) : activeTab !== ('metas' as any) ? (
         <div className="space-y-4 lg:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
           <DashboardMetricsCards
             metrics={metrics}
@@ -187,7 +155,16 @@ export default function DashboardGestor() {
           />
         </div>
       ) : (
-        <DashboardGoals goalsData={goalsData} metrics={metrics} brandSecondary={brandSecondary} />
+        <div className="flex flex-col items-center justify-center p-12 lg:p-16 mt-4 bg-card rounded-xl border border-border shadow-sm">
+          <h3 className="text-lg lg:text-xl font-bold text-foreground">O Book de Metas mudou!</h3>
+          <p className="text-slate-600 text-xs lg:text-sm mt-2 text-center max-w-md">
+            O Book de Metas agora é um módulo independente. Acesse-o através do menu lateral ou
+            clique no botão abaixo.
+          </p>
+          <Button asChild className="mt-6">
+            <Link to="/gestao-terceiros/metas">Acessar Book de Metas</Link>
+          </Button>
+        </div>
       )}
     </div>
   )
