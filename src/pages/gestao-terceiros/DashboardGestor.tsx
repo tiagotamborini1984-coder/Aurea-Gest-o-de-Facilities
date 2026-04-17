@@ -16,6 +16,7 @@ import DashboardMetricsCards from './components/DashboardMetricsCards'
 import DashboardPlantSummary from './components/DashboardPlantSummary'
 import DashboardDetails from './components/DashboardDetails'
 import DashboardGoals from './components/DashboardGoals'
+import { useDashboardSchedules } from './hooks/useDashboardSchedules'
 
 export default function DashboardGestor() {
   const { activeClient, profile, selectedMasterClient } = useAppStore()
@@ -53,6 +54,7 @@ export default function DashboardGestor() {
   }, [selectedMasterClient])
 
   const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
+  const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
 
   const {
     metrics,
@@ -77,6 +79,8 @@ export default function DashboardGestor() {
     dateFrom,
     dateTo,
     absenteeismTarget,
+    schedules,
+    areas,
   )
 
   if (!profile) return null

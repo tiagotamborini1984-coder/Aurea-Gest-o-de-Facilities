@@ -42,6 +42,77 @@ export default function DashboardGoals({ goalsData, metrics, brandSecondary }: a
           {goalsData.equipDisp.toFixed(0)}%
         </div>
       </div>
+
+      {goalsData.cleaningAdherence !== null && (
+        <div
+          className="flex items-center justify-between bg-card border border-border rounded-lg p-4 shadow-sm border-l-4"
+          style={{
+            borderLeftColor:
+              goalsData.cleaningAdherence >= 80
+                ? '#22c55e'
+                : goalsData.cleaningAdherence >= 50
+                  ? '#eab308'
+                  : '#ef4444',
+          }}
+        >
+          <div>
+            <h3 className="font-bold text-foreground text-base lg:text-lg">
+              Aderência ao Cronograma de Limpeza
+            </h3>
+            <p className="text-[10px] lg:text-xs text-muted-foreground mt-1">
+              Automático — tarefas realizadas / total programado (até a data atual)
+            </p>
+          </div>
+          <div
+            className={cn(
+              'text-2xl lg:text-3xl font-black',
+              goalsData.cleaningAdherence >= 80
+                ? 'text-green-500'
+                : goalsData.cleaningAdherence >= 50
+                  ? 'text-amber-500'
+                  : 'text-red-500',
+            )}
+          >
+            {goalsData.cleaningAdherence.toFixed(1)}%
+          </div>
+        </div>
+      )}
+
+      {goalsData.gardeningAdherence !== null && (
+        <div
+          className="flex items-center justify-between bg-card border border-border rounded-lg p-4 shadow-sm border-l-4"
+          style={{
+            borderLeftColor:
+              goalsData.gardeningAdherence >= 80
+                ? '#22c55e'
+                : goalsData.gardeningAdherence >= 50
+                  ? '#eab308'
+                  : '#ef4444',
+          }}
+        >
+          <div>
+            <h3 className="font-bold text-foreground text-base lg:text-lg">
+              Aderência ao Cronograma de Jardinagem
+            </h3>
+            <p className="text-[10px] lg:text-xs text-muted-foreground mt-1">
+              Automático — tarefas realizadas / total programado (até a data atual)
+            </p>
+          </div>
+          <div
+            className={cn(
+              'text-2xl lg:text-3xl font-black',
+              goalsData.gardeningAdherence >= 80
+                ? 'text-green-500'
+                : goalsData.gardeningAdherence >= 50
+                  ? 'text-amber-500'
+                  : 'text-red-500',
+            )}
+          >
+            {goalsData.gardeningAdherence.toFixed(1)}%
+          </div>
+        </div>
+      )}
+
       {goalsData.manualGoals.map((g: any) => (
         <div
           key={g.id}

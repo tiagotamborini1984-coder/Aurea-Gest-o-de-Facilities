@@ -16,6 +16,8 @@ export function useDashboardCalculations(
   dateFrom: string,
   dateTo: string,
   absenteeismTarget: number = 4,
+  schedules: any[] = [],
+  areas: any[] = [],
 ) {
   return useMemo(() => {
     // Normaliza datas para garantir que logs com timestamp sejam considerados corretamente
@@ -321,6 +323,43 @@ export function useDashboardCalculations(
     const absAchieved = absenteismo <= absenteeismTarget ? 100 : 0
     let sum = absAchieved + equipDisp
     let count = 2
+
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const validSchedules = schedules.filter(
+      (s) => validPlants.includes(s.plant_id) && s.activity_date <= today,
+    )
+
+    let cleaningTotal = 0
+    let cleaningRealizado = 0
+    let gardeningTotal = 0
+    let gardeningRealizado = 0
+
+    validSchedules.forEach((s) => {
+      const area = areas.find((a) => a.id === s.area_id)
+      if (area) {
+        if (area.type === 'cleaning') {
+          cleaningTotal++
+          if (s.status === 'Realizado') cleaningRealizado++
+        } else if (area.type === 'gardening') {
+          gardeningTotal++
+          if (s.status === 'Realizado') gardeningRealizado++
+        }
+      }
+    })
+
+    const cleaningAdherence = cleaningTotal > 0 ? (cleaningRealizado / cleaningTotal) * 100 : null
+    const gardeningAdherence =
+      gardeningTotal > 0 ? (gardeningRealizado / gardeningTotal) * 100 : null
+
+    if (cleaningAdherence !== null) {
+      sum += cleaningAdherence
+      count++
+    }
+    if (gardeningAdherence !== null) {
+      sum += gardeningAdherence
+      count++
+    }
+
     const manualGoals = goals
       .filter((g) => g.is_active)
       .map((g) => {
@@ -353,6 +392,8 @@ export function useDashboardCalculations(
       goalsData: {
         absAchieved,
         equipDisp,
+        cleaningAdherence,
+        gardeningAdherence,
         manualGoals,
         notaGeral: count > 0 ? (sum / count).toFixed(1) : '0.0',
         absenteeismTarget,
@@ -373,5 +414,7 @@ export function useDashboardCalculations(
     equipment,
     goals,
     absenteeismTarget,
+    schedules,
+    areas,
   ])
 }
