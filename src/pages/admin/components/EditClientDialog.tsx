@@ -32,6 +32,7 @@ const AVAILABLE_MODULES = [
   'Gestão de Imóveis',
   'Gestão de Budget',
   'BI Dashboard',
+  'Book de Metas',
 ]
 
 export function EditClientDialog({
