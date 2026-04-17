@@ -17,7 +17,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend, ResponsiveContainer } from 'recharts'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
-import { RankingList } from '../../components/BIRankings'
+import { RankingList } from '../components/BIRankings'
 import { cn } from '@/lib/utils'
 
 export default function DashboardLJ() {
