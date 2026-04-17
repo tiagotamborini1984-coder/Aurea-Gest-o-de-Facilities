@@ -96,6 +96,7 @@ export default function RelatoriosTarefas() {
   const [filterAssignee, setFilterAssignee] = useState('all')
 
   const [tasks, setTasks] = useState<any[]>([])
+  const [timelines, setTimelines] = useState<any[]>([])
   const [taskTypes, setTaskTypes] = useState<any[]>([])
   const [taskStatuses, setTaskStatuses] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
@@ -129,6 +130,24 @@ export default function RelatoriosTarefas() {
 
     const { data } = await query
     setTasks(data || [])
+
+    if (data && data.length > 0) {
+      const taskIds = data.map((t: any) => t.id)
+      const tlData: any[] = []
+      const chunkSize = 150
+      for (let i = 0; i < taskIds.length; i += chunkSize) {
+        const chunk = taskIds.slice(i, i + chunkSize)
+        const { data: chunkData } = await supabase
+          .from('task_timeline')
+          .select('*')
+          .in('task_id', chunk)
+        if (chunkData) tlData.push(...chunkData)
+      }
+      setTimelines(tlData)
+    } else {
+      setTimelines([])
+    }
+
     setLoading(false)
   }
 
@@ -234,6 +253,68 @@ export default function RelatoriosTarefas() {
     (id) => taskTypes.find((x) => x.id === id)?.name || 'Desconhecido',
   )
 
+  const getTaskDiffs = (task: any, timelines: any[], taskStatuses: any[]) => {
+    const taskTl = timelines
+      .filter((tl) => tl.task_id === task.id)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+    const abertoDate = new Date(task.created_at)
+
+    let rcDate: Date | null = task.rc_created_date ? new Date(task.rc_created_date) : null
+    const tlRc = taskTl.find(
+      (tl) =>
+        tl.content.toLowerCase().includes('requisição criada') ||
+        tl.content.toLowerCase().includes('requisicao criada'),
+    )
+    if (!rcDate && tlRc) rcDate = new Date(tlRc.created_at)
+
+    let poDate: Date | null = task.po_generated_date ? new Date(task.po_generated_date) : null
+    const tlPo = taskTl.find((tl) => tl.content.toLowerCase().includes('pedido gerado'))
+    if (!poDate && tlPo) poDate = new Date(tlPo.created_at)
+
+    let closedDate: Date | null = task.closed_at ? new Date(task.closed_at) : null
+    const tlClosed = taskTl.find((tl) => tl.content.toLowerCase().includes('finalizado'))
+    if (!closedDate && tlClosed) closedDate = new Date(tlClosed.created_at)
+
+    const currentStatus =
+      taskStatuses.find((s) => s.id === task.status_id)?.name.toLowerCase() || ''
+    if (!rcDate && (currentStatus === 'requisição criada' || currentStatus === 'requisicao criada'))
+      rcDate = new Date(task.status_updated_at)
+    if (!poDate && currentStatus === 'pedido gerado') poDate = new Date(task.status_updated_at)
+    if (!closedDate && currentStatus === 'finalizado') closedDate = new Date(task.status_updated_at)
+
+    let diffRC: number | null = null
+    let diffPO: number | null = null
+    let diffDelivery: number | null = null
+
+    if (rcDate) {
+      diffRC = Math.max(0, differenceInSeconds(rcDate, abertoDate) / 86400)
+    }
+
+    if (poDate && rcDate) {
+      diffPO = Math.max(0, differenceInSeconds(poDate, rcDate) / 86400)
+    } else if (poDate) {
+      diffPO = Math.max(0, differenceInSeconds(poDate, abertoDate) / 86400)
+    }
+
+    if (closedDate && poDate) {
+      diffDelivery = Math.max(0, differenceInSeconds(closedDate, poDate) / 86400)
+    }
+
+    return { diffRC, diffPO, diffDelivery }
+  }
+
+  const comprasTasks = tasks.filter((task) => {
+    const type = taskTypes.find((t) => t.id === task.type_id)
+    if (!type) return false
+    const name = type.name.toLowerCase()
+    return (
+      name.includes('compra de materiais') ||
+      name.includes('compra de serviço') ||
+      name.includes('compra de servico')
+    )
+  })
+
   const buildComprasMetrics = () => {
     let sumToRC = 0
     let countToRC = 0
@@ -244,50 +325,29 @@ export default function RelatoriosTarefas() {
     let sumToDelivery = 0
     let countToDelivery = 0
 
-    tasks.forEach((task) => {
-      if (task.rc_created_date) {
-        const created = new Date(task.created_at)
-        const rc = new Date(task.rc_created_date)
-        let diff = differenceInSeconds(rc, created)
-        if (diff < 0 && rc.toISOString().split('T')[0] === created.toISOString().split('T')[0])
-          diff = 0
-        if (diff >= 0) {
-          sumToRC += diff
-          countToRC++
-        }
+    comprasTasks.forEach((task) => {
+      const { diffRC, diffPO, diffDelivery } = getTaskDiffs(task, timelines, taskStatuses)
+
+      if (diffRC !== null) {
+        sumToRC += diffRC
+        countToRC++
       }
 
-      if (task.po_generated_date) {
-        const start = task.rc_created_date
-          ? new Date(task.rc_created_date)
-          : new Date(task.created_at)
-        const po = new Date(task.po_generated_date)
-        let diff = differenceInSeconds(po, start)
-        if (diff < 0 && po.toISOString().split('T')[0] === start.toISOString().split('T')[0])
-          diff = 0
-        if (diff >= 0) {
-          sumToPO += diff
-          countToPO++
-        }
+      if (diffPO !== null) {
+        sumToPO += diffPO
+        countToPO++
       }
 
-      if (task.po_generated_date && task.closed_at) {
-        const po = new Date(task.po_generated_date)
-        const closed = new Date(task.closed_at)
-        let diff = differenceInSeconds(closed, po)
-        if (diff < 0 && closed.toISOString().split('T')[0] === po.toISOString().split('T')[0])
-          diff = 0
-        if (diff >= 0) {
-          sumToDelivery += diff
-          countToDelivery++
-        }
+      if (diffDelivery !== null) {
+        sumToDelivery += diffDelivery
+        countToDelivery++
       }
     })
 
     return {
-      avgToRC: countToRC > 0 ? sumToRC / countToRC / 86400 : 0,
-      avgToPO: countToPO > 0 ? sumToPO / countToPO / 86400 : 0,
-      avgToDelivery: countToDelivery > 0 ? sumToDelivery / countToDelivery / 86400 : 0,
+      avgToRC: countToRC > 0 ? sumToRC / countToRC : 0,
+      avgToPO: countToPO > 0 ? sumToPO / countToPO : 0,
+      avgToDelivery: countToDelivery > 0 ? sumToDelivery / countToDelivery : 0,
       countToRC,
       countToPO,
       countToDelivery,
@@ -297,6 +357,7 @@ export default function RelatoriosTarefas() {
   const comprasMetrics = buildComprasMetrics()
 
   const formatDays = (days: number) => {
+    if (days === 0) return '0.0'
     if (days > 0 && days < 1) return (days * 24).toFixed(1)
     return days.toFixed(1)
   }
@@ -612,67 +673,145 @@ export default function RelatoriosTarefas() {
               <Loader2 className="h-8 w-8 animate-spin text-brand-deepBlue" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="shadow-sm border-gray-200">
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-                  <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Tempo para RC
-                  </div>
-                  <div className="text-4xl font-black text-brand-deepBlue mb-1">
-                    {formatDays(comprasMetrics.avgToRC)}{' '}
-                    <span className="text-lg text-slate-500 font-medium">
-                      {formatUnit(comprasMetrics.avgToRC)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Média de {comprasMetrics.countToRC} chamados
-                  </div>
-                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                    Tempo médio desde a abertura da tarefa até a criação da Requisição de Compras
-                    (RC).
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Tempo para RC
+                    </div>
+                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                      {formatDays(comprasMetrics.avgToRC)}{' '}
+                      <span className="text-lg text-slate-500 font-medium">
+                        {formatUnit(comprasMetrics.avgToRC)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Média de {comprasMetrics.countToRC} chamados
+                    </div>
+                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                      Tempo médio desde a abertura da tarefa até a criação da Requisição de Compras
+                      (RC).
+                    </p>
+                  </CardContent>
+                </Card>
 
-              <Card className="shadow-sm border-gray-200">
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-                  <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Tempo para Pedido
-                  </div>
-                  <div className="text-4xl font-black text-brand-deepBlue mb-1">
-                    {formatDays(comprasMetrics.avgToPO)}{' '}
-                    <span className="text-lg text-slate-500 font-medium">
-                      {formatUnit(comprasMetrics.avgToPO)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Média de {comprasMetrics.countToPO} chamados
-                  </div>
-                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                    Tempo médio desde a RC até a data de emissão do Pedido de Compras.
-                  </p>
-                </CardContent>
-              </Card>
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Tempo para Pedido
+                    </div>
+                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                      {formatDays(comprasMetrics.avgToPO)}{' '}
+                      <span className="text-lg text-slate-500 font-medium">
+                        {formatUnit(comprasMetrics.avgToPO)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Média de {comprasMetrics.countToPO} chamados
+                    </div>
+                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                      Tempo médio desde a RC até a data de emissão do Pedido de Compras.
+                    </p>
+                  </CardContent>
+                </Card>
 
-              <Card className="shadow-sm border-gray-200">
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-                  <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Tempo de Entrega
-                  </div>
-                  <div className="text-4xl font-black text-brand-deepBlue mb-1">
-                    {formatDays(comprasMetrics.avgToDelivery)}{' '}
-                    <span className="text-lg text-slate-500 font-medium">
-                      {formatUnit(comprasMetrics.avgToDelivery)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Média de {comprasMetrics.countToDelivery} chamados
-                  </div>
-                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                    Tempo médio desde a emissão do Pedido até a finalização do chamado (Entrega).
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Tempo de Entrega
+                    </div>
+                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                      {formatDays(comprasMetrics.avgToDelivery)}{' '}
+                      <span className="text-lg text-slate-500 font-medium">
+                        {formatUnit(comprasMetrics.avgToDelivery)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Média de {comprasMetrics.countToDelivery} chamados
+                    </div>
+                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                      Tempo médio desde a emissão do Pedido até a finalização do chamado (Entrega).
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+                <div className="p-4 border-b border-gray-200 bg-slate-50">
+                  <h3 className="font-bold text-slate-800">Detalhamento dos Chamados de Compras</h3>
+                  <p className="text-xs text-slate-500">
+                    Listagem das tarefas consideradas nos cálculos acima.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+                <Table className="print:text-xs">
+                  <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+                    <TableRow>
+                      <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
+                      <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
+                      <TableHead className="font-semibold text-slate-800 text-center">
+                        T. RC
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-800 text-center">
+                        T. Pedido
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-800 text-center">
+                        T. Entrega
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {comprasTasks.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="text-center py-8 text-slate-500 font-medium"
+                        >
+                          Nenhum chamado de compras encontrado no período.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      comprasTasks.map((task) => {
+                        const type = taskTypes.find((t) => t.id === task.type_id)
+                        const { diffRC, diffPO, diffDelivery } = getTaskDiffs(
+                          task,
+                          timelines,
+                          taskStatuses,
+                        )
+
+                        return (
+                          <TableRow
+                            key={task.id}
+                            className="hover:bg-slate-50 border-gray-100 print:border-b"
+                          >
+                            <TableCell className="font-medium text-slate-800">
+                              {task.task_number}
+                            </TableCell>
+                            <TableCell className="text-slate-600 font-medium">
+                              {type?.name}
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {diffRC !== null
+                                ? `${formatDays(diffRC)} ${formatUnit(diffRC)}`
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {diffPO !== null
+                                ? `${formatDays(diffPO)} ${formatUnit(diffPO)}`
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {diffDelivery !== null
+                                ? `${formatDays(diffDelivery)} ${formatUnit(diffDelivery)}`
+                                : '-'}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </TabsContent>
