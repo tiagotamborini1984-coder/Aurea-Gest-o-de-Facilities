@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useDashboardLogs } from './hooks/useDashboardLogs'
 import { useDashboardCalculations } from './hooks/useDashboardCalculations'
 import { useDashboardSchedules } from './hooks/useDashboardSchedules'
@@ -18,7 +19,6 @@ export default function BookMetas() {
 
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [referenceMonth, setReferenceMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [selectedPlants, setSelectedPlants] = useState<string[]>([])
 
   const [absenteeismTarget, setAbsenteeismTarget] = useState<number>(() => {
@@ -38,6 +38,8 @@ export default function BookMetas() {
   const filteredGoals = goals || []
   const filteredEmployees = employees || []
   const filteredEquipment = equipment || []
+
+  const referenceMonth = format(new Date(dateTo), 'yyyy-MM')
 
   const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
@@ -61,6 +63,18 @@ export default function BookMetas() {
     areas,
   )
 
+  const toggleAllPlants = () => {
+    setSelectedPlants(
+      selectedPlants.length === filteredPlants.length ? [] : filteredPlants.map((p: any) => p.id),
+    )
+  }
+
+  const togglePlant = (id: string) => {
+    setSelectedPlants((prev: string[]) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
+    )
+  }
+
   if (!profile) return null
 
   return (
@@ -75,8 +89,44 @@ export default function BookMetas() {
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 items-end bg-card p-4 rounded-xl border border-border shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+      <div className="flex flex-col gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
+        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+          <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            Planta(s)
+          </div>
+          <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
+            <Checkbox
+              id="all-plants"
+              checked={selectedPlants.length > 0 && selectedPlants.length === filteredPlants.length}
+              onCheckedChange={toggleAllPlants}
+            />
+            <label
+              htmlFor="all-plants"
+              className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
+            >
+              Todas as plantas
+            </label>
+          </div>
+          {filteredPlants.map((p: any) => (
+            <div key={p.id} className="flex items-center space-x-2">
+              <Checkbox
+                id={`plant-${p.id}`}
+                checked={selectedPlants.includes(p.id)}
+                onCheckedChange={() => togglePlant(p.id)}
+              />
+              <label
+                htmlFor={`plant-${p.id}`}
+                className="text-xs lg:text-sm text-muted-foreground cursor-pointer hover:text-foreground"
+              >
+                {p.name}
+              </label>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-px bg-border w-full" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full md:w-2/3 lg:w-1/2">
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Data Inicial
@@ -96,17 +146,6 @@ export default function BookMetas() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="h-9 focus-visible:ring-1 focus-visible:ring-brand-vividBlue"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Mês de Referência (Metas Manuais)
-            </Label>
-            <Input
-              type="month"
-              value={referenceMonth}
-              onChange={(e) => setReferenceMonth(e.target.value)}
               className="h-9 focus-visible:ring-1 focus-visible:ring-brand-vividBlue"
             />
           </div>

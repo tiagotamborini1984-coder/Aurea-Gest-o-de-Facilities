@@ -54,7 +54,6 @@ export default function DashboardFilters({
   const tabs = [
     { id: 'colaboradores', icon: Users, label: 'Colaboradores' },
     { id: 'equipamentos', icon: Wrench, label: 'Equipamentos' },
-    { id: 'metas', icon: Target, label: 'Metas' },
   ]
 
   return (
@@ -95,50 +94,49 @@ export default function DashboardFilters({
             ))}
           </div>
 
-          {(activeTab === 'colaboradores' || activeTab === 'metas') &&
-            availableCompanies.length > 0 && (
-              <>
-                <div className="h-px bg-border w-full" />
-                <div className="flex flex-wrap items-center gap-4 lg:gap-6">
-                  <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                    Empresa(s)
-                  </div>
-                  <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
+          {activeTab === 'colaboradores' && availableCompanies.length > 0 && (
+            <>
+              <div className="h-px bg-border w-full" />
+              <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                <div className="w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  Empresa(s)
+                </div>
+                <div className="flex items-center space-x-2 bg-background border border-border px-3 py-1.5 rounded-md shadow-sm">
+                  <Checkbox
+                    id="all-companies"
+                    checked={
+                      selectedCompanies.length === 0 ||
+                      selectedCompanies.length === availableCompanies.length
+                    }
+                    onCheckedChange={() => setSelectedCompanies([])}
+                  />
+                  <label
+                    htmlFor="all-companies"
+                    className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
+                  >
+                    Todas
+                  </label>
+                </div>
+                {availableCompanies.map((c: any) => (
+                  <div key={c} className="flex items-center space-x-2">
                     <Checkbox
-                      id="all-companies"
+                      id={`company-${c}`}
                       checked={
-                        selectedCompanies.length === 0 ||
-                        selectedCompanies.length === availableCompanies.length
+                        selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
                       }
-                      onCheckedChange={() => setSelectedCompanies([])}
+                      onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
                     />
                     <label
-                      htmlFor="all-companies"
-                      className="text-xs lg:text-sm font-medium leading-none cursor-pointer"
+                      htmlFor={`company-${c}`}
+                      className="text-xs lg:text-sm text-muted-foreground cursor-pointer hover:text-foreground"
                     >
-                      Todas
+                      {c}
                     </label>
                   </div>
-                  {availableCompanies.map((c: any) => (
-                    <div key={c} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`company-${c}`}
-                        checked={
-                          selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
-                        }
-                        onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
-                      />
-                      <label
-                        htmlFor={`company-${c}`}
-                        className="text-xs lg:text-sm text-muted-foreground cursor-pointer hover:text-foreground"
-                      >
-                        {c}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+                ))}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -167,19 +165,6 @@ export default function DashboardFilters({
                 className="w-[130px] lg:w-[140px] h-8 lg:h-9 text-xs lg:text-sm bg-background"
               />
             </div>
-            {activeTab === 'metas' && (
-              <div className="space-y-1.5 ml-2 lg:ml-4 border-l border-border pl-4">
-                <Label className="text-[10px] lg:text-xs text-muted-foreground uppercase tracking-wider">
-                  Mês Ref.
-                </Label>
-                <Input
-                  type="month"
-                  value={referenceMonth}
-                  onChange={(e) => setReferenceMonth(e.target.value)}
-                  className="w-[140px] lg:w-[150px] h-8 lg:h-9 text-xs lg:text-sm bg-background"
-                />
-              </div>
-            )}
           </div>
           <div className="flex-1 flex gap-2 p-3 lg:p-4 xl:px-6 bg-muted/20 justify-start xl:justify-end items-center overflow-x-auto no-scrollbar">
             {tabs.map((t) => (
