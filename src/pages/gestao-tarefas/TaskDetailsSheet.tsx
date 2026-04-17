@@ -170,8 +170,9 @@ export function TaskDetailsSheet({
   const handleStatusChange = async (newStatusId: string) => {
     if (!profile) return
     const status = taskStatuses.find((s: any) => s.id === newStatusId)
+    const statusName = status?.name.toLowerCase() || ''
 
-    if (status?.name.toLowerCase().includes('pedido gerado')) {
+    if (statusName.includes('pedido gerado') || statusName.includes('pedido emitido')) {
       setPendingStatusId(newStatusId)
       setPoGeneratedDate(format(new Date(), 'yyyy-MM-dd'))
       setPoDateDialogOpen(true)
@@ -222,7 +223,15 @@ export function TaskDetailsSheet({
     }
     setPoDateDialogOpen(false)
     if (pendingStatusId) {
-      const isoDate = new Date(`${poGeneratedDate}T12:00:00Z`).toISOString()
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      let isoDate = ''
+
+      if (poGeneratedDate === todayStr) {
+        isoDate = new Date().toISOString()
+      } else {
+        isoDate = new Date(`${poGeneratedDate}T23:59:59.999Z`).toISOString()
+      }
+
       await processStatusChange(pendingStatusId, { po_generated_date: isoDate })
       setPendingStatusId(null)
     }

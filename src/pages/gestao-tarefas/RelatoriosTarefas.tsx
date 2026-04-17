@@ -248,8 +248,11 @@ export default function RelatoriosTarefas() {
       if (task.rc_created_date) {
         const created = new Date(task.created_at)
         const rc = new Date(task.rc_created_date)
-        if (rc >= created) {
-          sumToRC += differenceInSeconds(rc, created)
+        let diff = differenceInSeconds(rc, created)
+        if (diff < 0 && rc.toISOString().split('T')[0] === created.toISOString().split('T')[0])
+          diff = 0
+        if (diff >= 0) {
+          sumToRC += diff
           countToRC++
         }
       }
@@ -259,8 +262,11 @@ export default function RelatoriosTarefas() {
           ? new Date(task.rc_created_date)
           : new Date(task.created_at)
         const po = new Date(task.po_generated_date)
-        if (po >= start) {
-          sumToPO += differenceInSeconds(po, start)
+        let diff = differenceInSeconds(po, start)
+        if (diff < 0 && po.toISOString().split('T')[0] === start.toISOString().split('T')[0])
+          diff = 0
+        if (diff >= 0) {
+          sumToPO += diff
           countToPO++
         }
       }
@@ -268,8 +274,11 @@ export default function RelatoriosTarefas() {
       if (task.po_generated_date && task.closed_at) {
         const po = new Date(task.po_generated_date)
         const closed = new Date(task.closed_at)
-        if (closed >= po) {
-          sumToDelivery += differenceInSeconds(closed, po)
+        let diff = differenceInSeconds(closed, po)
+        if (diff < 0 && closed.toISOString().split('T')[0] === po.toISOString().split('T')[0])
+          diff = 0
+        if (diff >= 0) {
+          sumToDelivery += diff
           countToDelivery++
         }
       }
@@ -286,6 +295,16 @@ export default function RelatoriosTarefas() {
   }
 
   const comprasMetrics = buildComprasMetrics()
+
+  const formatDays = (days: number) => {
+    if (days > 0 && days < 1) return (days * 24).toFixed(1)
+    return days.toFixed(1)
+  }
+
+  const formatUnit = (days: number) => {
+    if (days > 0 && days < 1) return 'horas'
+    return 'dias'
+  }
 
   const renderMetricCards = (metrics: any[]) => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -600,8 +619,10 @@ export default function RelatoriosTarefas() {
                     Tempo para RC
                   </div>
                   <div className="text-4xl font-black text-brand-deepBlue mb-1">
-                    {comprasMetrics.avgToRC.toFixed(1)}{' '}
-                    <span className="text-lg text-slate-500 font-medium">dias</span>
+                    {formatDays(comprasMetrics.avgToRC)}{' '}
+                    <span className="text-lg text-slate-500 font-medium">
+                      {formatUnit(comprasMetrics.avgToRC)}
+                    </span>
                   </div>
                   <div className="text-xs text-slate-400">
                     Média de {comprasMetrics.countToRC} chamados
@@ -619,8 +640,10 @@ export default function RelatoriosTarefas() {
                     Tempo para Pedido
                   </div>
                   <div className="text-4xl font-black text-brand-deepBlue mb-1">
-                    {comprasMetrics.avgToPO.toFixed(1)}{' '}
-                    <span className="text-lg text-slate-500 font-medium">dias</span>
+                    {formatDays(comprasMetrics.avgToPO)}{' '}
+                    <span className="text-lg text-slate-500 font-medium">
+                      {formatUnit(comprasMetrics.avgToPO)}
+                    </span>
                   </div>
                   <div className="text-xs text-slate-400">
                     Média de {comprasMetrics.countToPO} chamados
@@ -637,8 +660,10 @@ export default function RelatoriosTarefas() {
                     Tempo de Entrega
                   </div>
                   <div className="text-4xl font-black text-brand-deepBlue mb-1">
-                    {comprasMetrics.avgToDelivery.toFixed(1)}{' '}
-                    <span className="text-lg text-slate-500 font-medium">dias</span>
+                    {formatDays(comprasMetrics.avgToDelivery)}{' '}
+                    <span className="text-lg text-slate-500 font-medium">
+                      {formatUnit(comprasMetrics.avgToDelivery)}
+                    </span>
                   </div>
                   <div className="text-xs text-slate-400">
                     Média de {comprasMetrics.countToDelivery} chamados
