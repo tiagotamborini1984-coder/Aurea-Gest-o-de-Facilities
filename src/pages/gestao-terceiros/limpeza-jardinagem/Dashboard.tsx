@@ -23,7 +23,8 @@ export default function DashboardLJ() {
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Limpeza e Jardinagem')
   const [plantId, setPlantId] = useState('all')
-  const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+  const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [schedules, setSchedules] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -31,8 +32,6 @@ export default function DashboardLJ() {
     const fetchStats = async () => {
       if (!profile) return
       setLoading(true)
-      const startDate = format(startOfMonth(new Date(`${month}-01T00:00:00`)), 'yyyy-MM-dd')
-      const endDate = format(endOfMonth(new Date(`${month}-01T00:00:00`)), 'yyyy-MM-dd')
 
       let q = supabase
         .from('cleaning_gardening_schedules')
@@ -46,27 +45,33 @@ export default function DashboardLJ() {
       setSchedules(data || [])
       setLoading(false)
     }
-    fetchStats()
-  }, [profile, plantId, month])
+    if (startDate && endDate) {
+      fetchStats()
+    }
+  }, [profile, plantId, startDate, endDate])
 
   const kpis = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+
     const gardening = schedules.filter((s) => s.areas?.type === 'gardening')
-    const gardeningDone = gardening.filter((s) => s.status === 'Realizado').length
-    const gardeningAdherence = gardening.length
-      ? ((gardeningDone / gardening.length) * 100).toFixed(1)
+    const gardeningValid = gardening.filter((s) => s.activity_date <= todayStr)
+    const gardeningDone = gardeningValid.filter((s) => s.status === 'Realizado').length
+    const gardeningAdherence = gardeningValid.length
+      ? ((gardeningDone / gardeningValid.length) * 100).toFixed(1)
       : 0
 
     const cleaning = schedules.filter((s) => s.areas?.type === 'cleaning')
-    const cleaningDone = cleaning.filter((s) => s.status === 'Realizado').length
-    const cleaningAdherence = cleaning.length
-      ? ((cleaningDone / cleaning.length) * 100).toFixed(1)
+    const cleaningValid = cleaning.filter((s) => s.activity_date <= todayStr)
+    const cleaningDone = cleaningValid.filter((s) => s.status === 'Realizado').length
+    const cleaningAdherence = cleaningValid.length
+      ? ((cleaningDone / cleaningValid.length) * 100).toFixed(1)
       : 0
 
     return {
       gardeningAdherence,
       cleaningAdherence,
-      gTotal: gardening.length,
-      cTotal: cleaning.length,
+      gTotal: gardeningValid.length,
+      cTotal: cleaningValid.length,
     }
   }, [schedules])
 
@@ -107,13 +112,22 @@ export default function DashboardLJ() {
             </p>
           </div>
         </div>
-        <div className="flex gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="w-40 border-slate-200"
-          />
+        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-36 border-slate-200"
+            />
+            <span className="text-slate-400 text-sm">até</span>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-36 border-slate-200"
+            />
+          </div>
           <Select value={plantId} onValueChange={setPlantId}>
             <SelectTrigger className="w-48 bg-slate-50">
               <SelectValue placeholder="Todas as Plantas" />
@@ -151,7 +165,7 @@ export default function DashboardLJ() {
                       {kpis.gardeningAdherence}%
                     </h3>
                     <span className="text-xs text-emerald-700 font-medium">
-                      de {kpis.gTotal} previstos
+                      de {kpis.gTotal} válidos até hoje
                     </span>
                   </div>
                 </div>
@@ -167,7 +181,7 @@ export default function DashboardLJ() {
                   <div className="flex items-baseline gap-2">
                     <h3 className="text-3xl font-bold text-blue-900">{kpis.cleaningAdherence}%</h3>
                     <span className="text-xs text-blue-700 font-medium">
-                      de {kpis.cTotal} previstos
+                      de {kpis.cTotal} válidos até hoje
                     </span>
                   </div>
                 </div>
