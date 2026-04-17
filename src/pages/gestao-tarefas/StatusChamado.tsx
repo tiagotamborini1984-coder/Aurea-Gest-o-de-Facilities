@@ -37,6 +37,12 @@ export default function StatusChamado() {
               required: false,
             },
             {
+              name: 'ignore_sla',
+              label: 'Ignorar SLA (Não contabilizar tempo)?',
+              type: 'toggle',
+              required: false,
+            },
+            {
               name: 'return_to_requester',
               label: 'Devolver para Requisitante ao entrar no status?',
               type: 'toggle',
@@ -75,6 +81,11 @@ export default function StatusChamado() {
               render: (item: any) => (item.freeze_sla ? 'Sim' : 'Não'),
             },
             {
+              header: 'Ignora SLA',
+              accessor: 'ignore_sla',
+              render: (item: any) => (item.ignore_sla ? 'Sim' : 'Não'),
+            },
+            {
               header: 'Devolve p/ Req.',
               accessor: 'return_to_requester',
               render: (item: any) => (item.return_to_requester ? 'Sim' : 'Não'),
@@ -93,12 +104,16 @@ export default function StatusChamado() {
           const payload = { ...record, client_id: profile.client_id }
           if (payload.is_terminal === undefined) payload.is_terminal = false
           if (payload.freeze_sla === undefined) payload.freeze_sla = false
+          if (payload.ignore_sla === undefined) payload.ignore_sla = false
           if (payload.return_to_requester === undefined) payload.return_to_requester = false
           if (payload.sla_days === undefined) payload.sla_days = 1
           const { error } = await supabase.from('task_statuses').insert(payload)
           return { success: !error, error }
         }}
         onUpdate={async (id: string, record: any) => {
+          if (record.is_terminal === undefined) record.is_terminal = false
+          if (record.freeze_sla === undefined) record.freeze_sla = false
+          if (record.ignore_sla === undefined) record.ignore_sla = false
           if (record.return_to_requester === undefined) record.return_to_requester = false
           const { error } = await supabase.from('task_statuses').update(record).eq('id', id)
           return { success: !error, error }

@@ -51,6 +51,15 @@ export function calculateSLA(task: any, currentStatus?: any, nonWorkingDays: str
     }
   }
 
+  if (currentStatus.ignore_sla) {
+    return {
+      text: 'Sem SLA',
+      color: 'bg-slate-100 text-slate-500 border-slate-200',
+      percentage: 0,
+      isLate: false,
+    }
+  }
+
   if (currentStatus.freeze_sla) {
     return {
       text: 'Pausado',
