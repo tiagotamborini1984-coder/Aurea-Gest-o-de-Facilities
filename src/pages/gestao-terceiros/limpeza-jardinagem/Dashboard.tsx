@@ -17,6 +17,8 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend, ResponsiveContainer } from 'recharts'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { RankingList } from '../../components/BIRankings'
+import { cn } from '@/lib/utils'
 
 export default function DashboardLJ() {
   const { profile } = useAppStore()
@@ -92,6 +94,37 @@ export default function DashboardLJ() {
       )
       .slice(0, 10)
   }, [schedules])
+
+  const plantRankingData = useMemo(() => {
+    if (plantId !== 'all') return []
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const validSchedules = schedules.filter((s) => s.activity_date <= todayStr)
+
+    const grouped: Record<string, { total: number; done: number }> = {}
+
+    validSchedules.forEach((s) => {
+      if (!grouped[s.plant_id]) {
+        grouped[s.plant_id] = { total: 0, done: 0 }
+      }
+      grouped[s.plant_id].total++
+      if (s.status === 'Realizado') {
+        grouped[s.plant_id].done++
+      }
+    })
+
+    return Object.entries(grouped)
+      .map(([pId, stats]) => {
+        const plant = plants.find((p) => p.id === pId)
+        const adherence = stats.total > 0 ? (stats.done / stats.total) * 100 : 0
+        return {
+          id: pId,
+          name: plant?.name || 'Desconhecida',
+          value: adherence.toFixed(1),
+        }
+      })
+      .sort((a, b) => parseFloat(b.value) - parseFloat(a.value))
+  }, [schedules, plants, plantId])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -189,41 +222,63 @@ export default function DashboardLJ() {
             </Card>
           </div>
 
-          <Card className="shadow-sm border-gray-200">
-            <CardHeader className="bg-slate-50/50 border-b border-gray-200 py-4">
-              <CardTitle className="text-lg text-slate-800">Status por Área (Top 10)</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              {chartData.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">Sem dados para exibir.</p>
-              ) : (
-                <ChartContainer
-                  config={{
-                    Realizado: { label: 'Realizado', color: 'hsl(var(--primary))' },
-                    Pendente: { label: 'Pendente', color: '#f59e0b' },
-                    NãoRealizado: { label: 'Não Realizado', color: '#ef4444' },
-                  }}
-                  className="h-[300px] w-full"
-                >
-                  <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="area"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Bar dataKey="Realizado" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
-                    <Bar dataKey="Pendente" fill="#f59e0b" radius={[4, 4, 0, 0]} stackId="a" />
-                    <Bar dataKey="NãoRealizado" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a" />
-                  </BarChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
+          <div className={cn('grid gap-4 grid-cols-1', plantId === 'all' ? 'lg:grid-cols-3' : '')}>
+            <Card
+              className={cn('shadow-sm border-gray-200', plantId === 'all' ? 'lg:col-span-2' : '')}
+            >
+              <CardHeader className="bg-slate-50/50 border-b border-gray-200 py-4">
+                <CardTitle className="text-lg text-slate-800">Status por Área (Top 10)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                {chartData.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">Sem dados para exibir.</p>
+                ) : (
+                  <ChartContainer
+                    config={{
+                      Realizado: { label: 'Realizado', color: 'hsl(var(--primary))' },
+                      Pendente: { label: 'Pendente', color: '#f59e0b' },
+                      NãoRealizado: { label: 'Não Realizado', color: '#ef4444' },
+                    }}
+                    className="h-[300px] w-full"
+                  >
+                    <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="area"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      <Bar dataKey="Realizado" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
+                      <Bar dataKey="Pendente" fill="#f59e0b" radius={[4, 4, 0, 0]} stackId="a" />
+                      <Bar
+                        dataKey="NãoRealizado"
+                        fill="#ef4444"
+                        radius={[4, 4, 0, 0]}
+                        stackId="a"
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {plantId === 'all' && (
+              <Card className="shadow-sm border-gray-200">
+                <CardHeader className="bg-slate-50/50 border-b border-gray-200 py-4">
+                  <CardTitle className="text-lg text-slate-800">
+                    Ranking por Planta (Aderência)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <RankingList items={plantRankingData} valueSuffix="%" />
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </>
       )}
     </div>
