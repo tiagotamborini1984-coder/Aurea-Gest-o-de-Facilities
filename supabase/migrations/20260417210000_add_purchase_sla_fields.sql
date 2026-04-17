@@ -42,4 +42,4 @@ BEGIN
   
   RETURN NEW;
 END;
-$function$ LANGUAGE plpgsql;
+$function$;
