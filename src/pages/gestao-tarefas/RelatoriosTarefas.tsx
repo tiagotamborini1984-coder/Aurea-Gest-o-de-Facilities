@@ -234,6 +234,59 @@ export default function RelatoriosTarefas() {
     (id) => taskTypes.find((x) => x.id === id)?.name || 'Desconhecido',
   )
 
+  const buildComprasMetrics = () => {
+    let sumToRC = 0
+    let countToRC = 0
+
+    let sumToPO = 0
+    let countToPO = 0
+
+    let sumToDelivery = 0
+    let countToDelivery = 0
+
+    tasks.forEach((task) => {
+      if (task.rc_created_date) {
+        const created = new Date(task.created_at)
+        const rc = new Date(task.rc_created_date)
+        if (rc >= created) {
+          sumToRC += differenceInSeconds(rc, created)
+          countToRC++
+        }
+      }
+
+      if (task.po_generated_date) {
+        const start = task.rc_created_date
+          ? new Date(task.rc_created_date)
+          : new Date(task.created_at)
+        const po = new Date(task.po_generated_date)
+        if (po >= start) {
+          sumToPO += differenceInSeconds(po, start)
+          countToPO++
+        }
+      }
+
+      if (task.po_generated_date && task.closed_at) {
+        const po = new Date(task.po_generated_date)
+        const closed = new Date(task.closed_at)
+        if (closed >= po) {
+          sumToDelivery += differenceInSeconds(closed, po)
+          countToDelivery++
+        }
+      }
+    })
+
+    return {
+      avgToRC: countToRC > 0 ? sumToRC / countToRC / 86400 : 0,
+      avgToPO: countToPO > 0 ? sumToPO / countToPO / 86400 : 0,
+      avgToDelivery: countToDelivery > 0 ? sumToDelivery / countToDelivery / 86400 : 0,
+      countToRC,
+      countToPO,
+      countToDelivery,
+    }
+  }
+
+  const comprasMetrics = buildComprasMetrics()
+
   const renderMetricCards = (metrics: any[]) => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {metrics.map((m) => (
@@ -370,7 +423,7 @@ export default function RelatoriosTarefas() {
       </div>
 
       <Tabs defaultValue="lista" className="space-y-6 print:block">
-        <TabsList className="bg-white border border-gray-200 print:hidden h-12 w-full sm:w-auto">
+        <TabsList className="bg-white border border-gray-200 print:hidden h-12 w-full sm:w-auto flex-wrap">
           <TabsTrigger
             value="lista"
             className="text-base font-semibold px-6 py-2 flex-1 sm:flex-none"
@@ -382,6 +435,12 @@ export default function RelatoriosTarefas() {
             className="text-base font-semibold px-6 py-2 flex-1 sm:flex-none"
           >
             Dashboard de Performance
+          </TabsTrigger>
+          <TabsTrigger
+            value="compras"
+            className="text-base font-semibold px-6 py-2 flex-1 sm:flex-none"
+          >
+            SLA de Compras
           </TabsTrigger>
         </TabsList>
 
@@ -525,6 +584,71 @@ export default function RelatoriosTarefas() {
                 {metricsByType.length > 0 ? renderMetricCards(metricsByType) : renderEmptyState()}
               </TabsContent>
             </Tabs>
+          )}
+        </TabsContent>
+
+        <TabsContent value="compras" className="m-0 space-y-4 print:hidden">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-brand-deepBlue" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="shadow-sm border-gray-200">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Tempo para RC
+                  </div>
+                  <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    {comprasMetrics.avgToRC.toFixed(1)}{' '}
+                    <span className="text-lg text-slate-500 font-medium">dias</span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Média de {comprasMetrics.countToRC} chamados
+                  </div>
+                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    Tempo médio desde a abertura da tarefa até a criação da Requisição de Compras
+                    (RC).
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm border-gray-200">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Tempo para Pedido
+                  </div>
+                  <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    {comprasMetrics.avgToPO.toFixed(1)}{' '}
+                    <span className="text-lg text-slate-500 font-medium">dias</span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Média de {comprasMetrics.countToPO} chamados
+                  </div>
+                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    Tempo médio desde a RC até a data de emissão do Pedido de Compras.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm border-gray-200">
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Tempo de Entrega
+                  </div>
+                  <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    {comprasMetrics.avgToDelivery.toFixed(1)}{' '}
+                    <span className="text-lg text-slate-500 font-medium">dias</span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Média de {comprasMetrics.countToDelivery} chamados
+                  </div>
+                  <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    Tempo médio desde a emissão do Pedido até a finalização do chamado (Entrega).
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </TabsContent>
       </Tabs>

@@ -81,6 +81,10 @@ export function TaskDetailsSheet({
   const [wizardStep, setWizardStep] = useState<number>(-1)
   const [showConfirm, setShowConfirm] = useState(false)
 
+  const [pendingStatusId, setPendingStatusId] = useState<string | null>(null)
+  const [poDateDialogOpen, setPoDateDialogOpen] = useState(false)
+  const [poGeneratedDate, setPoGeneratedDate] = useState('')
+
   useEffect(() => {
     if (isOpen && task) {
       loadTimeline()
@@ -166,9 +170,23 @@ export function TaskDetailsSheet({
   const handleStatusChange = async (newStatusId: string) => {
     if (!profile) return
     const status = taskStatuses.find((s: any) => s.id === newStatusId)
+
+    if (status?.name.toLowerCase().includes('pedido gerado')) {
+      setPendingStatusId(newStatusId)
+      setPoGeneratedDate(format(new Date(), 'yyyy-MM-dd'))
+      setPoDateDialogOpen(true)
+      return
+    }
+
+    await processStatusChange(newStatusId)
+  }
+
+  const processStatusChange = async (newStatusId: string, extraPayload: any = {}) => {
+    if (!profile) return
+    const status = taskStatuses.find((s: any) => s.id === newStatusId)
     const isTerminal = status?.is_terminal
 
-    const payload: any = { status_id: newStatusId }
+    const payload: any = { status_id: newStatusId, ...extraPayload }
     if (isTerminal) {
       payload.closed_at = new Date().toISOString()
     } else if (task.closed_at) {
@@ -184,8 +202,30 @@ export function TaskDetailsSheet({
       action_type: 'status_change',
     })
 
+    if (extraPayload.po_generated_date) {
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile.id,
+        content: `Data de geração do pedido registrada: ${format(new Date(extraPayload.po_generated_date), 'dd/MM/yyyy')}`,
+        action_type: 'comment',
+      })
+    }
+
     onTaskUpdated()
     loadTimeline()
+  }
+
+  const confirmPoDate = async () => {
+    if (!poGeneratedDate) {
+      toast({ title: 'Data obrigatória', variant: 'destructive' })
+      return
+    }
+    setPoDateDialogOpen(false)
+    if (pendingStatusId) {
+      const isoDate = new Date(`${poGeneratedDate}T12:00:00Z`).toISOString()
+      await processStatusChange(pendingStatusId, { po_generated_date: isoDate })
+      setPendingStatusId(null)
+    }
   }
 
   const handleDelegate = async (newAssigneeId: string) => {
@@ -1214,6 +1254,32 @@ export function TaskDetailsSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={poDateDialogOpen} onOpenChange={setPoDateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Data de Geração do Pedido</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Informe a data exata que o pedido foi gerado *</Label>
+              <Input
+                type="date"
+                value={poGeneratedDate}
+                onChange={(e) => setPoGeneratedDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setPoDateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="tech" onClick={confirmPoDate}>
+              Confirmar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
