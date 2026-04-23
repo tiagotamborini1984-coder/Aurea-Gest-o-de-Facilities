@@ -11,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Network } from 'lucide-react'
+import { Network, Download, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/hooks/use-toast'
 
 const OrgNode = ({ node }: { node: any }) => (
   <div className="org-tree-node">
@@ -52,9 +54,11 @@ const OrgNode = ({ node }: { node: any }) => (
 export default function OrgDashboard() {
   const { activeClient } = useAppStore()
   const { plants } = useMasterData()
+  const { toast } = useToast()
   const [collaborators, setCollaborators] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (!activeClient) return
@@ -80,6 +84,54 @@ export default function OrgDashboard() {
 
   const rootNodes = buildTree(collaborators, null)
 
+  const handleExportPNG = async () => {
+    const element = document.getElementById('org-chart-container')
+    if (!element) return
+
+    setExporting(true)
+    try {
+      if (!(window as any).html2canvas) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+          script.onload = resolve
+          script.onerror = reject
+          document.head.appendChild(script)
+        })
+      }
+
+      await new Promise((res) => setTimeout(res, 300))
+
+      const isDark = document.documentElement.classList.contains('dark')
+      const canvas = await (window as any).html2canvas(element, {
+        backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+        useCORS: true,
+        scale: 2,
+        logging: false,
+      })
+
+      const dataUrl = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.download = `organograma-${activeClient?.name?.replace(/\s+/g, '-').toLowerCase() || 'empresa'}.png`
+      link.href = dataUrl
+      link.click()
+
+      toast({
+        title: 'Exportação concluída',
+        description: 'O organograma foi baixado com sucesso.',
+      })
+    } catch (error) {
+      console.error('Failed to export PNG', error)
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Não foi possível gerar a imagem do organograma.',
+        variant: 'destructive',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto overflow-hidden">
       <style>{`
@@ -104,52 +156,46 @@ export default function OrgDashboard() {
           padding: 20px 10px 0 10px;
           flex-shrink: 0;
         }
-        /* Horizontal line on top of each child node */
         .org-tree-node::before, .org-tree-node::after {
           content: '';
           position: absolute;
           top: 0;
           right: 50%;
-          border-top: 2px solid hsl(var(--border));
+          border-top: 3px solid hsl(var(--primary) / 0.5);
           width: 50%;
           height: 20px;
         }
         .org-tree-node::after {
           right: auto;
           left: 50%;
-          border-left: 2px solid hsl(var(--border));
+          border-left: 3px solid hsl(var(--primary) / 0.5);
         }
-        /* Remove connectors for single child */
         .org-tree-node:only-child::after, .org-tree-node:only-child::before {
           display: none;
         }
         .org-tree-node:only-child {
           padding-top: 0;
         }
-        /* Remove left line from first child, right line from last child */
         .org-tree-node:first-child::before, .org-tree-node:last-child::after {
           border: 0 none;
         }
-        /* Add curve to first and last child */
         .org-tree-node:last-child::before {
-          border-right: 2px solid hsl(var(--border));
+          border-right: 3px solid hsl(var(--primary) / 0.5);
           border-radius: 0 6px 0 0;
         }
         .org-tree-node:first-child::after {
           border-radius: 6px 0 0 0;
         }
-        /* Line coming down from parent card to the horizontal line */
         .org-tree-group::before {
           content: '';
           position: absolute;
           top: 0;
           left: 50%;
-          border-left: 2px solid hsl(var(--border));
+          border-left: 3px solid hsl(var(--primary) / 0.5);
           width: 0;
           height: 20px;
           transform: translateX(-50%);
         }
-        /* Hide top lines for root nodes */
         .org-tree > .org-tree-node::before,
         .org-tree > .org-tree-node::after {
           display: none;
@@ -165,9 +211,9 @@ export default function OrgDashboard() {
           </h1>
           <p className="text-muted-foreground">Visualize a hierarquia da sua empresa.</p>
         </div>
-        <div className="w-full sm:w-64">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Filtrar por Planta" />
             </SelectTrigger>
             <SelectContent>
@@ -179,6 +225,19 @@ export default function OrgDashboard() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            onClick={handleExportPNG}
+            disabled={loading || rootNodes.length === 0 || exporting}
+            className="gap-2"
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">Exportar PNG</span>
+          </Button>
         </div>
       </div>
 
@@ -188,7 +247,10 @@ export default function OrgDashboard() {
             <p className="text-muted-foreground animate-pulse">Desenhando organograma...</p>
           </div>
         ) : rootNodes.length > 0 ? (
-          <div className="pt-4 pb-12 w-max min-w-full flex justify-center">
+          <div
+            id="org-chart-container"
+            className="pt-4 pb-12 px-8 w-max min-w-full flex justify-center bg-slate-50/50 dark:bg-slate-900/50"
+          >
             <div className="org-tree">
               {rootNodes.map((root) => (
                 <OrgNode key={root.id} node={root} />
