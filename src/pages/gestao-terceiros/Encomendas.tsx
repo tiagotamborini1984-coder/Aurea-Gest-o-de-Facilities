@@ -281,25 +281,48 @@ export default function Encomendas() {
             seq = parseInt(parts[2], 10) + 1
           }
         }
-        const protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
 
-        const payload = {
-          client_id: targetClientId,
-          plant_id: form.plant_id,
-          package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
-          protocol_number: protocol,
-          arrival_date: form.arrival_date,
-          sender: form.sender,
-          recipient_name: form.recipient_name,
-          recipient_email: form.recipient_email,
-          tracking_code: form.tracking_code,
-          observations: form.observations,
-          status: form.status,
-          attachment_url,
+        let protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
+        let success = false
+        let retries = 0
+        let finalProtocol = protocol
+
+        while (!success && retries < 10) {
+          const payload = {
+            client_id: targetClientId,
+            plant_id: form.plant_id,
+            package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
+            protocol_number: finalProtocol,
+            arrival_date: form.arrival_date,
+            sender: form.sender,
+            recipient_name: form.recipient_name,
+            recipient_email: form.recipient_email,
+            tracking_code: form.tracking_code,
+            observations: form.observations,
+            status: form.status,
+            attachment_url,
+          }
+
+          const { error } = await supabase.from('packages' as any).insert(payload)
+
+          if (error) {
+            if (error.code === '23505' || error.message?.includes('duplicate key')) {
+              seq++
+              finalProtocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
+              retries++
+            } else {
+              throw error
+            }
+          } else {
+            success = true
+          }
         }
 
-        const { error } = await supabase.from('packages' as any).insert(payload)
-        if (error) throw error
+        if (!success) {
+          throw new Error('Não foi possível gerar um número de protocolo único. Tente novamente.')
+        }
+
+        protocol = finalProtocol
 
         toast({
           title: 'Encomenda registrada com sucesso!',
