@@ -57,6 +57,7 @@ const AVAILABLE_MODULES = [
   'Gestão de Budget',
   'BI Dashboard',
   'Book de Metas',
+  'Organograma e Fluxos',
 ]
 
 export default function Clientes() {
