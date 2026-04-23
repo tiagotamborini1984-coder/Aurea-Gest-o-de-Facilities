@@ -31,6 +31,7 @@ import { AccessGuard } from './components/AccessGuard'
 import { MasterGuard } from './components/MasterGuard'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
+import { ThemeProvider } from './components/theme-provider'
 
 // Limpeza e Jardinagem Pages
 import AreasLJ from './pages/gestao-terceiros/limpeza-jardinagem/Areas'
@@ -62,91 +63,96 @@ import ContasContabeisBudget from './pages/gestao-budget/ContasContabeis'
 import LancamentosBudget from './pages/gestao-budget/Lancamentos'
 
 const App = () => (
-  <AuthProvider>
-    <AppProvider>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route path="/login" element={<Login />} />
+  <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+    <AuthProvider>
+      <AppProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/login" element={<Login />} />
 
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route element={<MasterGuard />}>
-                  <Route path="/admin/clientes" element={<Clientes />} />
-                </Route>
-                <Route element={<AccessGuard />}>
-                  <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
-                  <Route path="/gestao-terceiros" element={<DashboardGestor />} />
-                  <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route element={<MasterGuard />}>
+                    <Route path="/admin/clientes" element={<Clientes />} />
+                  </Route>
+                  <Route element={<AccessGuard />}>
+                    <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
+                    <Route path="/gestao-terceiros" element={<DashboardGestor />} />
+                    <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
 
-                  {/* Limpeza e Jardinagem */}
-                  <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
-                  <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
-                  <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
-                  <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
+                    {/* Limpeza e Jardinagem */}
+                    <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
+                    <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
+                    <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
+                    <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
 
-                  {/* Gestão de Tarefas */}
-                  <Route path="/gestao-tarefas" element={<PainelChamados />} />
-                  <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
-                  <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
-                  <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
+                    {/* Gestão de Tarefas */}
+                    <Route path="/gestao-tarefas" element={<PainelChamados />} />
+                    <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
+                    <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
+                    <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
 
-                  {/* Auditoria e Checklist */}
-                  <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
-                  <Route
-                    path="/auditoria-checklist/configuracao/:id"
-                    element={<AuditoriaConfig />}
-                  />
-                  <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
-                  <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
-                  <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+                    {/* Auditoria e Checklist */}
+                    <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
+                    <Route
+                      path="/auditoria-checklist/configuracao/:id"
+                      element={<AuditoriaConfig />}
+                    />
+                    <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
+                    <Route
+                      path="/auditoria-checklist/realizadas"
+                      element={<AuditoriaRealizadas />}
+                    />
+                    <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
 
-                  {/* Organograma e Fluxos */}
-                  <Route path="/organograma/dashboard" element={<OrgDashboard />} />
-                  <Route path="/organograma/cadastros" element={<OrgCadastros />} />
-                  <Route path="/organograma/fluxogramas" element={<OrgFluxogramas />} />
+                    {/* Organograma e Fluxos */}
+                    <Route path="/organograma/dashboard" element={<OrgDashboard />} />
+                    <Route path="/organograma/cadastros" element={<OrgCadastros />} />
+                    <Route path="/organograma/fluxogramas" element={<OrgFluxogramas />} />
 
-                  {/* Gestão de Budget */}
-                  <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
-                  <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
-                  <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
-                  <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
+                    {/* Gestão de Budget */}
+                    <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
+                    <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
+                    <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
+                    <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
 
-                  {/* Gestão de Imóveis */}
-                  <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
-                  <Route path="/gestao-imoveis/ocupacao" element={<OcupacaoImoveis />} />
-                  <Route path="/gestao-imoveis/imoveis" element={<Imoveis />} />
-                  <Route path="/gestao-imoveis/hospedes" element={<Hospedes />} />
-                  <Route path="/gestao-imoveis/centros-custo" element={<CentrosCustoImoveis />} />
-                  <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
+                    {/* Gestão de Imóveis */}
+                    <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
+                    <Route path="/gestao-imoveis/ocupacao" element={<OcupacaoImoveis />} />
+                    <Route path="/gestao-imoveis/imoveis" element={<Imoveis />} />
+                    <Route path="/gestao-imoveis/hospedes" element={<Hospedes />} />
+                    <Route path="/gestao-imoveis/centros-custo" element={<CentrosCustoImoveis />} />
+                    <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
 
-                  {/* Gestão de Encomendas */}
-                  <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
-                  <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
-                  <Route
-                    path="/gestao-terceiros/encomendas/configuracoes"
-                    element={<ConfiguracoesEncomendas />}
-                  />
+                    {/* Gestão de Encomendas */}
+                    <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
+                    <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
+                    <Route
+                      path="/gestao-terceiros/encomendas/configuracoes"
+                      element={<ConfiguracoesEncomendas />}
+                    />
 
-                  <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
-                  <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
-                  <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
-                  <Route path="/gestao-terceiros/metas" element={<BookMetas />} />
-                  <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
-                  <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
-                  <Route path="/usuarios" element={<Usuarios />} />
+                    <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
+                    <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
+                    <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
+                    <Route path="/gestao-terceiros/metas" element={<BookMetas />} />
+                    <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
+                    <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
+                    <Route path="/usuarios" element={<Usuarios />} />
+                  </Route>
                 </Route>
               </Route>
-            </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
-      </BrowserRouter>
-    </AppProvider>
-  </AuthProvider>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </BrowserRouter>
+      </AppProvider>
+    </AuthProvider>
+  </ThemeProvider>
 )
 
 export default App

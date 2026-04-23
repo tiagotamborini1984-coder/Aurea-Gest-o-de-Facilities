@@ -284,7 +284,7 @@ export default function DashboardImoveis() {
   return (
     <div className="p-6 space-y-6 animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-800">Dashboard de Imóveis</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard de Imóveis</h1>
 
         {/* Filtros */}
         <div className="flex flex-wrap items-center gap-3">
@@ -293,11 +293,11 @@ export default function DashboardImoveis() {
               <Button
                 variant="outline"
                 className={cn(
-                  'w-[260px] justify-start text-left font-normal bg-white',
+                  'w-[260px] justify-start text-left font-normal bg-background',
                   !dateRange.from && 'text-muted-foreground',
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4 text-slate-500" />
+                <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                 {dateRange?.from ? (
                   dateRange.to ? (
                     <>
@@ -333,8 +333,8 @@ export default function DashboardImoveis() {
               setSelectedProperty('all') // Reset property when city changes
             }}
           >
-            <SelectTrigger className="w-[180px] bg-white">
-              <MapPin className="w-4 h-4 mr-2 text-slate-500" />
+            <SelectTrigger className="w-[180px] bg-background">
+              <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Todas as Cidades" />
             </SelectTrigger>
             <SelectContent>
@@ -348,8 +348,8 @@ export default function DashboardImoveis() {
           </Select>
 
           <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-            <SelectTrigger className="w-[200px] bg-white">
-              <Home className="w-4 h-4 mr-2 text-slate-500" />
+            <SelectTrigger className="w-[200px] bg-background">
+              <Home className="w-4 h-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Todos os Imóveis" />
             </SelectTrigger>
             <SelectContent>
@@ -366,58 +366,64 @@ export default function DashboardImoveis() {
 
       {/* Métricas Principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-blue-500 shadow-sm">
+        <Card className="border-l-4 border-l-blue-500 shadow-sm bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Faturamento Total</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Faturamento Total
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="text-2xl font-bold text-foreground">
               R$ {metrics.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-indigo-500 shadow-sm">
+        <Card className="border-l-4 border-l-indigo-500 shadow-sm bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Reservas (Período)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Reservas (Período)
+            </CardTitle>
             <Users className="h-4 w-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{metrics.reservas}</div>
+            <div className="text-2xl font-bold text-foreground">{metrics.reservas}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
+        <Card className="border-l-4 border-l-emerald-500 shadow-sm bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Ticket Médio</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Ticket Médio
+            </CardTitle>
             <Building className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="text-2xl font-bold text-foreground">
               R$ {metrics.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-amber-500 shadow-sm">
+        <Card className="border-l-4 border-l-amber-500 shadow-sm bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Taxa de Ocupação Global
             </CardTitle>
             <Percent className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{metrics.ocupacao}%</div>
+            <div className="text-2xl font-bold text-foreground">{metrics.ocupacao}%</div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Gráfico Principal */}
-        <Card className="lg:col-span-2 shadow-sm">
+        <Card className="lg:col-span-2 shadow-sm bg-card">
           <CardHeader>
-            <CardTitle className="text-slate-800">{chartTitle}</CardTitle>
+            <CardTitle className="text-foreground">{chartTitle}</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px]">
             {chartData.length > 0 ? (
@@ -426,16 +432,20 @@ export default function DashboardImoveis() {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 30, right: 20, left: 20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="hsl(var(--border))"
+                    />
                     <XAxis
                       dataKey="name"
-                      tick={{ fill: '#64748b' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <YAxis
                       tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR')}`}
-                      tick={{ fill: '#64748b' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
                       axisLine={false}
                       tickLine={false}
                     />
@@ -445,7 +455,7 @@ export default function DashboardImoveis() {
                         dataKey="value"
                         position="top"
                         offset={10}
-                        className="fill-slate-600 text-[11px] font-medium"
+                        className="fill-foreground text-[11px] font-medium"
                         formatter={(val: number) =>
                           `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         }
@@ -461,7 +471,7 @@ export default function DashboardImoveis() {
                 </ResponsiveContainer>
               </ChartContainer>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-slate-50/50 rounded-lg border border-dashed">
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/50 rounded-lg border border-dashed">
                 <Building className="w-10 h-10 mb-2 opacity-20" />
                 <p>Sem dados financeiros para o período e filtros selecionados.</p>
               </div>
@@ -471,9 +481,9 @@ export default function DashboardImoveis() {
 
         {/* Rankings */}
         <div className="space-y-6">
-          <Card className="shadow-sm">
+          <Card className="shadow-sm bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-slate-800">
+              <CardTitle className="text-base font-semibold text-foreground">
                 Top Ocupação por Cidade
               </CardTitle>
             </CardHeader>
@@ -482,7 +492,7 @@ export default function DashboardImoveis() {
                 rankingCity.map((item, idx) => (
                   <div key={item.name} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-700 flex items-center gap-2">
+                      <span className="font-medium text-foreground flex items-center gap-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full"
                           style={{
@@ -491,9 +501,9 @@ export default function DashboardImoveis() {
                         />
                         {item.name}
                       </span>
-                      <span className="text-slate-600 font-semibold">{item.rate}%</span>
+                      <span className="text-muted-foreground font-semibold">{item.rate}%</span>
                     </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full transition-all duration-500"
                         style={{
@@ -505,16 +515,16 @@ export default function DashboardImoveis() {
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-center text-slate-500 py-4">
+                <div className="text-sm text-center text-muted-foreground py-4">
                   Nenhum dado disponível
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="shadow-sm bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-slate-800">
+              <CardTitle className="text-base font-semibold text-foreground">
                 Top Ocupação por Centro de Custo
               </CardTitle>
             </CardHeader>
@@ -523,7 +533,7 @@ export default function DashboardImoveis() {
                 rankingCostCenter.map((item, idx) => (
                   <div key={item.name} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-700 flex items-center gap-2 truncate pr-2">
+                      <span className="font-medium text-foreground flex items-center gap-2 truncate pr-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{
@@ -532,9 +542,11 @@ export default function DashboardImoveis() {
                         />
                         <span className="truncate">{item.name}</span>
                       </span>
-                      <span className="text-slate-600 font-semibold shrink-0">{item.rate}%</span>
+                      <span className="text-muted-foreground font-semibold shrink-0">
+                        {item.rate}%
+                      </span>
                     </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full transition-all duration-500"
                         style={{
@@ -546,7 +558,7 @@ export default function DashboardImoveis() {
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-center text-slate-500 py-4">
+                <div className="text-sm text-center text-muted-foreground py-4">
                   Nenhum dado disponível
                 </div>
               )}
