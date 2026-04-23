@@ -24,65 +24,12 @@ import {
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { format, subDays, differenceInSeconds } from 'date-fns'
 import { exportToCSV } from '@/lib/export'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
-
-const SemiCircleGauge = ({
-  value,
-  label,
-  size = 180,
-  color,
-}: {
-  value: number
-  label: string
-  size?: number
-  color?: string
-}) => {
-  const data = [
-    { name: 'Aderência', value: value },
-    { name: 'Falta', value: 100 - value < 0 ? 0 : 100 - value },
-  ]
-  const fillColor = color || (value >= 80 ? '#22c55e' : value >= 50 ? '#f59e0b' : '#ef4444')
-  return (
-    <div
-      className="relative flex flex-col items-center justify-center"
-      style={{ width: size, height: size * 0.65 }}
-    >
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="85%"
-            startAngle={180}
-            endAngle={0}
-            innerRadius="70%"
-            outerRadius="100%"
-            dataKey="value"
-            stroke="none"
-            isAnimationActive={true}
-          >
-            <Cell key="cell-0" fill={fillColor} />
-            <Cell key="cell-1" fill="#f1f5f9" />
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="absolute bottom-0 flex flex-col items-center">
-        <span className="text-3xl font-black" style={{ color: fillColor }}>
-          {value.toFixed(1)}%
-        </span>
-        <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">
-          {label}
-        </span>
-      </div>
-    </div>
-  )
-}
 
 export default function RelatoriosTarefas() {
   const { profile } = useAppStore()
@@ -126,7 +73,12 @@ export default function RelatoriosTarefas() {
 
     if (filterPlant !== 'all') query = query.eq('plant_id', filterPlant)
     if (filterStatus !== 'all') query = query.eq('status_id', filterStatus)
-    if (filterAssignee !== 'all') query = query.eq('assignee_id', filterAssignee)
+
+    // Only apply assignee filter if it's set to a specific user
+    // The UI now restricts setting this for non-admins, but we keep the logic to apply it if set.
+    if (filterAssignee !== 'all') {
+      query = query.eq('assignee_id', filterAssignee)
+    }
 
     const { data } = await query
     setTasks(data || [])
@@ -185,73 +137,6 @@ export default function RelatoriosTarefas() {
     })
     exportToCSV(`Relatorio_Chamados_${format(new Date(), 'yyyyMMdd')}.csv`, exportData)
   }
-
-  const buildMetrics = (groupKeyFn: (t: any) => string, nameFn: (id: string) => string) => {
-    const groups: Record<string, any> = {}
-
-    tasks.forEach((task) => {
-      const key = groupKeyFn(task)
-      if (!key) return
-      if (!groups[key]) {
-        groups[key] = {
-          id: key,
-          name: nameFn(key),
-          total: 0,
-          closed: 0,
-          late: 0,
-          onTime: 0,
-          totalElapsedHours: 0,
-        }
-      }
-
-      groups[key].total++
-      if (task.closed_at) groups[key].closed++
-
-      const tType = taskTypes.find((t) => t.id === task.type_id)
-      if (tType && tType.sla_hours > 0) {
-        const start = new Date(task.created_at)
-        const end = task.closed_at ? new Date(task.closed_at) : new Date()
-        const frozenSecs = (task.frozen_time_minutes || 0) * 60
-        let elapsedSecs = differenceInSeconds(end, start) - frozenSecs
-        if (elapsedSecs < 0) elapsedSecs = 0
-
-        groups[key].totalElapsedHours += elapsedSecs / 3600
-
-        const slaSecs = tType.sla_hours * 3600
-        if (elapsedSecs > slaSecs) {
-          groups[key].late++
-        } else {
-          groups[key].onTime++
-        }
-      }
-    })
-
-    return Object.values(groups)
-      .map((g: any) => {
-        const totalSlaTasks = g.late + g.onTime
-        const adherence = totalSlaTasks > 0 ? (g.onTime / totalSlaTasks) * 100 : 100
-        const avgSlaHours = g.total > 0 ? g.totalElapsedHours / g.total : 0
-        return { ...g, adherence, totalSlaTasks, avgSlaHours }
-      })
-      .sort((a, b) => b.total - a.total)
-  }
-
-  const metricsByRequester = buildMetrics(
-    (t) => t.requester_id,
-    (id) => users.find((u) => u.id === id)?.name || 'Desconhecido',
-  )
-  const metricsByAssignee = buildMetrics(
-    (t) => t.assignee_id,
-    (id) => users.find((u) => u.id === id)?.name || 'Desconhecido',
-  )
-  const metricsByPlant = buildMetrics(
-    (t) => t.plant_id,
-    (id) => plants.find((p) => p.id === id)?.name || 'Desconhecido',
-  )
-  const metricsByType = buildMetrics(
-    (t) => t.type_id,
-    (id) => taskTypes.find((x) => x.id === id)?.name || 'Desconhecido',
-  )
 
   const getTaskDiffs = (task: any, timelines: any[], taskStatuses: any[]) => {
     const taskTl = timelines
@@ -367,48 +252,6 @@ export default function RelatoriosTarefas() {
     return 'dias'
   }
 
-  const renderMetricCards = (metrics: any[]) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {metrics.map((m) => (
-        <Card key={m.id} className="shadow-sm border-gray-200 hover:shadow-md transition-shadow">
-          <CardContent className="p-6 flex flex-col items-center">
-            <h3
-              className="font-bold text-[15px] text-slate-800 mb-6 text-center line-clamp-1 w-full"
-              title={m.name}
-            >
-              {m.name}
-            </h3>
-            <SemiCircleGauge value={m.adherence} label="Aderência SLA" size={200} />
-            <div className="grid grid-cols-2 gap-4 w-full mt-8 text-center">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col justify-center">
-                <div className="text-2xl font-black text-brand-deepBlue">{m.total}</div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
-                  Chamados
-                </div>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col justify-center">
-                <div className="text-2xl font-black text-brand-deepBlue">
-                  {m.avgSlaHours.toFixed(1)}h
-                </div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
-                  SLA Médio
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-
-  const renderEmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-gray-100 border-dashed text-slate-500">
-      <AlertTriangle className="w-8 h-8 mb-3 text-slate-400" />
-      <p className="font-medium text-lg">Nenhum dado encontrado</p>
-      <p className="text-sm">Não há chamados suficientes para este período e filtros.</p>
-    </div>
-  )
-
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in print:max-w-none">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
@@ -484,22 +327,25 @@ export default function RelatoriosTarefas() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-700">Responsável</Label>
-          <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-            <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Responsáveis</SelectItem>
-              {users.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+
+        {['Administrador', 'Master'].includes(profile?.role || '') && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-700">Responsável</Label>
+            <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+              <SelectTrigger className="h-9 w-[180px]">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="lista" className="space-y-6 print:block">
@@ -509,12 +355,6 @@ export default function RelatoriosTarefas() {
             className="text-base font-semibold px-6 py-2 flex-1 sm:flex-none"
           >
             Lista de Chamados
-          </TabsTrigger>
-          <TabsTrigger
-            value="dashboard"
-            className="text-base font-semibold px-6 py-2 flex-1 sm:flex-none"
-          >
-            Dashboard de Performance
           </TabsTrigger>
           <TabsTrigger
             value="compras"
@@ -621,50 +461,6 @@ export default function RelatoriosTarefas() {
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-
-        <TabsContent value="dashboard" className="m-0 space-y-4 print:hidden">
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-brand-deepBlue" />
-            </div>
-          ) : (
-            <Tabs defaultValue="requisitante" className="w-full">
-              <div className="flex justify-center mb-6">
-                <TabsList className="bg-slate-100/80 p-1">
-                  <TabsTrigger value="requisitante" className="rounded-md">
-                    Por Requisitante
-                  </TabsTrigger>
-                  <TabsTrigger value="responsavel" className="rounded-md">
-                    Por Responsável
-                  </TabsTrigger>
-                  <TabsTrigger value="planta" className="rounded-md">
-                    Por Planta
-                  </TabsTrigger>
-                  <TabsTrigger value="tipo" className="rounded-md">
-                    Por Tipo
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="requisitante" className="m-0">
-                {metricsByRequester.length > 0
-                  ? renderMetricCards(metricsByRequester)
-                  : renderEmptyState()}
-              </TabsContent>
-              <TabsContent value="responsavel" className="m-0">
-                {metricsByAssignee.length > 0
-                  ? renderMetricCards(metricsByAssignee)
-                  : renderEmptyState()}
-              </TabsContent>
-              <TabsContent value="planta" className="m-0">
-                {metricsByPlant.length > 0 ? renderMetricCards(metricsByPlant) : renderEmptyState()}
-              </TabsContent>
-              <TabsContent value="tipo" className="m-0">
-                {metricsByType.length > 0 ? renderMetricCards(metricsByType) : renderEmptyState()}
-              </TabsContent>
-            </Tabs>
-          )}
         </TabsContent>
 
         <TabsContent value="compras" className="m-0 space-y-4 print:hidden">
