@@ -171,7 +171,7 @@ export default function DashboardPlantSummary({
           <TableCols isLocal={false} />
           <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[350px]">
             {plantStats.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground/80 text-xs lg:text-sm">
+              <div className="p-8 text-center text-muted-foreground text-xs lg:text-sm">
                 Sem dados
               </div>
             ) : (
@@ -188,7 +188,7 @@ export default function DashboardPlantSummary({
           <TableCols isLocal={true} />
           <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[350px]">
             {locationStats.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground/80 text-xs lg:text-sm">
+              <div className="p-8 text-center text-muted-foreground text-xs lg:text-sm">
                 Sem dados
               </div>
             ) : (

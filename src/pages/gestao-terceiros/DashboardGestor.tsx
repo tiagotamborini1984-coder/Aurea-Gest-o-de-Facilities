@@ -114,11 +114,11 @@ export default function DashboardGestor() {
 
       {selectedPlants.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 lg:p-16 mt-4 bg-card rounded-xl border border-border shadow-sm">
-          <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-slate-400 mb-4" />
+          <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-muted-foreground mb-4" />
           <h3 className="text-lg lg:text-xl font-bold text-foreground">
             Nenhuma planta selecionada
           </h3>
-          <p className="text-slate-600 text-xs lg:text-sm mt-2 text-center max-w-md">
+          <p className="text-muted-foreground text-xs lg:text-sm mt-2 text-center max-w-md">
             Selecione uma planta.
           </p>
         </div>
@@ -157,7 +157,7 @@ export default function DashboardGestor() {
       ) : (
         <div className="flex flex-col items-center justify-center p-12 lg:p-16 mt-4 bg-card rounded-xl border border-border shadow-sm">
           <h3 className="text-lg lg:text-xl font-bold text-foreground">O Book de Metas mudou!</h3>
-          <p className="text-slate-600 text-xs lg:text-sm mt-2 text-center max-w-md">
+          <p className="text-muted-foreground text-xs lg:text-sm mt-2 text-center max-w-md">
             O Book de Metas agora é um módulo independente. Acesse-o através do menu lateral ou
             clique no botão abaixo.
           </p>

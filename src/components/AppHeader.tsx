@@ -69,7 +69,7 @@ export function AppHeader() {
 
         <div className="flex flex-1 items-center justify-end gap-3 lg:gap-4">
           <div className="w-full max-w-sm hidden md:flex relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Buscar no sistema..."

@@ -63,7 +63,7 @@ import ContasContabeisBudget from './pages/gestao-budget/ContasContabeis'
 import LancamentosBudget from './pages/gestao-budget/Lancamentos'
 
 const App = () => (
-  <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+  <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
     <AuthProvider>
       <AppProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

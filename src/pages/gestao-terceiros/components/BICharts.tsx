@@ -25,15 +25,27 @@ export function ChartPlants({ data, colors }: { data: any[]; colors: any }) {
         className="h-full w-full"
       >
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} fontSize={10} />
-          <YAxis tickLine={false} axisLine={false} fontSize={10} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="presenca" fill="var(--color-presenca)" radius={[4, 4, 0, 0]}>
             <LabelList
               dataKey="presenca"
               position="top"
-              className="fill-slate-700 text-[9px]"
+              className="fill-foreground text-[9px]"
               formatter={(val: number) => `${val}%`}
             />
           </Bar>
@@ -41,7 +53,7 @@ export function ChartPlants({ data, colors }: { data: any[]; colors: any }) {
             <LabelList
               dataKey="absenteismo"
               position="top"
-              className="fill-slate-700 text-[9px]"
+              className="fill-foreground text-[9px]"
               formatter={(val: number) => `${val}%`}
             />
           </Bar>
@@ -59,8 +71,14 @@ export function ChartLocalAbs({ data, colors }: { data: any[]; colors: any }) {
         className="h-full w-full"
       >
         <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" tickLine={false} axisLine={false} fontSize={10} />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+          <XAxis
+            type="number"
+            tickLine={false}
+            axisLine={false}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
           <YAxis
             dataKey="name"
             type="category"
@@ -68,6 +86,7 @@ export function ChartLocalAbs({ data, colors }: { data: any[]; colors: any }) {
             axisLine={false}
             fontSize={10}
             width={100}
+            stroke="hsl(var(--muted-foreground))"
           />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="absenteismo" radius={[0, 4, 4, 0]}>
@@ -80,7 +99,7 @@ export function ChartLocalAbs({ data, colors }: { data: any[]; colors: any }) {
             <LabelList
               dataKey="absenteismo"
               position="right"
-              className="fill-slate-700 text-[10px]"
+              className="fill-foreground text-[10px]"
               formatter={(val: number) => `${val}%`}
             />
           </Bar>
@@ -98,9 +117,22 @@ export function ChartEqDisp({ data, colors }: { data: any[]; colors: any }) {
         className="h-full w-full"
       >
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} fontSize={10} />
-          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={10} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
+          <YAxis
+            domain={[0, 100]}
+            tickLine={false}
+            axisLine={false}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="disp" radius={[4, 4, 0, 0]}>
             {data.map((_, index) => (
@@ -112,7 +144,7 @@ export function ChartEqDisp({ data, colors }: { data: any[]; colors: any }) {
             <LabelList
               dataKey="disp"
               position="top"
-              className="fill-slate-700 text-[10px]"
+              className="fill-foreground text-[10px]"
               formatter={(val: number) => `${val}%`}
             />
           </Bar>
@@ -136,18 +168,24 @@ export function ChartComparativeAbs({
     <div className="h-[300px] w-full mt-2">
       <ChartContainer config={{}} className="h-full w-full">
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
           <XAxis
             dataKey="date"
             tickLine={false}
             axisLine={false}
             tickMargin={10}
             fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
             angle={data.length > 7 ? -45 : 0}
             textAnchor={data.length > 7 ? 'end' : 'middle'}
             height={data.length > 7 ? 50 : 30}
           />
-          <YAxis tickLine={false} axisLine={false} fontSize={10} />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
           <ChartTooltip content={<ChartTooltipContent />} />
           {locations.map((loc, i) => (
             <Line
@@ -174,15 +212,28 @@ export function ChartGoals({ data, colors }: { data: any[]; colors: any }) {
         className="h-full w-full"
       >
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} fontSize={10} />
-          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={10} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+          <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
+          <YAxis
+            domain={[0, 100]}
+            tickLine={false}
+            axisLine={false}
+            fontSize={10}
+            stroke="hsl(var(--muted-foreground))"
+          />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             <LabelList
               dataKey="value"
               position="top"
-              className="fill-slate-700 text-[10px]"
+              className="fill-foreground text-[10px]"
               formatter={(val: number) => `${val}%`}
             />
             {data.map((entry, index) => (
