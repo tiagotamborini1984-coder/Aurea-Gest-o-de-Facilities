@@ -22,9 +22,23 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts'
-import { Loader2, ClipboardCheck, TrendingUp, Building2, LayoutList } from 'lucide-react'
+import {
+  Loader2,
+  ClipboardCheck,
+  TrendingUp,
+  Building2,
+  LayoutList,
+  Calendar as CalendarIcon,
+} from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { DateRange } from 'react-day-picker'
+import { cn } from '@/lib/utils'
 
 const COLORS = ['#1e3a8a', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6366f1', '#ec4899']
 
@@ -38,6 +52,8 @@ export default function AuditoriaDashboard() {
 
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterType, setFilterType] = useState('all')
+  const [filterTitle, setFilterTitle] = useState('all')
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
 
   useEffect(() => {
     if (!profile) return
@@ -68,9 +84,29 @@ export default function AuditoriaDashboard() {
     return executions.filter((e) => {
       const matchP = filterPlant === 'all' || e.plant_id === filterPlant
       const matchT = filterType === 'all' || e.audits?.type === filterType
-      return matchP && matchT
+      const matchTitle = filterTitle === 'all' || e.audits?.title === filterTitle
+
+      let matchDate = true
+      if (dateRange?.from) {
+        const itemDate = new Date(e.created_at)
+        if (itemDate < dateRange.from) matchDate = false
+
+        if (!dateRange.to) {
+          const toDate = new Date(dateRange.from)
+          toDate.setHours(23, 59, 59, 999)
+          if (itemDate > toDate) matchDate = false
+        }
+      }
+      if (dateRange?.to) {
+        const itemDate = new Date(e.created_at)
+        const toDate = new Date(dateRange.to)
+        toDate.setHours(23, 59, 59, 999)
+        if (itemDate > toDate) matchDate = false
+      }
+
+      return matchP && matchT && matchTitle && matchDate
     })
-  }, [executions, filterPlant, filterType])
+  }, [executions, filterPlant, filterType, filterTitle, dateRange])
 
   const kpis = useMemo(() => {
     const total = filtered.length
@@ -107,6 +143,9 @@ export default function AuditoriaDashboard() {
   }, [filtered])
 
   const typesAvailable = Array.from(new Set(executions.map((e) => e.audits?.type).filter(Boolean)))
+  const titlesAvailable = Array.from(
+    new Set(executions.map((e) => e.audits?.title).filter(Boolean)),
+  )
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -122,9 +161,45 @@ export default function AuditoriaDashboard() {
             Visão analítica de performance e execução.
           </p>
         </div>
-        <div className="flex gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm w-full sm:w-auto">
+        <div className="flex flex-wrap gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm w-full sm:w-auto">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full sm:w-auto min-w-[200px] justify-start text-left font-normal bg-slate-50 border-slate-200 h-9',
+                  !dateRange && 'text-muted-foreground',
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, 'dd/MM/yy')} - {format(dateRange.to, 'dd/MM/yy')}
+                    </>
+                  ) : (
+                    format(dateRange.from, 'dd/MM/yy')
+                  )
+                ) : (
+                  <span>Período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={1}
+                locale={ptBR}
+              />
+            </PopoverContent>
+          </Popover>
+
           <Select value={filterPlant} onValueChange={setFilterPlant}>
-            <SelectTrigger className="w-full sm:w-48 bg-slate-50 border-slate-200 h-9">
+            <SelectTrigger className="w-full sm:w-40 bg-slate-50 border-slate-200 h-9">
               <SelectValue placeholder="Plantas" />
             </SelectTrigger>
             <SelectContent>
@@ -136,13 +211,28 @@ export default function AuditoriaDashboard() {
               ))}
             </SelectContent>
           </Select>
+
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-full sm:w-40 bg-slate-50 border-slate-200 h-9">
+            <SelectTrigger className="w-full sm:w-36 bg-slate-50 border-slate-200 h-9">
               <SelectValue placeholder="Tipos" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Tipos</SelectItem>
               {typesAvailable.map((t) => (
+                <SelectItem key={t as string} value={t as string}>
+                  {t as string}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterTitle} onValueChange={setFilterTitle}>
+            <SelectTrigger className="w-full sm:w-48 bg-slate-50 border-slate-200 h-9">
+              <SelectValue placeholder="Títulos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Títulos</SelectItem>
+              {titlesAvailable.map((t) => (
                 <SelectItem key={t as string} value={t as string}>
                   {t as string}
                 </SelectItem>
