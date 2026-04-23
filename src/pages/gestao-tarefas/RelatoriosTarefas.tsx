@@ -259,6 +259,7 @@ export default function RelatoriosTarefas() {
         return {
           plantId: pId,
           plantName: plant?.name || 'Desconhecida',
+          plantCode: plant?.code || '-',
           avgToRC: m.countToRC > 0 ? Number((m.sumToRC / m.countToRC).toFixed(2)) : null,
           avgToPO: m.countToPO > 0 ? Number((m.sumToPO / m.countToPO).toFixed(2)) : null,
           countToRC: m.countToRC,
@@ -593,9 +594,17 @@ export default function RelatoriosTarefas() {
                           >
                             <BarChart data={plantRanking.filter((r) => r.avgToRC !== null)}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis dataKey="plantName" />
+                              <XAxis dataKey="plantCode" />
                               <YAxis />
-                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <ChartTooltip
+                                content={
+                                  <ChartTooltipContent
+                                    labelFormatter={(label, payload) => {
+                                      return payload?.[0]?.payload?.plantName || label
+                                    }}
+                                  />
+                                }
+                              />
                               <ReferenceLine
                                 y={2}
                                 stroke="hsl(var(--destructive))"
@@ -680,9 +689,17 @@ export default function RelatoriosTarefas() {
                       >
                         <BarChart data={plantRanking.filter((r) => r.countToRC > 0)}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="plantName" />
+                          <XAxis dataKey="plantCode" />
                           <YAxis />
-                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <ChartTooltip
+                            content={
+                              <ChartTooltipContent
+                                labelFormatter={(label, payload) => {
+                                  return payload?.[0]?.payload?.plantName || label
+                                }}
+                              />
+                            }
+                          />
                           <Bar dataKey="countToRC" fill="var(--color-count)" radius={[4, 4, 0, 0]}>
                             <LabelList dataKey="countToRC" position="top" />
                           </Bar>
