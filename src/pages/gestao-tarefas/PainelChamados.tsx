@@ -49,7 +49,7 @@ import { useToast } from '@/hooks/use-toast'
 import { TaskDetailsSheet } from './TaskDetailsSheet'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 
 function SLACountdown({
@@ -104,8 +104,32 @@ export default function PainelChamados() {
   const [loading, setLoading] = useState(true)
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterPlant, setFilterPlant] = useState('all')
-  const [filterAssignee, setFilterAssignee] = useState('all')
+
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const filterPlant = searchParams.get('plant') || 'all'
+  const setFilterPlant = (val: string) => {
+    setSearchParams(
+      (prev) => {
+        if (val === 'all') prev.delete('plant')
+        else prev.set('plant', val)
+        return prev
+      },
+      { replace: true },
+    )
+  }
+
+  const filterAssignee = searchParams.get('assignee') || 'all'
+  const setFilterAssignee = (val: string) => {
+    setSearchParams(
+      (prev) => {
+        if (val === 'all') prev.delete('assignee')
+        else prev.set('assignee', val)
+        return prev
+      },
+      { replace: true },
+    )
+  }
 
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
 
@@ -113,7 +137,16 @@ export default function PainelChamados() {
   const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
   const showTodos = isSuperAdmin
 
-  const [activeTab, setActiveTab] = useState(showTodos ? 'todos' : 'recebidos')
+  const activeTab = searchParams.get('tab') || (showTodos ? 'todos' : 'recebidos')
+  const setActiveTab = (val: string) => {
+    setSearchParams(
+      (prev) => {
+        prev.set('tab', val)
+        return prev
+      },
+      { replace: true },
+    )
+  }
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -225,13 +258,23 @@ export default function PainelChamados() {
     }
   }
 
+  const prevClientRef = useRef(effectiveClientId)
   useEffect(() => {
     if (effectiveClientId) {
-      setFilterPlant('all')
-      setFilterAssignee('all')
+      if (prevClientRef.current && prevClientRef.current !== effectiveClientId) {
+        setSearchParams(
+          (prev) => {
+            prev.delete('plant')
+            prev.delete('assignee')
+            return prev
+          },
+          { replace: true },
+        )
+      }
+      prevClientRef.current = effectiveClientId
       loadData()
     }
-  }, [effectiveClientId, profile])
+  }, [effectiveClientId])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
