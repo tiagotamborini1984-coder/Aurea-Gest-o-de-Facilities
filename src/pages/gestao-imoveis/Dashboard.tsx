@@ -2,7 +2,16 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Cell,
+  LabelList,
+} from 'recharts'
 import { Building, DollarSign, Users, Percent, CalendarIcon, MapPin, Home } from 'lucide-react'
 import { format, differenceInDays, startOfMonth, endOfMonth, parseISO, max, min } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -426,7 +435,7 @@ export default function DashboardImoveis() {
                 config={{ value: { label: 'Faturamento', color: 'hsl(var(--primary))' } }}
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                  <BarChart data={chartData} margin={{ top: 30, right: 20, left: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis
                       dataKey="name"
@@ -435,13 +444,22 @@ export default function DashboardImoveis() {
                       tickLine={false}
                     />
                     <YAxis
-                      tickFormatter={(val) => `R$ ${val}`}
+                      tickFormatter={(val) => `R$ ${val.toLocaleString('pt-BR')}`}
                       tick={{ fill: '#64748b' }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        offset={10}
+                        className="fill-slate-600 text-[11px] font-medium"
+                        formatter={(val: number) =>
+                          `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        }
+                      />
                       {chartData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
