@@ -13,6 +13,7 @@ import {
   Home,
   DollarSign,
   Target,
+  Network,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -71,6 +72,15 @@ export function AppSidebar() {
         { title: 'Relatórios', path: '/gestao-tarefas/relatorios' },
         { title: 'Tipos de Chamado', path: '/gestao-tarefas/tipos' },
         { title: 'Status', path: '/gestao-tarefas/status' },
+      ],
+    },
+    {
+      title: 'Organograma e Fluxos',
+      icon: Network,
+      subItems: [
+        { title: 'Organograma', path: '/organograma/dashboard' },
+        { title: 'Cadastros', path: '/organograma/cadastros' },
+        { title: 'Fluxogramas', path: '/organograma/fluxogramas' },
       ],
     },
     {
@@ -179,6 +189,7 @@ export function AppSidebar() {
           'Cadastros:Quadro Contratado',
           'Limpeza e Jardinagem',
           'Gestão de Tarefas',
+          'Organograma e Fluxos',
           'Auditoria e Checklist',
           'Gestão de Imóveis',
           'Book de Metas',
@@ -220,6 +231,12 @@ export function AppSidebar() {
           )
         } else if (item.title === 'Gestão de Imóveis') {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
+        } else if (item.title === 'Organograma e Fluxos') {
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Organograma e Fluxos') ||
+              userMenus.includes(`Organograma e Fluxos:${sub.title}`),
+          )
         } else if (item.title === 'Auditoria e Checklist') {
           filteredSubItems = item.subItems.filter(
             (sub) =>

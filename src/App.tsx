@@ -53,6 +53,11 @@ import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
 // Gestão de Budget
 import DashboardBudget from './pages/gestao-budget/Dashboard'
 import CentrosCustoBudget from './pages/gestao-budget/CentrosCusto'
+
+// Organograma e Fluxos
+import OrgDashboard from './pages/organograma/Dashboard'
+import OrgCadastros from './pages/organograma/Cadastros'
+import OrgFluxogramas from './pages/organograma/Fluxogramas'
 import ContasContabeisBudget from './pages/gestao-budget/ContasContabeis'
 import LancamentosBudget from './pages/gestao-budget/Lancamentos'
 
@@ -97,6 +102,11 @@ const App = () => (
                   <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
                   <Route path="/auditoria-checklist/realizadas" element={<AuditoriaRealizadas />} />
                   <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+
+                  {/* Organograma e Fluxos */}
+                  <Route path="/organograma/dashboard" element={<OrgDashboard />} />
+                  <Route path="/organograma/cadastros" element={<OrgCadastros />} />
+                  <Route path="/organograma/fluxogramas" element={<OrgFluxogramas />} />
 
                   {/* Gestão de Budget */}
                   <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
