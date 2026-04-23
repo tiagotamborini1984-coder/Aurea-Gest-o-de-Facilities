@@ -200,6 +200,55 @@ export default function RelatoriosTarefas() {
     )
   })
 
+  const buildPlantRanking = () => {
+    const plantMetrics: Record<
+      string,
+      { sumToRC: number; countToRC: number; sumToPO: number; countToPO: number }
+    > = {}
+
+    plants.forEach((p) => {
+      plantMetrics[p.id] = { sumToRC: 0, countToRC: 0, sumToPO: 0, countToPO: 0 }
+    })
+
+    comprasTasks.forEach((task) => {
+      const { diffRC, diffPO } = getTaskDiffs(task, timelines, taskStatuses)
+      const pId = task.plant_id
+
+      if (!plantMetrics[pId]) {
+        plantMetrics[pId] = { sumToRC: 0, countToRC: 0, sumToPO: 0, countToPO: 0 }
+      }
+
+      if (diffRC !== null) {
+        plantMetrics[pId].sumToRC += diffRC
+        plantMetrics[pId].countToRC++
+      }
+
+      if (diffPO !== null) {
+        plantMetrics[pId].sumToPO += diffPO
+        plantMetrics[pId].countToPO++
+      }
+    })
+
+    const ranking = Object.keys(plantMetrics)
+      .map((pId) => {
+        const m = plantMetrics[pId]
+        const plant = plants.find((p) => p.id === pId)
+        return {
+          plantId: pId,
+          plantName: plant?.name || 'Desconhecida',
+          avgToRC: m.countToRC > 0 ? m.sumToRC / m.countToRC : null,
+          avgToPO: m.countToPO > 0 ? m.sumToPO / m.countToPO : null,
+        }
+      })
+      .filter((r) => r.avgToRC !== null || r.avgToPO !== null)
+
+    return ranking.sort((a, b) => {
+      const aVal = a.avgToRC ?? Infinity
+      const bVal = b.avgToRC ?? Infinity
+      return aVal - bVal
+    })
+  }
+
   const buildComprasMetrics = () => {
     let sumToRC = 0
     let countToRC = 0
@@ -240,6 +289,7 @@ export default function RelatoriosTarefas() {
   }
 
   const comprasMetrics = buildComprasMetrics()
+  const plantRanking = buildPlantRanking()
 
   const formatDays = (days: number) => {
     if (days === 0) return '0.0'
@@ -474,7 +524,7 @@ export default function RelatoriosTarefas() {
                 <Card className="shadow-sm border-gray-200">
                   <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                     <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Tempo para RC
+                      Tempo para criação da RC
                     </div>
                     <div className="text-4xl font-black text-brand-deepBlue mb-1">
                       {formatDays(comprasMetrics.avgToRC)}{' '}
@@ -495,7 +545,7 @@ export default function RelatoriosTarefas() {
                 <Card className="shadow-sm border-gray-200">
                   <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                     <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Tempo para Pedido
+                      Tempo para Criação do Pedido de Compras
                     </div>
                     <div className="text-4xl font-black text-brand-deepBlue mb-1">
                       {formatDays(comprasMetrics.avgToPO)}{' '}
@@ -533,6 +583,54 @@ export default function RelatoriosTarefas() {
                 </Card>
               </div>
 
+              {plantRanking.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+                  <div className="p-4 border-b border-gray-200 bg-slate-50">
+                    <h3 className="font-bold text-slate-800">Ranking por Planta</h3>
+                    <p className="text-xs text-slate-500">
+                      Médias de tempo para criação de RC e Pedido de Compras por unidade.
+                    </p>
+                  </div>
+                  <Table className="print:text-xs">
+                    <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+                      <TableRow>
+                        <TableHead className="font-semibold text-slate-800">Posição</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Planta</TableHead>
+                        <TableHead className="font-semibold text-slate-800 text-center">
+                          Média Criação RC
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-800 text-center">
+                          Média Criação Pedido
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {plantRanking.map((rank, index) => (
+                        <TableRow
+                          key={rank.plantId}
+                          className="hover:bg-slate-50 border-gray-100 print:border-b"
+                        >
+                          <TableCell className="font-bold text-slate-500">{index + 1}º</TableCell>
+                          <TableCell className="font-semibold text-slate-800">
+                            {rank.plantName}
+                          </TableCell>
+                          <TableCell className="text-center font-medium">
+                            {rank.avgToRC !== null
+                              ? `${formatDays(rank.avgToRC)} ${formatUnit(rank.avgToRC)}`
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="text-center font-medium">
+                            {rank.avgToPO !== null
+                              ? `${formatDays(rank.avgToPO)} ${formatUnit(rank.avgToPO)}`
+                              : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
                 <div className="p-4 border-b border-gray-200 bg-slate-50">
                   <h3 className="font-bold text-slate-800">Detalhamento dos Chamados de Compras</h3>
@@ -546,10 +644,10 @@ export default function RelatoriosTarefas() {
                       <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
                       <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
-                        T. RC
+                        T. Criação RC
                       </TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
-                        T. Pedido
+                        T. Criação Pedido
                       </TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
                         T. Entrega
