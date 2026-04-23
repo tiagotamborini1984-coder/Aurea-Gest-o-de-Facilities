@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, LabelList } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { format, parseISO } from 'date-fns'
 
@@ -74,7 +74,16 @@ export default function DashboardEquipmentTrendChart({
                     stroke: 'hsl(var(--background))',
                     strokeWidth: 2,
                   }}
-                />
+                >
+                  <LabelList
+                    dataKey="absenteismo"
+                    position="top"
+                    offset={12}
+                    className="fill-foreground font-medium"
+                    fontSize={11}
+                    formatter={(val: number) => `${val}%`}
+                  />
+                </Line>
               </LineChart>
             </ChartContainer>
           ) : (

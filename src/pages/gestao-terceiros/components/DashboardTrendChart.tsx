@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, LabelList } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
 interface DashboardTrendChartProps {
@@ -66,7 +66,16 @@ export default function DashboardTrendChart({ data, target }: DashboardTrendChar
               strokeWidth={2}
               dot={{ r: 4 }}
               activeDot={{ r: 6 }}
-            />
+            >
+              <LabelList
+                dataKey="absenteismo"
+                position="top"
+                offset={12}
+                className="fill-foreground"
+                fontSize={12}
+                formatter={(val: number) => `${val}%`}
+              />
+            </Line>
           </LineChart>
         </ChartContainer>
       </CardContent>
