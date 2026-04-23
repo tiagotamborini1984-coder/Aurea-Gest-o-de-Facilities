@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getOrgCollaborators } from '@/services/organograma'
+import { getOrgCollaborators, getOrgUnits } from '@/services/organograma'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
 import {
@@ -11,16 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Network, Download, Loader2 } from 'lucide-react'
+import { Network, Download, Loader2, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 const OrgNode = ({ node }: { node: any }) => (
   <div className="org-tree-node">
     <Card className="w-56 p-4 text-center z-10 shadow-sm border-border bg-card hover:border-brand-vividBlue hover:shadow-md transition-all duration-300 relative group">
-      <Avatar className="h-16 w-16 mx-auto mb-3 border-2 border-transparent group-hover:border-brand-vividBlue/20 transition-colors">
+      <Avatar className="h-16 w-16 mx-auto mb-3 border-2 border-transparent group-hover:border-brand-vividBlue/20 transition-colors bg-muted">
         <AvatarImage
-          src={node.photo_url || `https://img.usecurling.com/ppl/thumbnail?seed=${node.name}`}
+          src={
+            node.photo_url ||
+            `https://img.usecurling.com/ppl/thumbnail?seed=${encodeURIComponent(node.name)}`
+          }
+          crossOrigin="anonymous"
         />
         <AvatarFallback>{node.name.charAt(0)}</AvatarFallback>
       </Avatar>
@@ -55,10 +60,17 @@ export default function OrgDashboard() {
   const { activeClient } = useAppStore()
   const { plants } = useMasterData()
   const { toast } = useToast()
+
   const [collaborators, setCollaborators] = useState<any[]>([])
+  const [units, setUnits] = useState<any[]>([])
+
   const [selectedPlant, setSelectedPlant] = useState('all')
+  const [selectedUnit, setSelectedUnit] = useState('all')
+
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [zoom, setZoom] = useState(1)
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [startX, setStartX] = useState(0)
@@ -75,13 +87,8 @@ export default function OrgDashboard() {
     setScrollTop(scrollRef.current.scrollTop)
   }
 
-  const handleMouseLeave = () => {
-    setIsDragging(false)
-  }
-
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
+  const handleMouseLeave = () => setIsDragging(false)
+  const handleMouseUp = () => setIsDragging(false)
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !scrollRef.current) return
@@ -96,11 +103,24 @@ export default function OrgDashboard() {
 
   useEffect(() => {
     if (!activeClient) return
+    const loadUnits = async () => {
+      try {
+        const data = await getOrgUnits(activeClient.id)
+        setUnits(data || [])
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    loadUnits()
+  }, [activeClient])
+
+  useEffect(() => {
+    if (!activeClient) return
     const load = async () => {
       setLoading(true)
       try {
         const data = await getOrgCollaborators(activeClient.id, selectedPlant)
-        setCollaborators(data)
+        setCollaborators(data || [])
       } catch (e) {
         console.error(e)
       } finally {
@@ -110,19 +130,34 @@ export default function OrgDashboard() {
     load()
   }, [activeClient, selectedPlant])
 
+  const filteredCollaborators =
+    selectedUnit === 'all' ? collaborators : collaborators.filter((c) => c.unit_id === selectedUnit)
+
   const buildTree = (nodes: any[], parentId: string | null = null): any[] => {
     return nodes
       .filter((n) => n.manager_id === parentId)
       .map((n) => ({ ...n, children: buildTree(nodes, n.id) }))
   }
 
-  const rootNodes = buildTree(collaborators, null)
+  const rootNodes = filteredCollaborators
+    .filter((c) => !c.manager_id || !filteredCollaborators.some((fc) => fc.id === c.manager_id))
+    .map((r) => ({ ...r, children: buildTree(filteredCollaborators, r.id) }))
+
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.1, 2))
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.1, 0.3))
+  const handleZoomReset = () => setZoom(1)
 
   const handleExportPNG = async () => {
     const element = document.getElementById('org-chart-container')
     if (!element) return
 
     setExporting(true)
+    const originalZoom = zoom
+    setZoom(1) // Reset zoom temporariamente para capturar sem distorção
+
+    // Aguardar o re-render com zoom 1
+    await new Promise((res) => setTimeout(res, 300))
+
     try {
       if (!(window as any).html2canvas) {
         await new Promise((resolve, reject) => {
@@ -138,10 +173,20 @@ export default function OrgDashboard() {
 
       const isDark = document.documentElement.classList.contains('dark')
       const canvas = await (window as any).html2canvas(element, {
-        backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+        backgroundColor: isDark ? '#0f172a' : '#ffffff',
         useCORS: true,
         scale: 2,
         logging: false,
+        onclone: (clonedDoc: Document) => {
+          // Remove as classes de truncate para que o texto quebre linhas na exportação
+          // Evitando corte de texto em nomes e cargos
+          const nodes = clonedDoc.querySelectorAll('.truncate')
+          nodes.forEach((node: any) => {
+            node.classList.remove('truncate')
+            node.style.whiteSpace = 'normal'
+            node.style.wordBreak = 'break-word'
+          })
+        },
       })
 
       const dataUrl = canvas.toDataURL('image/png')
@@ -162,6 +207,7 @@ export default function OrgDashboard() {
         variant: 'destructive',
       })
     } finally {
+      setZoom(originalZoom)
       setExporting(false)
     }
   }
@@ -177,7 +223,7 @@ export default function OrgDashboard() {
           gap: 2rem;
         }
         .org-tree-group {
-          padding-top: 20px;
+          padding-top: 24px;
           position: relative;
           display: flex;
           justify-content: center;
@@ -187,7 +233,7 @@ export default function OrgDashboard() {
           flex-direction: column;
           align-items: center;
           position: relative;
-          padding: 20px 10px 0 10px;
+          padding: 24px 12px 0 12px;
           flex-shrink: 0;
         }
         .org-tree-node::before, .org-tree-node::after {
@@ -195,14 +241,14 @@ export default function OrgDashboard() {
           position: absolute;
           top: 0;
           right: 50%;
-          border-top: 4px solid hsl(var(--primary) / 0.6);
+          border-top: 3px solid hsl(var(--primary));
           width: 50%;
-          height: 20px;
+          height: 24px;
         }
         .org-tree-node::after {
           right: auto;
           left: 50%;
-          border-left: 4px solid hsl(var(--primary) / 0.6);
+          border-left: 3px solid hsl(var(--primary));
         }
         .org-tree-node:only-child::after, .org-tree-node:only-child::before {
           display: none;
@@ -214,7 +260,7 @@ export default function OrgDashboard() {
           border: 0 none;
         }
         .org-tree-node:last-child::before {
-          border-right: 4px solid hsl(var(--primary) / 0.6);
+          border-right: 3px solid hsl(var(--primary));
           border-radius: 0 6px 0 0;
         }
         .org-tree-node:first-child::after {
@@ -225,9 +271,9 @@ export default function OrgDashboard() {
           position: absolute;
           top: 0;
           left: 50%;
-          border-left: 4px solid hsl(var(--primary) / 0.6);
+          border-left: 3px solid hsl(var(--primary));
           width: 0;
-          height: 20px;
+          height: 24px;
           transform: translateX(-50%);
         }
         .org-tree > .org-tree-node::before,
@@ -238,6 +284,7 @@ export default function OrgDashboard() {
           padding-top: 0;
         }
       `}</style>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -245,10 +292,41 @@ export default function OrgDashboard() {
           </h1>
           <p className="text-muted-foreground">Visualize a hierarquia da sua empresa.</p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 bg-background border border-border rounded-md p-1 shadow-sm">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleZoomOut}
+              disabled={zoom <= 0.3}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-xs font-medium w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleZoomIn}
+              disabled={zoom >= 2}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleZoomReset}
+              title="Resetar Zoom"
+            >
+              <Maximize className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Filtrar por Planta" />
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Filtrar Planta" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as Plantas</SelectItem>
@@ -259,6 +337,21 @@ export default function OrgDashboard() {
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Filtrar Setor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Setores</SelectItem>
+              {units.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             onClick={handleExportPNG}
@@ -281,21 +374,26 @@ export default function OrgDashboard() {
         onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
-        className={`w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border overflow-auto h-[600px] shadow-inner relative ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+        className={cn(
+          'w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border overflow-auto h-[650px] shadow-inner relative',
+          isDragging ? 'cursor-grabbing select-none' : 'cursor-grab',
+        )}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full w-full absolute inset-0">
             <p className="text-muted-foreground animate-pulse">Desenhando organograma...</p>
           </div>
         ) : rootNodes.length > 0 ? (
-          <div
-            id="org-chart-container"
-            className="p-8 w-max min-w-full min-h-full flex justify-center items-start bg-slate-50/50 dark:bg-slate-900/50"
-          >
-            <div className="org-tree mx-auto">
-              {rootNodes.map((root) => (
-                <OrgNode key={root.id} node={root} />
-              ))}
+          <div style={{ zoom: zoom as any }} className="min-w-max min-h-max p-8">
+            <div
+              id="org-chart-container"
+              className="w-max min-w-full min-h-full flex justify-center items-start bg-transparent"
+            >
+              <div className="org-tree mx-auto">
+                {rootNodes.map((root) => (
+                  <OrgNode key={root.id} node={root} />
+                ))}
+              </div>
             </div>
           </div>
         ) : (
