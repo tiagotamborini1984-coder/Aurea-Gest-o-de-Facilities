@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Printer, Loader2, AlertTriangle, FileSpreadsheet } from 'lucide-react'
+import { Printer, Loader2, AlertTriangle, FileSpreadsheet, BarChart3 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -28,19 +28,44 @@ import { format, subDays, differenceInSeconds } from 'date-fns'
 import { exportToCSV } from '@/lib/export'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { Bar, BarChart, CartesianGrid, LabelList, ReferenceLine, XAxis, YAxis } from 'recharts'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 export default function RelatoriosTarefas() {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Gestão de Tarefas:Relatórios')
 
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [filterPlant, setFilterPlant] = useState('all')
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [filterAssignee, setFilterAssignee] = useState('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const dateFrom = searchParams.get('dateFrom') || format(subDays(new Date(), 30), 'yyyy-MM-dd')
+  const dateTo = searchParams.get('dateTo') || format(new Date(), 'yyyy-MM-dd')
+  const filterPlant = searchParams.get('planta') || 'all'
+  const filterStatus = searchParams.get('status') || 'all'
+  const filterAssignee = searchParams.get('assignee') || 'all'
+
+  const updateSearchParam = (key: string, value: string) => {
+    setSearchParams(
+      (prev) => {
+        if (value === 'all' || !value) {
+          prev.delete(key)
+        } else {
+          prev.set(key, value)
+        }
+        return prev
+      },
+      { replace: true },
+    )
+  }
 
   const [tasks, setTasks] = useState<any[]>([])
   const [timelines, setTimelines] = useState<any[]>([])
@@ -74,8 +99,6 @@ export default function RelatoriosTarefas() {
     if (filterPlant !== 'all') query = query.eq('plant_id', filterPlant)
     if (filterStatus !== 'all') query = query.eq('status_id', filterStatus)
 
-    // Only apply assignee filter if it's set to a specific user
-    // The UI now restricts setting this for non-admins, but we keep the logic to apply it if set.
     if (filterAssignee !== 'all') {
       query = query.eq('assignee_id', filterAssignee)
     }
@@ -236,11 +259,13 @@ export default function RelatoriosTarefas() {
         return {
           plantId: pId,
           plantName: plant?.name || 'Desconhecida',
-          avgToRC: m.countToRC > 0 ? m.sumToRC / m.countToRC : null,
-          avgToPO: m.countToPO > 0 ? m.sumToPO / m.countToPO : null,
+          avgToRC: m.countToRC > 0 ? Number((m.sumToRC / m.countToRC).toFixed(2)) : null,
+          avgToPO: m.countToPO > 0 ? Number((m.sumToPO / m.countToPO).toFixed(2)) : null,
+          countToRC: m.countToRC,
+          countToPO: m.countToPO,
         }
       })
-      .filter((r) => r.avgToRC !== null || r.avgToPO !== null)
+      .filter((r) => r.avgToRC !== null || r.avgToPO !== null || r.countToRC > 0)
 
     return ranking.sort((a, b) => {
       const aVal = a.avgToRC ?? Infinity
@@ -332,7 +357,7 @@ export default function RelatoriosTarefas() {
           <Input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => updateSearchParam('dateFrom', e.target.value)}
             className="h-9 w-36"
           />
         </div>
@@ -341,13 +366,13 @@ export default function RelatoriosTarefas() {
           <Input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => updateSearchParam('dateTo', e.target.value)}
             className="h-9 w-36"
           />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-bold text-slate-700">Planta</Label>
-          <Select value={filterPlant} onValueChange={setFilterPlant}>
+          <Select value={filterPlant} onValueChange={(v) => updateSearchParam('planta', v)}>
             <SelectTrigger className="h-9 w-[180px]">
               <SelectValue placeholder="Todas" />
             </SelectTrigger>
@@ -363,7 +388,7 @@ export default function RelatoriosTarefas() {
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-bold text-slate-700">Status</Label>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <Select value={filterStatus} onValueChange={(v) => updateSearchParam('status', v)}>
             <SelectTrigger className="h-9 w-[150px]">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
@@ -381,7 +406,7 @@ export default function RelatoriosTarefas() {
         {['Administrador', 'Master'].includes(profile?.role || '') && (
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-700">Responsável</Label>
-            <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+            <Select value={filterAssignee} onValueChange={(v) => updateSearchParam('assignee', v)}>
               <SelectTrigger className="h-9 w-[180px]">
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
@@ -520,9 +545,23 @@ export default function RelatoriosTarefas() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card className="shadow-sm border-gray-200">
-                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
+                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Total de RCs Criadas
+                    </div>
+                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                      {comprasMetrics.countToRC}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                      Soma total de RCs criadas em todas as plantas no período selecionado.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm border-gray-200 flex flex-col">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center flex-1">
                     <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Tempo para criação da RC
                     </div>
@@ -532,18 +571,59 @@ export default function RelatoriosTarefas() {
                         {formatUnit(comprasMetrics.avgToRC)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-400 mt-1">
                       Média de {comprasMetrics.countToRC} chamados
                     </div>
-                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                      Tempo médio desde a abertura da tarefa até a criação da Requisição de Compras
-                      (RC).
-                    </p>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="mt-4 w-full">
+                          <BarChart3 className="w-4 h-4 mr-2" />
+                          Ver Gráfico
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl">
+                        <DialogHeader>
+                          <DialogTitle>Média de Criação de RC por Planta</DialogTitle>
+                        </DialogHeader>
+                        <div className="h-[400px] w-full mt-4">
+                          <ChartContainer
+                            config={{
+                              avg: { label: 'Média (Dias)', color: 'hsl(var(--primary))' },
+                            }}
+                          >
+                            <BarChart data={plantRanking.filter((r) => r.avgToRC !== null)}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="plantName" />
+                              <YAxis />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <ReferenceLine
+                                y={2}
+                                stroke="hsl(var(--destructive))"
+                                strokeDasharray="3 3"
+                                label={{
+                                  position: 'top',
+                                  value: 'Meta (2 dias)',
+                                  fill: 'hsl(var(--destructive))',
+                                  fontSize: 12,
+                                }}
+                              />
+                              <Bar dataKey="avgToRC" fill="var(--color-avg)" radius={[4, 4, 0, 0]}>
+                                <LabelList
+                                  dataKey="avgToRC"
+                                  position="top"
+                                  formatter={(val: number) => formatDays(val)}
+                                />
+                              </Bar>
+                            </BarChart>
+                          </ChartContainer>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </CardContent>
                 </Card>
 
                 <Card className="shadow-sm border-gray-200">
-                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
                     <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Tempo para Criação do Pedido de Compras
                     </div>
@@ -553,17 +633,17 @@ export default function RelatoriosTarefas() {
                         {formatUnit(comprasMetrics.avgToPO)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-400 mt-1">
                       Média de {comprasMetrics.countToPO} chamados
                     </div>
                     <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                      Tempo médio desde a RC até a data de emissão do Pedido de Compras.
+                      Tempo médio desde a RC até a data de emissão do Pedido.
                     </p>
                   </CardContent>
                 </Card>
 
                 <Card className="shadow-sm border-gray-200">
-                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
                     <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
                       Tempo de Entrega
                     </div>
@@ -573,61 +653,89 @@ export default function RelatoriosTarefas() {
                         {formatUnit(comprasMetrics.avgToDelivery)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-400 mt-1">
                       Média de {comprasMetrics.countToDelivery} chamados
                     </div>
                     <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-                      Tempo médio desde a emissão do Pedido até a finalização do chamado (Entrega).
+                      Tempo médio desde a emissão do Pedido até a finalização do chamado.
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
               {plantRanking.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
-                  <div className="p-4 border-b border-gray-200 bg-slate-50">
-                    <h3 className="font-bold text-slate-800">Ranking por Planta</h3>
-                    <p className="text-xs text-slate-500">
-                      Médias de tempo para criação de RC e Pedido de Compras por unidade.
-                    </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
+                    <div className="mb-6">
+                      <h3 className="font-bold text-slate-800">Volume de RCs por Planta</h3>
+                      <p className="text-xs text-slate-500">
+                        Quantidade de Requisições de Compra criadas no período selecionado.
+                      </p>
+                    </div>
+                    <div className="h-[300px] w-full">
+                      <ChartContainer
+                        config={{
+                          count: { label: 'Qtd. RCs', color: 'hsl(var(--primary))' },
+                        }}
+                      >
+                        <BarChart data={plantRanking.filter((r) => r.countToRC > 0)}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="plantName" />
+                          <YAxis />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Bar dataKey="countToRC" fill="var(--color-count)" radius={[4, 4, 0, 0]}>
+                            <LabelList dataKey="countToRC" position="top" />
+                          </Bar>
+                        </BarChart>
+                      </ChartContainer>
+                    </div>
                   </div>
-                  <Table className="print:text-xs">
-                    <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
-                      <TableRow>
-                        <TableHead className="font-semibold text-slate-800">Posição</TableHead>
-                        <TableHead className="font-semibold text-slate-800">Planta</TableHead>
-                        <TableHead className="font-semibold text-slate-800 text-center">
-                          Média Criação RC
-                        </TableHead>
-                        <TableHead className="font-semibold text-slate-800 text-center">
-                          Média Criação Pedido
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {plantRanking.map((rank, index) => (
-                        <TableRow
-                          key={rank.plantId}
-                          className="hover:bg-slate-50 border-gray-100 print:border-b"
-                        >
-                          <TableCell className="font-bold text-slate-500">{index + 1}º</TableCell>
-                          <TableCell className="font-semibold text-slate-800">
-                            {rank.plantName}
-                          </TableCell>
-                          <TableCell className="text-center font-medium">
-                            {rank.avgToRC !== null
-                              ? `${formatDays(rank.avgToRC)} ${formatUnit(rank.avgToRC)}`
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="text-center font-medium">
-                            {rank.avgToPO !== null
-                              ? `${formatDays(rank.avgToPO)} ${formatUnit(rank.avgToPO)}`
-                              : '-'}
-                          </TableCell>
+
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+                    <div className="p-4 border-b border-gray-200 bg-slate-50">
+                      <h3 className="font-bold text-slate-800">Ranking por Planta</h3>
+                      <p className="text-xs text-slate-500">
+                        Médias de tempo para criação de RC e Pedido de Compras por unidade.
+                      </p>
+                    </div>
+                    <Table className="print:text-xs">
+                      <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+                        <TableRow>
+                          <TableHead className="font-semibold text-slate-800">Posição</TableHead>
+                          <TableHead className="font-semibold text-slate-800">Planta</TableHead>
+                          <TableHead className="font-semibold text-slate-800 text-center">
+                            Média Criação RC
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-800 text-center">
+                            Média Criação Pedido
+                          </TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {plantRanking.map((rank, index) => (
+                          <TableRow
+                            key={rank.plantId}
+                            className="hover:bg-slate-50 border-gray-100 print:border-b"
+                          >
+                            <TableCell className="font-bold text-slate-500">{index + 1}º</TableCell>
+                            <TableCell className="font-semibold text-slate-800">
+                              {rank.plantName}
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {rank.avgToRC !== null
+                                ? `${formatDays(rank.avgToRC)} ${formatUnit(rank.avgToRC)}`
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {rank.avgToPO !== null
+                                ? `${formatDays(rank.avgToPO)} ${formatUnit(rank.avgToPO)}`
+                                : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
 
