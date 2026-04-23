@@ -147,6 +147,19 @@ export default function OrgDashboard() {
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.1, 0.3))
   const handleZoomReset = () => setZoom(1)
 
+  useEffect(() => {
+    if (!loading && rootNodes.length > 0 && scrollRef.current) {
+      const timer = setTimeout(() => {
+        if (scrollRef.current) {
+          const { scrollWidth, clientWidth } = scrollRef.current
+          scrollRef.current.scrollLeft = (scrollWidth - clientWidth) / 2
+          scrollRef.current.scrollTop = 0
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [loading, selectedPlant, selectedUnit])
+
   const handleExportPNG = async () => {
     const element = document.getElementById('org-chart-container')
     if (!element) return
