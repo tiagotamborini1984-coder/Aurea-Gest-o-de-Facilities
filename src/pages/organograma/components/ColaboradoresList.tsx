@@ -93,11 +93,22 @@ export function ColaboradoresList() {
     e.preventDefault()
     if (!activeClient) return
     try {
-      const payload = {
-        ...formData,
+      const payload: any = {
         client_id: activeClient.id,
+        name: formData.name,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        photo_url: formData.photo_url || null,
+        plant_id: formData.plant_id || null,
+        unit_id: formData.unit_id || null,
+        function_id: formData.function_id || null,
         manager_id: formData.manager_id === 'none' ? null : formData.manager_id,
       }
+
+      if (formData.id) {
+        payload.id = formData.id
+      }
+
       await saveOrgCollaborator(payload)
       toast({ title: 'Sucesso', description: 'Colaborador salvo.' })
       setFormData(defaultForm)
