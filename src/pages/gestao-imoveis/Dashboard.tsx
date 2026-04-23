@@ -27,17 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAppStore } from '@/store/AppContext'
-
-const CHART_COLORS = [
-  '#4d7c0f', // Verde Musgo
-  '#0e7490', // Azul Petróleo
-  '#f97316', // Laranja
-  '#d4af37', // Dourado
-  '#8b0000', // Vermelho Escuro
-  '#008080', // Teal
-  '#4b0082', // Indigo
-  '#2e8b57', // Sea Green
-]
+import { GLOBAL_CHART_COLORS } from '@/lib/color-utils'
 
 type DateRange = {
   from: Date | undefined
@@ -463,7 +453,7 @@ export default function DashboardImoveis() {
                       {chartData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                          fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
                         />
                       ))}
                     </Bar>
@@ -495,7 +485,9 @@ export default function DashboardImoveis() {
                       <span className="font-medium text-slate-700 flex items-center gap-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                          style={{
+                            backgroundColor: GLOBAL_CHART_COLORS[idx % GLOBAL_CHART_COLORS.length],
+                          }}
                         />
                         {item.name}
                       </span>
@@ -506,7 +498,7 @@ export default function DashboardImoveis() {
                         className="h-full transition-all duration-500"
                         style={{
                           width: `${item.rate}%`,
-                          backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                          backgroundColor: GLOBAL_CHART_COLORS[idx % GLOBAL_CHART_COLORS.length],
                         }}
                       />
                     </div>
@@ -534,7 +526,9 @@ export default function DashboardImoveis() {
                       <span className="font-medium text-slate-700 flex items-center gap-2 truncate pr-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                          style={{
+                            backgroundColor: GLOBAL_CHART_COLORS[idx % GLOBAL_CHART_COLORS.length],
+                          }}
                         />
                         <span className="truncate">{item.name}</span>
                       </span>
@@ -545,7 +539,7 @@ export default function DashboardImoveis() {
                         className="h-full transition-all duration-500"
                         style={{
                           width: `${item.rate}%`,
-                          backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                          backgroundColor: GLOBAL_CHART_COLORS[idx % GLOBAL_CHART_COLORS.length],
                         }}
                       />
                     </div>

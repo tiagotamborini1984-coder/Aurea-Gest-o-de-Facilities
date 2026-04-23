@@ -21,7 +21,9 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  LabelList,
 } from 'recharts'
+import { GLOBAL_CHART_COLORS } from '@/lib/color-utils'
 import {
   Loader2,
   ClipboardCheck,
@@ -39,8 +41,6 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
-
-const COLORS = ['#1e3a8a', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6366f1', '#ec4899']
 
 export default function AuditoriaDashboard() {
   const { profile } = useAppStore()
@@ -327,7 +327,19 @@ export default function AuditoriaDashboard() {
                           boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                         }}
                       />
-                      <Bar dataKey="value" fill="#1e3a8a" radius={[6, 6, 0, 0]} barSize={40} />
+                      <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
+                        {plantData.map((_, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+                          />
+                        ))}
+                        <LabelList
+                          dataKey="value"
+                          position="top"
+                          className="fill-slate-700 font-medium text-[11px]"
+                        />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -353,7 +365,10 @@ export default function AuditoriaDashboard() {
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       >
                         {typeData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+                          />
                         ))}
                       </Pie>
                       <Tooltip

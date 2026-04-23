@@ -23,8 +23,10 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  LabelList,
 } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { GLOBAL_CHART_COLORS } from '@/lib/color-utils'
 
 export default function DashboardBudget() {
   const { profile } = useAppStore()
@@ -35,12 +37,12 @@ export default function DashboardBudget() {
   const [selectedCC, setSelectedCC] = useState<string>('all')
 
   useEffect(() => {
-    if (!profile?.client_id) return
-    supabase
-      .from('budget_cost_centers')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .then(({ data }) => setCostCenters(data || []))
+    if (!profile?.client_id)
+      return supabase
+        .from('budget_cost_centers')
+        .select('*')
+        .eq('client_id', profile.client_id)
+        .then(({ data }) => setCostCenters(data || []))
     supabase
       .from('budget_accounts')
       .select('*')
@@ -268,8 +270,32 @@ export default function DashboardBudget() {
                   }
                 />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar dataKey="Orcado" name="Orçado" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Realizado" name="Realizado" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="Orcado"
+                  name="Orçado"
+                  fill={GLOBAL_CHART_COLORS[0]}
+                  radius={[4, 4, 0, 0]}
+                >
+                  <LabelList
+                    dataKey="Orcado"
+                    position="top"
+                    className="fill-slate-600 text-[10px] font-medium"
+                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
+                  />
+                </Bar>
+                <Bar
+                  dataKey="Realizado"
+                  name="Realizado"
+                  fill={GLOBAL_CHART_COLORS[1]}
+                  radius={[4, 4, 0, 0]}
+                >
+                  <LabelList
+                    dataKey="Realizado"
+                    position="top"
+                    className="fill-slate-600 text-[10px] font-medium"
+                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -1,3 +1,14 @@
+export const GLOBAL_CHART_COLORS = [
+  '#4d7c0f', // Verde Musgo
+  '#0e7490', // Azul Petróleo
+  '#f97316', // Laranja
+  '#d4af37', // Dourado
+  '#8b0000', // Vermelho Escuro
+  '#008080', // Teal
+  '#4b0082', // Indigo
+  '#2e8b57', // Sea Green
+]
+
 export function hexToHsl(hex: string): string {
   hex = hex.replace(/^#/, '')
   if (hex.length === 3)

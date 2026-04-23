@@ -30,7 +30,17 @@ import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
-import { Bar, BarChart, CartesianGrid, LabelList, ReferenceLine, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+  Cell,
+} from 'recharts'
+import { GLOBAL_CHART_COLORS } from '@/lib/color-utils'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import {
   Dialog,
@@ -616,11 +626,20 @@ export default function RelatoriosTarefas() {
                                   fontSize: 12,
                                 }}
                               />
-                              <Bar dataKey="avgToRC" fill="var(--color-avg)" radius={[4, 4, 0, 0]}>
+                              <Bar dataKey="avgToRC" radius={[4, 4, 0, 0]}>
+                                {plantRanking
+                                  .filter((r) => r.avgToRC !== null)
+                                  .map((entry, index) => (
+                                    <Cell
+                                      key={`cell-${index}`}
+                                      fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+                                    />
+                                  ))}
                                 <LabelList
                                   dataKey="avgToRC"
                                   position="top"
                                   formatter={(val: number) => formatDays(val)}
+                                  className="fill-slate-700 font-medium text-[11px]"
                                 />
                               </Bar>
                             </BarChart>
@@ -700,8 +719,20 @@ export default function RelatoriosTarefas() {
                               />
                             }
                           />
-                          <Bar dataKey="countToRC" fill="var(--color-count)" radius={[4, 4, 0, 0]}>
-                            <LabelList dataKey="countToRC" position="top" />
+                          <Bar dataKey="countToRC" radius={[4, 4, 0, 0]}>
+                            {plantRanking
+                              .filter((r) => r.countToRC > 0)
+                              .map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+                                />
+                              ))}
+                            <LabelList
+                              dataKey="countToRC"
+                              position="top"
+                              className="fill-slate-700 font-medium text-[11px]"
+                            />
                           </Bar>
                         </BarChart>
                       </ChartContainer>

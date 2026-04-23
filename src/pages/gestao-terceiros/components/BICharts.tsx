@@ -9,8 +9,10 @@ import {
   LineChart,
   Cell,
   ResponsiveContainer,
+  LabelList,
 } from 'recharts'
 import { cn } from '@/lib/utils'
+import { GLOBAL_CHART_COLORS } from '@/lib/color-utils'
 
 export function ChartPlants({ data, colors }: { data: any[]; colors: any }) {
   return (
@@ -27,8 +29,22 @@ export function ChartPlants({ data, colors }: { data: any[]; colors: any }) {
           <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} fontSize={10} />
           <YAxis tickLine={false} axisLine={false} fontSize={10} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="presenca" fill="var(--color-presenca)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="absenteismo" fill="var(--color-absenteismo)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="presenca" fill="var(--color-presenca)" radius={[4, 4, 0, 0]}>
+            <LabelList
+              dataKey="presenca"
+              position="top"
+              className="fill-slate-700 text-[9px]"
+              formatter={(val: number) => `${val}%`}
+            />
+          </Bar>
+          <Bar dataKey="absenteismo" fill="var(--color-absenteismo)" radius={[4, 4, 0, 0]}>
+            <LabelList
+              dataKey="absenteismo"
+              position="top"
+              className="fill-slate-700 text-[9px]"
+              formatter={(val: number) => `${val}%`}
+            />
+          </Bar>
         </BarChart>
       </ChartContainer>
     </div>
@@ -54,7 +70,20 @@ export function ChartLocalAbs({ data, colors }: { data: any[]; colors: any }) {
             width={100}
           />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="absenteismo" fill="var(--color-absenteismo)" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="absenteismo" radius={[0, 4, 4, 0]}>
+            {data.map((_, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+              />
+            ))}
+            <LabelList
+              dataKey="absenteismo"
+              position="right"
+              className="fill-slate-700 text-[10px]"
+              formatter={(val: number) => `${val}%`}
+            />
+          </Bar>
         </BarChart>
       </ChartContainer>
     </div>
@@ -73,7 +102,20 @@ export function ChartEqDisp({ data, colors }: { data: any[]; colors: any }) {
           <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} fontSize={10} />
           <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={10} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="disp" fill="var(--color-disp)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="disp" radius={[4, 4, 0, 0]}>
+            {data.map((_, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+              />
+            ))}
+            <LabelList
+              dataKey="disp"
+              position="top"
+              className="fill-slate-700 text-[10px]"
+              formatter={(val: number) => `${val}%`}
+            />
+          </Bar>
         </BarChart>
       </ChartContainer>
     </div>
@@ -95,7 +137,16 @@ export function ChartComparativeAbs({
       <ChartContainer config={{}} className="h-full w-full">
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} fontSize={10} />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            fontSize={10}
+            angle={data.length > 7 ? -45 : 0}
+            textAnchor={data.length > 7 ? 'end' : 'middle'}
+            height={data.length > 7 ? 50 : 30}
+          />
           <YAxis tickLine={false} axisLine={false} fontSize={10} />
           <ChartTooltip content={<ChartTooltipContent />} />
           {locations.map((loc, i) => (
@@ -128,6 +179,12 @@ export function ChartGoals({ data, colors }: { data: any[]; colors: any }) {
           <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={10} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            <LabelList
+              dataKey="value"
+              position="top"
+              className="fill-slate-700 text-[10px]"
+              formatter={(val: number) => `${val}%`}
+            />
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}

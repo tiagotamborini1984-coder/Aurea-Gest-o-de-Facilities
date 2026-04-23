@@ -14,7 +14,16 @@ import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend, ResponsiveContainer } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Legend,
+  ResponsiveContainer,
+  LabelList,
+} from 'recharts'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { RankingList } from '../components/BIRankings'
@@ -252,14 +261,33 @@ export default function DashboardLJ() {
                       <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Legend />
-                      <Bar dataKey="Realizado" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
-                      <Bar dataKey="Pendente" fill="#f59e0b" radius={[4, 4, 0, 0]} stackId="a" />
-                      <Bar
-                        dataKey="NãoRealizado"
-                        fill="#ef4444"
-                        radius={[4, 4, 0, 0]}
-                        stackId="a"
-                      />
+                      <Bar dataKey="Realizado" fill="#10b981" radius={[0, 0, 0, 0]} stackId="a">
+                        <LabelList
+                          dataKey="Realizado"
+                          position="inside"
+                          fill="#fff"
+                          className="text-[10px] font-bold"
+                          formatter={(val: number) => (val > 0 ? val : '')}
+                        />
+                      </Bar>
+                      <Bar dataKey="Pendente" fill="#f59e0b" radius={[0, 0, 0, 0]} stackId="a">
+                        <LabelList
+                          dataKey="Pendente"
+                          position="inside"
+                          fill="#fff"
+                          className="text-[10px] font-bold"
+                          formatter={(val: number) => (val > 0 ? val : '')}
+                        />
+                      </Bar>
+                      <Bar dataKey="NãoRealizado" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a">
+                        <LabelList
+                          dataKey="NãoRealizado"
+                          position="inside"
+                          fill="#fff"
+                          className="text-[10px] font-bold"
+                          formatter={(val: number) => (val > 0 ? val : '')}
+                        />
+                      </Bar>
                     </BarChart>
                   </ChartContainer>
                 )}

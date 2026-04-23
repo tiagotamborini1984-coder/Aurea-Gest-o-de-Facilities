@@ -41,6 +41,9 @@ export default function DashboardEquipmentTrendChart({
                   tickLine={false}
                   axisLine={false}
                   dy={10}
+                  angle={data.length > 7 ? -45 : 0}
+                  textAnchor={data.length > 7 ? 'end' : 'middle'}
+                  height={data.length > 7 ? 50 : 30}
                 />
                 <YAxis
                   stroke="hsl(var(--muted-foreground))"
