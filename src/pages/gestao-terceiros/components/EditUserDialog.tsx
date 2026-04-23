@@ -31,6 +31,7 @@ const MAIN_MENUS = [
   'Gestão de Encomendas',
   'Limpeza e Jardinagem',
   'Gestão de Tarefas',
+  'Organograma e Fluxos',
   'Auditoria e Checklist',
   'Gestão de Budget',
 ]
@@ -48,6 +49,7 @@ const CADASTROS_SUBMENUS = [
 ]
 
 const GESTAO_TAREFAS_SUBMENUS = ['Painel de Chamados', 'Relatórios', 'Tipos de Chamado', 'Status']
+const ORGANOGRAMA_SUBMENUS = ['Organograma', 'Cadastros', 'Fluxogramas']
 const AUDITORIA_SUBMENUS = [
   'Nova Auditoria',
   'Auditorias Criadas',
@@ -184,6 +186,14 @@ export function EditUserDialog({
         next = next.filter((m) => m !== 'Gestão de Tarefas')
         GESTAO_TAREFAS_SUBMENUS.forEach((sub) => {
           if (`Gestão de Tarefas:${sub}` !== menu) next.push(`Gestão de Tarefas:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (menu.startsWith('Organograma e Fluxos:') && next.includes('Organograma e Fluxos')) {
+        next = next.filter((m) => m !== 'Organograma e Fluxos')
+        ORGANOGRAMA_SUBMENUS.forEach((sub) => {
+          if (`Organograma e Fluxos:${sub}` !== menu) next.push(`Organograma e Fluxos:${sub}`)
         })
         return { ...p, accessible_menus: next }
       }
@@ -332,6 +342,29 @@ export function EditUserDialog({
                             : 'outline'
                         }
                         className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Tarefas') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Organograma e Fluxos</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {ORGANOGRAMA_SUBMENUS.map((menu) => {
+                    const key = `Organograma e Fluxos:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Organograma e Fluxos')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Organograma e Fluxos') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}

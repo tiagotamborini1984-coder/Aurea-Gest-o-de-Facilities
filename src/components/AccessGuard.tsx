@@ -24,6 +24,9 @@ const routeMenuMap: Record<string, string> = {
   '/auditoria-checklist/criadas': 'Auditoria e Checklist:Auditorias Criadas',
   '/auditoria-checklist/realizadas': 'Auditoria e Checklist:Auditorias Realizadas',
   '/auditoria-checklist/dashboard': 'Auditoria e Checklist:Dashboard',
+  '/organograma/dashboard': 'Organograma e Fluxos:Organograma',
+  '/organograma/cadastros': 'Organograma e Fluxos:Cadastros',
+  '/organograma/fluxogramas': 'Organograma e Fluxos:Fluxogramas',
 }
 
 export function AccessGuard() {

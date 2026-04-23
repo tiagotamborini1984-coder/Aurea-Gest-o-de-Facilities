@@ -45,6 +45,10 @@ export function useHasAccess(menuName: string) {
     return true
   }
 
+  if (menuName.startsWith('Organograma e Fluxos:') && userMenus.includes('Organograma e Fluxos')) {
+    return true
+  }
+
   if (
     menuName.startsWith('Auditoria e Checklist:') &&
     userMenus.includes('Auditoria e Checklist')
@@ -62,6 +66,13 @@ export function useHasAccess(menuName: string) {
   if (
     menuName === 'Auditoria e Checklist' &&
     userMenus.some((m) => m.startsWith('Auditoria e Checklist'))
+  ) {
+    return true
+  }
+
+  if (
+    menuName === 'Organograma e Fluxos' &&
+    userMenus.some((m) => m.startsWith('Organograma e Fluxos'))
   ) {
     return true
   }
