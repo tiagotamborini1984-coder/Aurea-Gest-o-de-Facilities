@@ -17,7 +17,10 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error('Missing Authorization header')
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser(token)
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: callerProfile } = await supabaseClient

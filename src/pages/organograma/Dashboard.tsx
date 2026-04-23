@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getOrgCollaborators } from '@/services/organograma'
@@ -59,6 +59,40 @@ export default function OrgDashboard() {
   const [selectedPlant, setSelectedPlant] = useState('all')
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [startY, setStartY] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const [scrollTop, setScrollTop] = useState(0)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return
+    setIsDragging(true)
+    setStartX(e.pageX - scrollRef.current.offsetLeft)
+    setStartY(e.pageY - scrollRef.current.offsetTop)
+    setScrollLeft(scrollRef.current.scrollLeft)
+    setScrollTop(scrollRef.current.scrollTop)
+  }
+
+  const handleMouseLeave = () => {
+    setIsDragging(false)
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollRef.current.offsetLeft
+    const y = e.pageY - scrollRef.current.offsetTop
+    const walkX = (x - startX) * 1.5
+    const walkY = (y - startY) * 1.5
+    scrollRef.current.scrollLeft = scrollLeft - walkX
+    scrollRef.current.scrollTop = scrollTop - walkY
+  }
 
   useEffect(() => {
     if (!activeClient) return
@@ -161,14 +195,14 @@ export default function OrgDashboard() {
           position: absolute;
           top: 0;
           right: 50%;
-          border-top: 3px solid hsl(var(--primary) / 0.5);
+          border-top: 4px solid hsl(var(--primary) / 0.6);
           width: 50%;
           height: 20px;
         }
         .org-tree-node::after {
           right: auto;
           left: 50%;
-          border-left: 3px solid hsl(var(--primary) / 0.5);
+          border-left: 4px solid hsl(var(--primary) / 0.6);
         }
         .org-tree-node:only-child::after, .org-tree-node:only-child::before {
           display: none;
@@ -180,7 +214,7 @@ export default function OrgDashboard() {
           border: 0 none;
         }
         .org-tree-node:last-child::before {
-          border-right: 3px solid hsl(var(--primary) / 0.5);
+          border-right: 4px solid hsl(var(--primary) / 0.6);
           border-radius: 0 6px 0 0;
         }
         .org-tree-node:first-child::after {
@@ -191,7 +225,7 @@ export default function OrgDashboard() {
           position: absolute;
           top: 0;
           left: 50%;
-          border-left: 3px solid hsl(var(--primary) / 0.5);
+          border-left: 4px solid hsl(var(--primary) / 0.6);
           width: 0;
           height: 20px;
           transform: translateX(-50%);
@@ -241,7 +275,14 @@ export default function OrgDashboard() {
         </div>
       </div>
 
-      <div className="w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border p-8 overflow-x-auto min-h-[500px] flex justify-center shadow-inner relative">
+      <div
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className={`w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border overflow-auto h-[600px] shadow-inner relative ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full w-full absolute inset-0">
             <p className="text-muted-foreground animate-pulse">Desenhando organograma...</p>
@@ -249,9 +290,9 @@ export default function OrgDashboard() {
         ) : rootNodes.length > 0 ? (
           <div
             id="org-chart-container"
-            className="pt-4 pb-12 px-8 w-max min-w-full flex justify-center bg-slate-50/50 dark:bg-slate-900/50"
+            className="p-8 w-max min-w-full min-h-full flex justify-center items-start bg-slate-50/50 dark:bg-slate-900/50"
           >
-            <div className="org-tree">
+            <div className="org-tree mx-auto">
               {rootNodes.map((root) => (
                 <OrgNode key={root.id} node={root} />
               ))}
