@@ -23,7 +23,7 @@ const OrgNode = ({ node }: { node: any }) => (
         <AvatarImage
           src={
             node.photo_url ||
-            `https://img.usecurling.com/ppl/thumbnail?seed=${encodeURIComponent(node.name)}`
+            `https://img.usecurling.com/ppl/thumbnail?seed=${encodeURIComponent(node.name || 'User')}`
           }
           crossOrigin="anonymous"
         />
@@ -115,6 +115,10 @@ export default function OrgDashboard() {
   }, [activeClient])
 
   useEffect(() => {
+    setSelectedUnit('all')
+  }, [selectedPlant])
+
+  useEffect(() => {
     if (!activeClient) return
     const load = async () => {
       setLoading(true)
@@ -123,6 +127,7 @@ export default function OrgDashboard() {
         setCollaborators(data || [])
       } catch (e) {
         console.error(e)
+        setCollaborators([])
       } finally {
         setLoading(false)
       }
@@ -131,17 +136,30 @@ export default function OrgDashboard() {
   }, [activeClient, selectedPlant])
 
   const filteredCollaborators =
-    selectedUnit === 'all' ? collaborators : collaborators.filter((c) => c.unit_id === selectedUnit)
+    selectedUnit === 'all'
+      ? collaborators
+      : collaborators?.filter((c) => c.unit_id === selectedUnit) || []
 
-  const buildTree = (nodes: any[], parentId: string | null = null): any[] => {
+  const buildTree = (
+    nodes: any[],
+    parentId: string | null = null,
+    visited: Set<string> = new Set(),
+  ): any[] => {
     return nodes
       .filter((n) => n.manager_id === parentId)
-      .map((n) => ({ ...n, children: buildTree(nodes, n.id) }))
+      .map((n) => {
+        if (visited.has(n.id)) {
+          return { ...n, children: [] }
+        }
+        const newVisited = new Set(visited)
+        newVisited.add(n.id)
+        return { ...n, children: buildTree(nodes, n.id, newVisited) }
+      })
   }
 
   const rootNodes = filteredCollaborators
     .filter((c) => !c.manager_id || !filteredCollaborators.some((fc) => fc.id === c.manager_id))
-    .map((r) => ({ ...r, children: buildTree(filteredCollaborators, r.id) }))
+    .map((r) => ({ ...r, children: buildTree(filteredCollaborators, r.id, new Set([r.id])) }))
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.1, 2))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.1, 0.3))
@@ -343,7 +361,7 @@ export default function OrgDashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as Plantas</SelectItem>
-              {plants.map((p) => (
+              {plants?.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
                 </SelectItem>
@@ -357,7 +375,7 @@ export default function OrgDashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Setores</SelectItem>
-              {units.map((u) => (
+              {units?.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
                   {u.name}
                 </SelectItem>
