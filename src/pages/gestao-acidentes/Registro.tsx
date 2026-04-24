@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useAppStore } from '@/store/AppContext'
+import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { useNavigate } from 'react-router-dom'
@@ -26,7 +27,8 @@ interface ActionItem {
 }
 
 export default function RegistroAcidente() {
-  const { activeClient, plants, profile } = useAppStore()
+  const { activeClient, profile } = useAppStore()
+  const { plants } = useMasterData()
   const { toast } = useToast()
   const navigate = useNavigate()
 
