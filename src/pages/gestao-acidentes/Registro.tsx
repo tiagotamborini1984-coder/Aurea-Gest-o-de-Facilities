@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash, Save } from 'lucide-react'
+import { Plus, Trash, Save, UploadCloud, X } from 'lucide-react'
 
 interface ActionItem {
   id: string
@@ -34,6 +34,7 @@ export default function RegistroAcidente() {
 
   const [profiles, setProfiles] = useState<any[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [files, setFiles] = useState<File[]>([])
   const [formData, setFormData] = useState({
     plant_id: '',
     event_date: '',
@@ -71,12 +72,54 @@ export default function RegistroAcidente() {
     setActions(actions.map((a) => (a.id === id ? { ...a, [field]: value } : a)))
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!activeClient || !profile) return
     setSubmitting(true)
 
     try {
+      let uploadedPhotos: string[] = []
+
+      // Upload files if any
+      if (files.length > 0) {
+        for (const file of files) {
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+          const filePath = `${activeClient.id}/${formData.plant_id}/${fileName}`
+
+          const { error: uploadError, data } = await supabase.storage
+            .from('accident-evidences')
+            .upload(filePath, file)
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            toast({
+              title: 'Erro no anexo',
+              description: `Não foi possível anexar o arquivo ${file.name}`,
+              variant: 'destructive',
+            })
+            continue
+          }
+
+          if (data) {
+            const { data: publicUrlData } = supabase.storage
+              .from('accident-evidences')
+              .getPublicUrl(filePath)
+            uploadedPhotos.push(publicUrlData.publicUrl)
+          }
+        }
+      }
+
       const { error: accError } = await supabase
         .from('accidents')
         .insert({
@@ -87,6 +130,7 @@ export default function RegistroAcidente() {
           department: formData.department,
           severity: formData.severity,
           description: formData.description,
+          photos: uploadedPhotos.length > 0 ? uploadedPhotos : null,
           created_by: profile.id,
         })
         .select('id')
@@ -266,6 +310,55 @@ export default function RegistroAcidente() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 required
               />
+            </div>
+
+            {/* Campo de Anexos/Evidências */}
+            <div className="space-y-2 md:col-span-2">
+              <Label>Evidências (Opcional)</Label>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    id="file-upload"
+                    onChange={handleFileChange}
+                  />
+                  <Label
+                    htmlFor="file-upload"
+                    className="flex items-center justify-center w-full h-24 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-gray-400 focus:outline-none dark:bg-gray-950 dark:border-gray-800"
+                  >
+                    <span className="flex items-center space-x-2">
+                      <UploadCloud className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                      <span className="font-medium text-gray-600 dark:text-gray-400">
+                        Clique para anexar fotos ou documentos
+                      </span>
+                    </span>
+                  </Label>
+                </div>
+                {files.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    {files.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 text-sm border rounded-md"
+                      >
+                        <span className="truncate max-w-[150px]">{file.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="w-6 h-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => removeFile(index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

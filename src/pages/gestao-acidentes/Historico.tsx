@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
-import { FileText } from 'lucide-react'
+import { FileText, Paperclip } from 'lucide-react'
 
 export default function HistoricoAcidentes() {
   const { activeClient, activePlant } = useAppStore()
@@ -72,6 +72,7 @@ export default function HistoricoAcidentes() {
                     <TableHead>Departamento</TableHead>
                     <TableHead>Local</TableHead>
                     <TableHead>Gravidade</TableHead>
+                    <TableHead>Anexos</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -96,6 +97,16 @@ export default function HistoricoAcidentes() {
                         >
                           {item.severity}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.photos && Array.isArray(item.photos) && item.photos.length > 0 ? (
+                          <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                            <Paperclip className="w-3 h-3" />
+                            {item.photos.length}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
