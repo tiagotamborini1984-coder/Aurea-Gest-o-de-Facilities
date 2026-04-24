@@ -55,6 +55,11 @@ import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
 import DashboardBudget from './pages/gestao-budget/Dashboard'
 import CentrosCustoBudget from './pages/gestao-budget/CentrosCusto'
 
+// Gestão de Acidentes Pages
+import DashboardAcidentes from './pages/gestao-acidentes/Dashboard'
+import RegistroAcidente from './pages/gestao-acidentes/Registro'
+import HistoricoAcidentes from './pages/gestao-acidentes/Historico'
+
 // Organograma e Fluxos
 import OrgDashboard from './pages/organograma/Dashboard'
 import OrgCadastros from './pages/organograma/Cadastros'
@@ -112,6 +117,11 @@ const App = () => (
                     <Route path="/organograma/dashboard" element={<OrgDashboard />} />
                     <Route path="/organograma/cadastros" element={<OrgCadastros />} />
                     <Route path="/organograma/fluxogramas" element={<OrgFluxogramas />} />
+
+                    {/* Gestão de Acidentes */}
+                    <Route path="/gestao-acidentes/dashboard" element={<DashboardAcidentes />} />
+                    <Route path="/gestao-acidentes/registro" element={<RegistroAcidente />} />
+                    <Route path="/gestao-acidentes/historico" element={<HistoricoAcidentes />} />
 
                     {/* Gestão de Budget */}
                     <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />

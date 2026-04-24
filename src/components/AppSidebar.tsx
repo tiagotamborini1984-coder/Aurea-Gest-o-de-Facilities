@@ -14,6 +14,7 @@ import {
   DollarSign,
   Target,
   Network,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -91,6 +92,15 @@ export function AppSidebar() {
         { title: 'Auditorias Criadas', path: '/auditoria-checklist/criadas' },
         { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
         { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
+      ],
+    },
+    {
+      title: 'Gestão de Acidentes',
+      icon: AlertTriangle,
+      subItems: [
+        { title: 'Dashboard', path: '/gestao-acidentes/dashboard' },
+        { title: 'Novo Registro', path: '/gestao-acidentes/registro' },
+        { title: 'Histórico', path: '/gestao-acidentes/historico' },
       ],
     },
     {
@@ -193,6 +203,7 @@ export function AppSidebar() {
           'Auditoria e Checklist',
           'Gestão de Imóveis',
           'Book de Metas',
+          'Gestão de Acidentes',
         ]
       }
 
@@ -231,6 +242,8 @@ export function AppSidebar() {
           )
         } else if (item.title === 'Gestão de Imóveis') {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
+        } else if (item.title === 'Gestão de Acidentes') {
+          filteredSubItems = userMenus.includes('Gestão de Acidentes') ? item.subItems : []
         } else if (item.title === 'Organograma e Fluxos') {
           filteredSubItems = item.subItems.filter(
             (sub) =>
