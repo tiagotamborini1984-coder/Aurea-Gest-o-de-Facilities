@@ -280,6 +280,7 @@ export function useDashboardCalculations(
               return {
                 id: emp.id,
                 name: emp.name,
+                function_id: emp.function_id,
                 location: locations.find((l) => l.id === emp.location_id)?.name || 'N/A',
                 presencas: empLogs.filter((l) => l.status).length,
                 faltas: empLogs.filter((l) => !l.status).length,
@@ -415,6 +416,8 @@ export function useDashboardCalculations(
         contratado: formatStr(contratado),
         absenteismo,
         excludedDaysCount,
+        locationStats,
+        collaboratorStats,
       },
       plantStats,
       locationStats,
