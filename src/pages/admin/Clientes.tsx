@@ -58,6 +58,7 @@ const AVAILABLE_MODULES = [
   'BI Dashboard',
   'Book de Metas',
   'Organograma e Fluxos',
+  'Gestão de Acidentes',
 ]
 
 export default function Clientes() {

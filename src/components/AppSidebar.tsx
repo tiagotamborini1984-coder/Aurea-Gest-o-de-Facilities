@@ -243,7 +243,11 @@ export function AppSidebar() {
         } else if (item.title === 'Gestão de Imóveis') {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
         } else if (item.title === 'Gestão de Acidentes') {
-          filteredSubItems = userMenus.includes('Gestão de Acidentes') ? item.subItems : []
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Gestão de Acidentes') ||
+              userMenus.includes(`Gestão de Acidentes:${sub.title}`),
+          )
         } else if (item.title === 'Organograma e Fluxos') {
           filteredSubItems = item.subItems.filter(
             (sub) =>

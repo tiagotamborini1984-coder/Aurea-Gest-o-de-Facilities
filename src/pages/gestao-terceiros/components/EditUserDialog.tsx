@@ -34,6 +34,7 @@ const MAIN_MENUS = [
   'Organograma e Fluxos',
   'Auditoria e Checklist',
   'Gestão de Budget',
+  'Gestão de Acidentes',
 ]
 
 const CADASTROS_SUBMENUS = [
@@ -57,6 +58,7 @@ const AUDITORIA_SUBMENUS = [
   'Dashboard',
 ]
 const BUDGET_SUBMENUS = ['Dashboard', 'Lançamentos', 'Centros de Custo', 'Contas Contábeis']
+const GESTAO_ACIDENTES_SUBMENUS = ['Dashboard', 'Novo Registro', 'Histórico']
 
 export function EditUserDialog({
   userToEdit,
@@ -210,6 +212,14 @@ export function EditUserDialog({
         next = next.filter((m) => m !== 'Gestão de Budget')
         BUDGET_SUBMENUS.forEach((sub) => {
           if (`Gestão de Budget:${sub}` !== menu) next.push(`Gestão de Budget:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (menu.startsWith('Gestão de Acidentes:') && next.includes('Gestão de Acidentes')) {
+        next = next.filter((m) => m !== 'Gestão de Acidentes')
+        GESTAO_ACIDENTES_SUBMENUS.forEach((sub) => {
+          if (`Gestão de Acidentes:${sub}` !== menu) next.push(`Gestão de Acidentes:${sub}`)
         })
         return { ...p, accessible_menus: next }
       }
@@ -411,6 +421,29 @@ export function EditUserDialog({
                             : 'outline'
                         }
                         className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Budget') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Gestão de Acidentes</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {GESTAO_ACIDENTES_SUBMENUS.map((menu) => {
+                    const key = `Gestão de Acidentes:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Gestão de Acidentes')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Acidentes') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}
