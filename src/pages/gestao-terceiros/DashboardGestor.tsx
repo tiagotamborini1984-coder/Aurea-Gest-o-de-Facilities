@@ -15,6 +15,7 @@ import DashboardFilters from './components/DashboardFilters'
 import DashboardMetricsCards from './components/DashboardMetricsCards'
 import DashboardPlantSummary from './components/DashboardPlantSummary'
 import DashboardDetails from './components/DashboardDetails'
+import DashboardAureaAI from './components/DashboardAureaAI'
 import { useDashboardSchedules } from './hooks/useDashboardSchedules'
 import { Link } from 'react-router-dom'
 
@@ -132,6 +133,13 @@ export default function DashboardGestor() {
             equipment={filteredEquipment}
             selectedPlants={selectedPlants}
             selectedCompanies={selectedCompanies}
+          />
+
+          <DashboardAureaAI
+            metrics={metrics}
+            activeTab={activeTab}
+            plantStats={plantStats}
+            dailyTrend={dailyTrend}
           />
 
           {activeTab === 'colaboradores' && (
