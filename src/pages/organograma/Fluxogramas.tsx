@@ -9,7 +9,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2, GitFork, ArrowRight, Save, LayoutTemplate } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  GitFork,
+  ArrowRight,
+  Save,
+  LayoutTemplate,
+  Edit2,
+  Download,
+} from 'lucide-react'
 import { getFlowcharts, saveFlowchart, deleteFlowchart } from '@/services/fluxograma'
 import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/hooks/use-toast'
@@ -82,6 +91,99 @@ export default function OrgFluxogramas() {
     loadData()
   }
 
+  const handleExportPDF = () => {
+    if (!activeFlow) return
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    document.body.appendChild(iframe)
+
+    const pri = iframe.contentWindow
+    if (!pri) return
+
+    const nodesHtml = nodes
+      .map((node) => {
+        const isStart = node.type === 'start'
+        const isEnd = node.type === 'end'
+        const isDecision = node.type === 'decision'
+
+        let borderColor = '#cbd5e1'
+        let bgColor = '#f8fafc'
+
+        if (isStart) {
+          borderColor = '#4ade80'
+          bgColor = '#f0fdf4'
+        } else if (isEnd) {
+          borderColor = '#f87171'
+          bgColor = '#fef2f2'
+        } else if (isDecision) {
+          borderColor = '#fb923c'
+          bgColor = '#fff7ed'
+        }
+
+        return `
+        <div style="border: 2px solid ${borderColor}; background-color: ${bgColor}; padding: 16px; margin: 10px; border-radius: 8px; width: 300px; text-align: center; font-family: sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); page-break-inside: avoid;">
+          <div style="font-weight: bold; font-size: 16px; color: #0f172a;">${node.label}</div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 4px; text-transform: uppercase;">${
+            node.type === 'start'
+              ? 'Início'
+              : node.type === 'end'
+                ? 'Fim'
+                : node.type === 'decision'
+                  ? 'Decisão'
+                  : 'Processo'
+          }</div>
+          ${
+            !isEnd
+              ? `
+            <div style="margin-top: 12px; font-size: 12px; color: #475569; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+              Próximos Passos (ID): ${node.next.join(', ') || '-'}
+            </div>
+          `
+              : ''
+          }
+        </div>
+        ${!isEnd ? `<div style="font-size: 24px; color: #94a3b8; text-align: center; margin: 4px 0; page-break-inside: avoid;">↓</div>` : ''}
+      `
+      })
+      .join('')
+
+    pri.document.open()
+    pri.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${activeFlow.name || 'Fluxograma'}</title>
+          <style>
+            @page { margin: 20mm; }
+            body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; color: #0f172a; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .title { font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+            .desc { font-size: 14px; color: #64748b; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">${activeFlow.name || 'Fluxograma'}</div>
+            <div class="desc">${activeFlow.description || ''}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            ${nodesHtml}
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `)
+    pri.document.close()
+
+    setTimeout(() => {
+      document.body.removeChild(iframe)
+    }, 2000)
+  }
+
   if (activeFlow) {
     return (
       <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -102,6 +204,9 @@ export default function OrgFluxogramas() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setActiveFlow(null)}>
               Voltar
+            </Button>
+            <Button variant="secondary" onClick={handleExportPDF}>
+              <Download className="h-4 w-4 mr-2" /> Exportar PDF
             </Button>
             <Button onClick={handleSave}>
               <Save className="h-4 w-4 mr-2" /> Salvar Processo
