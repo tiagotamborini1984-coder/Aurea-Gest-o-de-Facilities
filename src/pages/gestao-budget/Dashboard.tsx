@@ -88,7 +88,8 @@ export default function DashboardBudget() {
   const costCenterChartData = useMemo(() => {
     const map: Record<string, { name: string; Orcado: number; Realizado: number }> = {}
     allEntries.forEach((e) => {
-      const cc = costCenters.find((c) => c.id === e.cost_center_id)?.name || 'Outros'
+      const ccObj = costCenters.find((c) => c.id === e.cost_center_id)
+      const cc = ccObj?.code || ccObj?.name || 'Outros'
       if (!map[cc]) map[cc] = { name: cc, Orcado: 0, Realizado: 0 }
       map[cc].Orcado += Number(e.budgeted_amount)
       map[cc].Realizado += Number(e.realized_amount)
@@ -110,11 +111,11 @@ export default function DashboardBudget() {
   const chartConfig = {
     Orcado: {
       label: 'Orçado',
-      color: 'hsl(var(--chart-1))',
+      color: '#16798a',
     },
     Realizado: {
       label: 'Realizado',
-      color: 'hsl(var(--chart-2))',
+      color: '#618c21',
     },
   }
 
@@ -248,14 +249,84 @@ export default function DashboardBudget() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-1 flex flex-col shadow-sm border-border">
+          <CardHeader>
+            <CardTitle className="text-lg text-foreground">Consolidado Geral</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <ChartContainer config={chartConfig} className="h-[400px] w-full">
+              <BarChart
+                data={[{ name: 'Total', Orcado: totalBudgeted, Realizado: totalRealized }]}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  tickFormatter={(v) => `R$ ${v / 1000}k`}
+                />
+                <ChartTooltip
+                  cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
+                  content={
+                    <ChartTooltipContent
+                      formatter={(val) =>
+                        new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(val as number)
+                      }
+                    />
+                  }
+                />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar
+                  dataKey="Orcado"
+                  name="Orçado"
+                  fill="var(--color-Orcado)"
+                  radius={[4, 4, 0, 0]}
+                  barSize={60}
+                >
+                  <LabelList
+                    dataKey="Orcado"
+                    position="top"
+                    className="fill-foreground text-[10px] font-medium"
+                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
+                  />
+                </Bar>
+                <Bar
+                  dataKey="Realizado"
+                  name="Realizado"
+                  fill="var(--color-Realizado)"
+                  radius={[4, 4, 0, 0]}
+                  barSize={60}
+                >
+                  <LabelList
+                    dataKey="Realizado"
+                    position="top"
+                    className="fill-foreground text-[10px] font-medium"
+                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2 flex flex-col shadow-sm border-border">
           <CardHeader>
             <CardTitle className="text-lg text-foreground">
               Orçado vs Realizado por Centro de Custo
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             <ChartContainer config={chartConfig} className="h-[400px] w-full">
               <BarChart
                 data={costCenterChartData}
@@ -293,6 +364,7 @@ export default function DashboardBudget() {
                   name="Orçado"
                   fill="var(--color-Orcado)"
                   radius={[4, 4, 0, 0]}
+                  maxBarSize={60}
                 >
                   <LabelList
                     dataKey="Orcado"
@@ -306,6 +378,7 @@ export default function DashboardBudget() {
                   name="Realizado"
                   fill="var(--color-Realizado)"
                   radius={[4, 4, 0, 0]}
+                  maxBarSize={60}
                 >
                   <LabelList
                     dataKey="Realizado"
@@ -320,7 +393,7 @@ export default function DashboardBudget() {
         </Card>
 
         {selectedCC !== 'all' && accountChartData.length > 0 && (
-          <Card className="animate-fade-in">
+          <Card className="animate-fade-in lg:col-span-3 shadow-sm border-border">
             <CardHeader>
               <CardTitle className="text-lg text-foreground">
                 Detalhamento por Conta Contábil
