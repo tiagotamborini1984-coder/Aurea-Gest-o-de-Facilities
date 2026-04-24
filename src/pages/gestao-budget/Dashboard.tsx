@@ -1,8 +1,17 @@
 import { useState, useEffect, useMemo } from 'react'
-import { DollarSign, TrendingUp, AlertTriangle, Wallet } from 'lucide-react'
+import {
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  Wallet,
+  Sparkles,
+  ArrowRight,
+  CheckCircle,
+} from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -69,6 +78,83 @@ export default function DashboardBudget() {
     if (selectedCC === 'all') return allEntries
     return allEntries.filter((e) => e.cost_center_id === selectedCC)
   }, [allEntries, selectedCC])
+
+  const insights = useMemo(() => {
+    if (!allEntries.length || costCenters.length === 0) return []
+    const msgs = []
+
+    const ccTotals = costCenters.map((cc) => {
+      const ccEntries = allEntries.filter((e) => e.cost_center_id === cc.id)
+      const budgeted = ccEntries.reduce((acc, e) => acc + Number(e.budgeted_amount), 0)
+      const realized = ccEntries.reduce((acc, e) => acc + Number(e.realized_amount), 0)
+      return { ...cc, budgeted, realized, percent: budgeted > 0 ? (realized / budgeted) * 100 : 0 }
+    })
+
+    const overBudget = ccTotals.filter((c) => c.percent > 100).sort((a, b) => b.percent - a.percent)
+    const nearBudget = ccTotals
+      .filter((c) => c.percent >= 90 && c.percent <= 100)
+      .sort((a, b) => b.percent - a.percent)
+
+    if (overBudget.length > 0) {
+      const worstCC = overBudget[0]
+      const ccEntries = allEntries.filter((e) => e.cost_center_id === worstCC.id)
+      const worstEntry = [...ccEntries].sort(
+        (a, b) => Number(b.realized_amount) - Number(a.realized_amount),
+      )[0]
+      const worstAccount = accounts.find((a) => a.id === worstEntry?.account_id)
+
+      msgs.push({
+        type: 'danger',
+        title: 'Atenção Crítica: Orçamento Estourado',
+        description: `O centro de custo ${worstCC.code || worstCC.name} excedeu o orçamento em ${(
+          worstCC.percent - 100
+        ).toFixed(1)}%. A conta "${worstAccount?.name || 'Desconhecida'}" é a que mais gastou.`,
+        action: 'Revisar Lançamentos',
+      })
+    }
+
+    if (nearBudget.length > 0) {
+      const nearCC = nearBudget[0]
+      msgs.push({
+        type: 'warning',
+        title: 'Alerta de Consumo Elevado',
+        description: `O centro de custo ${nearCC.code || nearCC.name} já consumiu ${nearCC.percent.toFixed(
+          1,
+        )}% do orçamento planejado para este mês. Fique atento.`,
+        action: 'Ajustar Orçamento',
+      })
+    }
+
+    if (msgs.length === 0) {
+      msgs.push({
+        type: 'success',
+        title: 'Orçamento Saudável',
+        description:
+          'Todos os centros de custo estão operando dentro ou abaixo da margem planejada. Excelente gestão financeira!',
+        action: null,
+      })
+    }
+
+    const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
+    if (isAdmin) {
+      const totalB = ccTotals.reduce((acc, c) => acc + c.budgeted, 0)
+      const totalR = ccTotals.reduce((acc, c) => acc + c.realized, 0)
+      const trend = totalB > 0 ? totalR / totalB : 1
+      const forecast = totalR * (trend > 1 ? 1.05 : 0.95)
+
+      msgs.push({
+        type: 'forecast',
+        title: 'Aurea AI Forecast (Mês Seguinte)',
+        description: `Projeção de gastos para o próximo mês: ${new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(forecast)}. Baseado no KPI Orçado x Realizado atual.`,
+        action: 'Planejar Próximo Mês',
+      })
+    }
+
+    return msgs
+  }, [allEntries, costCenters, accounts, profile])
 
   const { totalBudgeted, totalRealized, diff, diffPercent } = useMemo(() => {
     let b = 0,
@@ -160,7 +246,74 @@ export default function DashboardBudget() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {insights.length > 0 && (
+        <div className="space-y-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-brand-vividBlue">
+            <Sparkles className="h-5 w-5" />
+            Aurea AI Insights
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {insights.map((insight, idx) => (
+              <Card
+                key={idx}
+                className={`shadow-sm border-l-4 ${
+                  insight.type === 'danger'
+                    ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20'
+                    : insight.type === 'warning'
+                      ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+                      : insight.type === 'forecast'
+                        ? 'border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20'
+                        : 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
+                }`}
+              >
+                <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      {insight.type === 'danger' && (
+                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      )}
+                      {insight.type === 'warning' && (
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      )}
+                      {insight.type === 'forecast' && (
+                        <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      )}
+                      {insight.type === 'success' && (
+                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      )}
+                      <span
+                        className={`font-semibold text-sm ${
+                          insight.type === 'danger'
+                            ? 'text-red-700 dark:text-red-400'
+                            : insight.type === 'warning'
+                              ? 'text-amber-700 dark:text-amber-400'
+                              : insight.type === 'forecast'
+                                ? 'text-purple-700 dark:text-purple-400'
+                                : 'text-green-700 dark:text-green-400'
+                        }`}
+                      >
+                        {insight.title}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{insight.description}</p>
+                  </div>
+                  {insight.action && (
+                    <Button variant="outline" size="sm" className="w-fit gap-2 h-8">
+                      {insight.action}
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div
+        className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in-up"
+        style={{ animationDelay: '200ms' }}
+      >
         <Card className="bg-blue-50/50 dark:bg-blue-950/20 shadow-sm border-blue-100 dark:border-blue-900">
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
