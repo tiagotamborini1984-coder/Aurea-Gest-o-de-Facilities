@@ -330,7 +330,18 @@ export default function PainelChamados() {
           const { error: uploadError } = await supabase.storage
             .from('task-attachments')
             .upload(filePath, file)
-          if (uploadError) throw uploadError
+
+          if (uploadError) {
+            if (
+              uploadError.message.includes('mime type') &&
+              uploadError.message.includes('is not supported')
+            ) {
+              throw new Error(
+                `O formato do arquivo "${file.name}" não é suportado. Por favor, tente outro formato.`,
+              )
+            }
+            throw uploadError
+          }
 
           const { data: publicUrlData } = supabase.storage
             .from('task-attachments')
@@ -810,7 +821,7 @@ export default function PainelChamados() {
                   type="file"
                   multiple
                   onChange={handleFileChange}
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.eml,message/rfc822"
                   className="cursor-pointer file:cursor-pointer"
                 />
                 {selectedFiles.length > 0 && (

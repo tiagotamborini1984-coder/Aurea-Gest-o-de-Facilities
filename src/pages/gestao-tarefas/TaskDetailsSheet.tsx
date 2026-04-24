@@ -604,7 +604,19 @@ export function TaskDetailsSheet({
         const { error: uploadError } = await supabase.storage
           .from('task-attachments')
           .upload(filePath, file)
-        if (uploadError) throw uploadError
+
+        if (uploadError) {
+          if (
+            uploadError.message.includes('mime type') &&
+            uploadError.message.includes('is not supported')
+          ) {
+            throw new Error(
+              `O formato do arquivo "${file.name}" não é suportado. Por favor, tente outro formato.`,
+            )
+          }
+          throw uploadError
+        }
+
         const { data: publicUrlData } = supabase.storage
           .from('task-attachments')
           .getPublicUrl(filePath)
@@ -1009,6 +1021,7 @@ export function TaskDetailsSheet({
                       <Input
                         type="file"
                         multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.eml,message/rfc822"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 file:cursor-pointer"
                         onChange={handleAddNewAttachment}
                         disabled={
