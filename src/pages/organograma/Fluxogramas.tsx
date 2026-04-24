@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -13,7 +16,7 @@ import {
   Plus,
   Trash2,
   GitFork,
-  ArrowRight,
+  ArrowLeft,
   Save,
   LayoutTemplate,
   Edit2,
@@ -22,6 +25,7 @@ import {
 import { getFlowcharts, saveFlowchart, deleteFlowchart } from '@/services/fluxograma'
 import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 interface FlowNode {
   id: string
@@ -30,40 +34,175 @@ interface FlowNode {
   next: string[]
 }
 
+interface Point {
+  x: number
+  y: number
+}
+
+interface Edge {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
 export default function OrgFluxogramas() {
   const { activeClient } = useAppStore()
   const { toast } = useToast()
   const [flowcharts, setFlowcharts] = useState<any[]>([])
   const [activeFlow, setActiveFlow] = useState<any | null>(null)
   const [nodes, setNodes] = useState<FlowNode[]>([])
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [edges, setEdges] = useState<Edge[]>([])
+  const [levels, setLevels] = useState<FlowNode[][]>([])
 
   const loadData = async () => {
     if (!activeClient) return
-    const data = await getFlowcharts(activeClient.id)
-    setFlowcharts(data)
+    try {
+      const data = await getFlowcharts(activeClient.id)
+      setFlowcharts(data)
+    } catch (e: any) {
+      toast({ title: 'Erro ao carregar', description: e.message, variant: 'destructive' })
+    }
   }
 
   useEffect(() => {
     loadData()
   }, [activeClient])
 
+  const calculateLayout = useCallback(() => {
+    if (nodes.length === 0) {
+      setLevels([])
+      return
+    }
+
+    const depths: Record<string, number> = {}
+    const incoming: Record<string, number> = {}
+
+    nodes.forEach((n) => (incoming[n.id] = 0))
+    nodes.forEach((n) => {
+      n.next.forEach((nxt) => {
+        if (incoming[nxt] !== undefined) incoming[nxt]++
+      })
+    })
+
+    const roots = nodes.filter((n) => incoming[n.id] === 0)
+    if (roots.length === 0) roots.push(nodes[0])
+
+    const calc = (id: string, depth: number, visited: Set<string>) => {
+      if (visited.has(id)) return
+      if ((depths[id] || -1) < depth) depths[id] = depth
+
+      const node = nodes.find((n) => n.id === id)
+      if (node) {
+        const newVisited = new Set(visited)
+        newVisited.add(id)
+        node.next.forEach((nxt) => calc(nxt, depth + 1, newVisited))
+      }
+    }
+
+    roots.forEach((r) => calc(r.id, 0, new Set()))
+
+    nodes.forEach((n) => {
+      if (depths[n.id] === undefined) calc(n.id, 0, new Set())
+    })
+
+    const lvlMap: Record<number, FlowNode[]> = {}
+    nodes.forEach((n) => {
+      const d = depths[n.id] || 0
+      if (!lvlMap[d]) lvlMap[d] = []
+      lvlMap[d].push(n)
+    })
+
+    const maxD = Math.max(-1, ...Object.keys(lvlMap).map(Number))
+    const result: FlowNode[][] = []
+    for (let i = 0; i <= maxD; i++) {
+      result.push(lvlMap[i] || [])
+    }
+    setLevels(result)
+  }, [nodes])
+
+  useEffect(() => {
+    calculateLayout()
+  }, [calculateLayout])
+
+  const updateEdges = useCallback(() => {
+    if (!containerRef.current) return
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const newEdges: Edge[] = []
+
+    nodes.forEach((node) => {
+      const el1 = nodeRefs.current[node.id]
+      if (!el1) return
+      const rect1 = el1.getBoundingClientRect()
+
+      const x1 = rect1.left + rect1.width / 2 - containerRect.left
+      const y1 = rect1.bottom - containerRect.top
+
+      node.next.forEach((nextId) => {
+        const el2 = nodeRefs.current[nextId]
+        if (!el2) return
+        const rect2 = el2.getBoundingClientRect()
+
+        const x2 = rect2.left + rect2.width / 2 - containerRect.left
+        const y2 = rect2.top - containerRect.top
+
+        newEdges.push({ id: `${node.id}-${nextId}`, x1, y1, x2, y2 })
+      })
+    })
+    setEdges(newEdges)
+  }, [nodes, levels])
+
+  useEffect(() => {
+    let frameId: number
+    const update = () => {
+      frameId = requestAnimationFrame(updateEdges)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => {
+      cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', update)
+    }
+  }, [updateEdges])
+
   const handleCreate = () => {
     setActiveFlow({ name: 'Novo Fluxograma', description: '', id: '' })
     setNodes([{ id: '1', label: 'Início', type: 'start', next: [] }])
+    setSelectedNodeId('1')
   }
 
   const handleEdit = (flow: any) => {
     setActiveFlow(flow)
     setNodes(flow.flow_data?.nodes || [])
+    setSelectedNodeId(null)
   }
 
   const addNode = () => {
-    const newId = (nodes.length + 1).toString()
-    setNodes([...nodes, { id: newId, label: `Etapa ${newId}`, type: 'process', next: [] }])
+    const newId = Math.random().toString(36).substr(2, 9)
+    const newNode = { id: newId, label: 'Nova Etapa', type: 'process', next: [] }
+    setNodes([...nodes, newNode])
+    setSelectedNodeId(newId)
   }
 
   const updateNode = (id: string, field: string, value: any) => {
     setNodes(nodes.map((n) => (n.id === id ? { ...n, [field]: value } : n)))
+  }
+
+  const removeNode = (id: string) => {
+    setNodes(
+      nodes
+        .filter((n) => n.id !== id)
+        .map((n) => ({
+          ...n,
+          next: n.next.filter((nxt) => nxt !== id),
+        })),
+    )
+    if (selectedNodeId === id) setSelectedNodeId(null)
   }
 
   const handleSave = async () => {
@@ -76,9 +215,9 @@ export default function OrgFluxogramas() {
         description: activeFlow.description,
         flow_data: { nodes, edges: [] },
       }
-      await saveFlowchart(payload)
-      toast({ title: 'Sucesso', description: 'Fluxograma salvo.' })
-      setActiveFlow(null)
+      const saved = await saveFlowchart(payload)
+      toast({ title: 'Sucesso', description: 'Fluxograma salvo com sucesso.' })
+      setActiveFlow(saved)
       loadData()
     } catch (e: any) {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' })
@@ -86,116 +225,53 @@ export default function OrgFluxogramas() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Excluir?')) return
-    await deleteFlowchart(id)
-    loadData()
+    if (!confirm('Tem certeza que deseja excluir este fluxograma?')) return
+    try {
+      await deleteFlowchart(id)
+      toast({ title: 'Sucesso', description: 'Fluxograma excluído.' })
+      loadData()
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' })
+    }
   }
 
-  const handleExportPDF = () => {
-    if (!activeFlow) return
-    const iframe = document.createElement('iframe')
-    iframe.style.display = 'none'
-    document.body.appendChild(iframe)
-
-    const pri = iframe.contentWindow
-    if (!pri) return
-
-    const nodesHtml = nodes
-      .map((node) => {
-        const isStart = node.type === 'start'
-        const isEnd = node.type === 'end'
-        const isDecision = node.type === 'decision'
-
-        let borderColor = '#cbd5e1'
-        let bgColor = '#f8fafc'
-
-        if (isStart) {
-          borderColor = '#4ade80'
-          bgColor = '#f0fdf4'
-        } else if (isEnd) {
-          borderColor = '#f87171'
-          bgColor = '#fef2f2'
-        } else if (isDecision) {
-          borderColor = '#fb923c'
-          bgColor = '#fff7ed'
-        }
-
-        return `
-        <div style="border: 2px solid ${borderColor}; background-color: ${bgColor}; padding: 16px; margin: 10px; border-radius: 8px; width: 300px; text-align: center; font-family: sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); page-break-inside: avoid;">
-          <div style="font-weight: bold; font-size: 16px; color: #0f172a;">${node.label}</div>
-          <div style="font-size: 12px; color: #64748b; margin-top: 4px; text-transform: uppercase;">${
-            node.type === 'start'
-              ? 'Início'
-              : node.type === 'end'
-                ? 'Fim'
-                : node.type === 'decision'
-                  ? 'Decisão'
-                  : 'Processo'
-          }</div>
-          ${
-            !isEnd
-              ? `
-            <div style="margin-top: 12px; font-size: 12px; color: #475569; border-top: 1px solid #e2e8f0; padding-top: 8px;">
-              Próximos Passos (ID): ${node.next.join(', ') || '-'}
-            </div>
-          `
-              : ''
-          }
-        </div>
-        ${!isEnd ? `<div style="font-size: 24px; color: #94a3b8; text-align: center; margin: 4px 0; page-break-inside: avoid;">↓</div>` : ''}
-      `
-      })
-      .join('')
-
-    pri.document.open()
-    pri.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${activeFlow.name || 'Fluxograma'}</title>
-          <style>
-            @page { margin: 20mm; }
-            body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; color: #0f172a; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .title { font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-            .desc { font-size: 14px; color: #64748b; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">${activeFlow.name || 'Fluxograma'}</div>
-            <div class="desc">${activeFlow.description || ''}</div>
-          </div>
-          <div style="display: flex; flex-direction: column; align-items: center;">
-            ${nodesHtml}
-          </div>
-          <script>
-            window.onload = () => {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `)
-    pri.document.close()
-
-    setTimeout(() => {
-      document.body.removeChild(iframe)
-    }, 2000)
+  const handlePrint = () => {
+    window.print()
   }
+
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId)
 
   if (activeFlow) {
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6 h-[calc(100vh-100px)] flex flex-col print-hide-siblings">
+        <style>{`
+          @media print {
+            @page { size: landscape; margin: 0; }
+            body { margin: 0; padding: 0; background: white; }
+            #root > * { display: none; }
+            .print-canvas-wrapper {
+              display: block !important;
+              position: absolute;
+              top: 0; left: 0; right: 0; bottom: 0;
+              background: white;
+              z-index: 99999;
+              padding: 40px;
+            }
+            .print-hidden { display: none !important; }
+            .print-visible { display: block !important; }
+          }
+        `}</style>
+
+        <div className="flex justify-between items-center print-hidden shrink-0">
           <div>
             <Input
-              className="text-2xl font-bold h-auto py-1 px-2 border-transparent hover:border-border w-96 bg-transparent"
+              className="text-2xl font-bold h-auto py-1 px-2 border-transparent hover:border-border w-[400px] bg-transparent"
               value={activeFlow.name}
               onChange={(e) => setActiveFlow({ ...activeFlow, name: e.target.value })}
+              placeholder="Nome do Fluxograma"
             />
             <Input
-              className="text-sm text-muted-foreground h-auto py-1 px-2 border-transparent hover:border-border w-96 bg-transparent"
+              className="text-sm text-muted-foreground h-auto py-1 px-2 border-transparent hover:border-border w-[400px] bg-transparent mt-1"
               placeholder="Descrição do processo..."
               value={activeFlow.description || ''}
               onChange={(e) => setActiveFlow({ ...activeFlow, description: e.target.value })}
@@ -203,9 +279,9 @@ export default function OrgFluxogramas() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setActiveFlow(null)}>
-              Voltar
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
             </Button>
-            <Button variant="secondary" onClick={handleExportPDF}>
+            <Button variant="secondary" onClick={handlePrint}>
               <Download className="h-4 w-4 mr-2" /> Exportar PDF
             </Button>
             <Button onClick={handleSave}>
@@ -214,21 +290,145 @@ export default function OrgFluxogramas() {
           </div>
         </div>
 
-        <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-8 border min-h-[500px] flex flex-col items-center">
-          {nodes.map((node, i) => (
-            <div key={node.id} className="flex flex-col items-center animate-fade-in-up">
-              <Card
-                className={`w-80 shadow-md ${node.type === 'decision' ? 'border-orange-400 bg-orange-50/30' : node.type === 'start' ? 'border-green-400 bg-green-50/30' : node.type === 'end' ? 'border-red-400 bg-red-50/30' : ''}`}
-              >
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex justify-between gap-2">
+        <div className="flex-1 flex gap-6 overflow-hidden min-h-0 print-canvas-wrapper">
+          <div className="print-visible hidden mb-8 text-center">
+            <h1 className="text-3xl font-bold text-slate-900">{activeFlow.name}</h1>
+            <p className="text-slate-600 mt-2">{activeFlow.description}</p>
+          </div>
+
+          <div
+            className="flex-1 relative bg-slate-50/50 dark:bg-slate-900/20 border rounded-xl overflow-auto print:border-none print:overflow-visible"
+            ref={containerRef}
+            onClick={(e) => {
+              if (e.target === containerRef.current) setSelectedNodeId(null)
+            }}
+          >
+            <svg
+              className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
+              style={{ minHeight: '100%' }}
+            >
+              <defs>
+                <marker
+                  id="arrowhead"
+                  markerWidth="10"
+                  markerHeight="7"
+                  refX="9"
+                  refY="3.5"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+                </marker>
+              </defs>
+              {edges.map((edge) => {
+                const dy = edge.y2 - edge.y1
+                const cy = dy > 0 ? edge.y1 + dy / 2 : edge.y1 + 40
+                const d = `M ${edge.x1} ${edge.y1} C ${edge.x1} ${cy}, ${edge.x2} ${cy}, ${edge.x2} ${edge.y2}`
+                return (
+                  <path
+                    key={edge.id}
+                    d={d}
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="2"
+                    markerEnd="url(#arrowhead)"
+                    className="transition-all duration-300"
+                  />
+                )
+              })}
+            </svg>
+
+            <div className="py-16 px-8 min-w-max min-h-full flex flex-col items-center justify-start relative z-10 gap-24">
+              {levels.map((level, lvlIdx) => (
+                <div
+                  key={lvlIdx}
+                  className="flex flex-row items-center justify-center gap-16 w-full"
+                >
+                  {level.map((node) => {
+                    const isSelected = node.id === selectedNodeId
+                    let shapeClass = ''
+                    let innerClass = ''
+                    let colorClass = ''
+
+                    if (node.type === 'start') {
+                      shapeClass = 'rounded-full px-6 py-3 min-w-[140px] h-[60px]'
+                      colorClass =
+                        'bg-emerald-100 border-emerald-500 text-emerald-900 dark:bg-emerald-900/40 dark:border-emerald-500 dark:text-emerald-100'
+                    } else if (node.type === 'end') {
+                      shapeClass = 'rounded-full px-6 py-3 min-w-[140px] h-[60px] border-[3px]'
+                      colorClass =
+                        'bg-rose-100 border-rose-500 text-rose-900 dark:bg-rose-900/40 dark:border-rose-500 dark:text-rose-100'
+                    } else if (node.type === 'decision') {
+                      shapeClass = 'w-24 h-24 rotate-45'
+                      innerClass =
+                        '-rotate-45 max-w-[80px] text-center text-xs break-words leading-tight'
+                      colorClass =
+                        'bg-amber-100 border-amber-500 text-amber-900 dark:bg-amber-900/40 dark:border-amber-500 dark:text-amber-100'
+                    } else {
+                      shapeClass = 'rounded-lg px-4 py-3 min-w-[160px] h-[70px]'
+                      colorClass =
+                        'bg-blue-100 border-blue-500 text-blue-900 dark:bg-blue-900/40 dark:border-blue-500 dark:text-blue-100'
+                    }
+
+                    return (
+                      <div
+                        key={node.id}
+                        ref={(el) => (nodeRefs.current[node.id] = el)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedNodeId(node.id)
+                        }}
+                        className={cn(
+                          'relative border-2 flex items-center justify-center shadow-sm cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5',
+                          shapeClass,
+                          colorClass,
+                          isSelected &&
+                            'ring-4 ring-brand-vividBlue/50 ring-offset-2 dark:ring-offset-slate-900 shadow-lg scale-105',
+                        )}
+                      >
+                        <div className={cn('font-semibold text-sm text-center', innerClass)}>
+                          {node.label}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+              {nodes.length === 0 && (
+                <div className="text-muted-foreground text-center py-20">
+                  Nenhuma etapa criada. Use o painel lateral para adicionar.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="w-80 bg-background border rounded-xl flex flex-col print-hidden shrink-0 overflow-hidden shadow-sm">
+            <div className="p-4 border-b bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Edit2 className="h-4 w-4" /> Propriedades
+              </h3>
+              <Button size="sm" variant="outline" onClick={addNode}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <ScrollArea className="flex-1 p-4">
+              {selectedNode ? (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="space-y-2">
+                    <Label>Rótulo da Etapa</Label>
                     <Input
-                      value={node.label}
-                      onChange={(e) => updateNode(node.id, 'label', e.target.value)}
-                      className="font-medium bg-background"
+                      value={selectedNode.label}
+                      onChange={(e) => updateNode(selectedNode.id, 'label', e.target.value)}
                     />
-                    <Select value={node.type} onValueChange={(v) => updateNode(node.id, 'type', v)}>
-                      <SelectTrigger className="w-32 bg-background">
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Tipo de Etapa</Label>
+                    <Select
+                      value={selectedNode.type}
+                      onValueChange={(v) => updateNode(selectedNode.id, 'type', v)}
+                    >
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -239,42 +439,74 @@ export default function OrgFluxogramas() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {node.type !== 'end' && (
-                    <div className="pt-2 border-t border-border/50">
-                      <label className="text-xs text-muted-foreground block mb-1">
-                        Próximo Passo (ID):
-                      </label>
-                      <Input
-                        placeholder="Ex: 2, 3"
-                        value={node.next.join(', ')}
-                        onChange={(e) =>
-                          updateNode(
-                            node.id,
-                            'next',
-                            e.target.value
-                              .split(',')
-                              .map((s) => s.trim())
-                              .filter(Boolean),
-                          )
-                        }
-                        className="h-8 text-xs bg-background"
-                      />
+
+                  {selectedNode.type !== 'end' && (
+                    <div className="space-y-3">
+                      <Label>Próximas Etapas (Conexões)</Label>
+                      <div className="border rounded-md p-3 space-y-3 bg-slate-50/50 dark:bg-slate-900/50">
+                        {nodes
+                          .filter((n) => n.id !== selectedNode.id)
+                          .map((n) => (
+                            <div key={n.id} className="flex items-start space-x-3">
+                              <Checkbox
+                                id={`link-${n.id}`}
+                                checked={selectedNode.next.includes(n.id)}
+                                onCheckedChange={(checked) => {
+                                  const next = checked
+                                    ? [...selectedNode.next, n.id]
+                                    : selectedNode.next.filter((id) => id !== n.id)
+                                  updateNode(selectedNode.id, 'next', next)
+                                }}
+                              />
+                              <div className="grid gap-1.5 leading-none">
+                                <label
+                                  htmlFor={`link-${n.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                >
+                                  {n.label}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                                  {n.type === 'decision'
+                                    ? 'Decisão'
+                                    : n.type === 'start'
+                                      ? 'Início'
+                                      : n.type === 'end'
+                                        ? 'Fim'
+                                        : 'Processo'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        {nodes.length <= 1 && (
+                          <p className="text-xs text-muted-foreground text-center py-2">
+                            Crie mais etapas para conectar.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-              {node.type !== 'end' && (
-                <ArrowRight className="h-8 w-8 text-slate-300 my-2 rotate-90" />
+
+                  <div className="pt-6 border-t">
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => removeNode(selectedNode.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Excluir Etapa
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground space-y-4 py-20 px-4">
+                  <GitFork className="h-12 w-12 opacity-20" />
+                  <p>Selecione uma etapa no diagrama para editar suas propriedades.</p>
+                  <Button variant="outline" onClick={addNode}>
+                    Adicionar Primeira Etapa
+                  </Button>
+                </div>
               )}
-            </div>
-          ))}
-          <Button
-            variant="outline"
-            className="mt-4 border-dashed border-2 hover:border-brand-vividBlue"
-            onClick={addNode}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Adicionar Etapa
-          </Button>
+            </ScrollArea>
+          </div>
         </div>
       </div>
     )
@@ -300,12 +532,16 @@ export default function OrgFluxogramas() {
         {flowcharts.map((flow) => (
           <Card
             key={flow.id}
-            className="hover:shadow-md transition-shadow hover:border-brand-vividBlue/50 group"
+            className="hover:shadow-md transition-shadow hover:border-brand-vividBlue/50 group cursor-pointer"
+            onClick={() => handleEdit(flow)}
           >
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <LayoutTemplate className="h-8 w-8 text-brand-vividBlue/70 bg-brand-vividBlue/10 p-1.5 rounded-md" />
-                <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                <div
+                  className="flex opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Button variant="ghost" size="icon" onClick={() => handleEdit(flow)}>
                     <Edit2 className="h-4 w-4 text-blue-500" />
                   </Button>
