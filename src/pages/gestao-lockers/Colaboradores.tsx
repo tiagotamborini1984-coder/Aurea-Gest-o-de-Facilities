@@ -27,7 +27,7 @@ export default function ColaboradoresLockers() {
   const { activeClient } = useAppStore()
   const [collaborators, setCollaborators] = useState<any[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [formData, setFormData] = useState({ id: '', name: '', document: '', phone: '' })
+  const [formData, setFormData] = useState({ id: '', name: '', company: '', department: '' })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -55,18 +55,18 @@ export default function ColaboradoresLockers() {
           .from('locker_collaborators')
           .update({
             name: formData.name,
-            document: formData.document,
-            phone: formData.phone,
-          })
+            company: formData.company,
+            department: formData.department,
+          } as any)
           .eq('id', formData.id)
         toast.success('Colaborador atualizado!')
       } else {
         await supabase.from('locker_collaborators').insert({
           client_id: activeClient!.id,
           name: formData.name,
-          document: formData.document,
-          phone: formData.phone,
-        })
+          company: formData.company,
+          department: formData.department,
+        } as any)
         toast.success('Colaborador criado!')
       }
       setIsModalOpen(false)
@@ -91,7 +91,7 @@ export default function ColaboradoresLockers() {
         <h1 className="text-2xl font-bold text-slate-800">Colaboradores (Lockers)</h1>
         <Button
           onClick={() => {
-            setFormData({ id: '', name: '', document: '', phone: '' })
+            setFormData({ id: '', name: '', company: '', department: '' })
             setIsModalOpen(true)
           }}
         >
@@ -105,8 +105,8 @@ export default function ColaboradoresLockers() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Documento (CPF/RG)</TableHead>
-                <TableHead>Telefone</TableHead>
+                <TableHead>Empresa</TableHead>
+                <TableHead>Setor</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -114,8 +114,8 @@ export default function ColaboradoresLockers() {
               {collaborators.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>{c.document}</TableCell>
-                  <TableCell>{c.phone}</TableCell>
+                  <TableCell>{c.company}</TableCell>
+                  <TableCell>{c.department}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
@@ -124,8 +124,8 @@ export default function ColaboradoresLockers() {
                         setFormData({
                           id: c.id,
                           name: c.name,
-                          document: c.document || '',
-                          phone: c.phone || '',
+                          company: c.company || '',
+                          department: c.department || '',
                         })
                         setIsModalOpen(true)
                       }}
@@ -157,17 +157,17 @@ export default function ColaboradoresLockers() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Documento (CPF/RG)</Label>
+              <Label>Empresa</Label>
               <Input
-                value={formData.document}
-                onChange={(e) => setFormData({ ...formData, document: e.target.value })}
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Telefone</Label>
+              <Label>Setor</Label>
               <Input
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               />
             </div>
           </div>
