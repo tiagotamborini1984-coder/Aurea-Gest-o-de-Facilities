@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase/client'
-import { Wrench, Activity, Clock, Target, CalendarCheck } from 'lucide-react'
+import { Activity, Clock, Target } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -17,28 +17,32 @@ import {
 
 export default function DashboardManutencao() {
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    total: 0,
-    open: 0,
-    planned: 0,
-    completed: 0,
-  })
+  const [stats, setStats] = useState({ total: 0, open: 0, planned: 0, completed: 0 })
 
   useEffect(() => {
     fetchStats()
   }, [])
 
   const fetchStats = async () => {
-    // Simulated fetching for the demo, would be connected to real tables
-    setTimeout(() => {
-      setStats({
-        total: 124,
-        open: 18,
-        planned: 45,
-        completed: 61,
-      })
+    try {
+      const { data: tickets } = await supabase
+        .from('maintenance_tickets')
+        .select('id, status_id, planned_start, origin, status:maintenance_statuses(step)')
+
+      if (tickets) {
+        const total = tickets.length
+        const open = tickets.filter((t) => t.status?.step === 'Aberto' || !t.status).length
+        const planned = tickets.filter(
+          (t) => t.status?.step === 'Planejado' || t.planned_start,
+        ).length
+        const completed = tickets.filter((t) => t.status?.step === 'Concluído').length
+        setStats({ total, open, planned, completed })
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   const typeData = [
@@ -54,9 +58,8 @@ export default function DashboardManutencao() {
     { name: 'Mai', Proativo: 2.0, Reativo: 10.8 },
   ]
 
-  if (loading) {
+  if (loading)
     return <div className="p-8 text-center text-gray-500">Carregando painel gerencial...</div>
-  }
 
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">

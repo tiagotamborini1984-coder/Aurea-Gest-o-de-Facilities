@@ -1,25 +1,92 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CalendarCheck, ChevronLeft, ChevronRight, GripHorizontal } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 export default function PlanejamentoManutencao() {
-  const [days] = useState(['Segunda, 25', 'Terça, 26', 'Quarta, 27', 'Quinta, 28', 'Sexta, 29'])
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [currentWeek, setCurrentWeek] = useState(new Date())
+
+  const weekDays = Array.from({ length: 5 }).map((_, i) => {
+    const d = new Date(currentWeek)
+    const currentDay = d.getDay()
+    const diff = d.getDate() - currentDay + (currentDay === 0 ? -6 : 1) + i
+    d.setDate(diff)
+    return {
+      date: d.toISOString().split('T')[0],
+      label: new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit' }).format(d),
+    }
+  })
+
+  useEffect(() => {
+    loadTickets()
+  }, [])
+
+  const loadTickets = async () => {
+    const { data } = await supabase
+      .from('maintenance_tickets')
+      .select(`
+      id, ticket_number, description, planned_start, assignee_id,
+      assignee:profiles!maintenance_tickets_assignee_id_fkey(name),
+      status:maintenance_statuses(step)
+    `)
+      .not('status.step', 'eq', 'Concluído')
+    setTickets(data || [])
+    setLoading(false)
+  }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id)
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e: React.DragEvent, day: string) => {
+  const handleDrop = async (e: React.DragEvent, dateStr: string) => {
     e.preventDefault()
     const id = e.dataTransfer.getData('text/plain')
-    console.log(`Dropped ticket ${id} on ${day}`)
-    // would update state here
+
+    const plannedDate = `${dateStr}T09:00:00Z`
+    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, planned_start: plannedDate } : t)))
+
+    const { error } = await supabase
+      .from('maintenance_tickets')
+      .update({
+        planned_start: plannedDate,
+      })
+      .eq('id', id)
+
+    if (error) {
+      toast.error('Erro ao agendar OS')
+      loadTickets()
+    } else {
+      toast.success('OS Agendada com sucesso')
+    }
   }
+
+  const handleBacklogDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData('text/plain')
+
+    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, planned_start: null } : t)))
+
+    const { error } = await supabase
+      .from('maintenance_tickets')
+      .update({
+        planned_start: null,
+      })
+      .eq('id', id)
+
+    if (error) loadTickets()
+  }
+
+  const moveWeek = (days: number) => {
+    const d = new Date(currentWeek)
+    d.setDate(d.getDate() + days)
+    setCurrentWeek(d)
+  }
+
+  const backlogTickets = tickets.filter((t) => !t.planned_start)
 
   return (
     <div className="p-6 h-full flex flex-col animate-fade-in-up">
@@ -32,11 +99,15 @@ export default function PlanejamentoManutencao() {
           <p className="text-gray-500 mt-1">Arraste os chamados para agendar a execução.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" onClick={() => moveWeek(-7)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="font-medium px-4">Esta Semana</span>
-          <Button variant="outline" size="icon">
+          <span className="font-medium px-4 capitalize">
+            {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(
+              currentWeek,
+            )}
+          </span>
+          <Button variant="outline" size="icon" onClick={() => moveWeek(7)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -44,54 +115,88 @@ export default function PlanejamentoManutencao() {
 
       <div className="flex gap-6 h-full min-h-[500px]">
         {/* Backlog */}
-        <div className="w-72 bg-gray-50 border rounded-xl p-4 flex flex-col">
-          <h3 className="font-semibold text-gray-700 mb-4 pb-2 border-b">Aguardando Agenda</h3>
-          <div className="space-y-3 overflow-y-auto">
-            <Card
-              draggable
-              onDragStart={(e) => handleDragStart(e, '1')}
-              className="cursor-move border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-all"
-            >
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <GripHorizontal className="h-4 w-4 text-gray-400" />
-                  <span className="text-xs font-bold text-gray-600">MAN-2026-0012</span>
-                </div>
-                <p className="text-sm">Vazamento no encanamento...</p>
-                <div className="text-xs text-gray-500 mt-2">1.5h estimadas</div>
-              </CardContent>
-            </Card>
+        <div
+          className="w-72 bg-gray-50 border rounded-xl p-4 flex flex-col"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleBacklogDrop}
+        >
+          <h3 className="font-semibold text-gray-700 mb-4 pb-2 border-b flex justify-between">
+            Aguardando Agenda
+            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+              {backlogTickets.length}
+            </span>
+          </h3>
+          <div className="space-y-3 overflow-y-auto pb-10">
+            {loading ? (
+              <p className="text-center text-xs text-gray-500">Carregando...</p>
+            ) : (
+              backlogTickets.map((t) => (
+                <Card
+                  key={t.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, t.id)}
+                  className="cursor-move border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-all"
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <GripHorizontal className="h-4 w-4 text-gray-400" />
+                      <span className="text-xs font-bold text-gray-600">{t.ticket_number}</span>
+                    </div>
+                    <p className="text-sm line-clamp-2" title={t.description}>
+                      {t.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+            {!loading && backlogTickets.length === 0 && (
+              <div className="text-center text-gray-400 text-sm py-4 border-2 border-dashed rounded-lg">
+                Nenhuma OS no backlog
+              </div>
+            )}
           </div>
         </div>
 
         {/* Calendar Grid */}
         <div className="flex-1 grid grid-cols-5 gap-3">
-          {days.map((day) => (
-            <div
-              key={day}
-              className="bg-white border rounded-xl p-3 flex flex-col transition-colors hover:bg-gray-50/50"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, day)}
-            >
-              <h4 className="text-center font-medium text-gray-500 text-sm mb-3 pb-2 border-b">
-                {day}
-              </h4>
-              <div className="flex-1 border-2 border-transparent hover:border-dashed hover:border-blue-300 rounded-lg p-1 transition-all">
-                {day === 'Terça, 26' && (
-                  <Card className="border-l-4 border-l-blue-500 shadow-sm bg-blue-50/50">
-                    <CardContent className="p-3">
-                      <span className="text-xs font-bold text-blue-700">MAN-2026-0013</span>
-                      <p className="text-sm font-medium">Troca de filtro do Ar...</p>
-                      <div className="text-xs text-gray-500 mt-1 flex justify-between">
-                        <span>Carlos T.</span>
-                        <span>09:00</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+          {weekDays.map((day) => {
+            const dayTickets = tickets.filter(
+              (t) => t.planned_start && t.planned_start.startsWith(day.date),
+            )
+
+            return (
+              <div
+                key={day.date}
+                className="bg-white border rounded-xl p-3 flex flex-col transition-colors hover:bg-gray-50/50"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, day.date)}
+              >
+                <h4 className="text-center font-medium text-gray-500 text-sm mb-3 pb-2 border-b capitalize">
+                  {day.label}
+                </h4>
+                <div className="flex-1 border-2 border-transparent hover:border-dashed hover:border-blue-300 rounded-lg p-1 transition-all space-y-2">
+                  {dayTickets.map((t) => (
+                    <Card
+                      key={t.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, t.id)}
+                      className="border-l-4 border-l-blue-500 shadow-sm bg-blue-50/50 cursor-move"
+                    >
+                      <CardContent className="p-3">
+                        <span className="text-xs font-bold text-blue-700">{t.ticket_number}</span>
+                        <p className="text-xs font-medium line-clamp-2 my-1">{t.description}</p>
+                        {t.assignee && (
+                          <div className="text-[10px] text-gray-500 mt-1 flex justify-between">
+                            <span className="truncate">{t.assignee.name}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
