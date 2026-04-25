@@ -12,6 +12,7 @@ import {
   Globe,
   Home,
   DollarSign,
+  Archive,
   Target,
   Network,
   AlertTriangle,
@@ -119,6 +120,16 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Gestão de Lockers',
+      icon: Archive,
+      subItems: [
+        { title: 'Dashboard', path: '/gestao-lockers/dashboard' },
+        { title: 'Mapa de Ocupação', path: '/gestao-lockers/ocupacao' },
+        { title: 'Lockers', path: '/gestao-lockers/lockers' },
+        { title: 'Colaboradores', path: '/gestao-lockers/colaboradores' },
+      ],
+    },
+    {
       title: 'Gestão de Imóveis',
       icon: Home,
       subItems: [
@@ -202,6 +213,7 @@ export function AppSidebar() {
           'Organograma e Fluxos',
           'Auditoria e Checklist',
           'Gestão de Imóveis',
+          'Gestão de Lockers',
           'Book de Metas',
           'Gestão de Acidentes',
         ]
@@ -242,6 +254,8 @@ export function AppSidebar() {
           )
         } else if (item.title === 'Gestão de Imóveis') {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
+        } else if (item.title === 'Gestão de Lockers') {
+          filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
         } else if (item.title === 'Gestão de Acidentes') {
           filteredSubItems = item.subItems.filter(
             (sub) =>

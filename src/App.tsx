@@ -17,6 +17,12 @@ import BookMetas from './pages/gestao-terceiros/BookMetas'
 import Clientes from './pages/admin/Clientes'
 
 // Gestão de Imóveis Pages
+// Gestão de Lockers Pages
+import DashboardLockers from './pages/gestao-lockers/Dashboard'
+import Lockers from './pages/gestao-lockers/Lockers'
+import ColaboradoresLockers from './pages/gestao-lockers/Colaboradores'
+import OcupacaoLockers from './pages/gestao-lockers/Ocupacao'
+
 import DashboardImoveis from './pages/gestao-imoveis/Dashboard'
 import OcupacaoImoveis from './pages/gestao-imoveis/Ocupacao'
 import Imoveis from './pages/gestao-imoveis/Imoveis'
@@ -129,6 +135,15 @@ const App = () => (
                     <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
                     <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
                     <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
+
+                    {/* Gestão de Lockers */}
+                    <Route path="/gestao-lockers/dashboard" element={<DashboardLockers />} />
+                    <Route path="/gestao-lockers/ocupacao" element={<OcupacaoLockers />} />
+                    <Route path="/gestao-lockers/lockers" element={<Lockers />} />
+                    <Route
+                      path="/gestao-lockers/colaboradores"
+                      element={<ColaboradoresLockers />}
+                    />
 
                     {/* Gestão de Imóveis */}
                     <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
