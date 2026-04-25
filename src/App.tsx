@@ -121,6 +121,7 @@ const App = () => (
                     {/* Gestão de Acidentes */}
                     <Route path="/gestao-acidentes/dashboard" element={<DashboardAcidentes />} />
                     <Route path="/gestao-acidentes/registro" element={<RegistroAcidente />} />
+                    <Route path="/gestao-acidentes/registro/:id" element={<RegistroAcidente />} />
                     <Route path="/gestao-acidentes/historico" element={<HistoricoAcidentes />} />
 
                     {/* Gestão de Budget */}

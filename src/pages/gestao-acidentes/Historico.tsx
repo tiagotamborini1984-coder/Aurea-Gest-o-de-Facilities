@@ -12,19 +12,22 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
-import { FileText, Paperclip } from 'lucide-react'
+import { FileText, Paperclip, Edit } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useNavigate } from 'react-router-dom'
 
 export default function HistoricoAcidentes() {
-  const { activeClient, activePlant } = useAppStore()
+  const { activeClient, activePlant, profile } = useAppStore()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     async function fetchData() {
       if (!activeClient) return
       let query = supabase
         .from('accidents')
-        .select('*, plants(name)')
+        .select('*, plants(name), companies(name)')
         .eq('client_id', activeClient.id)
         .order('event_date', { ascending: false })
       if (activePlant && activePlant !== 'all') {
@@ -36,6 +39,15 @@ export default function HistoricoAcidentes() {
     }
     fetchData()
   }, [activeClient, activePlant])
+
+  const canEdit = (item: any) => {
+    if (!profile) return false
+    return (
+      profile.role === 'Administrador' ||
+      profile.role === 'Master' ||
+      item.created_by === profile.id
+    )
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto animate-fade-in">
@@ -69,10 +81,11 @@ export default function HistoricoAcidentes() {
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Planta</TableHead>
+                    <TableHead>Empresa</TableHead>
                     <TableHead>Departamento</TableHead>
-                    <TableHead>Local</TableHead>
                     <TableHead>Gravidade</TableHead>
                     <TableHead>Anexos</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -82,8 +95,8 @@ export default function HistoricoAcidentes() {
                         {format(new Date(item.event_date), 'dd/MM/yyyy HH:mm')}
                       </TableCell>
                       <TableCell>{item.plants?.name || 'N/A'}</TableCell>
+                      <TableCell>{item.companies?.name || 'N/A'}</TableCell>
                       <TableCell>{item.department}</TableCell>
-                      <TableCell>{item.location}</TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -106,6 +119,17 @@ export default function HistoricoAcidentes() {
                           </Badge>
                         ) : (
                           <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {canEdit(item) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/gestao-acidentes/registro/${item.id}`)}
+                          >
+                            <Edit className="w-4 h-4 text-gray-500" />
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
