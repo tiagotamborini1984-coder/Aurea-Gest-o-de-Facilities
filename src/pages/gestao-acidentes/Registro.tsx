@@ -172,7 +172,10 @@ export default function RegistroAcidente() {
             task_number: `ACT-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000000)}`,
             title: `Ação Preventiva: ${formData.department}`,
             description: act.description,
-            due_date: new Date(act.due_date).toISOString(),
+            due_date: (() => {
+              const [y, m, d] = act.due_date.split('-')
+              return new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 23, 59, 59).toISOString()
+            })(),
             status_updated_at: new Date().toISOString(),
           }))
           await supabase.from('tasks').insert(tasks)
@@ -402,7 +405,7 @@ export default function RegistroAcidente() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Prazo</Label>
+                    <Label>Data Limite (SLA)</Label>
                     <Input
                       type="date"
                       value={action.due_date}

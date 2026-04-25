@@ -941,7 +941,14 @@ export function TaskDetailsSheet({
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <h4 className="font-semibold text-slate-800 mb-2">Descrição</h4>
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-semibold text-slate-800">Descrição</h4>
+                {task?.due_date && (
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                    Data Limite (SLA): {format(new Date(task.due_date), 'dd/MM/yyyy')}
+                  </Badge>
+                )}
+              </div>
               <p className="text-slate-600 text-sm whitespace-pre-wrap">{task?.description}</p>
 
               {/* Participantes Section */}
