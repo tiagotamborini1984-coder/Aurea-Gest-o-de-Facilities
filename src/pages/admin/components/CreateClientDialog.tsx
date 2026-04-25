@@ -23,6 +23,7 @@ const AVAILABLE_MODULES = [
   'Auditoria e Checklist',
   'Gestão de Terceiros',
   'Gestão de Imóveis',
+  'Gestão de Lockers',
   'Gestão de Budget',
   'BI Dashboard',
   'Book de Metas',

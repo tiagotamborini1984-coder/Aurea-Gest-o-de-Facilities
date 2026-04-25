@@ -28,6 +28,7 @@ const MAIN_MENUS = [
   'Log de Auditoria',
   'Usuários',
   'Gestão de Imóveis',
+  'Gestão de Lockers',
   'Gestão de Encomendas',
   'Limpeza e Jardinagem',
   'Gestão de Tarefas',

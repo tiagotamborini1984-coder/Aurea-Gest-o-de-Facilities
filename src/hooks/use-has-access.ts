@@ -15,7 +15,12 @@ export function useHasAccess(menuName: string) {
       'Cadastros:Quadro Contratado',
       'Limpeza e Jardinagem',
       'Gestão de Tarefas',
+      'Organograma e Fluxos',
       'Auditoria e Checklist',
+      'Gestão de Imóveis',
+      'Gestão de Lockers',
+      'Book de Metas',
+      'Gestão de Acidentes',
     ]
   }
 
