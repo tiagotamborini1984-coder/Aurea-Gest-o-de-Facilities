@@ -60,6 +60,7 @@ const AVAILABLE_MODULES = [
   'Book de Metas',
   'Organograma e Fluxos',
   'Gestão de Acidentes',
+  'Gestão da Manutenção',
 ]
 
 export default function Clientes() {

@@ -36,6 +36,7 @@ const MAIN_MENUS = [
   'Auditoria e Checklist',
   'Gestão de Budget',
   'Gestão de Acidentes',
+  'Gestão da Manutenção',
 ]
 
 const CADASTROS_SUBMENUS = [
@@ -60,6 +61,13 @@ const AUDITORIA_SUBMENUS = [
 ]
 const BUDGET_SUBMENUS = ['Dashboard', 'Lançamentos', 'Centros de Custo', 'Contas Contábeis']
 const GESTAO_ACIDENTES_SUBMENUS = ['Dashboard', 'Novo Registro', 'Histórico']
+const MANUTENCAO_SUBMENUS = [
+  'Dashboard',
+  'Painel de Chamados',
+  'Planejamento (Agenda)',
+  'Manutenção Preventiva',
+  'Cadastros',
+]
 
 export function EditUserDialog({
   userToEdit,
@@ -221,6 +229,14 @@ export function EditUserDialog({
         next = next.filter((m) => m !== 'Gestão de Acidentes')
         GESTAO_ACIDENTES_SUBMENUS.forEach((sub) => {
           if (`Gestão de Acidentes:${sub}` !== menu) next.push(`Gestão de Acidentes:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (menu.startsWith('Gestão da Manutenção:') && next.includes('Gestão da Manutenção')) {
+        next = next.filter((m) => m !== 'Gestão da Manutenção')
+        MANUTENCAO_SUBMENUS.forEach((sub) => {
+          if (`Gestão da Manutenção:${sub}` !== menu) next.push(`Gestão da Manutenção:${sub}`)
         })
         return { ...p, accessible_menus: next }
       }
@@ -445,6 +461,29 @@ export function EditUserDialog({
                             : 'outline'
                         }
                         className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Acidentes') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Gestão da Manutenção</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {MANUTENCAO_SUBMENUS.map((menu) => {
+                    const key = `Gestão da Manutenção:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Gestão da Manutenção')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão da Manutenção') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}

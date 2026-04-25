@@ -16,6 +16,7 @@ import {
   Target,
   Network,
   AlertTriangle,
+  Wrench,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -102,6 +103,17 @@ export function AppSidebar() {
         { title: 'Dashboard', path: '/gestao-acidentes/dashboard' },
         { title: 'Novo Registro', path: '/gestao-acidentes/registro' },
         { title: 'Histórico', path: '/gestao-acidentes/historico' },
+      ],
+    },
+    {
+      title: 'Gestão da Manutenção',
+      icon: Wrench,
+      subItems: [
+        { title: 'Dashboard', path: '/gestao-manutencao/dashboard' },
+        { title: 'Painel de Chamados', path: '/gestao-manutencao/chamados' },
+        { title: 'Planejamento (Agenda)', path: '/gestao-manutencao/planejamento' },
+        { title: 'Manutenção Preventiva', path: '/gestao-manutencao/preventivas' },
+        { title: 'Cadastros', path: '/gestao-manutencao/cadastros' },
       ],
     },
     {
@@ -216,6 +228,7 @@ export function AppSidebar() {
           'Gestão de Lockers',
           'Book de Metas',
           'Gestão de Acidentes',
+          'Gestão da Manutenção',
         ]
       }
 
@@ -256,6 +269,12 @@ export function AppSidebar() {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
         } else if (item.title === 'Gestão de Lockers') {
           filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
+        } else if (item.title === 'Gestão da Manutenção') {
+          filteredSubItems = item.subItems.filter(
+            (sub) =>
+              userMenus.includes('Gestão da Manutenção') ||
+              userMenus.includes(`Gestão da Manutenção:${sub.title}`),
+          )
         } else if (item.title === 'Gestão de Acidentes') {
           filteredSubItems = item.subItems.filter(
             (sub) =>

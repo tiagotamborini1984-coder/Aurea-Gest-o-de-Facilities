@@ -28,6 +28,8 @@ const AVAILABLE_MODULES = [
   'BI Dashboard',
   'Book de Metas',
   'Organograma e Fluxos',
+  'Gestão de Acidentes',
+  'Gestão da Manutenção',
 ]
 
 export function CreateClientDialog({

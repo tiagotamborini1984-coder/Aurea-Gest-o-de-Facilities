@@ -73,6 +73,14 @@ import OrgFluxogramas from './pages/organograma/Fluxogramas'
 import ContasContabeisBudget from './pages/gestao-budget/ContasContabeis'
 import LancamentosBudget from './pages/gestao-budget/Lancamentos'
 
+// Gestão de Manutenção
+import NovaSolicitacaoPublica from './pages/gestao-manutencao/public/NovaSolicitacao'
+import DashboardManutencao from './pages/gestao-manutencao/Dashboard'
+import ChamadosManutencao from './pages/gestao-manutencao/Chamados'
+import PlanejamentoManutencao from './pages/gestao-manutencao/Planejamento'
+import PreventivasManutencao from './pages/gestao-manutencao/Preventivas'
+import CadastrosManutencao from './pages/gestao-manutencao/Cadastros'
+
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
     <AuthProvider>
@@ -83,6 +91,8 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/login" element={<Login />} />
+
+              <Route path="/m/:slug/nova-solicitacao" element={<NovaSolicitacaoPublica />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
@@ -135,6 +145,19 @@ const App = () => (
                     <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
                     <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
                     <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
+
+                    {/* Gestão de Manutenção */}
+                    <Route path="/gestao-manutencao/dashboard" element={<DashboardManutencao />} />
+                    <Route path="/gestao-manutencao/chamados" element={<ChamadosManutencao />} />
+                    <Route
+                      path="/gestao-manutencao/planejamento"
+                      element={<PlanejamentoManutencao />}
+                    />
+                    <Route
+                      path="/gestao-manutencao/preventivas"
+                      element={<PreventivasManutencao />}
+                    />
+                    <Route path="/gestao-manutencao/cadastros" element={<CadastrosManutencao />} />
 
                     {/* Gestão de Lockers */}
                     <Route path="/gestao-lockers/dashboard" element={<DashboardLockers />} />
