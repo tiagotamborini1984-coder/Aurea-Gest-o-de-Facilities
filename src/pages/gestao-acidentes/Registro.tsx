@@ -54,9 +54,9 @@ export default function RegistroAcidente() {
     if (!activeClient) return
     const fetchDeps = async () => {
       const [profRes, compRes, plantsRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('client_id', activeClient.id),
-        supabase.from('companies').select('*').eq('client_id', activeClient.id),
-        supabase.from('plants').select('*').eq('client_id', activeClient.id),
+        supabase.from('profiles').select('*').eq('client_id', activeClient.id).order('name'),
+        supabase.from('companies').select('*').eq('client_id', activeClient.id).order('name'),
+        supabase.from('plants').select('*').eq('client_id', activeClient.id).order('name'),
       ])
       if (profRes.data) setProfiles(profRes.data)
       if (compRes.data) setCompanies(compRes.data)
