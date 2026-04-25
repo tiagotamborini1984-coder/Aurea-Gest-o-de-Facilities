@@ -327,7 +327,9 @@ export function AppSidebar() {
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden">
                         <item.icon className="h-5 w-5 group-hover:text-brand-vividBlue transition-colors" />
-                        <span className="font-medium tracking-wide">{item.title}</span>
+                        <span className="font-medium tracking-wide" translate="no">
+                          {item.title}
+                        </span>
                         <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
@@ -347,7 +349,9 @@ export function AppSidebar() {
                                     'bg-brand-vividBlue text-white font-medium shadow-[inset_0_0_8px_rgba(0,0,0,0.2)] border-l-2 border-white/20',
                                 )}
                               >
-                                <Link to={sub.path}>{sub.label || sub.title}</Link>
+                                <Link to={sub.path} translate="no">
+                                  {sub.label || sub.title}
+                                </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           )
@@ -374,7 +378,9 @@ export function AppSidebar() {
                 >
                   <Link to={item.path}>
                     <item.icon className="h-5 w-5 group-hover:text-brand-vividBlue transition-colors" />
-                    <span className="font-medium tracking-wide">{item.title}</span>
+                    <span className="font-medium tracking-wide" translate="no">
+                      {item.title}
+                    </span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

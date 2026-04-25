@@ -61,16 +61,30 @@ function SLACountdown({
   status: any
   nonWorkingDays: string[]
 }) {
-  const [sla, setSla] = useState(() => calculateSLA(task, status, nonWorkingDays))
+  const [sla, setSla] = useState(() => {
+    try {
+      return calculateSLA(task, status, nonWorkingDays)
+    } catch (e) {
+      return { text: 'N/A', color: 'text-slate-500', percentage: 0 }
+    }
+  })
 
   useEffect(() => {
     if (status?.is_terminal || status?.freeze_sla || task.closed_at) {
-      setSla(calculateSLA(task, status, nonWorkingDays))
+      try {
+        setSla(calculateSLA(task, status, nonWorkingDays))
+      } catch (e) {
+        // ignore error to prevent crash
+      }
       return
     }
 
     const interval = setInterval(() => {
-      setSla(calculateSLA(task, status, nonWorkingDays))
+      try {
+        setSla(calculateSLA(task, status, nonWorkingDays))
+      } catch (e) {
+        // ignore error to prevent crash
+      }
     }, 1000)
 
     return () => clearInterval(interval)
@@ -747,7 +761,7 @@ export default function PainelChamados() {
               <div className="space-y-2">
                 <Label>Planta *</Label>
                 <Select
-                  value={form.plant_id}
+                  value={form.plant_id || undefined}
                   onValueChange={(v) => setForm({ ...form, plant_id: v })}
                   required
                 >
@@ -755,9 +769,9 @@ export default function PainelChamados() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {localPlants.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                    {localPlants?.map((p) => (
+                      <SelectItem key={p.id} value={p.id || 'unknown'}>
+                        {p.name || 'Sem nome'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -766,7 +780,7 @@ export default function PainelChamados() {
               <div className="space-y-2">
                 <Label>Tipo de Chamado *</Label>
                 <Select
-                  value={form.type_id}
+                  value={form.type_id || undefined}
                   onValueChange={(v) => setForm({ ...form, type_id: v })}
                   required
                 >
@@ -775,10 +789,10 @@ export default function PainelChamados() {
                   </SelectTrigger>
                   <SelectContent>
                     {taskTypes
-                      .filter((t) => t.client_id === effectiveClientId)
-                      .map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
+                      ?.filter((t) => t.client_id === effectiveClientId)
+                      ?.map((t) => (
+                        <SelectItem key={t.id} value={t.id || 'unknown'}>
+                          {t.name || 'Sem nome'}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -787,7 +801,7 @@ export default function PainelChamados() {
               <div className="space-y-2 sm:col-span-2">
                 <Label>Responsável (Atribuir a) *</Label>
                 <Select
-                  value={form.assignee_id}
+                  value={form.assignee_id || undefined}
                   onValueChange={(v) => setForm({ ...form, assignee_id: v })}
                   required
                 >
@@ -796,10 +810,10 @@ export default function PainelChamados() {
                   </SelectTrigger>
                   <SelectContent>
                     {users
-                      .filter((u) => u.client_id === effectiveClientId)
-                      .map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name} ({u.role})
+                      ?.filter((u) => u.client_id === effectiveClientId)
+                      ?.map((u) => (
+                        <SelectItem key={u.id} value={u.id || 'unknown'}>
+                          {u.name || 'Sem nome'} ({u.role || 'Sem perfil'})
                         </SelectItem>
                       ))}
                   </SelectContent>

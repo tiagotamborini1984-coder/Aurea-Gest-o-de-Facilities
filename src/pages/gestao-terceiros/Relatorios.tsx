@@ -301,8 +301,11 @@ export default function Relatorios() {
           {activeTab !== 'treinamentos' && (
             <div className="flex flex-wrap gap-6">
               <div className="space-y-1.5">
-                <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
-                  De
+                <Label
+                  className="text-xs text-slate-700 uppercase font-bold tracking-wider"
+                  translate="no"
+                >
+                  Data Inicial
                 </Label>
                 <Input
                   type="date"
@@ -312,8 +315,11 @@ export default function Relatorios() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
-                  Até
+                <Label
+                  className="text-xs text-slate-700 uppercase font-bold tracking-wider"
+                  translate="no"
+                >
+                  Data Final
                 </Label>
                 <Input
                   type="date"

@@ -317,7 +317,9 @@ export default function RelatoriosLJ() {
 
       <div className="flex flex-wrap gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm print:hidden">
         <div className="space-y-1.5">
-          <Label className="text-xs">De</Label>
+          <Label className="text-xs" translate="no">
+            Data Inicial
+          </Label>
           <Input
             type="date"
             value={dateFrom}
@@ -326,7 +328,9 @@ export default function RelatoriosLJ() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Até</Label>
+          <Label className="text-xs" translate="no">
+            Data Final
+          </Label>
           <Input
             type="date"
             value={dateTo}
