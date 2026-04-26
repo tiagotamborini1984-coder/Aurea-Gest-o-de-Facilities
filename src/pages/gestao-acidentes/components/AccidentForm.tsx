@@ -111,12 +111,14 @@ export function AccidentForm({ initialData }: { initialData?: any }) {
   }
 
   useEffect(() => {
-    if (!activeClient)
-      return supabase
-        .from('plants')
-        .select('id, name')
-        .eq('client_id', activeClient.id)
-        .then(({ data }) => setPlants(data || []))
+    if (!activeClient) return
+
+    supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient.id)
+      .then(({ data }) => setPlants(data || []))
+
     supabase
       .from('companies')
       .select('id, name')
