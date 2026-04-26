@@ -106,7 +106,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
           .select('task_number')
           .eq('client_id', activeClient.id)
           .like('task_number', `TSK-${year}-%`)
-          .order('created_at', { ascending: false })
+          .order('task_number', { ascending: false })
           .limit(1)
 
         let seq = 1
@@ -114,7 +114,6 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
           const p = latest[0].task_number.split('-')
           if (p.length === 3) seq = parseInt(p[2], 10) + 1
         }
-        const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
         let typeId = formData.type_id || types[0]?.id
         let statusId = formData.status_id || statuses[0]?.id
@@ -144,22 +143,45 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
           else throw new Error('Erro ao configurar status da tarefa padrão.')
         }
 
-        const payload: any = {
-          client_id: activeClient.id,
-          plant_id: plantId,
-          type_id: typeId,
-          status_id: statusId,
-          requester_id: profile.id,
-          assignee_id: formData.assignee_id,
-          task_number: taskNumber,
-          title: formData.title,
-          description: formData.description,
-          due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
-          accident_id: accidentId,
+        let success = false
+        let retries = 0
+        let currentSeq = seq
+
+        while (!success && retries < 5) {
+          const taskNumber = `TSK-${year}-${currentSeq.toString().padStart(4, '0')}`
+
+          const payload: any = {
+            client_id: activeClient.id,
+            plant_id: plantId,
+            type_id: typeId,
+            status_id: statusId,
+            requester_id: profile.id,
+            assignee_id: formData.assignee_id,
+            task_number: taskNumber,
+            title: formData.title,
+            description: formData.description,
+            due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+            accident_id: accidentId,
+          }
+
+          const { error } = await supabase.from('tasks').insert(payload)
+
+          if (error) {
+            if (error.code === '23505') {
+              // Unique constraint violation
+              currentSeq++
+              retries++
+              continue
+            }
+            throw error
+          }
+          success = true
         }
 
-        const { error } = await supabase.from('tasks').insert(payload)
-        if (error) throw error
+        if (!success) {
+          throw new Error('Erro ao gerar número da tarefa após várias tentativas. Tente novamente.')
+        }
+
         toast({ title: 'Sucesso', description: 'Nova ação criada.' })
       }
 
