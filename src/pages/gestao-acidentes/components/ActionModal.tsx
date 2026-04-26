@@ -82,6 +82,10 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
     if (!activeClient || !profile) return
 
     try {
+      if (!formData.assignee_id) {
+        throw new Error('Preencha o Responsável pela ação.')
+      }
+
       if (existingTask) {
         const payload: any = {
           title: formData.title,
@@ -112,11 +116,32 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
         }
         const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
-        const typeId = formData.type_id || types[0]?.id
-        const statusId = formData.status_id || statuses[0]?.id
+        let typeId = formData.type_id || types[0]?.id
+        let statusId = formData.status_id || statuses[0]?.id
 
-        if (!typeId || !statusId || !formData.assignee_id) {
-          throw new Error('Preencha os campos obrigatórios (Tipo, Status e Responsável).')
+        if (!typeId) {
+          const { data: newType } = await supabase
+            .from('task_types')
+            .insert({ client_id: activeClient.id, name: 'Geral', sla_hours: 24 })
+            .select('id')
+            .single()
+          if (newType) typeId = newType.id
+          else throw new Error('Erro ao configurar tipo de tarefa padrão.')
+        }
+
+        if (!statusId) {
+          const { data: newStatus } = await supabase
+            .from('task_statuses')
+            .insert({
+              client_id: activeClient.id,
+              name: 'Pendente',
+              color: '#eab308',
+              is_terminal: false,
+            })
+            .select('id')
+            .single()
+          if (newStatus) statusId = newStatus.id
+          else throw new Error('Erro ao configurar status da tarefa padrão.')
         }
 
         const payload: any = {
@@ -170,7 +195,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
             <div className="space-y-2">
               <Label>Responsável</Label>
               <Select
-                value={formData.assignee_id}
+                value={formData.assignee_id || undefined}
                 onValueChange={(v) => setFormData({ ...formData, assignee_id: v })}
               >
                 <SelectTrigger>
@@ -196,7 +221,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
             <div className="space-y-2">
               <Label>Tipo de Tarefa</Label>
               <Select
-                value={formData.type_id}
+                value={formData.type_id || undefined}
                 onValueChange={(v) => setFormData({ ...formData, type_id: v })}
               >
                 <SelectTrigger>
@@ -214,7 +239,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
             <div className="space-y-2">
               <Label>Status</Label>
               <Select
-                value={formData.status_id}
+                value={formData.status_id || undefined}
                 onValueChange={(v) => setFormData({ ...formData, status_id: v })}
               >
                 <SelectTrigger>
