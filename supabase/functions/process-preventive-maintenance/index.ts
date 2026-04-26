@@ -4,8 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -36,6 +35,7 @@ Deno.serve(async (req: Request) => {
     for (const plan of plans || []) {
       // Very simplified check: if last_generated is not today
       if (plan.last_generated_date !== todayStr) {
+        
         // Generate OS Number
         const year = new Date().getFullYear()
         const { data: latest } = await supabaseClient
@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
             assignee_id: plan.assignee_id,
             ticket_number: ticketNumber,
             description: `[PREVENTIVA] ${plan.title}\n\n${plan.description || ''}`,
-            origin: 'Preventiva',
+            origin: 'Preventiva'
           } as any)
           .select()
 
