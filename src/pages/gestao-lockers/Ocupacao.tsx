@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Archive, KeyRound, CalendarDays, User, UploadCloud } from 'lucide-react'
+import { Archive, KeyRound, CalendarDays, User, UploadCloud, Edit2 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -44,6 +44,9 @@ export default function OcupacaoLockers() {
   const [deliveryDate, setDeliveryDate] = useState('')
   const [termUrl, setTermUrl] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const [isEditingTermUrl, setIsEditingTermUrl] = useState(false)
+  const [editTermUrl, setEditTermUrl] = useState('')
 
   useEffect(() => {
     if (activeClient) {
@@ -84,7 +87,12 @@ export default function OcupacaoLockers() {
   }
 
   const fetchData = async () => {
-    let lockersQuery = supabase.from('lockers').select('*').eq('client_id', activeClient!.id)
+    let lockersQuery = supabase
+      .from('lockers')
+      .select('*')
+      .eq('client_id', activeClient!.id)
+      .order('identification', { ascending: true })
+
     if (selectedPlant !== 'all') lockersQuery = lockersQuery.eq('plant_id', selectedPlant)
     if (selectedLocation !== 'all') lockersQuery = lockersQuery.eq('location', selectedLocation)
 
@@ -161,6 +169,26 @@ export default function OcupacaoLockers() {
     }
   }
 
+  const handleSaveTermUrl = async () => {
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('locker_occupations')
+        .update({ term_url: editTermUrl || null })
+        .eq('id', selectedOccupation.id)
+
+      if (error) throw error
+      toast.success('Anexo atualizado com sucesso!')
+      setIsEditingTermUrl(false)
+      setSelectedOccupation({ ...selectedOccupation, term_url: editTermUrl || null })
+      fetchData()
+    } catch (err: any) {
+      toast.error('Erro ao atualizar anexo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const openAssign = (locker: any) => {
     setSelectedLocker(locker)
     setSelectedCollab('')
@@ -172,6 +200,8 @@ export default function OcupacaoLockers() {
   const openDetails = (locker: any, occupation: any) => {
     setSelectedLocker(locker)
     setSelectedOccupation(occupation)
+    setEditTermUrl(occupation.term_url || '')
+    setIsEditingTermUrl(false)
     setDetailsModalOpen(true)
   }
 
@@ -341,18 +371,60 @@ export default function OcupacaoLockers() {
               </div>
             </div>
 
-            {selectedOccupation?.term_url && (
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="space-y-2 p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-slate-900">
                   Termo de Responsabilidade
                 </span>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={selectedOccupation.term_url} target="_blank" rel="noreferrer">
-                    Visualizar
-                  </a>
-                </Button>
+                {!isEditingTermUrl && (
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditingTermUrl(true)}>
+                    <Edit2 className="h-4 w-4 mr-1" /> Editar
+                  </Button>
+                )}
               </div>
-            )}
+
+              {isEditingTermUrl ? (
+                <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                  <Input
+                    placeholder="URL do termo..."
+                    value={editTermUrl}
+                    onChange={(e) => setEditTermUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() =>
+                        setEditTermUrl('https://img.usecurling.com/p/200/300?q=document')
+                      }
+                      title="Simular Upload"
+                    >
+                      <UploadCloud className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" onClick={handleSaveTermUrl} disabled={loading}>
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              ) : selectedOccupation?.term_url ? (
+                <div className="flex items-center justify-between mt-2 pl-1">
+                  <span
+                    className="text-xs text-slate-500 truncate max-w-[200px]"
+                    title={selectedOccupation.term_url}
+                  >
+                    Anexo Disponível
+                  </span>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={selectedOccupation.term_url} target="_blank" rel="noreferrer">
+                      Visualizar
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 mt-2 pl-1">Nenhum termo anexado.</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailsModalOpen(false)}>
