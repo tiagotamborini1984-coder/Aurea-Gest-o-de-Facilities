@@ -36,7 +36,12 @@ export default function DashboardLockers() {
 
   const fetchPlants = async () => {
     const { data } = await supabase.from('plants').select('*').eq('client_id', activeClient!.id)
-    setPlants(data || [])
+    if (data) {
+      setPlants(data)
+      if (data.length === 1) {
+        setSelectedPlant(data[0].id)
+      }
+    }
   }
 
   const fetchLocations = async () => {

@@ -115,7 +115,13 @@ export default function Lockers() {
         <h1 className="text-2xl font-bold text-slate-800">Cadastros de Lockers</h1>
         <Button
           onClick={() => {
-            setFormData({ id: '', plant_id: '', location: '', identification: '', description: '' })
+            setFormData({
+              id: '',
+              plant_id: plants.length === 1 ? plants[0].id : '',
+              location: '',
+              identification: '',
+              description: '',
+            })
             setIsModalOpen(true)
           }}
         >
