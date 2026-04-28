@@ -64,6 +64,9 @@ export default function Lancamentos() {
   const [selectedCCs, setSelectedCCs] = useState<string[]>([])
   const [ccPopoverOpen, setCcPopoverOpen] = useState(false)
 
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+  const [accPopoverOpen, setAccPopoverOpen] = useState(false)
+
   const [entries, setEntries] = useState<Record<string, { budgeted: string; realized: string }>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -117,6 +120,7 @@ export default function Lancamentos() {
       .then(({ data }) => setAccounts(data || []))
 
     setSelectedCCs([])
+    setSelectedAccounts([])
     setEntries({})
   }, [activeClientId])
 
@@ -209,8 +213,13 @@ export default function Lancamentos() {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
+  const filteredAccounts = useMemo(() => {
+    if (selectedAccounts.length === 0) return accounts
+    return accounts.filter((a) => selectedAccounts.includes(a.id))
+  }, [accounts, selectedAccounts])
+
   const totals = useMemo(() => {
-    return accounts.reduce(
+    return filteredAccounts.reduce(
       (acc, curr) => {
         const vals = entries[curr.id]
         acc.budgeted += parseFloat(vals?.budgeted || '0')
@@ -219,7 +228,7 @@ export default function Lancamentos() {
       },
       { budgeted: 0, realized: 0 },
     )
-  }, [accounts, entries])
+  }, [filteredAccounts, entries])
 
   const totalDifference = totals.budgeted - totals.realized
 
@@ -267,7 +276,7 @@ export default function Lancamentos() {
 
       <Card className="shadow-sm border-slate-200">
         <CardHeader className="pb-5 border-b bg-slate-50/50">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="space-y-3">
               <Label className="text-slate-700 font-bold text-base">Mês(es) de Referência</Label>
               <div className="flex items-center gap-3">
@@ -397,6 +406,92 @@ export default function Lancamentos() {
                 </PopoverContent>
               </Popover>
             </div>
+
+            <div className="space-y-3">
+              <Label className="text-slate-700 font-bold text-base">Contas Contábeis</Label>
+              <Popover open={accPopoverOpen} onOpenChange={setAccPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={accPopoverOpen}
+                    className="w-full justify-between bg-white h-auto min-h-[60px] py-3 px-4 border-slate-300 text-base"
+                  >
+                    <div className="flex flex-wrap gap-2 items-center text-left flex-1">
+                      {selectedAccounts.length === 0 ? (
+                        <span className="text-slate-500 font-normal">Todas as contas...</span>
+                      ) : selectedAccounts.length <= 3 ? (
+                        selectedAccounts.map((id) => {
+                          const a = accounts.find((x) => x.id === id)
+                          return a ? (
+                            <Badge
+                              variant="secondary"
+                              key={id}
+                              className="font-normal bg-slate-100 text-slate-800 hover:bg-slate-200 py-1.5 px-3 text-[15px]"
+                            >
+                              {a.code ? `${a.code} - ` : ''}
+                              {a.name}
+                            </Badge>
+                          ) : null
+                        })
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="font-normal bg-slate-100 text-slate-800 py-1.5 px-3 text-[15px]"
+                        >
+                          {selectedAccounts.length} contas selecionadas
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronsUpDown className="ml-3 h-5 w-5 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[450px] p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Buscar conta contábil..."
+                      className="h-11 text-base"
+                    />
+                    <CommandList className="max-h-[350px]">
+                      <CommandEmpty>Nenhuma conta contábil encontrada.</CommandEmpty>
+                      <CommandGroup>
+                        {accounts.map((acc) => {
+                          const isSelected = selectedAccounts.includes(acc.id)
+                          return (
+                            <CommandItem
+                              key={acc.id}
+                              onSelect={() => {
+                                setSelectedAccounts((prev) =>
+                                  isSelected
+                                    ? prev.filter((id) => id !== acc.id)
+                                    : [...prev, acc.id],
+                                )
+                              }}
+                              className="cursor-pointer py-3 text-base"
+                            >
+                              <div
+                                className={cn(
+                                  'mr-4 flex h-5 w-5 items-center justify-center rounded-sm border',
+                                  isSelected
+                                    ? 'bg-brand-vividBlue border-brand-vividBlue text-white'
+                                    : 'border-slate-300 opacity-50 [&_svg]:invisible',
+                                )}
+                              >
+                                <Check className="h-4 w-4" />
+                              </div>
+                              <span className="font-medium text-slate-800">
+                                {acc.code ? `${acc.code} - ` : ''}
+                              </span>
+                              <span className="text-slate-600 ml-1">{acc.name}</span>
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </CardHeader>
 
@@ -487,7 +582,7 @@ export default function Lancamentos() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accounts.map((acc, idx) => {
+                  {filteredAccounts.map((acc, idx) => {
                     const budgeted = parseFloat(entries[acc.id]?.budgeted || '0')
                     const realized = parseFloat(entries[acc.id]?.realized || '0')
                     const difference = budgeted - realized
@@ -585,7 +680,7 @@ export default function Lancamentos() {
         </CardContent>
         {selectedCCs.length > 0 &&
           selectedMonths.length > 0 &&
-          accounts.length > 0 &&
+          filteredAccounts.length > 0 &&
           !isReadOnly && (
             <div className="p-6 bg-slate-50 border-t flex justify-end rounded-b-xl">
               <Button
