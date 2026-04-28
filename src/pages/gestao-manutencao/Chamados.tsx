@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Wrench, MapPin, Clock, Plus, Filter } from 'lucide-react'
+import { Wrench, MapPin, Clock, Plus, Filter, Paperclip, X } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
 import {
@@ -24,41 +24,39 @@ export default function ChamadosManutencao() {
   const [open, setOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const { user } = useAuth()
+  const [submitting, setSubmitting] = useState(false)
 
   const [plants, setPlants] = useState<any[]>([])
-  const [locations, setLocations] = useState<any[]>([])
+  const [areas, setAreas] = useState<any[]>([])
   const [sublocations, setSublocations] = useState<any[]>([])
   const [assets, setAssets] = useState<any[]>([])
   const [priorities, setPriorities] = useState<any[]>([])
   const [statuses, setStatuses] = useState<any[]>([])
 
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedLocation, setSelectedLocation] = useState<string>('all')
+  const [selectedArea, setSelectedArea] = useState<string>('all')
 
   const [form, setForm] = useState({
     description: '',
-    priority_id: '',
     plant_id: '',
-    location_id: '',
+    area_id: '',
     sublocation_id: '',
     asset_id: '',
   })
+  const [files, setFiles] = useState<File[]>([])
 
-  const formLocations = useMemo(
-    () => locations.filter((l) => l.plant_id === form.plant_id),
-    [locations, form.plant_id],
+  const formAreas = useMemo(
+    () => areas.filter((a) => a.plant_id === form.plant_id),
+    [areas, form.plant_id],
   )
   const formSublocations = useMemo(
-    () => sublocations.filter((s) => s.location_id === form.location_id),
-    [sublocations, form.location_id],
+    () => sublocations.filter((s) => s.area_id === form.area_id),
+    [sublocations, form.area_id],
   )
   const formAssets = useMemo(
     () =>
       assets.filter(
-        (a) =>
-          a.plant_id === form.plant_id &&
-          (!form.location_id || a.location_id === form.location_id) &&
-          (!form.sublocation_id || a.sublocation_id === form.sublocation_id),
+        (a) => a.plant_id === form.plant_id && (!form.area_id || a.area_id === form.area_id),
       ),
     [assets, form],
   )
@@ -68,27 +66,24 @@ export default function ChamadosManutencao() {
   }, [])
   useEffect(() => {
     loadTickets()
-  }, [selectedPlant, selectedLocation])
-  useEffect(() => {
-    if (plants.length === 1 && !form.plant_id) setForm((f) => ({ ...f, plant_id: plants[0].id }))
-  }, [plants, form.plant_id])
+  }, [selectedPlant, selectedArea])
 
   const loadAuxData = async () => {
-    const [pRes, lRes, subRes, aRes, prioRes, statRes] = await Promise.all([
+    const [pRes, aRes, subRes, asRes, prioRes, statRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
-      supabase.from('locations').select('id, name, plant_id').order('name'),
-      supabase.from('maintenance_sublocations').select('id, name, location_id').order('name'),
+      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
+      supabase.from('maintenance_sublocations').select('id, name, area_id').order('name'),
       supabase
         .from('maintenance_assets')
-        .select('id, name, plant_id, location_id, sublocation_id')
+        .select('id, name, plant_id, area_id, sublocation_id')
         .order('name'),
       supabase.from('maintenance_priorities').select('*').order('name'),
       supabase.from('maintenance_statuses').select('*').order('order_index'),
     ])
     if (pRes.data) setPlants(pRes.data)
-    if (lRes.data) setLocations(lRes.data)
+    if (aRes.data) setAreas(aRes.data)
     if (subRes.data) setSublocations(subRes.data)
-    if (aRes.data) setAssets(aRes.data)
+    if (asRes.data) setAssets(asRes.data)
     if (prioRes.data) setPriorities(prioRes.data)
     if (statRes.data) setStatuses(statRes.data)
   }
@@ -99,13 +94,13 @@ export default function ChamadosManutencao() {
       .from('maintenance_tickets')
       .select(`
       *, priority:maintenance_priorities(id, name, color), status:maintenance_statuses(id, name, color, step),
-      asset:maintenance_assets(name), location:locations(name), sublocation:maintenance_sublocations(name),
+      asset:maintenance_assets(name), area:maintenance_areas(name), sublocation:maintenance_sublocations(name),
       plant:plants(name), assignee:profiles!maintenance_tickets_assignee_id_fkey(name)
     `)
       .order('created_at', { ascending: false })
 
     if (selectedPlant !== 'all') q = q.eq('plant_id', selectedPlant)
-    if (selectedLocation !== 'all') q = q.eq('location_id', selectedLocation)
+    if (selectedArea !== 'all') q = q.eq('area_id', selectedArea)
 
     const { data } = await q
     setTickets(data || [])
@@ -114,14 +109,29 @@ export default function ChamadosManutencao() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.plant_id || !form.description) return toast.error('Preencha os campos obrigatórios')
+    setSubmitting(true)
     try {
-      if (!form.plant_id) throw new Error('Planta é obrigatória')
       const { data: profile } = await supabase
         .from('profiles')
         .select('client_id')
         .eq('id', user?.id)
         .single()
       if (!profile?.client_id) throw new Error('Cliente não encontrado')
+
+      let uploadedPhotos: string[] = []
+      for (const file of files) {
+        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+        const { data } = await supabase.storage
+          .from('maintenance_attachments')
+          .upload(fileName, file)
+        if (data) {
+          const { data: urlData } = supabase.storage
+            .from('maintenance_attachments')
+            .getPublicUrl(data.path)
+          uploadedPhotos.push(urlData.publicUrl)
+        }
+      }
 
       const year = new Date().getFullYear()
       const { data: latest } = await supabase
@@ -131,8 +141,7 @@ export default function ChamadosManutencao() {
         .like('ticket_number', `MAN-${year}-%`)
         .order('created_at', { ascending: false })
         .limit(1)
-      let seq = 1
-      if (latest && latest.length > 0) seq = parseInt(latest[0].ticket_number.split('-')[2], 10) + 1
+      let seq = latest?.length ? parseInt(latest[0].ticket_number.split('-')[2], 10) + 1 : 1
       const ticketNumber = `MAN-${year}-${seq.toString().padStart(4, '0')}`
 
       const initStatus = statuses.find((s) => s.step === 'Aberto') || statuses[0]
@@ -140,31 +149,44 @@ export default function ChamadosManutencao() {
       const { error } = await supabase.from('maintenance_tickets').insert({
         client_id: profile.client_id,
         plant_id: form.plant_id,
-        location_id: form.location_id || null,
+        area_id: form.area_id || null,
         sublocation_id: form.sublocation_id || null,
         asset_id: form.asset_id || null,
         ticket_number: ticketNumber,
         description: form.description,
-        priority_id: form.priority_id || null,
         status_id: initStatus?.id || null,
         origin: 'Manual',
         requester_name: user?.email,
+        photos: uploadedPhotos,
       })
 
       if (error) throw error
-      toast.success('OS criada!')
+      toast.success('OS criada com sucesso!')
       setOpen(false)
-      setForm({
-        description: '',
-        priority_id: '',
-        plant_id: '',
-        location_id: '',
-        sublocation_id: '',
-        asset_id: '',
-      })
+      setForm({ description: '', plant_id: '', area_id: '', sublocation_id: '', asset_id: '' })
+      setFiles([])
       loadTickets()
     } catch (err: any) {
       toast.error(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const updatePriority = async (val: string) => {
+    if (!selectedTicket) return
+    const { error } = await supabase
+      .from('maintenance_tickets')
+      .update({ priority_id: val })
+      .eq('id', selectedTicket.id)
+    if (!error) {
+      toast.success('Prioridade atualizada')
+      setSelectedTicket({
+        ...selectedTicket,
+        priority_id: val,
+        priority: priorities.find((p) => p.id === val),
+      })
+      loadTickets()
     }
   }
 
@@ -184,7 +206,7 @@ export default function ChamadosManutencao() {
             value={selectedPlant}
             onValueChange={(v) => {
               setSelectedPlant(v)
-              setSelectedLocation('all')
+              setSelectedArea('all')
             }}
           >
             <SelectTrigger className="w-[160px] bg-white">
@@ -200,18 +222,18 @@ export default function ChamadosManutencao() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+          <Select value={selectedArea} onValueChange={setSelectedArea}>
             <SelectTrigger className="w-[160px] bg-white">
               <MapPin className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Locais" />
+              <SelectValue placeholder="Áreas" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os Locais</SelectItem>
-              {locations
-                .filter((l) => selectedPlant === 'all' || l.plant_id === selectedPlant)
-                .map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
+              <SelectItem value="all">Todas as Áreas</SelectItem>
+              {areas
+                .filter((a) => selectedPlant === 'all' || a.plant_id === selectedPlant)
+                .map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -229,7 +251,7 @@ export default function ChamadosManutencao() {
               </SheetHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-6 pb-6">
                 <div className="space-y-2">
-                  <Label>Planta</Label>
+                  <Label>Planta *</Label>
                   <Select
                     required
                     value={form.plant_id}
@@ -237,7 +259,7 @@ export default function ChamadosManutencao() {
                       setForm({
                         ...form,
                         plant_id: v,
-                        location_id: '',
+                        area_id: '',
                         sublocation_id: '',
                         asset_id: '',
                       })
@@ -259,18 +281,18 @@ export default function ChamadosManutencao() {
                   <Label>Área / Local</Label>
                   <Select
                     disabled={!form.plant_id}
-                    value={form.location_id}
+                    value={form.area_id}
                     onValueChange={(v) =>
-                      setForm({ ...form, location_id: v, sublocation_id: '', asset_id: '' })
+                      setForm({ ...form, area_id: v, sublocation_id: '', asset_id: '' })
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {formLocations.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          {l.name}
+                      {formAreas.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -279,7 +301,7 @@ export default function ChamadosManutencao() {
                 <div className="space-y-2">
                   <Label>Sublocal</Label>
                   <Select
-                    disabled={!form.location_id}
+                    disabled={!form.area_id}
                     value={form.sublocation_id}
                     onValueChange={(v) => setForm({ ...form, sublocation_id: v, asset_id: '' })}
                   >
@@ -315,25 +337,7 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Prioridade</Label>
-                  <Select
-                    value={form.priority_id}
-                    onValueChange={(v) => setForm({ ...form, priority_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {priorities.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Descrição do Problema</Label>
+                  <Label>Descrição do Problema *</Label>
                   <Textarea
                     required
                     rows={4}
@@ -342,8 +346,44 @@ export default function ChamadosManutencao() {
                     placeholder="Descreva o problema..."
                   />
                 </div>
-                <Button type="submit" className="w-full bg-brand-vividBlue">
-                  Salvar OS
+                <div className="space-y-2">
+                  <Label>Anexos</Label>
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                    <input
+                      type="file"
+                      multiple
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) =>
+                        e.target.files &&
+                        setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+                      }
+                    />
+                    <Paperclip className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                    <span className="text-sm text-gray-600">
+                      Clique ou arraste arquivos (Fotos/Documentos)
+                    </span>
+                  </div>
+                  {files.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {files.map((f, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between text-xs bg-gray-100 px-2 py-1 rounded"
+                        >
+                          <span className="truncate">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
+                          >
+                            <X className="h-3 w-3 text-red-500" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button type="submit" disabled={submitting} className="w-full bg-brand-vividBlue">
+                  {submitting ? 'Salvando...' : 'Salvar OS'}
                 </Button>
               </form>
             </SheetContent>
@@ -395,7 +435,7 @@ export default function ChamadosManutencao() {
                       <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-2">
                         <MapPin className="h-3 w-3" />
                         <span className="truncate">
-                          {ticket.location?.name || ticket.plant?.name || 'Sem local'}
+                          {ticket.area?.name || ticket.plant?.name || 'Sem local'}
                         </span>
                       </div>
                       {ticket.asset && (
@@ -403,29 +443,9 @@ export default function ChamadosManutencao() {
                           Ativo: {ticket.asset.name}
                         </div>
                       )}
-                      <div className="pt-2 border-t flex justify-between items-center">
-                        <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                          <Clock className="h-3 w-3" />
-                          {new Date(ticket.reported_at).toLocaleDateString()}
-                        </div>
-                        {ticket.assignee ? (
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-[10px] bg-blue-100 text-blue-700">
-                              {ticket.assignee.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                        ) : (
-                          <span className="text-[10px] text-gray-400 italic">Não atribuído</span>
-                        )}
-                      </div>
                     </CardContent>
                   </Card>
                 ))}
-                {colTickets.length === 0 && (
-                  <div className="h-20 border-2 border-dashed rounded-lg flex items-center justify-center text-xs text-gray-400">
-                    Nenhum chamado
-                  </div>
-                )}
               </div>
             </div>
           )
@@ -454,55 +474,42 @@ export default function ChamadosManutencao() {
                 </div>
                 <div>
                   <Label className="text-gray-500">Prioridade</Label>
-                  <div className="mt-1">
-                    {selectedTicket.priority ? (
-                      <Badge
-                        variant="outline"
-                        style={{
-                          borderColor: selectedTicket.priority.color,
-                          color: selectedTicket.priority.color,
-                        }}
-                      >
-                        {selectedTicket.priority.name}
-                      </Badge>
-                    ) : (
-                      '-'
-                    )}
-                  </div>
+                  <Select value={selectedTicket.priority_id || ''} onValueChange={updatePriority}>
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Definir Prioridade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priorities.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label className="text-gray-500">Planta</Label>
-                  <p className="text-sm">{selectedTicket.plant?.name || '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-500">Local</Label>
-                  <p className="text-sm">{selectedTicket.location?.name || '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-500">Sublocal</Label>
-                  <p className="text-sm">{selectedTicket.sublocation?.name || '-'}</p>
+                  <Label className="text-gray-500">Área / Local</Label>
+                  <p className="text-sm">{selectedTicket.area?.name || '-'}</p>
                 </div>
                 <div>
                   <Label className="text-gray-500">Equipamento</Label>
                   <p className="text-sm">{selectedTicket.asset?.name || '-'}</p>
                 </div>
-                <div>
-                  <Label className="text-gray-500">Criado em</Label>
-                  <p className="text-sm">
-                    {new Date(selectedTicket.reported_at).toLocaleString('pt-BR')}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-gray-500">Responsável</Label>
-                  <p className="text-sm">{selectedTicket.assignee?.name || 'Não atribuído'}</p>
-                </div>
               </div>
-              {selectedTicket.closure_notes && (
+              {selectedTicket.photos?.length > 0 && (
                 <div className="mt-4">
-                  <Label className="text-gray-500">Notas de Fechamento</Label>
-                  <p className="text-sm bg-gray-50 p-3 rounded-md mt-1">
-                    {selectedTicket.closure_notes}
-                  </p>
+                  <Label className="text-gray-500 mb-2 block">Anexos / Fotos</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {selectedTicket.photos.map((url: string, idx: number) => (
+                      <a key={idx} href={url} target="_blank" rel="noreferrer">
+                        <img
+                          src={url}
+                          alt="anexo"
+                          className="w-full h-20 object-cover rounded-md border hover:opacity-80 transition"
+                        />
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

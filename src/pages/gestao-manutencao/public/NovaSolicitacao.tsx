@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Wrench, CheckCircle2, UploadCloud, Building2, MapPin, Tag } from 'lucide-react'
+import { Wrench, CheckCircle2, UploadCloud, MapPin, Tag, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 export default function NovaSolicitacaoPublica() {
@@ -25,20 +25,22 @@ export default function NovaSolicitacaoPublica() {
   const [options, setOptions] = useState<any>({
     client: null,
     plants: [],
-    locations: [],
+    areas: [],
     sublocations: [],
     assets: [],
   })
 
   const [form, setForm] = useState({
     plant_id: '',
-    location_id: '',
+    area_id: '',
     sublocation_id: '',
     asset_id: '',
     requester_name: '',
     requester_email: '',
     description: '',
   })
+
+  const [files, setFiles] = useState<File[]>([])
 
   useEffect(() => {
     loadOptions()
@@ -65,16 +67,30 @@ export default function NovaSolicitacaoPublica() {
 
     setSubmitting(true)
     try {
+      let uploadedPhotos: string[] = []
+      for (const file of files) {
+        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+        const { data } = await supabase.storage
+          .from('maintenance_attachments')
+          .upload(fileName, file)
+        if (data) {
+          const { data: urlData } = supabase.storage
+            .from('maintenance_attachments')
+            .getPublicUrl(data.path)
+          uploadedPhotos.push(urlData.publicUrl)
+        }
+      }
+
       const { data, error } = await supabase.rpc('submit_maintenance_ticket', {
         p_client_id: options.client.id,
         p_plant_id: form.plant_id,
-        p_location_id: form.location_id || null,
+        p_area_id: form.area_id || null,
         p_sublocation_id: form.sublocation_id || null,
         p_asset_id: form.asset_id || null,
         p_requester_name: form.requester_name,
         p_requester_email: form.requester_email || null,
         p_description: form.description,
-        p_photos: [], // Upload logic skipped for brevity, keeping it simple
+        p_photos: uploadedPhotos,
       })
 
       if (error) throw error
@@ -88,26 +104,21 @@ export default function NovaSolicitacaoPublica() {
     }
   }
 
-  if (loading) {
+  if (loading)
     return <div className="min-h-screen flex items-center justify-center">Carregando...</div>
-  }
-
-  if (!options.client) {
+  if (!options.client)
     return (
       <div className="min-h-screen flex items-center justify-center text-red-500">
         Página não encontrada ou inativa.
       </div>
     )
-  }
 
-  const filteredLocations = options.locations.filter((l: any) => l.plant_id === form.plant_id)
-  const filteredSublocations = options.sublocations.filter(
-    (s: any) => s.location_id === form.location_id,
-  )
+  const filteredAreas = options.areas.filter((a: any) => a.plant_id === form.plant_id)
+  const filteredSublocations = options.sublocations.filter((s: any) => s.area_id === form.area_id)
   const filteredAssets = options.assets.filter(
     (a: any) =>
       (!form.plant_id || a.plant_id === form.plant_id) &&
-      (!form.location_id || a.location_id === form.location_id),
+      (!form.area_id || a.area_id === form.area_id),
   )
 
   if (success) {
@@ -128,6 +139,7 @@ export default function NovaSolicitacaoPublica() {
               onClick={() => {
                 setSuccess(null)
                 setForm({ ...form, description: '' })
+                setFiles([])
               }}
             >
               Abrir Novo Chamado
@@ -182,7 +194,6 @@ export default function NovaSolicitacaoPublica() {
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-blue-500" /> Localização
                 </h3>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>
@@ -194,7 +205,7 @@ export default function NovaSolicitacaoPublica() {
                         setForm({
                           ...form,
                           plant_id: v,
-                          location_id: '',
+                          area_id: '',
                           sublocation_id: '',
                           asset_id: '',
                         })
@@ -212,40 +223,38 @@ export default function NovaSolicitacaoPublica() {
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="space-y-2">
-                    <Label>Local</Label>
+                    <Label>Área</Label>
                     <Select
-                      value={form.location_id}
+                      value={form.area_id}
                       disabled={!form.plant_id}
                       onValueChange={(v) =>
-                        setForm({ ...form, location_id: v, sublocation_id: '', asset_id: '' })
+                        setForm({ ...form, area_id: v, sublocation_id: '', asset_id: '' })
                       }
                     >
                       <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Selecione o Local (Opcional)" />
+                        <SelectValue placeholder="Selecione a Área (Opcional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredLocations.map((l: any) => (
-                          <SelectItem key={l.id} value={l.id}>
-                            {l.name}
+                        {filteredAreas.map((a: any) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Sub-local (Sala/Área)</Label>
+                    <Label>Sub-local (Sala)</Label>
                     <Select
                       value={form.sublocation_id}
-                      disabled={!form.location_id}
+                      disabled={!form.area_id}
                       onValueChange={(v) => setForm({ ...form, sublocation_id: v })}
                     >
                       <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Selecione o Sub-local (Opcional)" />
+                        <SelectValue placeholder="Selecione (Opcional)" />
                       </SelectTrigger>
                       <SelectContent>
                         {filteredSublocations.map((s: any) => (
@@ -256,7 +265,6 @@ export default function NovaSolicitacaoPublica() {
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="space-y-2">
                     <Label>Equipamento / Ativo</Label>
                     <Select
@@ -283,7 +291,6 @@ export default function NovaSolicitacaoPublica() {
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Tag className="h-4 w-4 text-blue-500" /> Detalhes do Chamado
                 </h3>
-
                 <div className="space-y-2">
                   <Label>
                     Descrição do Problema <span className="text-red-500">*</span>
@@ -296,12 +303,40 @@ export default function NovaSolicitacaoPublica() {
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
                 </div>
-
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50/50 hover:bg-gray-50 transition-colors cursor-pointer">
-                  <UploadCloud className="h-8 w-8 text-gray-400 mb-2" />
-                  <p className="text-sm font-medium text-gray-600">Clique para anexar fotos</p>
-                  <p className="text-xs text-gray-400 mt-1">PNG, JPG até 5MB</p>
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center bg-gray-50/50 hover:bg-gray-50 transition-colors relative cursor-pointer">
+                  <input
+                    type="file"
+                    multiple
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) =>
+                      e.target.files &&
+                      setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+                    }
+                  />
+                  <UploadCloud className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-gray-600">
+                    Clique para anexar fotos/documentos
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG ou PDF</p>
                 </div>
+                {files.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    {files.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center bg-gray-100 px-3 py-2 rounded text-sm"
+                      >
+                        <span className="truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiles(files.filter((_, i) => i !== idx))}
+                        >
+                          <X className="h-4 w-4 text-red-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm space-y-4">

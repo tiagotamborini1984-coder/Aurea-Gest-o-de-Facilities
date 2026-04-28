@@ -25,9 +25,9 @@ export default function PlanejamentoManutencao() {
   const [currentWeek, setCurrentWeek] = useState(new Date())
 
   const [plants, setPlants] = useState<any[]>([])
-  const [locations, setLocations] = useState<any[]>([])
+  const [areas, setAreas] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedLocation, setSelectedLocation] = useState<string>('all')
+  const [selectedArea, setSelectedArea] = useState<string>('all')
 
   const weekDays = Array.from({ length: 5 }).map((_, i) => {
     const d = new Date(currentWeek)
@@ -45,15 +45,15 @@ export default function PlanejamentoManutencao() {
   }, [])
   useEffect(() => {
     loadTickets()
-  }, [selectedPlant, selectedLocation])
+  }, [selectedPlant, selectedArea])
 
   const loadAuxData = async () => {
-    const [pRes, lRes] = await Promise.all([
+    const [pRes, aRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
-      supabase.from('locations').select('id, name, plant_id').order('name'),
+      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
     ])
     if (pRes.data) setPlants(pRes.data)
-    if (lRes.data) setLocations(lRes.data)
+    if (aRes.data) setAreas(aRes.data)
   }
 
   const loadTickets = async () => {
@@ -61,14 +61,14 @@ export default function PlanejamentoManutencao() {
     let query = supabase
       .from('maintenance_tickets')
       .select(`
-      id, ticket_number, description, planned_start, assignee_id, plant_id, location_id,
+      id, ticket_number, description, planned_start, assignee_id, plant_id, area_id,
       assignee:profiles!maintenance_tickets_assignee_id_fkey(name),
       status:maintenance_statuses(step)
     `)
       .not('status.step', 'eq', 'Concluído')
 
     if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
-    if (selectedLocation !== 'all') query = query.eq('location_id', selectedLocation)
+    if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
 
     const { data } = await query
     setTickets(data || [])
@@ -145,18 +145,18 @@ export default function PlanejamentoManutencao() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+            <Select value={selectedArea} onValueChange={setSelectedArea}>
               <SelectTrigger className="w-[160px] bg-white">
                 <MapPin className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Locais" />
+                <SelectValue placeholder="Áreas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os Locais</SelectItem>
-                {locations
-                  .filter((l) => selectedPlant === 'all' || l.plant_id === selectedPlant)
-                  .map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
+                <SelectItem value="all">Todas as Áreas</SelectItem>
+                {areas
+                  .filter((a) => selectedPlant === 'all' || a.plant_id === selectedPlant)
+                  .map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
                     </SelectItem>
                   ))}
               </SelectContent>

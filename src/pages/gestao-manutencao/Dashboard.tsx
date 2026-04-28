@@ -27,24 +27,24 @@ export default function DashboardManutencao() {
   const [stats, setStats] = useState({ total: 0, open: 0, planned: 0, completed: 0 })
 
   const [plants, setPlants] = useState<any[]>([])
-  const [locations, setLocations] = useState<any[]>([])
+  const [areas, setAreas] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedLocation, setSelectedLocation] = useState<string>('all')
+  const [selectedArea, setSelectedArea] = useState<string>('all')
 
   useEffect(() => {
     loadAuxData()
   }, [])
   useEffect(() => {
     fetchStats()
-  }, [selectedPlant, selectedLocation])
+  }, [selectedPlant, selectedArea])
 
   const loadAuxData = async () => {
-    const [pRes, lRes] = await Promise.all([
+    const [pRes, aRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
-      supabase.from('locations').select('id, name, plant_id').order('name'),
+      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
     ])
     if (pRes.data) setPlants(pRes.data)
-    if (lRes.data) setLocations(lRes.data)
+    if (aRes.data) setAreas(aRes.data)
   }
 
   const fetchStats = async () => {
@@ -53,11 +53,11 @@ export default function DashboardManutencao() {
       let query = supabase
         .from('maintenance_tickets')
         .select(
-          'id, status_id, planned_start, origin, plant_id, location_id, status:maintenance_statuses(step)',
+          'id, status_id, planned_start, origin, plant_id, area_id, status:maintenance_statuses(step)',
         )
 
       if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
-      if (selectedLocation !== 'all') query = query.eq('location_id', selectedLocation)
+      if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
 
       const { data: tickets } = await query
 
@@ -121,18 +121,18 @@ export default function DashboardManutencao() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+          <Select value={selectedArea} onValueChange={setSelectedArea}>
             <SelectTrigger className="w-[180px] bg-white">
               <MapPin className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Locais" />
+              <SelectValue placeholder="Áreas" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os Locais</SelectItem>
-              {locations
-                .filter((l) => selectedPlant === 'all' || l.plant_id === selectedPlant)
-                .map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
+              <SelectItem value="all">Todas as Áreas</SelectItem>
+              {areas
+                .filter((a) => selectedPlant === 'all' || a.plant_id === selectedPlant)
+                .map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
                   </SelectItem>
                 ))}
             </SelectContent>
