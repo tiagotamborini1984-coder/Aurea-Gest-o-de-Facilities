@@ -57,6 +57,7 @@ export default function ChamadosManutencao() {
   const [files, setFiles] = useState<File[]>([])
 
   const [editForm, setEditForm] = useState({
+    plant_id: '',
     area_id: '',
     sublocation_id: '',
     asset_id: '',
@@ -87,8 +88,8 @@ export default function ChamadosManutencao() {
   )
 
   const editFormAreas = useMemo(
-    () => areas.filter((a) => a.plant_id === selectedTicket?.plant_id),
-    [areas, selectedTicket?.plant_id],
+    () => areas.filter((a) => a.plant_id === editForm.plant_id),
+    [areas, editForm.plant_id],
   )
   const editFormSublocations = useMemo(
     () => sublocations.filter((s) => s.area_id === editForm.area_id),
@@ -98,10 +99,10 @@ export default function ChamadosManutencao() {
     () =>
       assets.filter(
         (a) =>
-          a.plant_id === selectedTicket?.plant_id &&
+          a.plant_id === editForm.plant_id &&
           (!editForm.area_id || editForm.area_id === 'none' || a.area_id === editForm.area_id),
       ),
-    [assets, selectedTicket?.plant_id, editForm.area_id],
+    [assets, editForm.plant_id, editForm.area_id],
   )
 
   useEffect(() => {
@@ -114,6 +115,7 @@ export default function ChamadosManutencao() {
   useEffect(() => {
     if (selectedTicket) {
       setEditForm({
+        plant_id: selectedTicket.plant_id || '',
         area_id: selectedTicket.area_id || 'none',
         sublocation_id: selectedTicket.sublocation_id || 'none',
         asset_id: selectedTicket.asset_id || 'none',
@@ -241,6 +243,7 @@ export default function ChamadosManutencao() {
     setUpdating(true)
     try {
       const payload = {
+        plant_id: editForm.plant_id,
         area_id: editForm.area_id === 'none' ? null : editForm.area_id,
         sublocation_id: editForm.sublocation_id === 'none' ? null : editForm.sublocation_id,
         asset_id: editForm.asset_id === 'none' ? null : editForm.asset_id,
@@ -264,6 +267,7 @@ export default function ChamadosManutencao() {
       setSelectedTicket({
         ...selectedTicket,
         ...payload,
+        plant: plants.find((p) => p.id === payload.plant_id),
         area: areas.find((a) => a.id === payload.area_id),
         sublocation: sublocations.find((s) => s.id === payload.sublocation_id),
         asset: assets.find((a) => a.id === payload.asset_id),
@@ -563,6 +567,32 @@ export default function ChamadosManutencao() {
                 <p className="text-sm font-medium mt-1">{selectedTicket.description}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label className="text-gray-500">Planta</Label>
+                  <Select
+                    value={editForm.plant_id}
+                    onValueChange={(v) =>
+                      setEditForm({
+                        ...editForm,
+                        plant_id: v,
+                        area_id: 'none',
+                        sublocation_id: 'none',
+                        asset_id: 'none',
+                      })
+                    }
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Selecione a Planta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plants.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="col-span-2 sm:col-span-1">
                   <Label className="text-gray-500">Área / Local</Label>
                   <Select
