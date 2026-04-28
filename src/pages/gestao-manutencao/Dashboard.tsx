@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase/client'
-import { Activity, Clock, Target, Filter, MapPin } from 'lucide-react'
+import { Activity, Clock, Target, Filter, MapPin, CheckCircle2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -25,6 +25,7 @@ import {
 export default function DashboardManutencao() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, open: 0, planned: 0, completed: 0 })
+  const [aderencia, setAderencia] = useState({ proativo: 0, reativo: 0, total: 0 })
 
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
@@ -50,11 +51,12 @@ export default function DashboardManutencao() {
   const fetchStats = async () => {
     setLoading(true)
     try {
-      let query = supabase
-        .from('maintenance_tickets')
-        .select(
-          'id, status_id, planned_start, origin, plant_id, area_id, status:maintenance_statuses(step)',
-        )
+      let query = supabase.from('maintenance_tickets').select(
+        `id, status_id, planned_start, planned_end, actual_start, actual_end, origin, plant_id, area_id, reported_at, created_at, updated_at,
+          status:maintenance_statuses(step, is_terminal),
+          type:maintenance_types(name),
+          priority:maintenance_priorities(sla_hours)`,
+      )
 
       if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
       if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
@@ -63,12 +65,66 @@ export default function DashboardManutencao() {
 
       if (tickets) {
         const total = tickets.length
-        const open = tickets.filter((t) => t.status?.step === 'Aberto' || !t.status).length
+        const open = tickets.filter((t: any) => t.status?.step === 'Aberto' || !t.status).length
         const planned = tickets.filter(
-          (t) => t.status?.step === 'Planejado' || t.planned_start,
+          (t: any) => t.status?.step === 'Planejado' || t.planned_start,
         ).length
-        const completed = tickets.filter((t) => t.status?.step === 'Concluído').length
+        const completed = tickets.filter(
+          (t: any) => t.status?.step === 'Concluído' || t.status?.is_terminal,
+        ).length
         setStats({ total, open, planned, completed })
+
+        const now = new Date()
+        let proativoTotal = 0
+        let proativoNoPrazo = 0
+        let reativoTotal = 0
+        let reativoNoPrazo = 0
+
+        tickets.forEach((t: any) => {
+          const typeName = t.type?.name?.toLowerCase() || ''
+          const isProativo = typeName.includes('proativo') || typeName.includes('prev')
+          const isReativo = typeName.includes('reativo') || typeName.includes('corr')
+
+          if (!isProativo && !isReativo) return
+
+          const reportedAt = new Date(t.reported_at || t.created_at)
+          const slaHours = t.priority?.sla_hours || 0
+
+          let limitDate = new Date(reportedAt.getTime() + slaHours * 60 * 60 * 1000)
+
+          if (t.planned_end && isProativo) {
+            limitDate = new Date(t.planned_end)
+          } else if (slaHours === 0 && !t.planned_end) {
+            return
+          }
+
+          const isTerminal = t.status?.is_terminal || t.status?.step === 'Concluído'
+          const endDate = t.actual_end
+            ? new Date(t.actual_end)
+            : isTerminal
+              ? new Date(t.updated_at)
+              : now
+
+          const withinSLA = endDate <= limitDate
+
+          if (isProativo) {
+            proativoTotal++
+            if (withinSLA) proativoNoPrazo++
+          }
+          if (isReativo) {
+            reativoTotal++
+            if (withinSLA) reativoNoPrazo++
+          }
+        })
+
+        const adProativo = proativoTotal > 0 ? (proativoNoPrazo / proativoTotal) * 100 : 0
+        const adReativo = reativoTotal > 0 ? (reativoNoPrazo / reativoTotal) * 100 : 0
+        const adTotal =
+          proativoTotal + reativoTotal > 0
+            ? ((proativoNoPrazo + reativoNoPrazo) / (proativoTotal + reativoTotal)) * 100
+            : 0
+
+        setAderencia({ proativo: adProativo, reativo: adReativo, total: adTotal })
       }
     } catch (e) {
       console.error(e)
@@ -105,7 +161,7 @@ export default function DashboardManutencao() {
             value={selectedPlant}
             onValueChange={(v) => {
               setSelectedPlant(v)
-              setSelectedLocation('all')
+              setSelectedArea('all')
             }}
           >
             <SelectTrigger className="w-[180px] bg-white">
@@ -175,7 +231,7 @@ export default function DashboardManutencao() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <Card className="shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -209,7 +265,7 @@ export default function DashboardManutencao() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Target className="h-5 w-5 text-gray-500" />
@@ -241,6 +297,59 @@ export default function DashboardManutencao() {
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm lg:col-span-1 flex flex-col">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              Aderência à Prog.
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-center">
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                Carregando...
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div>
+                  <div className="text-5xl font-bold text-gray-900">
+                    {aderencia.total.toFixed(0)}%
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">SLA Respeitado (Geral)</p>
+                </div>
+
+                <div className="w-full space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-gray-600">Proativos</span>
+                      <span className="text-blue-600">{aderencia.proativo.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${aderencia.proativo}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-gray-600">Reativos</span>
+                      <span className="text-red-500">{aderencia.reativo.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${aderencia.reativo}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
