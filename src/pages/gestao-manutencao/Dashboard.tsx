@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import { Activity, Clock, Target, Filter, MapPin, CheckCircle2 } from 'lucide-react'
 import {
   Select,
@@ -26,6 +27,8 @@ export default function DashboardManutencao() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, open: 0, planned: 0, completed: 0 })
   const [aderencia, setAderencia] = useState({ proativo: 0, reativo: 0, total: 0 })
+  const [typeData, setTypeData] = useState<any[]>([])
+  const [mttrData, setMttrData] = useState<any[]>([])
 
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
@@ -80,6 +83,23 @@ export default function DashboardManutencao() {
         let reativoTotal = 0
         let reativoNoPrazo = 0
 
+        let proativoExec = 0
+        let reativoExec = 0
+
+        const monthlyMttr: Record<string, any> = {}
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+          const monthName = d.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          monthlyMttr[key] = {
+            label: monthName,
+            proativoSoma: 0,
+            proativoQtd: 0,
+            reativoSoma: 0,
+            reativoQtd: 0,
+          }
+        }
+
         tickets.forEach((t: any) => {
           const typeName = t.type?.name?.toLowerCase() || ''
           const isProativo = typeName.includes('proativo') || typeName.includes('prev')
@@ -94,8 +114,6 @@ export default function DashboardManutencao() {
 
           if (t.planned_end && isProativo) {
             limitDate = new Date(t.planned_end)
-          } else if (slaHours === 0 && !t.planned_end) {
-            return
           }
 
           const isTerminal = t.status?.is_terminal || t.status?.step === 'Concluído'
@@ -107,13 +125,34 @@ export default function DashboardManutencao() {
 
           const withinSLA = endDate <= limitDate
 
-          if (isProativo) {
-            proativoTotal++
-            if (withinSLA) proativoNoPrazo++
+          if (t.planned_end || slaHours > 0) {
+            if (isProativo) {
+              proativoTotal++
+              if (withinSLA) proativoNoPrazo++
+            }
+            if (isReativo) {
+              reativoTotal++
+              if (withinSLA) reativoNoPrazo++
+            }
           }
-          if (isReativo) {
-            reativoTotal++
-            if (withinSLA) reativoNoPrazo++
+
+          if (isTerminal) {
+            if (isProativo) proativoExec++
+            if (isReativo) reativoExec++
+
+            const finalDate = t.actual_end ? new Date(t.actual_end) : new Date(t.updated_at)
+            const monthKey = `${finalDate.getFullYear()}-${String(finalDate.getMonth() + 1).padStart(2, '0')}`
+            if (monthlyMttr[monthKey]) {
+              const repairHours = (finalDate.getTime() - reportedAt.getTime()) / (1000 * 60 * 60)
+              if (isProativo) {
+                monthlyMttr[monthKey].proativoSoma += Math.max(0, repairHours)
+                monthlyMttr[monthKey].proativoQtd++
+              }
+              if (isReativo) {
+                monthlyMttr[monthKey].reativoSoma += Math.max(0, repairHours)
+                monthlyMttr[monthKey].reativoQtd++
+              }
+            }
           }
         })
 
@@ -125,6 +164,24 @@ export default function DashboardManutencao() {
             : 0
 
         setAderencia({ proativo: adProativo, reativo: adReativo, total: adTotal })
+
+        const newTypeData = []
+        if (proativoExec > 0)
+          newTypeData.push({ name: 'Proativo (Prev.)', value: proativoExec, color: '#3b82f6' })
+        if (reativoExec > 0)
+          newTypeData.push({ name: 'Reativo (Corr.)', value: reativoExec, color: '#ef4444' })
+
+        if (newTypeData.length === 0) {
+          newTypeData.push({ name: 'Sem dados', value: 1, color: '#e5e7eb' })
+        }
+        setTypeData(newTypeData)
+
+        const newMttrData = Object.values(monthlyMttr).map((m: any) => ({
+          name: m.label.charAt(0).toUpperCase() + m.label.slice(1),
+          Proativo: m.proativoQtd > 0 ? Number((m.proativoSoma / m.proativoQtd).toFixed(1)) : 0,
+          Reativo: m.reativoQtd > 0 ? Number((m.reativoSoma / m.reativoQtd).toFixed(1)) : 0,
+        }))
+        setMttrData(newMttrData)
       }
     } catch (e) {
       console.error(e)
@@ -132,19 +189,6 @@ export default function DashboardManutencao() {
       setLoading(false)
     }
   }
-
-  const typeData = [
-    { name: 'Proativo (Prev.)', value: 65, color: '#3b82f6' },
-    { name: 'Reativo (Corr.)', value: 35, color: '#ef4444' },
-  ]
-
-  const mttrData = [
-    { name: 'Jan', Proativo: 2.4, Reativo: 14.5 },
-    { name: 'Fev', Proativo: 2.1, Reativo: 12.0 },
-    { name: 'Mar', Proativo: 2.8, Reativo: 15.2 },
-    { name: 'Abr', Proativo: 1.9, Reativo: 11.5 },
-    { name: 'Mai', Proativo: 2.0, Reativo: 10.8 },
-  ]
 
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">
@@ -322,30 +366,48 @@ export default function DashboardManutencao() {
                   <p className="text-sm text-gray-500 mt-1">SLA Respeitado (Geral)</p>
                 </div>
 
-                <div className="w-full space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="text-gray-600">Proativos</span>
-                      <span className="text-blue-600">{aderencia.proativo.toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${aderencia.proativo}%` }}
-                      />
-                    </div>
+                <div className="w-full">
+                  <div className="flex justify-between text-xs font-medium mb-1">
+                    <span className="text-gray-600">Meta: 90%</span>
+                    <span className={aderencia.total >= 90 ? 'text-green-600' : 'text-amber-600'}>
+                      {aderencia.total >= 90 ? 'Atingida' : 'Abaixo da meta'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2 mb-6">
+                    <div
+                      className={cn(
+                        'h-2 rounded-full transition-all duration-500',
+                        aderencia.total >= 90 ? 'bg-green-500' : 'bg-amber-500',
+                      )}
+                      style={{ width: `${Math.min(aderencia.total, 100)}%` }}
+                    />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="text-gray-600">Reativos</span>
-                      <span className="text-red-500">{aderencia.reativo.toFixed(0)}%</span>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span className="text-gray-600">Proativos</span>
+                        <span className="text-blue-600">{aderencia.proativo.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(aderencia.proativo, 100)}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-red-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${aderencia.reativo}%` }}
-                      />
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span className="text-gray-600">Reativos</span>
+                        <span className="text-red-500">{aderencia.reativo.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(aderencia.reativo, 100)}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
