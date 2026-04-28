@@ -4,9 +4,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Wrench, MapPin, Clock, Plus, Filter, Paperclip, X } from 'lucide-react'
+import { Wrench, MapPin, Plus, Filter, Paperclip, X } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -17,6 +18,14 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+
+const toLocalDatetime = (utcStr: string | null) => {
+  if (!utcStr) return ''
+  const d = new Date(utcStr)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export default function ChamadosManutencao() {
   const [tickets, setTickets] = useState<any[]>([])
@@ -32,6 +41,8 @@ export default function ChamadosManutencao() {
   const [assets, setAssets] = useState<any[]>([])
   const [priorities, setPriorities] = useState<any[]>([])
   const [statuses, setStatuses] = useState<any[]>([])
+  const [types, setTypes] = useState<any[]>([])
+  const [assignees, setAssignees] = useState<any[]>([])
 
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
@@ -44,6 +55,17 @@ export default function ChamadosManutencao() {
     asset_id: '',
   })
   const [files, setFiles] = useState<File[]>([])
+
+  const [editForm, setEditForm] = useState({
+    type_id: '',
+    priority_id: '',
+    assignee_id: '',
+    planned_start: '',
+    planned_end: '',
+    actual_start: '',
+    actual_end: '',
+  })
+  const [updating, setUpdating] = useState(false)
 
   const formAreas = useMemo(
     () => areas.filter((a) => a.plant_id === form.plant_id),
@@ -68,8 +90,22 @@ export default function ChamadosManutencao() {
     loadTickets()
   }, [selectedPlant, selectedArea])
 
+  useEffect(() => {
+    if (selectedTicket) {
+      setEditForm({
+        type_id: selectedTicket.type_id || 'none',
+        priority_id: selectedTicket.priority_id || 'none',
+        assignee_id: selectedTicket.assignee_id || 'none',
+        planned_start: toLocalDatetime(selectedTicket.planned_start),
+        planned_end: toLocalDatetime(selectedTicket.planned_end),
+        actual_start: toLocalDatetime(selectedTicket.actual_start),
+        actual_end: toLocalDatetime(selectedTicket.actual_end),
+      })
+    }
+  }, [selectedTicket])
+
   const loadAuxData = async () => {
-    const [pRes, aRes, subRes, asRes, prioRes, statRes] = await Promise.all([
+    const [pRes, aRes, subRes, asRes, prioRes, statRes, tRes, assignRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
       supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
       supabase.from('maintenance_sublocations').select('id, name, area_id').order('name'),
@@ -79,6 +115,8 @@ export default function ChamadosManutencao() {
         .order('name'),
       supabase.from('maintenance_priorities').select('*').order('name'),
       supabase.from('maintenance_statuses').select('*').order('order_index'),
+      supabase.from('maintenance_types').select('*').order('name'),
+      supabase.from('profiles').select('id, name').order('name'),
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
@@ -86,6 +124,8 @@ export default function ChamadosManutencao() {
     if (asRes.data) setAssets(asRes.data)
     if (prioRes.data) setPriorities(prioRes.data)
     if (statRes.data) setStatuses(statRes.data)
+    if (tRes.data) setTypes(tRes.data)
+    if (assignRes.data) setAssignees(assignRes.data)
   }
 
   const loadTickets = async () => {
@@ -173,20 +213,37 @@ export default function ChamadosManutencao() {
     }
   }
 
-  const updatePriority = async (val: string) => {
-    if (!selectedTicket) return
-    const { error } = await supabase
-      .from('maintenance_tickets')
-      .update({ priority_id: val })
-      .eq('id', selectedTicket.id)
-    if (!error) {
-      toast.success('Prioridade atualizada')
+  const handleUpdateTicket = async () => {
+    setUpdating(true)
+    try {
+      const payload = {
+        type_id: editForm.type_id === 'none' ? null : editForm.type_id,
+        priority_id: editForm.priority_id === 'none' ? null : editForm.priority_id,
+        assignee_id: editForm.assignee_id === 'none' ? null : editForm.assignee_id,
+        planned_start: editForm.planned_start
+          ? new Date(editForm.planned_start).toISOString()
+          : null,
+        planned_end: editForm.planned_end ? new Date(editForm.planned_end).toISOString() : null,
+        actual_start: editForm.actual_start ? new Date(editForm.actual_start).toISOString() : null,
+        actual_end: editForm.actual_end ? new Date(editForm.actual_end).toISOString() : null,
+      }
+      const { error } = await supabase
+        .from('maintenance_tickets')
+        .update(payload)
+        .eq('id', selectedTicket.id)
+      if (error) throw error
+      toast.success('O.S. atualizada com sucesso!')
+      loadTickets()
       setSelectedTicket({
         ...selectedTicket,
-        priority_id: val,
-        priority: priorities.find((p) => p.id === val),
+        ...payload,
+        priority: priorities.find((p) => p.id === payload.priority_id),
+        assignee: assignees.find((a) => a.id === payload.assignee_id),
       })
-      loadTickets()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -432,14 +489,26 @@ export default function ChamadosManutencao() {
                       <p className="text-sm font-medium leading-snug line-clamp-2">
                         {ticket.description}
                       </p>
-                      <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-2">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate">
-                          {ticket.area?.name || ticket.plant?.name || 'Sem local'}
-                        </span>
+                      <div className="text-xs text-gray-500 flex flex-col gap-1.5 mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">
+                            {ticket.area?.name || ticket.plant?.name || 'Sem local'}
+                          </span>
+                        </div>
+                        {ticket.assignee && (
+                          <div className="flex items-center gap-1.5 font-medium text-gray-700 mt-1">
+                            <Avatar className="h-4 w-4">
+                              <AvatarFallback className="text-[8px] bg-brand-vividBlue text-white">
+                                {ticket.assignee.name?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="truncate">{ticket.assignee.name}</span>
+                          </div>
+                        )}
                       </div>
                       {ticket.asset && (
-                        <div className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
+                        <div className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block mt-1">
                           Ativo: {ticket.asset.name}
                         </div>
                       )}
@@ -453,7 +522,7 @@ export default function ChamadosManutencao() {
       </div>
 
       <Sheet open={!!selectedTicket} onOpenChange={(v) => !v && setSelectedTicket(null)}>
-        <SheetContent className="sm:max-w-md overflow-y-auto">
+        <SheetContent className="sm:max-w-md overflow-y-auto pb-10">
           <SheetHeader>
             <SheetTitle>OS: {selectedTicket?.ticket_number}</SheetTitle>
           </SheetHeader>
@@ -465,6 +534,15 @@ export default function ChamadosManutencao() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label className="text-gray-500">Área / Local</Label>
+                  <p className="text-sm font-medium mt-1">{selectedTicket.area?.name || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Equipamento</Label>
+                  <p className="text-sm font-medium mt-1">{selectedTicket.asset?.name || '-'}</p>
+                </div>
+
+                <div className="col-span-2">
                   <Label className="text-gray-500">Status</Label>
                   <div className="mt-1">
                     <Badge style={{ backgroundColor: selectedTicket.status?.color, color: '#fff' }}>
@@ -472,32 +550,117 @@ export default function ChamadosManutencao() {
                     </Badge>
                   </div>
                 </div>
+
                 <div>
-                  <Label className="text-gray-500">Prioridade</Label>
-                  <Select value={selectedTicket.priority_id || ''} onValueChange={updatePriority}>
+                  <Label className="text-gray-500">Tipo de Manutenção</Label>
+                  <Select
+                    value={editForm.type_id}
+                    onValueChange={(v) => setEditForm({ ...editForm, type_id: v })}
+                  >
                     <SelectTrigger className="mt-1 h-8 text-xs">
-                      <SelectValue placeholder="Definir Prioridade" />
+                      <SelectValue placeholder="Selecione o Tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {priorities.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {types.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-gray-500">Área / Local</Label>
-                  <p className="text-sm">{selectedTicket.area?.name || '-'}</p>
+                  <Label className="text-gray-500">Criticidade (SLA)</Label>
+                  <Select
+                    value={editForm.priority_id}
+                    onValueChange={(v) => setEditForm({ ...editForm, priority_id: v })}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Selecione a Criticidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {priorities.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} ({p.sla_hours}h)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="col-span-2">
+                  <Label className="text-gray-500">Manutentor Responsável</Label>
+                  <Select
+                    value={editForm.assignee_id}
+                    onValueChange={(v) => setEditForm({ ...editForm, assignee_id: v })}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Atribuir a..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Não atribuído</SelectItem>
+                      {assignees.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-gray-500">Início Planejado</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editForm.planned_start}
+                    onChange={(e) => setEditForm({ ...editForm, planned_start: e.target.value })}
+                    className="mt-1 h-8 text-xs"
+                  />
                 </div>
                 <div>
-                  <Label className="text-gray-500">Equipamento</Label>
-                  <p className="text-sm">{selectedTicket.asset?.name || '-'}</p>
+                  <Label className="text-gray-500">Fim Planejado</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editForm.planned_end}
+                    onChange={(e) => setEditForm({ ...editForm, planned_end: e.target.value })}
+                    className="mt-1 h-8 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-gray-500">Início Realizado</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editForm.actual_start}
+                    onChange={(e) => setEditForm({ ...editForm, actual_start: e.target.value })}
+                    className="mt-1 h-8 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-500">Fim Realizado</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editForm.actual_end}
+                    onChange={(e) => setEditForm({ ...editForm, actual_end: e.target.value })}
+                    className="mt-1 h-8 text-xs"
+                  />
+                </div>
+
+                <div className="col-span-2 mt-4">
+                  <Button
+                    onClick={handleUpdateTicket}
+                    disabled={updating}
+                    className="w-full bg-brand-vividBlue text-sm h-10"
+                  >
+                    {updating ? 'Salvando...' : 'Salvar Alterações'}
+                  </Button>
                 </div>
               </div>
+
               {selectedTicket.photos?.length > 0 && (
-                <div className="mt-4">
+                <div className="mt-4 pt-4 border-t border-gray-100">
                   <Label className="text-gray-500 mb-2 block">Anexos / Fotos</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {selectedTicket.photos.map((url: string, idx: number) => (

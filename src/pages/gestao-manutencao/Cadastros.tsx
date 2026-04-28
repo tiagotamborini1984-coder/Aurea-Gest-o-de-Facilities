@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Database, Plus, Trash, MapPin, Building2, LayoutGrid } from 'lucide-react'
+import {
+  Database,
+  Plus,
+  Trash,
+  MapPin,
+  Building2,
+  LayoutGrid,
+  Wrench,
+  AlertTriangle,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,10 +23,14 @@ export default function CadastrosManutencao() {
   const [areas, setAreas] = useState<any[]>([])
   const [subareas, setSubareas] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
+  const [tipos, setTipos] = useState<any[]>([])
+  const [prioridades, setPrioridades] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [newArea, setNewArea] = useState({ name: '', plant_id: '' })
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
+  const [newTipo, setNewTipo] = useState({ name: '', category: 'Corretiva' })
+  const [newPrioridade, setNewPrioridade] = useState({ name: '', sla_hours: 24, color: '#3b82f6' })
 
   useEffect(() => {
     loadData()
@@ -25,18 +38,31 @@ export default function CadastrosManutencao() {
 
   const loadData = async () => {
     setLoading(true)
-    const [pRes, aRes, sRes] = await Promise.all([
+    const [pRes, aRes, sRes, tRes, prRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
       supabase.from('maintenance_areas').select('*, plant:plants(name)').order('name'),
       supabase
         .from('maintenance_sublocations')
         .select('*, area:maintenance_areas(name, plant:plants(name))')
         .order('name'),
+      supabase.from('maintenance_types').select('*').order('name'),
+      supabase.from('maintenance_priorities').select('*').order('sla_hours'),
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
     if (sRes.data) setSubareas(sRes.data)
+    if (tRes.data) setTipos(tRes.data)
+    if (prRes.data) setPrioridades(prRes.data)
     setLoading(false)
+  }
+
+  const getClientId = async () => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id)
+      .single()
+    return profile?.client_id
   }
 
   const handleAddArea = async () => {
@@ -44,26 +70,8 @@ export default function CadastrosManutencao() {
       toast.error('Preencha nome e planta da Área')
       return
     }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('client_id')
-      .eq('id', user?.id)
-      .single()
-
-    let clientId = profile?.client_id
-    if (!clientId) {
-      const { data: plant } = await supabase
-        .from('plants')
-        .select('client_id')
-        .eq('id', newArea.plant_id)
-        .single()
-      clientId = plant?.client_id
-    }
-
-    if (!clientId) {
-      toast.error('Erro de permissão: Client ID não encontrado')
-      return
-    }
+    const clientId = await getClientId()
+    if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
 
     const { error } = await supabase.from('maintenance_areas').insert({
       client_id: clientId,
@@ -94,26 +102,8 @@ export default function CadastrosManutencao() {
       toast.error('Preencha nome e selecione a Área Pai')
       return
     }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('client_id')
-      .eq('id', user?.id)
-      .single()
-
-    let clientId = profile?.client_id
-    if (!clientId) {
-      const { data: area } = await supabase
-        .from('maintenance_areas')
-        .select('client_id')
-        .eq('id', newSubarea.area_id)
-        .single()
-      clientId = area?.client_id
-    }
-
-    if (!clientId) {
-      toast.error('Erro de permissão: Client ID não encontrado')
-      return
-    }
+    const clientId = await getClientId()
+    if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
 
     const { error } = await supabase.from('maintenance_sublocations').insert({
       client_id: clientId,
@@ -139,6 +129,69 @@ export default function CadastrosManutencao() {
     }
   }
 
+  const handleAddTipo = async () => {
+    if (!newTipo.name) {
+      toast.error('Preencha o nome do tipo')
+      return
+    }
+    const clientId = await getClientId()
+    if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
+
+    const { error } = await supabase.from('maintenance_types').insert({
+      client_id: clientId,
+      name: newTipo.name,
+      category: newTipo.category,
+    } as any)
+
+    if (error) toast.error('Erro ao salvar: ' + error.message)
+    else {
+      toast.success('Tipo adicionado')
+      setNewTipo({ name: '', category: 'Corretiva' })
+      loadData()
+    }
+  }
+
+  const handleDeleteTipo = async (id: string) => {
+    const { error } = await supabase.from('maintenance_types').delete().eq('id', id)
+    if (error) toast.error('Erro ao deletar (pode estar em uso)')
+    else {
+      toast.success('Tipo removido')
+      loadData()
+    }
+  }
+
+  const handleAddPrioridade = async () => {
+    if (!newPrioridade.name) {
+      toast.error('Preencha o nome da criticidade')
+      return
+    }
+    const clientId = await getClientId()
+    if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
+
+    const { error } = await supabase.from('maintenance_priorities').insert({
+      client_id: clientId,
+      name: newPrioridade.name,
+      sla_hours: newPrioridade.sla_hours,
+      color: newPrioridade.color,
+    } as any)
+
+    if (error) toast.error('Erro ao salvar: ' + error.message)
+    else {
+      toast.success('Criticidade adicionada')
+      setNewPrioridade({ name: '', sla_hours: 24, color: '#3b82f6' })
+      loadData()
+    }
+  }
+
+  const handleDeletePrioridade = async (id: string) => {
+    const { error } = await supabase.from('maintenance_priorities').delete().eq('id', id)
+    if (error) toast.error('Erro ao deletar (pode estar em uso)')
+    else {
+      toast.success('Criticidade removida')
+      loadData()
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">
       <div>
@@ -147,12 +200,12 @@ export default function CadastrosManutencao() {
           Cadastros Base - Manutenção
         </h1>
         <p className="text-gray-500 mt-1">
-          Configure locais e sub-locais (hierarquia) para o módulo CMMS.
+          Configure locais, hierarquias, tipos e criticidades do módulo CMMS.
         </p>
       </div>
 
       <Tabs defaultValue="areas" className="w-full">
-        <TabsList className="bg-white border rounded-lg h-auto p-1 shadow-sm">
+        <TabsList className="bg-white border rounded-lg h-auto p-1 shadow-sm flex-wrap">
           <TabsTrigger value="areas" className="py-2.5 px-4 flex items-center gap-2">
             <Building2 className="w-4 h-4" />
             Áreas (Locais)
@@ -164,6 +217,14 @@ export default function CadastrosManutencao() {
           <TabsTrigger value="ativos" className="py-2.5 px-4 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Equipamentos/Ativos
+          </TabsTrigger>
+          <TabsTrigger value="tipos" className="py-2.5 px-4 flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            Tipos de O.S.
+          </TabsTrigger>
+          <TabsTrigger value="prioridades" className="py-2.5 px-4 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Criticidades / SLA
           </TabsTrigger>
         </TabsList>
 
@@ -325,6 +386,175 @@ export default function CadastrosManutencao() {
                     {subareas.length === 0 && (
                       <p className="text-sm text-gray-500 italic py-4 text-center">
                         Nenhuma subárea cadastrada.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="tipos" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-1 shadow-sm h-fit">
+              <CardHeader>
+                <CardTitle className="text-lg">Novo Tipo de O.S.</CardTitle>
+                <CardDescription>Crie tipos de manutenção (Preventiva, etc.)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome do Tipo</Label>
+                  <Input
+                    placeholder="Ex: Preventiva Elétrica"
+                    value={newTipo.name}
+                    onChange={(e) => setNewTipo({ ...newTipo, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={newTipo.category}
+                    onChange={(e) => setNewTipo({ ...newTipo, category: e.target.value })}
+                  >
+                    <option value="Corretiva">Corretiva (Reativa)</option>
+                    <option value="Preventiva">Preventiva</option>
+                    <option value="Preditiva">Preditiva</option>
+                    <option value="Melhoria">Melhoria / Projeto</option>
+                  </select>
+                </div>
+                <Button
+                  onClick={handleAddTipo}
+                  className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Salvar Tipo
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Tipos Cadastrados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-sm text-gray-500">Carregando tipos...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {tipos.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div>
+                          <p className="font-medium text-sm text-gray-900">{t.name}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Cat: {t.category}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteTipo(t.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {tipos.length === 0 && (
+                      <p className="text-sm text-gray-500 italic py-4 text-center">
+                        Nenhum tipo cadastrado.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="prioridades" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-1 shadow-sm h-fit">
+              <CardHeader>
+                <CardTitle className="text-lg">Nova Criticidade</CardTitle>
+                <CardDescription>Defina prioridades e seus limites de SLA</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome</Label>
+                  <Input
+                    placeholder="Ex: Urgente, Alta..."
+                    value={newPrioridade.name}
+                    onChange={(e) => setNewPrioridade({ ...newPrioridade, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>SLA Limite (Horas)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={newPrioridade.sla_hours}
+                    onChange={(e) =>
+                      setNewPrioridade({ ...newPrioridade, sla_hours: Number(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor de Destaque</Label>
+                  <Input
+                    type="color"
+                    className="h-10 p-1 w-full"
+                    value={newPrioridade.color}
+                    onChange={(e) => setNewPrioridade({ ...newPrioridade, color: e.target.value })}
+                  />
+                </div>
+                <Button
+                  onClick={handleAddPrioridade}
+                  className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Salvar Criticidade
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Criticidades Cadastradas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-sm text-gray-500">Carregando prioridades...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {prioridades.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-4 h-4 rounded-full border"
+                            style={{ backgroundColor: p.color }}
+                          />
+                          <div>
+                            <p className="font-medium text-sm text-gray-900">{p.name}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">SLA: {p.sla_hours} horas</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeletePrioridade(p.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {prioridades.length === 0 && (
+                      <p className="text-sm text-gray-500 italic py-4 text-center">
+                        Nenhuma criticidade cadastrada.
                       </p>
                     )}
                   </div>
