@@ -513,9 +513,22 @@ export default function ChamadosManutencao() {
 
       <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
         {columns.map((column) => {
-          const colTickets = tickets.filter(
-            (t) => t.status?.step === column || (!t.status && column === 'Aberto'),
-          )
+          const colTickets = tickets.filter((t) => {
+            if (!t.status && column === 'Aberto') return true
+            if (!t.status) return false
+
+            const isPlanejadoByName = t.status.name?.toLowerCase() === 'planejado'
+
+            if (column === 'Planejado') {
+              return t.status.step === 'Planejado' || isPlanejadoByName
+            }
+
+            if (column === 'Aberto') {
+              return t.status.step === 'Aberto' && !isPlanejadoByName
+            }
+
+            return t.status.step === column
+          })
           return (
             <div
               key={column}
