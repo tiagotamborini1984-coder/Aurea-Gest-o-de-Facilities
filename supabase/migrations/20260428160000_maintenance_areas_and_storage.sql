@@ -73,7 +73,7 @@ BEGIN
 
   RETURN jsonb_build_object('success', true, 'ticket_number', v_ticket_number, 'id', v_ticket_id);
 END;
-$;
+$$;
 
 -- Update public options to expose areas instead of global locations
 DROP FUNCTION IF EXISTS public.get_maintenance_public_options;
@@ -106,4 +106,4 @@ BEGIN
 
   RETURN v_result;
 END;
-$;
+$$;
