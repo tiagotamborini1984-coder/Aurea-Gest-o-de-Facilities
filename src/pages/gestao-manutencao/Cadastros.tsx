@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Users,
   ListTodo,
+  Pencil,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,14 @@ import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 
 export default function CadastrosManutencao() {
   const { user } = useAuth()
@@ -43,6 +52,16 @@ export default function CadastrosManutencao() {
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
   const [newTipo, setNewTipo] = useState({ name: '', color: '#3b82f6' })
   const [newPrioridade, setNewPrioridade] = useState({ name: '', sla_hours: 24, color: '#3b82f6' })
+
+  const [editModal, setEditModal] = useState<{
+    open: boolean
+    type: string | null
+    data: any
+  }>({
+    open: false,
+    type: null,
+    data: null,
+  })
 
   useEffect(() => {
     loadData()
@@ -294,6 +313,78 @@ export default function CadastrosManutencao() {
     }
   }
 
+  const openEdit = (type: string, item: any) => {
+    const data = { ...item }
+    if (type === 'manutentor') {
+      data.plant_id = item.authorized_plants?.[0] || ''
+    }
+    setEditModal({ open: true, type, data })
+  }
+
+  const handleUpdateField = (field: string, value: any) => {
+    setEditModal((prev) => ({
+      ...prev,
+      data: {
+        ...prev.data,
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleSaveEdit = async () => {
+    const { type, data } = editModal
+    if (!data || !data.id) return
+
+    try {
+      let error
+      if (type === 'area') {
+        const res = await supabase
+          .from('maintenance_areas')
+          .update({ name: data.name, plant_id: data.plant_id })
+          .eq('id', data.id)
+        error = res.error
+      } else if (type === 'subarea') {
+        const res = await supabase
+          .from('maintenance_sublocations')
+          .update({ name: data.name, area_id: data.area_id })
+          .eq('id', data.id)
+        error = res.error
+      } else if (type === 'tipo') {
+        const res = await supabase
+          .from('maintenance_types')
+          .update({ name: data.name, color: data.color })
+          .eq('id', data.id)
+        error = res.error
+      } else if (type === 'status') {
+        const res = await supabase
+          .from('maintenance_statuses')
+          .update({ name: data.name, color: data.color, step: data.step })
+          .eq('id', data.id)
+        error = res.error
+      } else if (type === 'prioridade') {
+        const res = await supabase
+          .from('maintenance_priorities')
+          .update({ name: data.name, color: data.color, sla_hours: data.sla_hours })
+          .eq('id', data.id)
+        error = res.error
+      } else if (type === 'manutentor') {
+        const res = await supabase
+          .from('profiles')
+          .update({ name: data.name, authorized_plants: data.plant_id ? [data.plant_id] : [] })
+          .eq('id', data.id)
+        error = res.error
+      }
+
+      if (error) throw error
+
+      toast.success('Atualizado com sucesso!')
+      setEditModal({ open: false, type: null, data: null })
+      loadData()
+    } catch (err: any) {
+      toast.error('Erro ao atualizar: ' + err.message)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">
       <div>
@@ -399,14 +490,24 @@ export default function CadastrosManutencao() {
                             {a.plant?.name}
                           </p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteArea(a.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit('area', a)}
+                            className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteArea(a.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {areas.length === 0 && (
@@ -483,14 +584,24 @@ export default function CadastrosManutencao() {
                             {s.area?.plant?.name}
                           </p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteSubarea(s.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit('subarea', s)}
+                            className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteSubarea(s.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {subareas.length === 0 && (
@@ -560,14 +671,24 @@ export default function CadastrosManutencao() {
                           />
                           <p className="font-medium text-sm text-gray-900">{t.name}</p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteTipo(t.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit('tipo', t)}
+                            className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteTipo(t.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {tipos.length === 0 && (
@@ -653,14 +774,24 @@ export default function CadastrosManutencao() {
                             <p className="text-xs text-gray-500 mt-0.5">Etapa: {s.step}</p>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteStatus(s.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit('status', s)}
+                            className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteStatus(s.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {statuses.length === 0 && (
@@ -744,14 +875,24 @@ export default function CadastrosManutencao() {
                             <p className="text-xs text-gray-500 mt-0.5">SLA: {p.sla_hours} horas</p>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeletePrioridade(p.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit('prioridade', p)}
+                            className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeletePrioridade(p.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {prioridades.length === 0 && (
@@ -866,14 +1007,24 @@ export default function CadastrosManutencao() {
                               </p>
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteManutentor(m.id)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit('manutentor', m)}
+                              className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteManutentor(m.id)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       )
                     })}
@@ -897,6 +1048,195 @@ export default function CadastrosManutencao() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Sheet
+        open={editModal.open}
+        onOpenChange={(open) => !open && setEditModal((prev) => ({ ...prev, open: false }))}
+      >
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Editar Cadastro</SheetTitle>
+            <SheetDescription>Faça as alterações necessárias e clique em salvar.</SheetDescription>
+          </SheetHeader>
+
+          <div className="py-6 space-y-4">
+            {editModal.type === 'area' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Nome da Área</Label>
+                  <Input
+                    value={editModal.data?.name || ''}
+                    onChange={(e) => handleUpdateField('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Planta / Filial</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={editModal.data?.plant_id || ''}
+                    onChange={(e) => handleUpdateField('plant_id', e.target.value)}
+                  >
+                    <option value="">Selecione a Planta...</option>
+                    {plants.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {editModal.type === 'subarea' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Nome da Subárea</Label>
+                  <Input
+                    value={editModal.data?.name || ''}
+                    onChange={(e) => handleUpdateField('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Área Pai (Local Macro)</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={editModal.data?.area_id || ''}
+                    onChange={(e) => handleUpdateField('area_id', e.target.value)}
+                  >
+                    <option value="">Selecione a Área...</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.plant?.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {editModal.type === 'tipo' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Nome do Tipo</Label>
+                  <Input
+                    value={editModal.data?.name || ''}
+                    onChange={(e) => handleUpdateField('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor de Destaque</Label>
+                  <Input
+                    type="color"
+                    className="h-10 p-1 w-full cursor-pointer"
+                    value={editModal.data?.color || '#000000'}
+                    onChange={(e) => handleUpdateField('color', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {editModal.type === 'status' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Nome do Status</Label>
+                  <Input
+                    value={editModal.data?.name || ''}
+                    onChange={(e) => handleUpdateField('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Etapa no Kanban</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={editModal.data?.step || ''}
+                    onChange={(e) => handleUpdateField('step', e.target.value)}
+                  >
+                    <option value="Aberto">Aberto</option>
+                    <option value="Planejado">Planejado</option>
+                    <option value="Em Execução">Em Execução</option>
+                    <option value="Concluído">Concluído</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor</Label>
+                  <Input
+                    type="color"
+                    className="h-10 p-1 w-full cursor-pointer"
+                    value={editModal.data?.color || '#000000'}
+                    onChange={(e) => handleUpdateField('color', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {editModal.type === 'prioridade' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Nome da Criticidade</Label>
+                  <Input
+                    value={editModal.data?.name || ''}
+                    onChange={(e) => handleUpdateField('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>SLA Limite (Horas)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={editModal.data?.sla_hours || ''}
+                    onChange={(e) => handleUpdateField('sla_hours', Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor de Destaque</Label>
+                  <Input
+                    type="color"
+                    className="h-10 p-1 w-full cursor-pointer"
+                    value={editModal.data?.color || '#000000'}
+                    onChange={(e) => handleUpdateField('color', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {editModal.type === 'manutentor' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Nome Completo</Label>
+                  <Input
+                    value={editModal.data?.name || ''}
+                    onChange={(e) => handleUpdateField('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Planta Vinculada</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={editModal.data?.plant_id || ''}
+                    onChange={(e) => handleUpdateField('plant_id', e.target.value)}
+                  >
+                    <option value="">Todas as plantas (ou selecione...)</option>
+                    {plants.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+          </div>
+
+          <SheetFooter>
+            <Button
+              onClick={handleSaveEdit}
+              className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
+            >
+              Salvar Alterações
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
