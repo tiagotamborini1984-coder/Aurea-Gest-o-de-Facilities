@@ -57,6 +57,9 @@ export default function ChamadosManutencao() {
   const [files, setFiles] = useState<File[]>([])
 
   const [editForm, setEditForm] = useState({
+    area_id: '',
+    sublocation_id: '',
+    asset_id: '',
     type_id: '',
     priority_id: '',
     assignee_id: '',
@@ -83,6 +86,24 @@ export default function ChamadosManutencao() {
     [assets, form],
   )
 
+  const editFormAreas = useMemo(
+    () => areas.filter((a) => a.plant_id === selectedTicket?.plant_id),
+    [areas, selectedTicket?.plant_id],
+  )
+  const editFormSublocations = useMemo(
+    () => sublocations.filter((s) => s.area_id === editForm.area_id),
+    [sublocations, editForm.area_id],
+  )
+  const editFormAssets = useMemo(
+    () =>
+      assets.filter(
+        (a) =>
+          a.plant_id === selectedTicket?.plant_id &&
+          (!editForm.area_id || editForm.area_id === 'none' || a.area_id === editForm.area_id),
+      ),
+    [assets, selectedTicket?.plant_id, editForm.area_id],
+  )
+
   useEffect(() => {
     loadAuxData()
   }, [])
@@ -93,6 +114,9 @@ export default function ChamadosManutencao() {
   useEffect(() => {
     if (selectedTicket) {
       setEditForm({
+        area_id: selectedTicket.area_id || 'none',
+        sublocation_id: selectedTicket.sublocation_id || 'none',
+        asset_id: selectedTicket.asset_id || 'none',
         type_id: selectedTicket.type_id || 'none',
         priority_id: selectedTicket.priority_id || 'none',
         assignee_id: selectedTicket.assignee_id || 'none',
@@ -116,7 +140,7 @@ export default function ChamadosManutencao() {
       supabase.from('maintenance_priorities').select('*').order('name'),
       supabase.from('maintenance_statuses').select('*').order('order_index'),
       supabase.from('maintenance_types').select('*').order('name'),
-      supabase.from('profiles').select('id, name').order('name'),
+      supabase.from('profiles').select('id, name, role').order('name'),
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
@@ -217,6 +241,9 @@ export default function ChamadosManutencao() {
     setUpdating(true)
     try {
       const payload = {
+        area_id: editForm.area_id === 'none' ? null : editForm.area_id,
+        sublocation_id: editForm.sublocation_id === 'none' ? null : editForm.sublocation_id,
+        asset_id: editForm.asset_id === 'none' ? null : editForm.asset_id,
         type_id: editForm.type_id === 'none' ? null : editForm.type_id,
         priority_id: editForm.priority_id === 'none' ? null : editForm.priority_id,
         assignee_id: editForm.assignee_id === 'none' ? null : editForm.assignee_id,
@@ -237,6 +264,9 @@ export default function ChamadosManutencao() {
       setSelectedTicket({
         ...selectedTicket,
         ...payload,
+        area: areas.find((a) => a.id === payload.area_id),
+        sublocation: sublocations.find((s) => s.id === payload.sublocation_id),
+        asset: assets.find((a) => a.id === payload.asset_id),
         priority: priorities.find((p) => p.id === payload.priority_id),
         assignee: assignees.find((a) => a.id === payload.assignee_id),
       })
@@ -533,13 +563,72 @@ export default function ChamadosManutencao() {
                 <p className="text-sm font-medium mt-1">{selectedTicket.description}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <Label className="text-gray-500">Área / Local</Label>
-                  <p className="text-sm font-medium mt-1">{selectedTicket.area?.name || '-'}</p>
+                  <Select
+                    value={editForm.area_id}
+                    onValueChange={(v) =>
+                      setEditForm({
+                        ...editForm,
+                        area_id: v,
+                        sublocation_id: 'none',
+                        asset_id: 'none',
+                      })
+                    }
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Selecione a Área" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {editFormAreas.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
+                  <Label className="text-gray-500">Sublocal</Label>
+                  <Select
+                    value={editForm.sublocation_id}
+                    onValueChange={(v) =>
+                      setEditForm({ ...editForm, sublocation_id: v, asset_id: 'none' })
+                    }
+                    disabled={editForm.area_id === 'none'}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Selecione o Sublocal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {editFormSublocations.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
                   <Label className="text-gray-500">Equipamento</Label>
-                  <p className="text-sm font-medium mt-1">{selectedTicket.asset?.name || '-'}</p>
+                  <Select
+                    value={editForm.asset_id}
+                    onValueChange={(v) => setEditForm({ ...editForm, asset_id: v })}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs">
+                      <SelectValue placeholder="Selecione o Equipamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {editFormAssets.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="col-span-2">
@@ -601,11 +690,13 @@ export default function ChamadosManutencao() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Não atribuído</SelectItem>
-                      {assignees.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
+                      {assignees
+                        .filter((a) => a.role === 'Manutentor' || a.id === editForm.assignee_id)
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

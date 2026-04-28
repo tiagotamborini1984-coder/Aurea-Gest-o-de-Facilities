@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Wrench,
   AlertTriangle,
+  Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 export default function CadastrosManutencao() {
   const { user } = useAuth()
@@ -25,9 +27,11 @@ export default function CadastrosManutencao() {
   const [plants, setPlants] = useState<any[]>([])
   const [tipos, setTipos] = useState<any[]>([])
   const [prioridades, setPrioridades] = useState<any[]>([])
+  const [manutentores, setManutentores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [newArea, setNewArea] = useState({ name: '', plant_id: '' })
+  const [newManutentor, setNewManutentor] = useState({ name: '', email: '', password: '' })
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
   const [newTipo, setNewTipo] = useState({ name: '', category: 'Corretiva' })
   const [newPrioridade, setNewPrioridade] = useState({ name: '', sla_hours: 24, color: '#3b82f6' })
@@ -38,7 +42,7 @@ export default function CadastrosManutencao() {
 
   const loadData = async () => {
     setLoading(true)
-    const [pRes, aRes, sRes, tRes, prRes] = await Promise.all([
+    const [pRes, aRes, sRes, tRes, prRes, mRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
       supabase.from('maintenance_areas').select('*, plant:plants(name)').order('name'),
       supabase
@@ -47,12 +51,14 @@ export default function CadastrosManutencao() {
         .order('name'),
       supabase.from('maintenance_types').select('*').order('name'),
       supabase.from('maintenance_priorities').select('*').order('sla_hours'),
+      supabase.from('profiles').select('*').eq('role', 'Manutentor').order('name'),
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
     if (sRes.data) setSubareas(sRes.data)
     if (tRes.data) setTipos(tRes.data)
     if (prRes.data) setPrioridades(prRes.data)
+    if (mRes.data) setManutentores(mRes.data)
     setLoading(false)
   }
 
@@ -192,6 +198,50 @@ export default function CadastrosManutencao() {
     }
   }
 
+  const handleAddManutentor = async () => {
+    if (!newManutentor.name || !newManutentor.email || !newManutentor.password) {
+      toast.error('Preencha nome, e-mail e senha do Manutentor')
+      return
+    }
+    const clientId = await getClientId()
+    if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
+
+    toast.loading('Criando manutentor...', { id: 'create-manutentor' })
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email: newManutentor.email,
+        password: newManutentor.password,
+        name: newManutentor.name,
+        role: 'Manutentor',
+        client_id: clientId,
+      },
+    })
+
+    if (error || data?.error) {
+      toast.error('Erro ao salvar: ' + (error?.message || data?.error), { id: 'create-manutentor' })
+    } else {
+      toast.success('Manutentor adicionado', { id: 'create-manutentor' })
+      setNewManutentor({ name: '', email: '', password: '' })
+      loadData()
+    }
+  }
+
+  const handleDeleteManutentor = async (id: string) => {
+    if (!confirm('Deseja realmente remover este manutentor? O acesso dele será revogado.')) return
+
+    toast.loading('Removendo manutentor...', { id: 'del-manutentor' })
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { userId: id },
+    })
+
+    if (error || data?.error) {
+      toast.error('Erro ao remover: ' + (error?.message || data?.error), { id: 'del-manutentor' })
+    } else {
+      toast.success('Manutentor removido', { id: 'del-manutentor' })
+      loadData()
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">
       <div>
@@ -225,6 +275,10 @@ export default function CadastrosManutencao() {
           <TabsTrigger value="prioridades" className="py-2.5 px-4 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
             Criticidades / SLA
+          </TabsTrigger>
+          <TabsTrigger value="manutentores" className="py-2.5 px-4 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Manutentores
           </TabsTrigger>
         </TabsList>
 
@@ -555,6 +609,98 @@ export default function CadastrosManutencao() {
                     {prioridades.length === 0 && (
                       <p className="text-sm text-gray-500 italic py-4 text-center">
                         Nenhuma criticidade cadastrada.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="manutentores" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-1 shadow-sm h-fit">
+              <CardHeader>
+                <CardTitle className="text-lg">Novo Manutentor</CardTitle>
+                <CardDescription>Cadastre um técnico para assumir as O.S.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome Completo</Label>
+                  <Input
+                    placeholder="Ex: João Silva"
+                    value={newManutentor.name}
+                    onChange={(e) => setNewManutentor({ ...newManutentor, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>E-mail de Acesso</Label>
+                  <Input
+                    type="email"
+                    placeholder="joao.silva@email.com"
+                    value={newManutentor.email}
+                    onChange={(e) => setNewManutentor({ ...newManutentor, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Senha Inicial</Label>
+                  <Input
+                    type="password"
+                    placeholder="******"
+                    value={newManutentor.password}
+                    onChange={(e) =>
+                      setNewManutentor({ ...newManutentor, password: e.target.value })
+                    }
+                  />
+                </div>
+                <Button
+                  onClick={handleAddManutentor}
+                  className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Cadastrar Manutentor
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Manutentores Cadastrados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-sm text-gray-500">Carregando manutentores...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {manutentores.map((m) => (
+                      <div
+                        key={m.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-brand-vividBlue text-white text-xs">
+                              {m.name?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm text-gray-900">{m.name}</p>
+                            <p className="text-xs text-gray-500">{m.email}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteManutentor(m.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {manutentores.length === 0 && (
+                      <p className="text-sm text-gray-500 italic py-4 text-center">
+                        Nenhum manutentor cadastrado.
                       </p>
                     )}
                   </div>
