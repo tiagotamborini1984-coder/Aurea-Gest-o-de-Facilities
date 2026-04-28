@@ -48,6 +48,7 @@ export default function PlanejamentoManutencao() {
   const [editForm, setEditForm] = useState({
     planned_start: '',
     planned_end: '',
+    assignee_id: 'unassigned',
   })
   const [updating, setUpdating] = useState(false)
 
@@ -75,6 +76,7 @@ export default function PlanejamentoManutencao() {
       setEditForm({
         planned_start: toLocalDatetime(selectedTicket.planned_start),
         planned_end: toLocalDatetime(selectedTicket.planned_end),
+        assignee_id: selectedTicket.assignee_id || 'unassigned',
       })
     }
   }, [selectedTicket])
@@ -95,9 +97,12 @@ export default function PlanejamentoManutencao() {
     let query = supabase
       .from('maintenance_tickets')
       .select(`
-      id, ticket_number, description, planned_start, planned_end, assignee_id, plant_id, area_id,
-      assignee:profiles!maintenance_tickets_assignee_id_fkey(name),
-      status:maintenance_statuses(step)
+      id, ticket_number, description, planned_start, planned_end, assignee_id, plant_id, area_id, sublocation_id, asset_id, photos,
+      assignee:profiles!maintenance_tickets_assignee_id_fkey(id, name),
+      status:maintenance_statuses(step),
+      area:maintenance_areas(name),
+      sublocation:maintenance_sublocations(name),
+      asset:maintenance_assets(name)
     `)
       .not('status.step', 'eq', 'Concluído')
 
@@ -157,6 +162,7 @@ export default function PlanejamentoManutencao() {
           ? new Date(editForm.planned_start).toISOString()
           : null,
         planned_end: editForm.planned_end ? new Date(editForm.planned_end).toISOString() : null,
+        assignee_id: editForm.assignee_id === 'unassigned' ? null : editForm.assignee_id,
       }
       const { error } = await supabase
         .from('maintenance_tickets')
@@ -164,7 +170,7 @@ export default function PlanejamentoManutencao() {
         .eq('id', selectedTicket.id)
 
       if (error) throw error
-      toast.success('Datas da O.S. atualizadas com sucesso!')
+      toast.success('O.S. atualizada com sucesso!')
       loadTickets()
       setSelectedTicket(null)
     } catch (e: any) {
@@ -372,12 +378,65 @@ export default function PlanejamentoManutencao() {
                 </p>
               </div>
 
-              {selectedTicket.assignee && (
-                <div>
-                  <Label className="text-gray-500 text-xs">Manutentor Responsável</Label>
-                  <p className="text-sm font-medium mt-1">{selectedTicket.assignee.name}</p>
-                </div>
-              )}
+              <div>
+                <Label className="text-gray-500 text-xs">Localização / Equipamento</Label>
+                <p className="text-sm font-medium mt-1 leading-snug">
+                  {selectedTicket.area?.name || 'N/A'}
+                  {selectedTicket.sublocation?.name ? ` > ${selectedTicket.sublocation.name}` : ''}
+                  {selectedTicket.asset?.name ? ` > ${selectedTicket.asset.name}` : ''}
+                </p>
+              </div>
+
+              {selectedTicket.photos &&
+                Array.isArray(selectedTicket.photos) &&
+                selectedTicket.photos.length > 0 && (
+                  <div>
+                    <Label className="text-gray-500 text-xs mb-2 block">Anexos</Label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {selectedTicket.photos.map((photo: any, i: number) => {
+                        const url = typeof photo === 'string' ? photo : photo.url
+                        if (!url) return null
+                        return (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block relative w-16 h-16 border rounded-md overflow-hidden hover:opacity-80 transition-opacity"
+                          >
+                            <img
+                              src={url}
+                              alt={`Anexo ${i + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </a>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              <div>
+                <Label className="text-gray-500 text-xs mb-2 block">Manutentor Responsável</Label>
+                <Select
+                  value={editForm.assignee_id}
+                  onValueChange={(v) => setEditForm({ ...editForm, assignee_id: v })}
+                >
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Sem Atribuição</SelectItem>
+                    {assignees
+                      .filter((a) => a.role === 'Manutentor' || editForm.assignee_id === a.id)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="pt-2 border-t">
                 <Label className="text-gray-700 font-semibold">Datas de Planejamento</Label>
@@ -411,7 +470,7 @@ export default function PlanejamentoManutencao() {
                   disabled={updating}
                   className="w-full bg-brand-vividBlue h-10"
                 >
-                  {updating ? 'Salvando...' : 'Salvar no Calendário'}
+                  {updating ? 'Salvando...' : 'Salvar Alterações'}
                 </Button>
               </div>
             </div>
