@@ -109,11 +109,7 @@ export default function OcupacaoLockers() {
   }
 
   const fetchData = async () => {
-    let lockersQuery = supabase
-      .from('lockers')
-      .select('*')
-      .eq('client_id', activeClient!.id)
-      .order('identification', { ascending: true })
+    let lockersQuery = supabase.from('lockers').select('*').eq('client_id', activeClient!.id)
 
     if (selectedPlant !== 'all') {
       lockersQuery = lockersQuery.eq('plant_id', selectedPlant)
@@ -131,10 +127,18 @@ export default function OcupacaoLockers() {
     if (selectedLocation !== 'all') lockersQuery = lockersQuery.eq('location', selectedLocation)
 
     const { data: lockersData } = await lockersQuery
-    setLockers(lockersData || [])
 
-    if (lockersData && lockersData.length > 0) {
-      const lockerIds = lockersData.map((l) => l.id)
+    const sortedLockers = (lockersData || []).sort((a, b) =>
+      a.identification.localeCompare(b.identification, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    )
+
+    setLockers(sortedLockers)
+
+    if (sortedLockers.length > 0) {
+      const lockerIds = sortedLockers.map((l) => l.id)
       const { data: occData } = await supabase
         .from('locker_occupations')
         .select('*, locker_collaborators(name)')

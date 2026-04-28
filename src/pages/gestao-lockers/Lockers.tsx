@@ -61,8 +61,14 @@ export default function Lockers() {
       .from('lockers')
       .select('*, plants(name)')
       .eq('client_id', activeClient!.id)
-      .order('created_at', { ascending: false })
-    setLockers(data || [])
+
+    const sortedLockers = (data || []).sort((a, b) =>
+      a.identification.localeCompare(b.identification, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    )
+    setLockers(sortedLockers)
   }
 
   const handleSave = async () => {
