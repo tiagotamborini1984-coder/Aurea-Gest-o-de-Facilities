@@ -54,6 +54,8 @@ export default function ChamadosManutencao() {
     area_id: '',
     sublocation_id: '',
     asset_id: '',
+    type_id: '',
+    status_id: '',
   })
   const [files, setFiles] = useState<File[]>([])
 
@@ -226,7 +228,10 @@ export default function ChamadosManutencao() {
       let seq = latest?.length ? parseInt(latest[0].ticket_number.split('-')[2], 10) + 1 : 1
       const ticketNumber = `MAN-${year}-${seq.toString().padStart(4, '0')}`
 
-      const initStatus = statuses.find((s) => s.step === 'Aberto') || statuses[0]
+      const initStatus =
+        form.status_id && form.status_id !== 'none'
+          ? statuses.find((s) => s.id === form.status_id)
+          : statuses.find((s) => s.step === 'Aberto') || statuses[0]
 
       const { error } = await supabase.from('maintenance_tickets').insert({
         client_id: profile.client_id,
@@ -234,6 +239,7 @@ export default function ChamadosManutencao() {
         area_id: form.area_id || null,
         sublocation_id: form.sublocation_id || null,
         asset_id: form.asset_id || null,
+        type_id: form.type_id && form.type_id !== 'none' ? form.type_id : null,
         ticket_number: ticketNumber,
         description: form.description,
         status_id: initStatus?.id || null,
@@ -245,7 +251,15 @@ export default function ChamadosManutencao() {
       if (error) throw error
       toast.success('OS criada com sucesso!')
       setOpen(false)
-      setForm({ description: '', plant_id: '', area_id: '', sublocation_id: '', asset_id: '' })
+      setForm({
+        description: '',
+        plant_id: '',
+        area_id: '',
+        sublocation_id: '',
+        asset_id: '',
+        type_id: '',
+        status_id: '',
+      })
       setFiles([])
       loadTickets()
     } catch (err: any) {
@@ -455,6 +469,46 @@ export default function ChamadosManutencao() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <Label>Tipo de Manutenção</Label>
+                    <Select
+                      value={form.type_id}
+                      onValueChange={(v) => setForm({ ...form, type_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Não definido</SelectItem>
+                        {types.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <Label>Status Inicial</Label>
+                    <Select
+                      value={form.status_id}
+                      onValueChange={(v) => setForm({ ...form, status_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Padrão (Aberto)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Padrão (Aberto)</SelectItem>
+                        {statuses.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Descrição do Problema *</Label>

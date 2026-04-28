@@ -10,6 +10,7 @@ import {
   Wrench,
   AlertTriangle,
   Users,
+  ListTodo,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,9 +29,11 @@ export default function CadastrosManutencao() {
   const [tipos, setTipos] = useState<any[]>([])
   const [prioridades, setPrioridades] = useState<any[]>([])
   const [manutentores, setManutentores] = useState<any[]>([])
+  const [statuses, setStatuses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [newArea, setNewArea] = useState({ name: '', plant_id: '' })
+  const [newStatus, setNewStatus] = useState({ name: '', color: '#64748b', step: 'Aberto' })
   const [newManutentor, setNewManutentor] = useState({
     name: '',
     email: '',
@@ -47,7 +50,7 @@ export default function CadastrosManutencao() {
 
   const loadData = async () => {
     setLoading(true)
-    const [pRes, aRes, sRes, tRes, prRes, mRes] = await Promise.all([
+    const [pRes, aRes, sRes, tRes, prRes, mRes, statRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
       supabase.from('maintenance_areas').select('*, plant:plants(name)').order('name'),
       supabase
@@ -57,6 +60,7 @@ export default function CadastrosManutencao() {
       supabase.from('maintenance_types').select('*').order('name'),
       supabase.from('maintenance_priorities').select('*').order('sla_hours'),
       supabase.from('profiles').select('*').eq('role', 'Manutentor').order('name'),
+      supabase.from('maintenance_statuses').select('*').order('order_index'),
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
@@ -64,6 +68,7 @@ export default function CadastrosManutencao() {
     if (tRes.data) setTipos(tRes.data)
     if (prRes.data) setPrioridades(prRes.data)
     if (mRes.data) setManutentores(mRes.data)
+    if (statRes.data) setStatuses(statRes.data)
     setLoading(false)
   }
 
@@ -202,6 +207,42 @@ export default function CadastrosManutencao() {
     }
   }
 
+  const handleAddStatus = async () => {
+    if (!newStatus.name || !newStatus.step) {
+      toast.error('Preencha o nome e a etapa do status')
+      return
+    }
+    const clientId = await getClientId()
+    if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
+
+    const maxOrder = statuses.filter((s) => s.step === newStatus.step).length
+
+    const { error } = await supabase.from('maintenance_statuses').insert({
+      client_id: clientId,
+      name: newStatus.name,
+      color: newStatus.color,
+      step: newStatus.step,
+      order_index: maxOrder,
+      is_terminal: newStatus.step === 'Concluído',
+    } as any)
+
+    if (error) toast.error('Erro ao salvar: ' + error.message)
+    else {
+      toast.success('Status adicionado')
+      setNewStatus({ name: '', color: '#64748b', step: 'Aberto' })
+      loadData()
+    }
+  }
+
+  const handleDeleteStatus = async (id: string) => {
+    const { error } = await supabase.from('maintenance_statuses').delete().eq('id', id)
+    if (error) toast.error('Erro ao deletar (pode estar em uso)')
+    else {
+      toast.success('Status removido')
+      loadData()
+    }
+  }
+
   const handleAddManutentor = async () => {
     if (
       !newManutentor.name ||
@@ -281,6 +322,10 @@ export default function CadastrosManutencao() {
           <TabsTrigger value="tipos" className="py-2.5 px-4 flex items-center gap-2">
             <Wrench className="w-4 h-4" />
             Tipos de O.S.
+          </TabsTrigger>
+          <TabsTrigger value="status" className="py-2.5 px-4 flex items-center gap-2">
+            <ListTodo className="w-4 h-4" />
+            Status
           </TabsTrigger>
           <TabsTrigger value="prioridades" className="py-2.5 px-4 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
@@ -514,6 +559,99 @@ export default function CadastrosManutencao() {
                     {tipos.length === 0 && (
                       <p className="text-sm text-gray-500 italic py-4 text-center">
                         Nenhum tipo cadastrado.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="status" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-1 shadow-sm h-fit">
+              <CardHeader>
+                <CardTitle className="text-lg">Novo Status</CardTitle>
+                <CardDescription>Crie status customizados para o Kanban</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome do Status</Label>
+                  <Input
+                    placeholder="Ex: Aguardando Peça"
+                    value={newStatus.name}
+                    onChange={(e) => setNewStatus({ ...newStatus, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Etapa no Kanban</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={newStatus.step}
+                    onChange={(e) => setNewStatus({ ...newStatus, step: e.target.value })}
+                  >
+                    <option value="Aberto">Aberto</option>
+                    <option value="Planejado">Planejado</option>
+                    <option value="Em Execução">Em Execução</option>
+                    <option value="Concluído">Concluído</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor</Label>
+                  <Input
+                    type="color"
+                    className="h-10 p-1 w-full"
+                    value={newStatus.color}
+                    onChange={(e) => setNewStatus({ ...newStatus, color: e.target.value })}
+                  />
+                </div>
+                <Button
+                  onClick={handleAddStatus}
+                  className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Salvar Status
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Status Cadastrados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-sm text-gray-500">Carregando status...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {statuses.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-4 h-4 rounded-full border"
+                            style={{ backgroundColor: s.color }}
+                          />
+                          <div>
+                            <p className="font-medium text-sm text-gray-900">{s.name}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Etapa: {s.step}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteStatus(s.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {statuses.length === 0 && (
+                      <p className="text-sm text-gray-500 italic py-4 text-center">
+                        Nenhum status cadastrado.
                       </p>
                     )}
                   </div>
