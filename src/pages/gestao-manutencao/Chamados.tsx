@@ -538,20 +538,34 @@ export default function ChamadosManutencao() {
                           <span className="text-xs font-mono font-bold text-gray-500">
                             {ticket.ticket_number}
                           </span>
-                          {ticket.status?.step === 'Planejado' && (
-                            <Badge className="bg-[#22c55e] text-black hover:bg-[#22c55e]/90 text-[10px] h-5 px-1.5 border-0">
-                              {ticket.status.name}
-                            </Badge>
-                          )}
                         </div>
                         {ticket.priority && (
                           <Badge
-                            variant="outline"
-                            style={{
-                              borderColor: ticket.priority.color,
-                              color: ticket.priority.color,
-                            }}
-                            className="text-[10px] px-1 h-5"
+                            variant={
+                              ticket.priority.name.toLowerCase() === 'planejado' ||
+                              ticket.priority.name.toLowerCase() === 'urgente'
+                                ? 'default'
+                                : 'outline'
+                            }
+                            style={
+                              ticket.priority.name.toLowerCase() === 'planejado'
+                                ? {
+                                    backgroundColor: '#22c55e',
+                                    color: '#000000',
+                                    borderColor: '#22c55e',
+                                  }
+                                : ticket.priority.name.toLowerCase() === 'urgente'
+                                  ? {
+                                      backgroundColor: '#ef4444',
+                                      color: '#ffffff',
+                                      borderColor: '#ef4444',
+                                    }
+                                  : {
+                                      borderColor: ticket.priority.color,
+                                      color: ticket.priority.color,
+                                    }
+                            }
+                            className="text-[10px] px-1 h-5 hover:opacity-90"
                           >
                             {ticket.priority.name}
                           </Badge>
@@ -597,11 +611,6 @@ export default function ChamadosManutencao() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               OS: {selectedTicket?.ticket_number}
-              {selectedTicket?.status?.step === 'Planejado' && (
-                <Badge className="bg-[#22c55e] text-black hover:bg-[#22c55e]/90 border-0">
-                  {selectedTicket.status.name}
-                </Badge>
-              )}
             </SheetTitle>
           </SheetHeader>
           {selectedTicket && (
