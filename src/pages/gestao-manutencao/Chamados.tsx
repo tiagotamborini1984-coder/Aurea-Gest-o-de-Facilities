@@ -240,6 +240,17 @@ export default function ChamadosManutencao() {
   }
 
   const handleUpdateTicket = async () => {
+    if (editForm.planned_start && editForm.planned_end) {
+      if (new Date(editForm.planned_end) < new Date(editForm.planned_start)) {
+        return toast.error('O fim planejado não pode ser anterior ao início planejado.')
+      }
+    }
+    if (editForm.actual_start && editForm.actual_end) {
+      if (new Date(editForm.actual_end) < new Date(editForm.actual_start)) {
+        return toast.error('O fim realizado não pode ser anterior ao início realizado.')
+      }
+    }
+
     setUpdating(true)
     try {
       const payload = {
@@ -745,29 +756,36 @@ export default function ChamadosManutencao() {
                   <Input
                     type="datetime-local"
                     value={editForm.planned_end}
+                    min={editForm.planned_start}
                     onChange={(e) => setEditForm({ ...editForm, planned_end: e.target.value })}
                     className="mt-1 h-8 text-xs"
                   />
                 </div>
 
-                <div>
-                  <Label className="text-gray-500">Início Realizado</Label>
-                  <Input
-                    type="datetime-local"
-                    value={editForm.actual_start}
-                    onChange={(e) => setEditForm({ ...editForm, actual_start: e.target.value })}
-                    className="mt-1 h-8 text-xs"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-500">Fim Realizado</Label>
-                  <Input
-                    type="datetime-local"
-                    value={editForm.actual_end}
-                    onChange={(e) => setEditForm({ ...editForm, actual_end: e.target.value })}
-                    className="mt-1 h-8 text-xs"
-                  />
-                </div>
+                {(selectedTicket.status?.step === 'Em Execução' ||
+                  selectedTicket.status?.step === 'Concluído') && (
+                  <>
+                    <div>
+                      <Label className="text-gray-500">Início Realizado</Label>
+                      <Input
+                        type="datetime-local"
+                        value={editForm.actual_start}
+                        onChange={(e) => setEditForm({ ...editForm, actual_start: e.target.value })}
+                        className="mt-1 h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-gray-500">Fim Realizado</Label>
+                      <Input
+                        type="datetime-local"
+                        value={editForm.actual_end}
+                        min={editForm.actual_start}
+                        onChange={(e) => setEditForm({ ...editForm, actual_end: e.target.value })}
+                        className="mt-1 h-8 text-xs"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="col-span-2 mt-4">
                   <Button

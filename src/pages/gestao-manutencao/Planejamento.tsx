@@ -155,6 +155,13 @@ export default function PlanejamentoManutencao() {
 
   const handleUpdateTicketDates = async () => {
     if (!selectedTicket) return
+
+    if (editForm.planned_start && editForm.planned_end) {
+      if (new Date(editForm.planned_end) < new Date(editForm.planned_start)) {
+        return toast.error('O fim planejado não pode ser anterior ao início planejado.')
+      }
+    }
+
     setUpdating(true)
     try {
       const payload = {
@@ -457,6 +464,7 @@ export default function PlanejamentoManutencao() {
                     <Input
                       type="datetime-local"
                       value={editForm.planned_end}
+                      min={editForm.planned_start}
                       onChange={(e) => setEditForm({ ...editForm, planned_end: e.target.value })}
                       className="mt-1"
                     />
