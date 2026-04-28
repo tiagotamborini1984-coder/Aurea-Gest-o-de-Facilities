@@ -8,6 +8,7 @@ import {
   GripHorizontal,
   Filter,
   MapPin,
+  User,
 } from 'lucide-react'
 import {
   Select,
@@ -16,8 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+
+const toLocalDatetime = (utcStr: string | null) => {
+  if (!utcStr) return ''
+  const d = new Date(utcStr)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export default function PlanejamentoManutencao() {
   const [tickets, setTickets] = useState<any[]>([])
@@ -26,8 +38,18 @@ export default function PlanejamentoManutencao() {
 
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
+  const [assignees, setAssignees] = useState<any[]>([])
+
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
+  const [selectedAssignee, setSelectedAssignee] = useState<string>('all')
+
+  const [selectedTicket, setSelectedTicket] = useState<any>(null)
+  const [editForm, setEditForm] = useState({
+    planned_start: '',
+    planned_end: '',
+  })
+  const [updating, setUpdating] = useState(false)
 
   const weekDays = Array.from({ length: 5 }).map((_, i) => {
     const d = new Date(currentWeek)
@@ -43,17 +65,29 @@ export default function PlanejamentoManutencao() {
   useEffect(() => {
     loadAuxData()
   }, [])
+
   useEffect(() => {
     loadTickets()
-  }, [selectedPlant, selectedArea])
+  }, [selectedPlant, selectedArea, selectedAssignee])
+
+  useEffect(() => {
+    if (selectedTicket) {
+      setEditForm({
+        planned_start: toLocalDatetime(selectedTicket.planned_start),
+        planned_end: toLocalDatetime(selectedTicket.planned_end),
+      })
+    }
+  }, [selectedTicket])
 
   const loadAuxData = async () => {
-    const [pRes, aRes] = await Promise.all([
+    const [pRes, aRes, assignRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
       supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
+      supabase.from('profiles').select('id, name, role').order('name'),
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
+    if (assignRes.data) setAssignees(assignRes.data)
   }
 
   const loadTickets = async () => {
@@ -61,7 +95,7 @@ export default function PlanejamentoManutencao() {
     let query = supabase
       .from('maintenance_tickets')
       .select(`
-      id, ticket_number, description, planned_start, assignee_id, plant_id, area_id,
+      id, ticket_number, description, planned_start, planned_end, assignee_id, plant_id, area_id,
       assignee:profiles!maintenance_tickets_assignee_id_fkey(name),
       status:maintenance_statuses(step)
     `)
@@ -69,6 +103,7 @@ export default function PlanejamentoManutencao() {
 
     if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
     if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
+    if (selectedAssignee !== 'all') query = query.eq('assignee_id', selectedAssignee)
 
     const { data } = await query
     setTickets(data || [])
@@ -83,12 +118,15 @@ export default function PlanejamentoManutencao() {
     e.preventDefault()
     const id = e.dataTransfer.getData('text/plain')
     const plannedDate = `${dateStr}T09:00:00Z`
+
+    // Optimistic update
     setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, planned_start: plannedDate } : t)))
 
     const { error } = await supabase
       .from('maintenance_tickets')
       .update({ planned_start: plannedDate })
       .eq('id', id)
+
     if (error) {
       toast.error('Erro ao agendar OS')
       loadTickets()
@@ -98,12 +136,42 @@ export default function PlanejamentoManutencao() {
   const handleBacklogDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     const id = e.dataTransfer.getData('text/plain')
+
+    // Optimistic update
     setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, planned_start: null } : t)))
+
     const { error } = await supabase
       .from('maintenance_tickets')
       .update({ planned_start: null })
       .eq('id', id)
+
     if (error) loadTickets()
+  }
+
+  const handleUpdateTicketDates = async () => {
+    if (!selectedTicket) return
+    setUpdating(true)
+    try {
+      const payload = {
+        planned_start: editForm.planned_start
+          ? new Date(editForm.planned_start).toISOString()
+          : null,
+        planned_end: editForm.planned_end ? new Date(editForm.planned_end).toISOString() : null,
+      }
+      const { error } = await supabase
+        .from('maintenance_tickets')
+        .update(payload)
+        .eq('id', selectedTicket.id)
+
+      if (error) throw error
+      toast.success('Datas da O.S. atualizadas com sucesso!')
+      loadTickets()
+      setSelectedTicket(null)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setUpdating(false)
+    }
   }
 
   const moveWeek = (days: number) => {
@@ -121,15 +189,17 @@ export default function PlanejamentoManutencao() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <CalendarCheck className="h-8 w-8 text-brand-vividBlue" /> Agenda de Planejamento
           </h1>
-          <p className="text-gray-500 mt-1">Arraste os chamados para agendar a execução.</p>
+          <p className="text-gray-500 mt-1">
+            Arraste os chamados para agendar ou clique para editar datas.
+          </p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <Select
               value={selectedPlant}
               onValueChange={(v) => {
                 setSelectedPlant(v)
-                setSelectedLocation('all')
+                setSelectedArea('all')
               }}
             >
               <SelectTrigger className="w-[160px] bg-white">
@@ -154,6 +224,22 @@ export default function PlanejamentoManutencao() {
                 <SelectItem value="all">Todas as Áreas</SelectItem>
                 {areas
                   .filter((a) => selectedPlant === 'all' || a.plant_id === selectedPlant)
+                  .map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
+              <SelectTrigger className="w-[160px] bg-white">
+                <User className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Manutentor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Manutentores</SelectItem>
+                {assignees
+                  .filter((a) => a.role === 'Manutentor' || selectedAssignee === a.id)
                   .map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}
@@ -200,7 +286,8 @@ export default function PlanejamentoManutencao() {
                   key={t.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, t.id)}
-                  className="cursor-move border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-all"
+                  onClick={() => setSelectedTicket(t)}
+                  className="cursor-pointer active:cursor-move border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-all"
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2 mb-1">
@@ -210,6 +297,11 @@ export default function PlanejamentoManutencao() {
                     <p className="text-sm line-clamp-2" title={t.description}>
                       {t.description}
                     </p>
+                    {t.assignee && (
+                      <div className="text-[10px] text-gray-500 mt-1 truncate">
+                        {t.assignee.name}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))
@@ -244,13 +336,15 @@ export default function PlanejamentoManutencao() {
                       key={t.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, t.id)}
-                      className="border-l-4 border-l-blue-500 shadow-sm bg-blue-50/50 cursor-move"
+                      onClick={() => setSelectedTicket(t)}
+                      className="border-l-4 border-l-blue-500 shadow-sm bg-blue-50/50 cursor-pointer active:cursor-move"
                     >
                       <CardContent className="p-3">
                         <span className="text-xs font-bold text-blue-700">{t.ticket_number}</span>
                         <p className="text-xs font-medium line-clamp-2 my-1">{t.description}</p>
                         {t.assignee && (
-                          <div className="text-[10px] text-gray-500 mt-1 truncate">
+                          <div className="text-[10px] text-gray-500 mt-1 truncate flex items-center gap-1">
+                            <User className="w-3 h-3" />
                             {t.assignee.name}
                           </div>
                         )}
@@ -263,6 +357,67 @@ export default function PlanejamentoManutencao() {
           })}
         </div>
       </div>
+
+      <Sheet open={!!selectedTicket} onOpenChange={(v) => !v && setSelectedTicket(null)}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Agendar OS: {selectedTicket?.ticket_number}</SheetTitle>
+          </SheetHeader>
+          {selectedTicket && (
+            <div className="mt-6 space-y-5">
+              <div>
+                <Label className="text-gray-500 text-xs">Descrição</Label>
+                <p className="text-sm font-medium mt-1 leading-snug">
+                  {selectedTicket.description}
+                </p>
+              </div>
+
+              {selectedTicket.assignee && (
+                <div>
+                  <Label className="text-gray-500 text-xs">Manutentor Responsável</Label>
+                  <p className="text-sm font-medium mt-1">{selectedTicket.assignee.name}</p>
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <Label className="text-gray-700 font-semibold">Datas de Planejamento</Label>
+
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <Label className="text-gray-500 text-xs">Início Planejado (Estimado)</Label>
+                    <Input
+                      type="datetime-local"
+                      value={editForm.planned_start}
+                      onChange={(e) => setEditForm({ ...editForm, planned_start: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-gray-500 text-xs">Fim Planejado (Estimado)</Label>
+                    <Input
+                      type="datetime-local"
+                      value={editForm.planned_end}
+                      onChange={(e) => setEditForm({ ...editForm, planned_end: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 pb-10">
+                <Button
+                  onClick={handleUpdateTicketDates}
+                  disabled={updating}
+                  className="w-full bg-brand-vividBlue h-10"
+                >
+                  {updating ? 'Salvando...' : 'Salvar no Calendário'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
