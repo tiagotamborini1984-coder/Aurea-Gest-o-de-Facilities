@@ -173,12 +173,20 @@ export default function PainelChamados() {
   const [deleteJustification, setDeleteJustification] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    plant_id: string
+    type_id: string
+    assignee_id: string
+    title: string
+    description: string
+    participants_ids: string[]
+  }>({
     plant_id: '',
     type_id: '',
     assignee_id: '',
     title: '',
     description: '',
+    participants_ids: [],
   })
 
   const effectiveClientId = isMaster ? selectedMasterClient : profile?.client_id
@@ -311,7 +319,14 @@ export default function PainelChamados() {
       })
       return
     }
-    setForm({ plant_id: '', type_id: '', assignee_id: '', title: '', description: '' })
+    setForm({
+      plant_id: '',
+      type_id: '',
+      assignee_id: '',
+      title: '',
+      description: '',
+      participants_ids: [],
+    })
     setSelectedFiles([])
     setIsModalOpen(true)
   }
@@ -402,7 +417,7 @@ export default function PainelChamados() {
           attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
           attachment_urls,
           status_updated_at: new Date().toISOString(),
-          participants_ids: [],
+          participants_ids: form.participants_ids,
         } as any)
         .select()
         .single()
@@ -828,6 +843,89 @@ export default function PainelChamados() {
                   className="resize-none"
                   rows={4}
                 />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Participantes (Opcional)</Label>
+                <div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-slate-500 font-normal"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Selecionar participantes...
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      className="w-full min-w-[280px] max-h-[250px] overflow-y-auto"
+                      align="start"
+                    >
+                      <DropdownMenuLabel>Disponíveis</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {users
+                        ?.filter(
+                          (u) =>
+                            u.client_id === effectiveClientId &&
+                            u.id !== form.assignee_id &&
+                            u.id !== profile.id,
+                        )
+                        ?.map((u) => (
+                          <DropdownMenuCheckboxItem
+                            key={u.id}
+                            checked={form.participants_ids.includes(u.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setForm({
+                                  ...form,
+                                  participants_ids: [...form.participants_ids, u.id],
+                                })
+                              } else {
+                                setForm({
+                                  ...form,
+                                  participants_ids: form.participants_ids.filter(
+                                    (pId) => pId !== u.id,
+                                  ),
+                                })
+                              }
+                            }}
+                          >
+                            {u.name || 'Sem nome'} ({u.role || 'Sem perfil'})
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                {form.participants_ids.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {form.participants_ids.map((id) => {
+                      const user = users.find((u) => u.id === id)
+                      if (!user) return null
+                      return (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="pl-2 pr-1 py-1 flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200"
+                        >
+                          <Users className="w-3 h-3 text-slate-400" />
+                          {user.name}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                participants_ids: form.participants_ids.filter((pId) => pId !== id),
+                              })
+                            }
+                            className="ml-1 rounded-full hover:bg-slate-200 p-0.5 text-slate-500 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Anexos (Opcional)</Label>
