@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Wrench, MapPin, Plus, Filter, Paperclip, X } from 'lucide-react'
+import { Wrench, MapPin, Plus, Filter, Paperclip, X, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
@@ -26,6 +26,42 @@ const toLocalDatetime = (utcStr: string | null) => {
   if (isNaN(d.getTime())) return ''
   const pad = (n: number) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const getTicketSLA = (ticket: any, currentTime: Date) => {
+  if (!ticket.priority?.sla_hours) return null
+
+  if (ticket.status?.step === 'Concluído') {
+    return { text: 'Concluído', color: 'text-slate-600 bg-slate-100 border-slate-200' }
+  }
+
+  const slaMs = ticket.priority.sla_hours * 60 * 60 * 1000
+  const start = new Date(ticket.reported_at || ticket.created_at).getTime()
+  const elapsed = currentTime.getTime() - start
+  const remaining = slaMs - elapsed
+
+  const isLate = remaining < 0
+  const absRemaining = Math.abs(remaining)
+
+  const days = Math.floor(absRemaining / (24 * 60 * 60 * 1000))
+  const hours = Math.floor((absRemaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
+  const minutes = Math.floor((absRemaining % (60 * 60 * 1000)) / (60 * 1000))
+
+  let timeText = ''
+  if (days > 0) timeText = `${days}d ${hours}h ${minutes}m`
+  else if (hours > 0) timeText = `${hours}h ${minutes}m`
+  else timeText = `${minutes}m`
+
+  const text = isLate ? `Atrasado: ${timeText}` : `Faltam: ${timeText}`
+
+  let color = 'text-emerald-700 bg-emerald-50 border-emerald-200'
+  if (isLate) {
+    color = 'text-red-700 bg-red-50 border-red-200 shadow-sm'
+  } else if (remaining < slaMs * 0.2) {
+    color = 'text-amber-700 bg-amber-50 border-amber-200'
+  }
+
+  return { text, color, isLate }
 }
 
 export default function ChamadosManutencao() {
@@ -75,6 +111,12 @@ export default function ChamadosManutencao() {
     actual_end: '',
   })
   const [updating, setUpdating] = useState(false)
+  const [now, setNow] = useState(new Date())
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const formAreas = useMemo(
     () => areas.filter((a) => a.plant_id === form.plant_id),
@@ -178,7 +220,7 @@ export default function ChamadosManutencao() {
     let q = supabase
       .from('maintenance_tickets')
       .select(`
-      *, priority:maintenance_priorities(id, name, color), status:maintenance_statuses(id, name, color, step),
+      *, priority:maintenance_priorities(id, name, color, sla_hours), status:maintenance_statuses(id, name, color, step),
       asset:maintenance_assets(name), area:maintenance_areas(name), sublocation:maintenance_sublocations(name),
       plant:plants(name), assignee:profiles!maintenance_tickets_assignee_id_fkey(name),
       type:maintenance_types(id, name, color)
@@ -679,19 +721,45 @@ export default function ChamadosManutencao() {
                             {ticket.area?.name || ticket.plant?.name || 'Sem local'}
                           </span>
                         </div>
-                        {ticket.assignee && (
-                          <div className="flex items-center gap-1.5 font-medium text-gray-700 mt-1">
-                            <Avatar className="h-4 w-4">
-                              <AvatarFallback className="text-[8px] bg-brand-vividBlue text-white">
-                                {ticket.assignee.name?.[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="truncate">{ticket.assignee.name}</span>
+
+                        <div className="flex items-center justify-between mt-1 border-t border-gray-100 pt-2">
+                          <div className="flex items-center gap-1.5 font-medium text-gray-700">
+                            {ticket.assignee ? (
+                              <>
+                                <Avatar className="h-4 w-4">
+                                  <AvatarFallback className="text-[8px] bg-brand-vividBlue text-white">
+                                    {ticket.assignee.name?.[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="truncate max-w-[100px]">
+                                  {ticket.assignee.name}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-gray-400 italic">Não atribuído</span>
+                            )}
                           </div>
-                        )}
+
+                          {(() => {
+                            const sla = getTicketSLA(ticket, now)
+                            if (!sla) return null
+                            return (
+                              <div
+                                className={cn(
+                                  'flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap',
+                                  sla.color,
+                                )}
+                                title={`SLA: ${ticket.priority?.sla_hours} horas`}
+                              >
+                                <Clock className="w-2.5 h-2.5" />
+                                {sla.text}
+                              </div>
+                            )
+                          })()}
+                        </div>
                       </div>
                       {ticket.asset && (
-                        <div className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block mt-1">
+                        <div className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block mt-1.5">
                           Ativo: {ticket.asset.name}
                         </div>
                       )}
@@ -709,6 +777,22 @@ export default function ChamadosManutencao() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               OS: {selectedTicket?.ticket_number}
+              {selectedTicket &&
+                (() => {
+                  const sla = getTicketSLA(selectedTicket, now)
+                  if (!sla) return null
+                  return (
+                    <span
+                      className={cn(
+                        'ml-auto text-xs font-bold px-2 py-1 rounded border flex items-center gap-1',
+                        sla.color,
+                      )}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {sla.text}
+                    </span>
+                  )
+                })()}
             </SheetTitle>
           </SheetHeader>
           {selectedTicket && (
