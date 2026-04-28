@@ -128,12 +128,26 @@ export default function OcupacaoLockers() {
 
     const { data: lockersData } = await lockersQuery
 
-    const sortedLockers = (lockersData || []).sort((a, b) =>
-      a.identification.localeCompare(b.identification, undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      }),
-    )
+    const sortedLockers = [...(lockersData || [])].sort((a, b) => {
+      const splitA = a.identification.match(/(\d+|\D+)/g) || []
+      const splitB = b.identification.match(/(\d+|\D+)/g) || []
+
+      for (let i = 0; i < Math.max(splitA.length, splitB.length); i++) {
+        const partA = splitA[i] || ''
+        const partB = splitB[i] || ''
+
+        const numA = parseInt(partA, 10)
+        const numB = parseInt(partB, 10)
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          if (numA !== numB) return numA - numB
+        } else {
+          const comp = partA.localeCompare(partB)
+          if (comp !== 0) return comp
+        }
+      }
+      return 0
+    })
 
     setLockers(sortedLockers)
 
