@@ -33,7 +33,7 @@ export default function CadastrosManutencao() {
   const [newArea, setNewArea] = useState({ name: '', plant_id: '' })
   const [newManutentor, setNewManutentor] = useState({ name: '', email: '', password: '' })
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
-  const [newTipo, setNewTipo] = useState({ name: '', category: 'Corretiva' })
+  const [newTipo, setNewTipo] = useState({ name: '' })
   const [newPrioridade, setNewPrioridade] = useState({ name: '', sla_hours: 24, color: '#3b82f6' })
 
   useEffect(() => {
@@ -146,13 +146,12 @@ export default function CadastrosManutencao() {
     const { error } = await supabase.from('maintenance_types').insert({
       client_id: clientId,
       name: newTipo.name,
-      category: newTipo.category,
     } as any)
 
     if (error) toast.error('Erro ao salvar: ' + error.message)
     else {
       toast.success('Tipo adicionado')
-      setNewTipo({ name: '', category: 'Corretiva' })
+      setNewTipo({ name: '' })
       loadData()
     }
   }
@@ -465,19 +464,6 @@ export default function CadastrosManutencao() {
                     onChange={(e) => setNewTipo({ ...newTipo, name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Categoria</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
-                    value={newTipo.category}
-                    onChange={(e) => setNewTipo({ ...newTipo, category: e.target.value })}
-                  >
-                    <option value="Corretiva">Corretiva (Reativa)</option>
-                    <option value="Preventiva">Preventiva</option>
-                    <option value="Preditiva">Preditiva</option>
-                    <option value="Melhoria">Melhoria / Projeto</option>
-                  </select>
-                </div>
                 <Button
                   onClick={handleAddTipo}
                   className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
@@ -503,7 +489,6 @@ export default function CadastrosManutencao() {
                       >
                         <div>
                           <p className="font-medium text-sm text-gray-900">{t.name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">Cat: {t.category}</p>
                         </div>
                         <Button
                           variant="ghost"
