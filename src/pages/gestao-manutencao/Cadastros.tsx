@@ -41,7 +41,7 @@ export default function CadastrosManutencao() {
     plant_id: '',
   })
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
-  const [newTipo, setNewTipo] = useState({ name: '' })
+  const [newTipo, setNewTipo] = useState({ name: '', color: '#3b82f6' })
   const [newPrioridade, setNewPrioridade] = useState({ name: '', sla_hours: 24, color: '#3b82f6' })
 
   useEffect(() => {
@@ -156,12 +156,13 @@ export default function CadastrosManutencao() {
     const { error } = await supabase.from('maintenance_types').insert({
       client_id: clientId,
       name: newTipo.name,
+      color: newTipo.color,
     } as any)
 
     if (error) toast.error('Erro ao salvar: ' + error.message)
     else {
       toast.success('Tipo adicionado')
-      setNewTipo({ name: '' })
+      setNewTipo({ name: '', color: '#3b82f6' })
       loadData()
     }
   }
@@ -520,6 +521,15 @@ export default function CadastrosManutencao() {
                     onChange={(e) => setNewTipo({ ...newTipo, name: e.target.value })}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Cor de Destaque</Label>
+                  <Input
+                    type="color"
+                    className="h-10 p-1 w-full cursor-pointer"
+                    value={newTipo.color}
+                    onChange={(e) => setNewTipo({ ...newTipo, color: e.target.value })}
+                  />
+                </div>
                 <Button
                   onClick={handleAddTipo}
                   className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
@@ -543,7 +553,11 @@ export default function CadastrosManutencao() {
                         key={t.id}
                         className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                       >
-                        <div>
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-4 h-4 rounded-full border shadow-sm"
+                            style={{ backgroundColor: t.color || '#e5e7eb' }}
+                          />
                           <p className="font-medium text-sm text-gray-900">{t.name}</p>
                         </div>
                         <Button

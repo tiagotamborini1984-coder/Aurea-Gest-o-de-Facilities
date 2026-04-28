@@ -47,6 +47,7 @@ export default function ChamadosManutencao() {
 
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
+  const [selectedType, setSelectedType] = useState<string>('all')
 
   const [form, setForm] = useState({
     description: '',
@@ -114,7 +115,7 @@ export default function ChamadosManutencao() {
   }, [])
   useEffect(() => {
     loadTickets()
-  }, [selectedPlant, selectedArea])
+  }, [selectedPlant, selectedArea, selectedType])
 
   useEffect(() => {
     if (selectedTicket) {
@@ -179,12 +180,14 @@ export default function ChamadosManutencao() {
       .select(`
       *, priority:maintenance_priorities(id, name, color), status:maintenance_statuses(id, name, color, step),
       asset:maintenance_assets(name), area:maintenance_areas(name), sublocation:maintenance_sublocations(name),
-      plant:plants(name), assignee:profiles!maintenance_tickets_assignee_id_fkey(name)
+      plant:plants(name), assignee:profiles!maintenance_tickets_assignee_id_fkey(name),
+      type:maintenance_types(id, name, color)
     `)
       .order('created_at', { ascending: false })
 
     if (selectedPlant !== 'all') q = q.eq('plant_id', selectedPlant)
     if (selectedArea !== 'all') q = q.eq('area_id', selectedArea)
+    if (selectedType !== 'all') q = q.eq('type_id', selectedType)
 
     const { data } = await q
     setTickets(data || [])
@@ -316,6 +319,7 @@ export default function ChamadosManutencao() {
         priority: priorities.find((p) => p.id === payload.priority_id),
         assignee: assignees.find((a) => a.id === payload.assignee_id),
         status: statuses.find((s) => s.id === payload.status_id),
+        type: types.find((t) => t.id === payload.type_id),
       })
     } catch (e: any) {
       toast.error(e.message)
@@ -370,6 +374,20 @@ export default function ChamadosManutencao() {
                     {a.name}
                   </SelectItem>
                 ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-[160px] bg-white">
+              <Wrench className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Tipos</SelectItem>
+              {types.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Sheet open={open} onOpenChange={setOpen}>
@@ -601,10 +619,23 @@ export default function ChamadosManutencao() {
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-mono font-bold text-gray-500">
                             {ticket.ticket_number}
                           </span>
+                          {ticket.type && (
+                            <Badge
+                              variant="outline"
+                              style={{
+                                backgroundColor: ticket.type.color || '#e5e7eb',
+                                color: '#fff',
+                                borderColor: ticket.type.color || '#e5e7eb',
+                              }}
+                              className="text-[10px] px-1.5 h-5 font-semibold tracking-wide"
+                            >
+                              {ticket.type.name}
+                            </Badge>
+                          )}
                         </div>
                         {ticket.priority && (
                           <Badge

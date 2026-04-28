@@ -1,0 +1,1 @@
+ALTER TABLE public.maintenance_types ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '#3b82f6';
