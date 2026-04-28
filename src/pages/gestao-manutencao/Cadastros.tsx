@@ -31,7 +31,12 @@ export default function CadastrosManutencao() {
   const [loading, setLoading] = useState(true)
 
   const [newArea, setNewArea] = useState({ name: '', plant_id: '' })
-  const [newManutentor, setNewManutentor] = useState({ name: '', email: '', password: '' })
+  const [newManutentor, setNewManutentor] = useState({
+    name: '',
+    email: '',
+    password: '',
+    plant_id: '',
+  })
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
   const [newTipo, setNewTipo] = useState({ name: '' })
   const [newPrioridade, setNewPrioridade] = useState({ name: '', sla_hours: 24, color: '#3b82f6' })
@@ -198,8 +203,13 @@ export default function CadastrosManutencao() {
   }
 
   const handleAddManutentor = async () => {
-    if (!newManutentor.name || !newManutentor.email || !newManutentor.password) {
-      toast.error('Preencha nome, e-mail e senha do Manutentor')
+    if (
+      !newManutentor.name ||
+      !newManutentor.email ||
+      !newManutentor.password ||
+      !newManutentor.plant_id
+    ) {
+      toast.error('Preencha nome, e-mail, senha e planta do Manutentor')
       return
     }
     const clientId = await getClientId()
@@ -213,6 +223,7 @@ export default function CadastrosManutencao() {
         name: newManutentor.name,
         role: 'Manutentor',
         client_id: clientId,
+        authorized_plants: [newManutentor.plant_id],
       },
     })
 
@@ -220,7 +231,7 @@ export default function CadastrosManutencao() {
       toast.error('Erro ao salvar: ' + (error?.message || data?.error), { id: 'create-manutentor' })
     } else {
       toast.success('Manutentor adicionado', { id: 'create-manutentor' })
-      setNewManutentor({ name: '', email: '', password: '' })
+      setNewManutentor({ name: '', email: '', password: '', plant_id: '' })
       loadData()
     }
   }
@@ -639,6 +650,23 @@ export default function CadastrosManutencao() {
                     }
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Planta Vinculada</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    value={newManutentor.plant_id}
+                    onChange={(e) =>
+                      setNewManutentor({ ...newManutentor, plant_id: e.target.value })
+                    }
+                  >
+                    <option value="">Selecione a Planta...</option>
+                    {plants.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <Button
                   onClick={handleAddManutentor}
                   className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
@@ -657,32 +685,46 @@ export default function CadastrosManutencao() {
                   <p className="text-sm text-gray-500">Carregando manutentores...</p>
                 ) : (
                   <div className="space-y-2">
-                    {manutentores.map((m) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-brand-vividBlue text-white text-xs">
-                              {m.name?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-sm text-gray-900">{m.name}</p>
-                            <p className="text-xs text-gray-500">{m.email}</p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteManutentor(m.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                    {manutentores.map((m) => {
+                      const plantNames =
+                        m.authorized_plants && Array.isArray(m.authorized_plants)
+                          ? m.authorized_plants
+                              .map((id: string) => plants.find((p) => p.id === id)?.name)
+                              .filter(Boolean)
+                              .join(', ')
+                          : 'Sem planta vinculada'
+
+                      return (
+                        <div
+                          key={m.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                         >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-brand-vividBlue text-white text-xs">
+                                {m.name?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm text-gray-900">{m.name}</p>
+                              <p className="text-xs text-gray-500">{m.email}</p>
+                              <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                <Building2 className="w-3 h-3" />
+                                {plantNames || 'Todas as plantas'}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteManutentor(m.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
                     {manutentores.length === 0 && (
                       <p className="text-sm text-gray-500 italic py-4 text-center">
                         Nenhum manutentor cadastrado.
