@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase/client'
-import { Activity, Clock, Target } from 'lucide-react'
+import { Activity, Clock, Target, Filter, MapPin } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Bar,
   BarChart,
@@ -19,15 +26,40 @@ export default function DashboardManutencao() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, open: 0, planned: 0, completed: 0 })
 
+  const [plants, setPlants] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
+  const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  const [selectedLocation, setSelectedLocation] = useState<string>('all')
+
+  useEffect(() => {
+    loadAuxData()
+  }, [])
   useEffect(() => {
     fetchStats()
-  }, [])
+  }, [selectedPlant, selectedLocation])
+
+  const loadAuxData = async () => {
+    const [pRes, lRes] = await Promise.all([
+      supabase.from('plants').select('id, name').order('name'),
+      supabase.from('locations').select('id, name, plant_id').order('name'),
+    ])
+    if (pRes.data) setPlants(pRes.data)
+    if (lRes.data) setLocations(lRes.data)
+  }
 
   const fetchStats = async () => {
+    setLoading(true)
     try {
-      const { data: tickets } = await supabase
+      let query = supabase
         .from('maintenance_tickets')
-        .select('id, status_id, planned_start, origin, status:maintenance_statuses(step)')
+        .select(
+          'id, status_id, planned_start, origin, plant_id, location_id, status:maintenance_statuses(step)',
+        )
+
+      if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
+      if (selectedLocation !== 'all') query = query.eq('location_id', selectedLocation)
+
+      const { data: tickets } = await query
 
       if (tickets) {
         const total = tickets.length
@@ -58,17 +90,54 @@ export default function DashboardManutencao() {
     { name: 'Mai', Proativo: 2.0, Reativo: 10.8 },
   ]
 
-  if (loading)
-    return <div className="p-8 text-center text-gray-500">Carregando painel gerencial...</div>
-
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-          <Activity className="h-8 w-8 text-brand-vividBlue" />
-          Dashboard de Manutenção
-        </h1>
-        <p className="text-gray-500 mt-1">Indicadores e KPIs de performance (estilo CMMS)</p>
+      <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <Activity className="h-8 w-8 text-brand-vividBlue" />
+            Dashboard de Manutenção
+          </h1>
+          <p className="text-gray-500 mt-1">Indicadores e KPIs de performance</p>
+        </div>
+        <div className="flex gap-2 items-center flex-wrap">
+          <Select
+            value={selectedPlant}
+            onValueChange={(v) => {
+              setSelectedPlant(v)
+              setSelectedLocation('all')
+            }}
+          >
+            <SelectTrigger className="w-[180px] bg-white">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Plantas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Plantas</SelectItem>
+              {plants.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+            <SelectTrigger className="w-[180px] bg-white">
+              <MapPin className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Locais" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Locais</SelectItem>
+              {locations
+                .filter((l) => selectedPlant === 'all' || l.plant_id === selectedPlant)
+                .map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -90,7 +159,7 @@ export default function DashboardManutencao() {
         </Card>
         <Card className="border-l-4 border-l-purple-500 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Planejados (Agenda)</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">Planejados</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-gray-900">{stats.planned}</div>
@@ -115,22 +184,28 @@ export default function DashboardManutencao() {
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mttrData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                <XAxis
-                  dataKey="name"
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip cursor={{ fill: 'transparent' }} />
-                <Legend />
-                <Bar dataKey="Proativo" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Reativo" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                Carregando...
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mttrData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <XAxis
+                    dataKey="name"
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{ fill: 'transparent' }} />
+                  <Legend />
+                  <Bar dataKey="Proativo" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Reativo" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -142,25 +217,31 @@ export default function DashboardManutencao() {
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[300px] flex flex-col items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={typeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {typeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                Carregando...
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={typeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {typeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
