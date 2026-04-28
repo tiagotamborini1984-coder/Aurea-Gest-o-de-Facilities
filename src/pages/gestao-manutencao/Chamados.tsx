@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Wrench, MapPin, Plus, Filter, Paperclip, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -64,6 +65,7 @@ export default function ChamadosManutencao() {
     type_id: '',
     priority_id: '',
     assignee_id: '',
+    status_id: '',
     planned_start: '',
     planned_end: '',
     actual_start: '',
@@ -122,6 +124,7 @@ export default function ChamadosManutencao() {
         type_id: selectedTicket.type_id || 'none',
         priority_id: selectedTicket.priority_id || 'none',
         assignee_id: selectedTicket.assignee_id || 'none',
+        status_id: selectedTicket.status_id || 'none',
         planned_start: toLocalDatetime(selectedTicket.planned_start),
         planned_end: toLocalDatetime(selectedTicket.planned_end),
         actual_start: toLocalDatetime(selectedTicket.actual_start),
@@ -129,6 +132,19 @@ export default function ChamadosManutencao() {
       })
     }
   }, [selectedTicket])
+
+  useEffect(() => {
+    if (editForm.planned_start && editForm.planned_end) {
+      const planejadoStatus = statuses.find(
+        (s) => s.step === 'Planejado' || s.name.toLowerCase() === 'planejado',
+      )
+      const currentStatus = statuses.find((s) => s.id === editForm.status_id)
+
+      if (planejadoStatus && currentStatus && currentStatus.step === 'Aberto') {
+        setEditForm((prev) => ({ ...prev, status_id: planejadoStatus.id }))
+      }
+    }
+  }, [editForm.planned_start, editForm.planned_end, statuses])
 
   const loadAuxData = async () => {
     const [pRes, aRes, subRes, asRes, prioRes, statRes, tRes, assignRes] = await Promise.all([
@@ -261,6 +277,7 @@ export default function ChamadosManutencao() {
         type_id: editForm.type_id === 'none' ? null : editForm.type_id,
         priority_id: editForm.priority_id === 'none' ? null : editForm.priority_id,
         assignee_id: editForm.assignee_id === 'none' ? null : editForm.assignee_id,
+        status_id: editForm.status_id === 'none' ? null : editForm.status_id,
         planned_start: editForm.planned_start
           ? new Date(editForm.planned_start).toISOString()
           : null,
@@ -284,6 +301,7 @@ export default function ChamadosManutencao() {
         asset: assets.find((a) => a.id === payload.asset_id),
         priority: priorities.find((p) => p.id === payload.priority_id),
         assignee: assignees.find((a) => a.id === payload.assignee_id),
+        status: statuses.find((s) => s.id === payload.status_id),
       })
     } catch (e: any) {
       toast.error(e.message)
@@ -503,8 +521,25 @@ export default function ChamadosManutencao() {
               key={column}
               className="flex-none w-80 bg-gray-100 rounded-xl p-3 flex flex-col h-full border"
             >
-              <div className="font-semibold text-gray-700 mb-3 px-2 flex justify-between items-center">
-                {column} <Badge variant="secondary">{colTickets.length}</Badge>
+              <div
+                className={cn(
+                  'font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm',
+                  column === 'Planejado'
+                    ? 'bg-[#22c55e] text-black'
+                    : 'text-gray-700 bg-gray-200/50',
+                )}
+              >
+                {column}
+                <Badge
+                  variant="secondary"
+                  className={
+                    column === 'Planejado'
+                      ? 'bg-black/10 text-black hover:bg-black/20 border-transparent'
+                      : ''
+                  }
+                >
+                  {colTickets.length}
+                </Badge>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 px-1">
                 {colTickets.map((ticket) => (
@@ -674,11 +709,34 @@ export default function ChamadosManutencao() {
 
                 <div className="col-span-2">
                   <Label className="text-gray-500">Status</Label>
-                  <div className="mt-1">
-                    <Badge style={{ backgroundColor: selectedTicket.status?.color, color: '#fff' }}>
-                      {selectedTicket.status?.name || 'Aberto'}
-                    </Badge>
-                  </div>
+                  <Select
+                    value={editForm.status_id}
+                    onValueChange={(v) => setEditForm({ ...editForm, status_id: v })}
+                  >
+                    <SelectTrigger
+                      className="mt-1 h-8 text-xs font-bold border-0 shadow-sm"
+                      style={{
+                        backgroundColor:
+                          statuses.find((s) => s.id === editForm.status_id)?.color || '#e5e7eb',
+                        color: '#000',
+                      }}
+                    >
+                      <SelectValue placeholder="Selecione o Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((s) => (
+                        <SelectItem key={s.id} value={s.id} className="font-semibold">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: s.color }}
+                            />
+                            {s.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
