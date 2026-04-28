@@ -521,25 +521,9 @@ export default function ChamadosManutencao() {
               key={column}
               className="flex-none w-80 bg-gray-100 rounded-xl p-3 flex flex-col h-full border"
             >
-              <div
-                className={cn(
-                  'font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm',
-                  column === 'Planejado'
-                    ? 'bg-[#22c55e] text-black'
-                    : 'text-gray-700 bg-gray-200/50',
-                )}
-              >
+              <div className="font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm text-gray-700 bg-gray-200/50">
                 {column}
-                <Badge
-                  variant="secondary"
-                  className={
-                    column === 'Planejado'
-                      ? 'bg-black/10 text-black hover:bg-black/20 border-transparent'
-                      : ''
-                  }
-                >
-                  {colTickets.length}
-                </Badge>
+                <Badge variant="secondary">{colTickets.length}</Badge>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 px-1">
                 {colTickets.map((ticket) => (
@@ -550,9 +534,16 @@ export default function ChamadosManutencao() {
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
-                        <span className="text-xs font-mono font-bold text-gray-500">
-                          {ticket.ticket_number}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-gray-500">
+                            {ticket.ticket_number}
+                          </span>
+                          {ticket.status?.step === 'Planejado' && (
+                            <Badge className="bg-[#22c55e] text-black hover:bg-[#22c55e]/90 text-[10px] h-5 px-1.5 border-0">
+                              {ticket.status.name}
+                            </Badge>
+                          )}
+                        </div>
                         {ticket.priority && (
                           <Badge
                             variant="outline"
@@ -604,7 +595,14 @@ export default function ChamadosManutencao() {
       <Sheet open={!!selectedTicket} onOpenChange={(v) => !v && setSelectedTicket(null)}>
         <SheetContent className="sm:max-w-md overflow-y-auto pb-10">
           <SheetHeader>
-            <SheetTitle>OS: {selectedTicket?.ticket_number}</SheetTitle>
+            <SheetTitle className="flex items-center gap-2">
+              OS: {selectedTicket?.ticket_number}
+              {selectedTicket?.status?.step === 'Planejado' && (
+                <Badge className="bg-[#22c55e] text-black hover:bg-[#22c55e]/90 border-0">
+                  {selectedTicket.status.name}
+                </Badge>
+              )}
+            </SheetTitle>
           </SheetHeader>
           {selectedTicket && (
             <div className="mt-6 space-y-4">
