@@ -119,28 +119,15 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
         let statusId = formData.status_id || statuses[0]?.id
 
         if (!typeId) {
-          const { data: newType } = await supabase
-            .from('task_types')
-            .insert({ client_id: activeClient.id, name: 'Geral', sla_hours: 24 })
-            .select('id')
-            .single()
-          if (newType) typeId = newType.id
-          else throw new Error('Erro ao configurar tipo de tarefa padrão.')
+          throw new Error(
+            'Nenhum Tipo de Tarefa configurado. Acesse Gestão de Tarefas > Tipos e crie um tipo.',
+          )
         }
 
         if (!statusId) {
-          const { data: newStatus } = await supabase
-            .from('task_statuses')
-            .insert({
-              client_id: activeClient.id,
-              name: 'Pendente',
-              color: '#eab308',
-              is_terminal: false,
-            })
-            .select('id')
-            .single()
-          if (newStatus) statusId = newStatus.id
-          else throw new Error('Erro ao configurar status da tarefa padrão.')
+          throw new Error(
+            'Nenhum Status de Tarefa configurado. Acesse Gestão de Tarefas > Status e crie um status.',
+          )
         }
 
         let success = false
