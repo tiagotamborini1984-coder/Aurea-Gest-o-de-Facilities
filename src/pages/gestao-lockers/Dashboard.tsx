@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Archive, UserCheck, UserMinus } from 'lucide-react'
 
 export default function DashboardLockers() {
-  const { activeClient } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [plants, setPlants] = useState<any[]>([])
   const [locations, setLocations] = useState<string[]>([])
 
@@ -37,18 +37,33 @@ export default function DashboardLockers() {
   const fetchPlants = async () => {
     const { data } = await supabase.from('plants').select('*').eq('client_id', activeClient!.id)
     if (data) {
-      setPlants(data)
-      if (data.length === 1) {
-        setSelectedPlant(data[0].id)
+      let filteredPlants = data
+      if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+        const authorized = profile.authorized_plants || []
+        filteredPlants = data.filter((p) => authorized.includes(p.id))
+      }
+      setPlants(filteredPlants)
+      if (filteredPlants.length === 1) {
+        setSelectedPlant(filteredPlants[0].id)
       }
     }
   }
 
   const fetchLocations = async () => {
     let query = supabase.from('lockers').select('location').eq('client_id', activeClient!.id)
+
     if (selectedPlant !== 'all') {
       query = query.eq('plant_id', selectedPlant)
+    } else if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+      const authorized = profile.authorized_plants || []
+      if (authorized.length > 0) {
+        query = query.in('plant_id', authorized)
+      } else {
+        setLocations([])
+        return
+      }
     }
+
     const { data } = await query
     if (data) {
       const locs = Array.from(new Set(data.map((d) => d.location)))
@@ -61,7 +76,19 @@ export default function DashboardLockers() {
       .from('lockers')
       .select('id, location, plant_id')
       .eq('client_id', activeClient!.id)
-    if (selectedPlant !== 'all') lockersQuery = lockersQuery.eq('plant_id', selectedPlant)
+
+    if (selectedPlant !== 'all') {
+      lockersQuery = lockersQuery.eq('plant_id', selectedPlant)
+    } else if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+      const authorized = profile.authorized_plants || []
+      if (authorized.length > 0) {
+        lockersQuery = lockersQuery.in('plant_id', authorized)
+      } else {
+        setStats({ total: 0, occupied: 0, available: 0 })
+        return
+      }
+    }
+
     if (selectedLocation !== 'all') lockersQuery = lockersQuery.eq('location', selectedLocation)
 
     const { data: lockers } = await lockersQuery

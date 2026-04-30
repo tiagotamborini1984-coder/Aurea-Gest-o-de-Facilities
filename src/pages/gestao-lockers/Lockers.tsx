@@ -31,9 +31,10 @@ import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 export default function Lockers() {
-  const { activeClient } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [lockers, setLockers] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
+  const [selectedFilterPlant, setSelectedFilterPlant] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState({
     id: '',
@@ -47,20 +48,43 @@ export default function Lockers() {
   useEffect(() => {
     if (activeClient) {
       fetchPlants()
-      fetchLockers()
     }
   }, [activeClient])
 
+  useEffect(() => {
+    if (activeClient) {
+      fetchLockers()
+    }
+  }, [activeClient, selectedFilterPlant])
+
   const fetchPlants = async () => {
     const { data } = await supabase.from('plants').select('*').eq('client_id', activeClient!.id)
-    setPlants(data || [])
+    if (data) {
+      let filteredPlants = data
+      if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+        const authorized = profile.authorized_plants || []
+        filteredPlants = data.filter((p) => authorized.includes(p.id))
+      }
+      setPlants(filteredPlants)
+    }
   }
 
   const fetchLockers = async () => {
-    const { data } = await supabase
-      .from('lockers')
-      .select('*, plants(name)')
-      .eq('client_id', activeClient!.id)
+    let query = supabase.from('lockers').select('*, plants(name)').eq('client_id', activeClient!.id)
+
+    if (selectedFilterPlant !== 'all') {
+      query = query.eq('plant_id', selectedFilterPlant)
+    } else if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+      const authorized = profile.authorized_plants || []
+      if (authorized.length > 0) {
+        query = query.in('plant_id', authorized)
+      } else {
+        setLockers([])
+        return
+      }
+    }
+
+    const { data } = await query
 
     const sortedLockers = (data || []).sort((a, b) =>
       a.identification.localeCompare(b.identification, undefined, {
@@ -117,22 +141,37 @@ export default function Lockers() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Cadastros de Lockers</h1>
-        <Button
-          onClick={() => {
-            setFormData({
-              id: '',
-              plant_id: plants.length === 1 ? plants[0].id : '',
-              location: '',
-              identification: '',
-              description: '',
-            })
-            setIsModalOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" /> Adicionar Locker
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={selectedFilterPlant} onValueChange={setSelectedFilterPlant}>
+            <SelectTrigger className="w-[200px] bg-white">
+              <SelectValue placeholder="Todas as Plantas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Plantas</SelectItem>
+              {plants.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={() => {
+              setFormData({
+                id: '',
+                plant_id: plants.length === 1 ? plants[0].id : '',
+                location: '',
+                identification: '',
+                description: '',
+              })
+              setIsModalOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Adicionar Locker
+          </Button>
+        </div>
       </div>
 
       <Card>
