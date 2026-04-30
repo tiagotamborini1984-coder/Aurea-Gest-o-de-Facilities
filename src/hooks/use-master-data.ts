@@ -76,7 +76,7 @@ export function useMasterData() {
     setGoals(gRes.data || [])
 
     const employeesData = filterByPlant(empRes.data || [])
-    setEmployees(employeesData)
+    setEmployees(employeesData.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')))
 
     setContracted(filterByPlant(cRes.data || []))
     setLocations(filterByPlant(lRes.data || []))

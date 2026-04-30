@@ -39,7 +39,7 @@ export default function ColaboradoresLockers() {
       .from('locker_collaborators')
       .select('*')
       .eq('client_id', activeClient!.id)
-      .order('name')
+      .order('name', { ascending: true })
     setCollaborators(data || [])
   }
 

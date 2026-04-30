@@ -48,7 +48,7 @@ export default function Usuarios() {
     let query = supabase
       .from('profiles')
       .select('*, clients(name)')
-      .order('created_at', { ascending: false })
+      .order('name', { ascending: true })
 
     if (profile?.role === 'Master') {
       if (selectedMasterClient !== 'all') {

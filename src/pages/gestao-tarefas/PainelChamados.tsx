@@ -216,7 +216,10 @@ export default function PainelChamados() {
         ;[tRes, sRes, uRes, nwdRes, pRes] = await Promise.all([
           supabase.from('task_types').select('*'),
           supabase.from('task_statuses').select('*').order('created_at', { ascending: true }),
-          supabase.from('profiles').select('id, name, email, role, client_id'),
+          supabase
+            .from('profiles')
+            .select('id, name, email, role, client_id')
+            .order('name', { ascending: true }),
           supabase.from('plant_non_working_days').select('date'),
           supabase.from('plants').select('*'),
         ])
@@ -231,7 +234,8 @@ export default function PainelChamados() {
           supabase
             .from('profiles')
             .select('id, name, email, role, client_id')
-            .eq('client_id', effectiveClientId),
+            .eq('client_id', effectiveClientId)
+            .order('name', { ascending: true }),
           supabase.from('plant_non_working_days').select('date').eq('client_id', effectiveClientId),
           supabase.from('plants').select('*').eq('client_id', effectiveClientId),
         ])

@@ -103,7 +103,7 @@ export default function CadastrosColaboradores() {
   }, [form.function_id, functionRequiredTrainings])
 
   const filteredData = useMemo(() => {
-    return employees.filter((e) => {
+    const filtered = employees.filter((e) => {
       const cName = e.company_id
         ? companies.find((c) => c.id === e.company_id)?.name || e.company_name
         : e.company_name
@@ -114,6 +114,7 @@ export default function CadastrosColaboradores() {
       const matchPlant = filterPlant === 'all' || e.plant_id === filterPlant
       return matchSearch && matchPlant
     })
+    return filtered.sort((a, b) => a.name.localeCompare(b.name))
   }, [employees, companies, searchTerm, filterPlant])
 
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />

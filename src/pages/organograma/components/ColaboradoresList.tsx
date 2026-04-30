@@ -54,7 +54,7 @@ export function ColaboradoresList() {
         getOrgUnits(activeClient.id),
         getOrgFunctions(activeClient.id),
       ])
-      setCollaborators(cData)
+      setCollaborators(cData.sort((a: any, b: any) => a.name.localeCompare(b.name)))
       setUnits(uData)
       setFunctions(fData)
     } catch (e: any) {
