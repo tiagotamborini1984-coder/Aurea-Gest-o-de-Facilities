@@ -4,7 +4,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -21,9 +22,7 @@ Deno.serve(async (req: Request) => {
     const today = new Date()
     today.setUTCHours(0, 0, 0, 0)
 
-    const { data: audits, error: auditsError } = await supabaseClient
-      .from('audits')
-      .select(`
+    const { data: audits, error: auditsError } = await supabaseClient.from('audits').select(`
         *,
         audit_assignments (
           plant_id,
@@ -41,7 +40,7 @@ Deno.serve(async (req: Request) => {
       targetDate.setUTCDate(targetDate.getUTCDate() + advanceNotice)
 
       const targetDateStr = targetDate.toISOString().split('T')[0]
-      
+
       if (!isOccurrence(audit.start_date, targetDateStr, audit.frequency)) {
         continue
       }
@@ -52,7 +51,7 @@ Deno.serve(async (req: Request) => {
         .eq('client_id', audit.client_id)
         .ilike('name', '%Auditoria%')
         .limit(1)
-      
+
       let typeId = typeRes?.[0]?.id
 
       if (!typeId) {
@@ -72,11 +71,13 @@ Deno.serve(async (req: Request) => {
         .eq('is_terminal', false)
         .order('created_at', { ascending: true })
         .limit(1)
-      
+
       let statusId = statusRes?.[0]?.id
 
       if (!typeId || !statusId) {
-        console.error(`Audit ${audit.id} skipped: Missing Task Type or Task Status for client ${audit.client_id}`)
+        console.error(
+          `Audit ${audit.id} skipped: Missing Task Type or Task Status for client ${audit.client_id}`,
+        )
         continue
       }
 
@@ -100,7 +101,7 @@ Deno.serve(async (req: Request) => {
             .gte('created_at', todayStr + 'T00:00:00Z')
 
           if (createdToday && createdToday.length > 0) {
-            continue;
+            continue
           }
 
           const { data: adminUser } = await supabaseClient
@@ -109,7 +110,7 @@ Deno.serve(async (req: Request) => {
             .eq('client_id', audit.client_id)
             .in('role', ['Administrador', 'Master'])
             .limit(1)
-          
+
           const requesterId = adminUser?.[0]?.id || assign.assignee_id
 
           const year = new Date().getFullYear()
@@ -172,69 +173,69 @@ Deno.serve(async (req: Request) => {
 })
 
 function isOccurrence(startDateStr: string, targetDateStr: string, frequency: string): boolean {
-  const start = new Date(startDateStr + 'T00:00:00Z');
-  const target = new Date(targetDateStr + 'T00:00:00Z');
+  const start = new Date(startDateStr + 'T00:00:00Z')
+  const target = new Date(targetDateStr + 'T00:00:00Z')
 
-  if (target < start) return false;
+  if (target < start) return false
 
-  const diffTime = target.getTime() - start.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  const diffTime = target.getTime() - start.getTime()
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
 
   switch (frequency) {
     case 'Única':
-      return diffDays === 0;
+      return diffDays === 0
     case 'Diária':
-      return diffDays >= 0;
+      return diffDays >= 0
     case 'Semanal':
-      return diffDays % 7 === 0;
+      return diffDays % 7 === 0
     case 'Mensal': {
-      const startYear = start.getUTCFullYear();
-      const startMonth = start.getUTCMonth();
-      const targetYear = target.getUTCFullYear();
-      const targetMonth = target.getUTCMonth();
-      
-      const monthDiff = (targetYear - startYear) * 12 + (targetMonth - startMonth);
-      if (monthDiff < 0) return false;
-      
-      const startDay = start.getUTCDate();
-      const targetDay = target.getUTCDate();
-      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-      const expectedDay = Math.min(startDay, daysInTargetMonth);
-      
-      return targetDay === expectedDay;
+      const startYear = start.getUTCFullYear()
+      const startMonth = start.getUTCMonth()
+      const targetYear = target.getUTCFullYear()
+      const targetMonth = target.getUTCMonth()
+
+      const monthDiff = (targetYear - startYear) * 12 + (targetMonth - startMonth)
+      if (monthDiff < 0) return false
+
+      const startDay = start.getUTCDate()
+      const targetDay = target.getUTCDate()
+      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
+      const expectedDay = Math.min(startDay, daysInTargetMonth)
+
+      return targetDay === expectedDay
     }
     case 'Semestral': {
-      const startYear = start.getUTCFullYear();
-      const startMonth = start.getUTCMonth();
-      const targetYear = target.getUTCFullYear();
-      const targetMonth = target.getUTCMonth();
-      
-      const monthDiff = (targetYear - startYear) * 12 + (targetMonth - startMonth);
-      if (monthDiff < 0 || monthDiff % 6 !== 0) return false;
-      
-      const startDay = start.getUTCDate();
-      const targetDay = target.getUTCDate();
-      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-      const expectedDay = Math.min(startDay, daysInTargetMonth);
-      
-      return targetDay === expectedDay;
+      const startYear = start.getUTCFullYear()
+      const startMonth = start.getUTCMonth()
+      const targetYear = target.getUTCFullYear()
+      const targetMonth = target.getUTCMonth()
+
+      const monthDiff = (targetYear - startYear) * 12 + (targetMonth - startMonth)
+      if (monthDiff < 0 || monthDiff % 6 !== 0) return false
+
+      const startDay = start.getUTCDate()
+      const targetDay = target.getUTCDate()
+      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
+      const expectedDay = Math.min(startDay, daysInTargetMonth)
+
+      return targetDay === expectedDay
     }
     case 'Anual': {
-      const startYear = start.getUTCFullYear();
-      const startMonth = start.getUTCMonth();
-      const targetYear = target.getUTCFullYear();
-      const targetMonth = target.getUTCMonth();
-      
-      if (targetYear < startYear || targetMonth !== startMonth) return false;
-      
-      const startDay = start.getUTCDate();
-      const targetDay = target.getUTCDate();
-      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-      const expectedDay = Math.min(startDay, daysInTargetMonth);
-      
-      return targetDay === expectedDay;
+      const startYear = start.getUTCFullYear()
+      const startMonth = start.getUTCMonth()
+      const targetYear = target.getUTCFullYear()
+      const targetMonth = target.getUTCMonth()
+
+      if (targetYear < startYear || targetMonth !== startMonth) return false
+
+      const startDay = start.getUTCDate()
+      const targetDay = target.getUTCDate()
+      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
+      const expectedDay = Math.min(startDay, daysInTargetMonth)
+
+      return targetDay === expectedDay
     }
     default:
-      return false;
+      return false
   }
 }

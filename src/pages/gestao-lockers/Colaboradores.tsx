@@ -18,28 +18,89 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Trash2, Edit2 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Plus, Trash2, Edit2, Filter } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
+import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 export default function ColaboradoresLockers() {
   const { activeClient } = useAppStore()
+  const { user } = useAuth()
   const [collaborators, setCollaborators] = useState<any[]>([])
+  const [plants, setPlants] = useState<any[]>([])
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [formData, setFormData] = useState({ id: '', name: '', company: '', department: '' })
+  const [formData, setFormData] = useState({
+    id: '',
+    plant_id: '',
+    name: '',
+    company: '',
+    department: '',
+  })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (activeClient) fetchCollaborators()
-  }, [activeClient])
+    if (activeClient && user) {
+      fetchPlants()
+    }
+  }, [activeClient, user])
+
+  useEffect(() => {
+    if (activeClient) {
+      fetchCollaborators()
+    }
+  }, [activeClient, selectedPlantFilter])
+
+  const fetchPlants = async () => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, authorized_plants')
+        .eq('id', user!.id)
+        .single()
+
+      const { data: allPlants } = await supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', activeClient!.id)
+        .order('name', { ascending: true })
+
+      if (!profile || !allPlants) return
+
+      if (profile.role === 'Master' || profile.role === 'Administrador') {
+        setPlants(allPlants)
+      } else {
+        const authPlants = profile.authorized_plants || []
+        setPlants(allPlants.filter((p: any) => authPlants.includes(p.id)))
+      }
+    } catch (error) {
+      console.error('Error fetching plants:', error)
+    }
+  }
 
   const fetchCollaborators = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('locker_collaborators')
-      .select('*')
+      .select('*, plants(name)')
       .eq('client_id', activeClient!.id)
       .order('name', { ascending: true })
+
+    if (selectedPlantFilter !== 'all') {
+      query = query.eq('plant_id', selectedPlantFilter)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error('Error fetching collaborators', error)
+    }
     setCollaborators(data || [])
   }
 
@@ -48,12 +109,18 @@ export default function ColaboradoresLockers() {
       toast.error('Nome é obrigatório')
       return
     }
+    if (!formData.plant_id) {
+      toast.error('Planta é obrigatória')
+      return
+    }
+
     setLoading(true)
     try {
       if (formData.id) {
         await supabase
           .from('locker_collaborators')
           .update({
+            plant_id: formData.plant_id,
             name: formData.name,
             company: formData.company,
             department: formData.department,
@@ -63,6 +130,7 @@ export default function ColaboradoresLockers() {
       } else {
         await supabase.from('locker_collaborators').insert({
           client_id: activeClient!.id,
+          plant_id: formData.plant_id,
           name: formData.name,
           company: formData.company,
           department: formData.department,
@@ -91,12 +159,32 @@ export default function ColaboradoresLockers() {
         <h1 className="text-2xl font-bold text-slate-800">Colaboradores (Lockers)</h1>
         <Button
           onClick={() => {
-            setFormData({ id: '', name: '', company: '', department: '' })
+            setFormData({ id: '', plant_id: '', name: '', company: '', department: '' })
             setIsModalOpen(true)
           }}
         >
           <Plus className="h-4 w-4 mr-2" /> Adicionar Colaborador
         </Button>
+      </div>
+
+      <div className="flex items-center space-x-4 bg-white p-4 rounded-lg border border-slate-200">
+        <div className="flex items-center space-x-2">
+          <Filter className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-medium text-slate-700">Filtrar por Planta:</span>
+        </div>
+        <Select value={selectedPlantFilter} onValueChange={setSelectedPlantFilter}>
+          <SelectTrigger className="w-[300px]">
+            <SelectValue placeholder="Todas as Plantas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Plantas</SelectItem>
+            {plants.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -105,6 +193,7 @@ export default function ColaboradoresLockers() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>Planta</TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Setor</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -114,6 +203,7 @@ export default function ColaboradoresLockers() {
               {collaborators.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell>{c.plants?.name || '-'}</TableCell>
                   <TableCell>{c.company}</TableCell>
                   <TableCell>{c.department}</TableCell>
                   <TableCell className="text-right">
@@ -123,6 +213,7 @@ export default function ColaboradoresLockers() {
                       onClick={() => {
                         setFormData({
                           id: c.id,
+                          plant_id: c.plant_id || '',
                           name: c.name,
                           company: c.company || '',
                           department: c.department || '',
@@ -138,6 +229,13 @@ export default function ColaboradoresLockers() {
                   </TableCell>
                 </TableRow>
               ))}
+              {collaborators.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                    Nenhum colaborador encontrado.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -149,6 +247,24 @@ export default function ColaboradoresLockers() {
             <DialogTitle>{formData.id ? 'Editar' : 'Novo'} Colaborador</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Planta *</Label>
+              <Select
+                value={formData.plant_id}
+                onValueChange={(val) => setFormData({ ...formData, plant_id: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Nome *</Label>
               <Input
