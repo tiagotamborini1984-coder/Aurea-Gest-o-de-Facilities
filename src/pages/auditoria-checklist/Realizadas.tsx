@@ -104,7 +104,20 @@ export default function AuditoriaRealizadas() {
     })
     setViewAnswers(sortedData)
 
-    if (exec.task_id) {
+    const { data: pendingExec } = await supabase
+      .from('audit_executions')
+      .select('*, tasks(*, task_statuses(*))')
+      .eq('audit_id', exec.audit_id)
+      .eq('plant_id', exec.plant_id)
+      .eq('assignee_id', exec.assignee_id)
+      .eq('status', 'Pendente')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (pendingExec && pendingExec.tasks) {
+      setViewTask(pendingExec.tasks)
+    } else if (exec.task_id) {
       const { data: taskData } = await supabase
         .from('tasks')
         .select('*, task_statuses(*)')
@@ -321,7 +334,7 @@ export default function AuditoriaRealizadas() {
                     return (
                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                          SLA
+                          {viewTask.id !== viewExec.task_id ? 'SLA Próxima' : 'SLA'}
                         </p>
                         <Badge variant="outline" className={cn('font-bold', slaResult.color)}>
                           {slaResult.text}
@@ -332,7 +345,7 @@ export default function AuditoriaRealizadas() {
                 ) : (
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                      SLA
+                      SLA Próxima
                     </p>
                     <p className="font-semibold text-slate-400">-</p>
                   </div>
@@ -474,7 +487,7 @@ export default function AuditoriaRealizadas() {
                 return (
                   <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
                     <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
-                      SLA
+                      {viewTask.id !== viewExec.task_id ? 'SLA Próxima Auditoria' : 'SLA'}
                     </span>
                     <span className="font-semibold text-slate-800">{slaResult.text}</span>
                   </div>
@@ -482,7 +495,9 @@ export default function AuditoriaRealizadas() {
               })()
             ) : (
               <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
-                <span className="block text-slate-500 text-xs font-bold uppercase mb-1">SLA</span>
+                <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                  SLA Próxima Auditoria
+                </span>
                 <span className="font-semibold text-slate-400">-</span>
               </div>
             )}

@@ -5,7 +5,7 @@
     "package-notifications": 2,
     "update-user-password": 2,
     "delete-user": 1,
-    "process-recurring-audits": 2,
+    "process-recurring-audits": 3,
     "process-preventive-maintenance": 1
   }
 }
