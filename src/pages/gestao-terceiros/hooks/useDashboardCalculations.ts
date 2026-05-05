@@ -84,22 +84,31 @@ export function useDashboardCalculations(
 
     const excludedDaysCount = allDatesInPeriod.length - allValidDatesSet.size
 
-    const validContracted = contracted.filter((c) => {
-      if (!validPlants.includes(c.plant_id)) return false
-      if (c.type !== typeCont) return false
+    const getApplicableContracted = (
+      plantId: string,
+      type: string,
+      date: string,
+      filterFn: (c: any) => boolean = () => true,
+    ) => {
+      const targetMonth = date.substring(0, 7) + '-01'
 
-      if (selectedCompanies.length > 0 && c.type === 'colaborador') {
-        const validCompanyIds = new Set(
-          employees
-            .filter((e) => companiesSet.has(e.company_name) && e.company_id)
-            .map((e) => e.company_id),
-        )
-        if (c.company_id) {
-          return validCompanyIds.has(c.company_id)
-        }
+      const plantContracted = contracted.filter((c) => c.plant_id === plantId && c.type === type)
+      if (plantContracted.length === 0) return []
+
+      const months = [
+        ...new Set(plantContracted.map((c) => c.reference_month || '2000-01-01')),
+      ].sort()
+      let applicableMonth = months[0]
+      for (const m of months) {
+        if (m <= targetMonth) applicableMonth = m
       }
-      return true
-    })
+
+      if (!applicableMonth) return []
+
+      return plantContracted.filter(
+        (c) => (c.reference_month || '2000-01-01') === applicableMonth && filterFn(c),
+      )
+    }
 
     // Compute global metrics using a unified denominator (global valid days)
     // O divisor do cálculo será composto exclusivamente pelo número de dias em que houve lançamentos salvos
@@ -114,9 +123,17 @@ export function useDashboardCalculations(
     Array.from(allValidDatesSet).forEach((date) => {
       validPlants.forEach((pid) => {
         if (plantValidDatesMap[pid].has(date)) {
-          const pCont = validContracted
-            .filter((c) => c.plant_id === pid)
-            .reduce((sum, c) => sum + c.quantity, 0)
+          const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
+            if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+              const validCompanyIds = new Set(
+                employees
+                  .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                  .map((e) => e.company_id),
+              )
+              if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+            }
+            return true
+          }).reduce((sum, c) => sum + c.quantity, 0)
           totalContractedSum += pCont
         }
       })
@@ -142,14 +159,37 @@ export function useDashboardCalculations(
         const pDays = pValidDates.size
         const pPres = pDays > 0 ? pValidLogs.filter((l) => l.status).length / pDays : 0
         const pAbs = pDays > 0 ? pValidLogs.filter((l) => !l.status).length / pDays : 0
-        const pCont = validContracted
-          .filter((c) => c.plant_id === plant.id)
-          .reduce((sum, c) => sum + c.quantity, 0)
+
+        let sumContratado = 0
+        pValidDates.forEach((date) => {
+          sumContratado += getApplicableContracted(plant.id, typeCont, date, (c) => {
+            if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+              const validCompanyIds = new Set(
+                employees
+                  .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                  .map((e) => e.company_id),
+              )
+              if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+            }
+            return true
+          }).reduce((sum, c) => sum + c.quantity, 0)
+        })
+        const pCont = pDays > 0 ? Math.round(sumContratado / pDays) : 0
 
         const dailyTrend = Array.from(pValidDates)
           .sort()
           .map((date) => {
-            const dCont = pCont
+            const dCont = getApplicableContracted(plant.id, typeCont, date, (c) => {
+              if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+                const validCompanyIds = new Set(
+                  employees
+                    .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                    .map((e) => e.company_id),
+                )
+                if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+              }
+              return true
+            }).reduce((sum, c) => sum + c.quantity, 0)
             const dPres = pLogs.filter((l) => l.date === date && l.status).length
             const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
             return {
@@ -197,14 +237,29 @@ export function useDashboardCalculations(
 
         const lPres = lDays > 0 ? lLogs.filter((l) => l.status).length / lDays : 0
         const lAbs = lDays > 0 ? lLogs.filter((l) => !l.status).length / lDays : 0
-        const lCont = validContracted
-          .filter((c) => c.location_id === loc.id)
-          .reduce((sum, c) => sum + c.quantity, 0)
+
+        let sumLocationContratado = 0
+        if (pValidDates) {
+          pValidDates.forEach((date) => {
+            sumLocationContratado += getApplicableContracted(
+              plantId,
+              typeCont,
+              date,
+              (c) => c.location_id === loc.id,
+            ).reduce((sum, c) => sum + c.quantity, 0)
+          })
+        }
+        const lCont = lDays > 0 ? Math.round(sumLocationContratado / lDays) : 0
 
         const dailyTrend = Array.from(pValidDates || [])
           .sort()
           .map((date) => {
-            const dCont = lCont
+            const dCont = getApplicableContracted(
+              plantId,
+              typeCont,
+              date,
+              (c) => c.location_id === loc.id,
+            ).reduce((sum, c) => sum + c.quantity, 0)
             const dPres = lLogsRaw.filter((l) => l.date === date && l.status).length
             const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
             return {
@@ -238,10 +293,25 @@ export function useDashboardCalculations(
               const plantId = eq.plant_id
               const pValidDates = plantValidDatesMap[plantId]
 
+              let sumEqContratado = 0
+              if (pValidDates) {
+                pValidDates.forEach((date) => {
+                  const eqRecords = getApplicableContracted(
+                    plantId,
+                    'equipamento',
+                    date,
+                    (c) => c.equipment_id === eq.id,
+                  )
+                  sumEqContratado +=
+                    eqRecords.length > 0
+                      ? eqRecords.reduce((sum, c) => sum + c.quantity, 0)
+                      : eq.quantity
+                })
+              }
               const eqCont =
-                validContracted
-                  .filter((c) => c.equipment_id === eq.id)
-                  .reduce((sum, c) => sum + c.quantity, 0) || eq.quantity
+                pValidDates && pValidDates.size > 0
+                  ? Math.round(sumEqContratado / pValidDates.size)
+                  : eq.quantity
 
               const eqLogs = processedLogs
                 .filter(
@@ -297,9 +367,18 @@ export function useDashboardCalculations(
 
         validPlants.forEach((pid) => {
           if (plantValidDatesMap[pid].has(date)) {
-            const pCont = validContracted
-              .filter((c) => c.plant_id === pid)
-              .reduce((sum, c) => sum + c.quantity, 0)
+            const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
+              if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+                const validCompanyIds = new Set(
+                  employees
+                    .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                    .map((e) => e.company_id),
+                )
+                if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+              }
+              return true
+            }).reduce((sum, c) => sum + c.quantity, 0)
+
             dContracted += pCont
 
             const pPres = activeLogs.filter(
@@ -321,19 +400,16 @@ export function useDashboardCalculations(
       })
 
     // Independent equipment calculation for goals
-    const validEquipContracted = contracted.filter(
-      (c) => validPlants.includes(c.plant_id) && c.type === 'equipamento',
-    )
-
     let totalEquipContractedSum = 0
     let totalEquipPresentCount = 0
 
     Array.from(allValidDatesSet).forEach((date) => {
       validPlants.forEach((pid) => {
         if (plantValidDatesMap[pid]?.has(date)) {
-          const eCont = validEquipContracted
-            .filter((c) => c.plant_id === pid)
-            .reduce((sum, c) => sum + c.quantity, 0)
+          const eCont = getApplicableContracted(pid, 'equipamento', date).reduce(
+            (sum, c) => sum + c.quantity,
+            0,
+          )
           totalEquipContractedSum += eCont
 
           const ePres = processedLogs.filter(

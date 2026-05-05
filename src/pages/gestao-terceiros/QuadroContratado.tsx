@@ -44,6 +44,10 @@ export default function QuadroContratado() {
 
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterType, setFilterType] = useState('all')
+  const [filterReferenceMonth, setFilterReferenceMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -52,8 +56,8 @@ export default function QuadroContratado() {
     function_id: 'none',
     equipment_id: 'none',
     quantity: '',
-    goal_id: '',
     reference_month: '',
+    goal_id: '',
     value: '',
   })
 
@@ -95,8 +99,8 @@ export default function QuadroContratado() {
       function_id: 'none',
       equipment_id: 'none',
       quantity: '',
+      reference_month: filterReferenceMonth !== 'all' ? filterReferenceMonth : '',
       goal_id: '',
-      reference_month: '',
       value: '',
     })
     setEntryType('colaboradores')
@@ -113,11 +117,80 @@ export default function QuadroContratado() {
       function_id: item.function_id || 'none',
       equipment_id: item.equipment_id || 'none',
       quantity: item.quantity?.toString() || '',
+      reference_month: item.reference_month ? item.reference_month.substring(0, 7) : '',
       goal_id: '',
-      reference_month: '',
       value: '',
     })
     setIsModalOpen(true)
+  }
+
+  const handleDuplicateMonth = async () => {
+    if (filterReferenceMonth === 'all') return
+
+    const [year, month] = filterReferenceMonth.split('-')
+    const prevDate = new Date(Number(year), Number(month) - 2, 1)
+    const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
+
+    const recordsToDuplicate = data.filter(
+      (d) =>
+        d.reference_month === `${prevMonthStr}-01` &&
+        (filterPlant === 'all' || d.plant_id === filterPlant),
+    )
+
+    if (recordsToDuplicate.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: 'Nenhum registro encontrado no mês anterior para duplicar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const currentRecords = data.filter(
+      (d) =>
+        d.reference_month === `${filterReferenceMonth}-01` &&
+        (filterPlant === 'all' || d.plant_id === filterPlant),
+    )
+
+    if (currentRecords.length > 0) {
+      toast({
+        title: 'Aviso',
+        description:
+          'Já existem registros para este mês nesta planta. Exclua-os primeiro se quiser duplicar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const newRecords = recordsToDuplicate.map((r) => ({
+        client_id: r.client_id,
+        company_id: r.company_id,
+        equipment_id: r.equipment_id,
+        function_id: r.function_id,
+        location_id: r.location_id,
+        plant_id: r.plant_id,
+        quantity: r.quantity,
+        type: r.type,
+        reference_month: `${filterReferenceMonth}-01`,
+      }))
+
+      const { error } = await supabase.from('contracted_headcount').insert(newRecords)
+      if (error) throw error
+
+      toast({
+        title: 'Registros duplicados',
+        description: 'O quadro do mês anterior foi copiado com sucesso.',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+      loadData()
+      refetch()
+    } catch (err: any) {
+      toast({ title: 'Erro ao duplicar', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,8 +217,8 @@ export default function QuadroContratado() {
           className: 'bg-green-50 text-green-900 border-green-200',
         })
       } else {
-        if (!form.plant_id || !form.quantity) {
-          throw new Error('Preencha Planta e Quantidade.')
+        if (!form.plant_id || !form.quantity || !form.reference_month) {
+          throw new Error('Preencha Planta, Quantidade e Mês de Referência.')
         }
         const isStaff = entryType === 'colaboradores'
 
@@ -160,6 +233,7 @@ export default function QuadroContratado() {
           function_id: isStaff && form.function_id !== 'none' ? form.function_id : null,
           equipment_id: !isStaff && form.equipment_id !== 'none' ? form.equipment_id : null,
           quantity: Number(form.quantity),
+          reference_month: `${form.reference_month}-01`,
         }
 
         if (editingId) {
@@ -205,6 +279,9 @@ export default function QuadroContratado() {
   const filteredData = data.filter((item) => {
     if (filterPlant !== 'all' && item.plant_id !== filterPlant) return false
     if (filterType !== 'all' && item.type !== filterType) return false
+    if (filterReferenceMonth !== 'all' && item.reference_month) {
+      if (item.reference_month.substring(0, 7) !== filterReferenceMonth) return false
+    }
     return true
   })
 
@@ -255,6 +332,24 @@ export default function QuadroContratado() {
             </SelectContent>
           </Select>
         </div>
+        <div className="w-full sm:w-64 flex items-center gap-2">
+          <Input
+            type="month"
+            value={filterReferenceMonth === 'all' ? '' : filterReferenceMonth}
+            onChange={(e) => setFilterReferenceMonth(e.target.value || 'all')}
+            className="bg-white"
+          />
+          {filterReferenceMonth !== 'all' && (
+            <Button
+              variant="outline"
+              onClick={handleDuplicateMonth}
+              title="Duplicar do mês anterior"
+              className="px-3"
+            >
+              Duplicar
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -267,6 +362,7 @@ export default function QuadroContratado() {
               <TableHead className="font-semibold text-slate-600">Local</TableHead>
               <TableHead className="font-semibold text-slate-600">Equip. / Função</TableHead>
               <TableHead className="font-semibold text-slate-600">Qtd.</TableHead>
+              <TableHead className="font-semibold text-slate-600">Mês Ref.</TableHead>
               <TableHead className="font-semibold text-slate-600 text-right pr-6">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -312,6 +408,14 @@ export default function QuadroContratado() {
                       : equipment.find((e) => e.id === item.equipment_id)?.name || '-'}
                   </TableCell>
                   <TableCell className="font-bold text-slate-800">{item.quantity}</TableCell>
+                  <TableCell className="text-slate-600">
+                    {item.reference_month
+                      ? (() => {
+                          const [y, m] = item.reference_month.split('-')
+                          return `${m}/${y}`
+                        })()
+                      : '-'}
+                  </TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex justify-end gap-1">
                       <Button
@@ -501,6 +605,18 @@ export default function QuadroContratado() {
                         ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {entryType !== 'metas' && (
+                <div className="space-y-2">
+                  <Label className="text-slate-700">Mês de Referência *</Label>
+                  <Input
+                    type="month"
+                    value={form.reference_month}
+                    onChange={(e) => setForm({ ...form, reference_month: e.target.value })}
+                    className="bg-white"
+                  />
                 </div>
               )}
 
