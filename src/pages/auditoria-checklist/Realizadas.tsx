@@ -25,6 +25,7 @@ import { format } from 'date-fns'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { calculateSLA } from '@/lib/sla-utils'
 
@@ -42,6 +43,7 @@ export default function AuditoriaRealizadas() {
   const [viewExec, setViewExec] = useState<any>(null)
   const [viewTask, setViewTask] = useState<any>(null)
   const [viewAnswers, setViewAnswers] = useState<any[]>([])
+  const [viewHistory, setViewHistory] = useState<any[]>([])
 
   useEffect(() => {
     if (!profile) return
@@ -127,6 +129,15 @@ export default function AuditoriaRealizadas() {
     } else {
       setViewTask(null)
     }
+
+    const { data: hData } = await supabase
+      .from('audit_executions')
+      .select('*, tasks(due_date)')
+      .eq('audit_id', exec.audit_id)
+      .eq('plant_id', exec.plant_id)
+      .order('created_at', { ascending: false })
+
+    setViewHistory(hData || [])
   }
 
   const handlePrint = () => {
@@ -320,120 +331,212 @@ export default function AuditoriaRealizadas() {
             </div>
           </DialogHeader>
           {viewExec && (
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                    Status
-                  </p>
-                  <p className="font-semibold text-slate-800">{viewExec.status}</p>
-                </div>
-                {viewTask && viewTask.task_statuses ? (
-                  (() => {
-                    const slaResult = calculateSLA(viewTask, viewTask.task_statuses, [])
-                    return (
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                          {viewTask.id !== viewExec.task_id ? 'SLA Próxima' : 'SLA'}
-                        </p>
-                        <Badge variant="outline" className={cn('font-bold', slaResult.color)}>
-                          {slaResult.text}
-                        </Badge>
-                      </div>
-                    )
-                  })()
-                ) : (
+            <Tabs defaultValue="details" className="w-full mt-4">
+              <TabsList className="grid w-full sm:w-[400px] grid-cols-2 mb-6">
+                <TabsTrigger value="details">Detalhes da Execução</TabsTrigger>
+                <TabsTrigger value="history">Histórico de Recorrências</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                      SLA Próxima
+                      Status
                     </p>
-                    <p className="font-semibold text-slate-400">-</p>
+                    <p className="font-semibold text-slate-800">{viewExec.status}</p>
                   </div>
-                )}
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                    Score
-                  </p>
-                  <p className="font-semibold text-brand-deepBlue">
-                    {viewExec.final_score || 0} / {viewExec.max_score || 0}
-                  </p>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                    Data Realização
-                  </p>
-                  <p className="font-semibold text-slate-800">
-                    {viewExec.realization_date
-                      ? format(new Date(viewExec.realization_date), 'dd/MM/yyyy')
-                      : '-'}
-                  </p>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
-                    Participantes
-                  </p>
-                  <p
-                    className="font-semibold text-slate-800 truncate"
-                    title={viewExec.participants}
-                  >
-                    {viewExec.participants || '-'}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-800 mb-3 text-lg border-b pb-2">Respostas</h4>
-                {viewAnswers.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    Nenhuma resposta registrada (Auditoria Pendente).
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {viewAnswers.map((ans, idx) => (
-                      <div
-                        key={ans.id}
-                        className="flex flex-col p-4 border border-slate-200 rounded-xl bg-white shadow-sm"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <p className="font-medium text-slate-800 text-sm">
-                              <span className="text-slate-400 mr-2">{idx + 1}.</span>
-                              {ans.audit_actions?.title}
-                            </p>
-                            {ans.evidence_url && (
-                              <a
-                                href={ans.evidence_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-block mt-2 text-xs text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-2 py-1 rounded border border-brand-deepBlue/10"
-                              >
-                                Ver Evidência Anexada
-                              </a>
-                            )}
-                          </div>
-                          <div className="shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-slate-50 border border-slate-200 text-lg font-black text-brand-deepBlue">
-                            {ans.score}
-                          </div>
+                  {viewTask && viewTask.task_statuses ? (
+                    (() => {
+                      const slaResult = calculateSLA(viewTask, viewTask.task_statuses, [])
+                      return (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                            {viewTask.id !== viewExec.task_id ? 'SLA Próxima' : 'SLA'}
+                          </p>
+                          <Badge variant="outline" className={cn('font-bold', slaResult.color)}>
+                            {slaResult.text}
+                          </Badge>
                         </div>
-                        {ans.observations && (
-                          <div className="mt-3 pt-3 border-t border-slate-50">
-                            <p className="text-xs text-slate-500">
-                              <strong className="font-semibold text-slate-600">Observações:</strong>{' '}
-                              {ans.observations}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })()
+                  ) : (
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                        SLA Próxima
+                      </p>
+                      <p className="font-semibold text-slate-400">-</p>
+                    </div>
+                  )}
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                      Score
+                    </p>
+                    <p className="font-semibold text-brand-deepBlue">
+                      {viewExec.final_score || 0} / {viewExec.max_score || 0}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div className="pt-4 border-t border-slate-100 sm:hidden">
-                <Button onClick={handlePrint} className="w-full">
-                  <Printer className="w-4 h-4 mr-2" /> Imprimir Relatório
-                </Button>
-              </div>
-            </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                      Data Realização
+                    </p>
+                    <p className="font-semibold text-slate-800">
+                      {viewExec.realization_date
+                        ? format(new Date(viewExec.realization_date), 'dd/MM/yyyy')
+                        : '-'}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                      Participantes
+                    </p>
+                    <p
+                      className="font-semibold text-slate-800 truncate"
+                      title={viewExec.participants}
+                    >
+                      {viewExec.participants || '-'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-3 text-lg border-b pb-2">Respostas</h4>
+                  {viewAnswers.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      Nenhuma resposta registrada (Auditoria Pendente).
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {viewAnswers.map((ans, idx) => (
+                        <div
+                          key={ans.id}
+                          className="flex flex-col p-4 border border-slate-200 rounded-xl bg-white shadow-sm"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-800 text-sm">
+                                <span className="text-slate-400 mr-2">{idx + 1}.</span>
+                                {ans.audit_actions?.title}
+                              </p>
+                              {ans.evidence_url && (
+                                <a
+                                  href={ans.evidence_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block mt-2 text-xs text-brand-deepBlue hover:underline bg-brand-deepBlue/5 px-2 py-1 rounded border border-brand-deepBlue/10"
+                                >
+                                  Ver Evidência Anexada
+                                </a>
+                              )}
+                            </div>
+                            <div className="shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-slate-50 border border-slate-200 text-lg font-black text-brand-deepBlue">
+                              {ans.score}
+                            </div>
+                          </div>
+                          {ans.observations && (
+                            <div className="mt-3 pt-3 border-t border-slate-50">
+                              <p className="text-xs text-slate-500">
+                                <strong className="font-semibold text-slate-600">
+                                  Observações:
+                                </strong>{' '}
+                                {ans.observations}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="pt-4 border-t border-slate-100 sm:hidden">
+                  <Button onClick={handlePrint} className="w-full">
+                    <Printer className="w-4 h-4 mr-2" /> Imprimir Relatório
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="space-y-4">
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50/80 border-b border-slate-200">
+                      <TableRow>
+                        <TableHead className="font-semibold text-slate-800">Status</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Gerada em</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Prazo (SLA)</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Realizada em</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Score</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewHistory.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                            Nenhum histórico encontrado.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        viewHistory.map((hExec) => {
+                          const user = users.find((u) => u.id === hExec.assignee_id)
+                          return (
+                            <TableRow
+                              key={hExec.id}
+                              className={hExec.id === viewExec.id ? 'bg-brand-deepBlue/5' : ''}
+                            >
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'font-bold',
+                                    hExec.status === 'Finalizado'
+                                      ? 'bg-green-100 text-green-800 border-green-200'
+                                      : 'bg-amber-100 text-amber-800 border-amber-300',
+                                  )}
+                                >
+                                  {hExec.status}
+                                </Badge>
+                                {hExec.id === viewExec.id && (
+                                  <span className="ml-2 text-[10px] font-bold text-brand-deepBlue uppercase">
+                                    Atual
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-slate-600">
+                                {format(new Date(hExec.created_at), 'dd/MM/yyyy')}
+                              </TableCell>
+                              <TableCell className="text-slate-600 font-medium">
+                                {hExec.tasks?.due_date
+                                  ? format(new Date(hExec.tasks.due_date), 'dd/MM/yyyy')
+                                  : '-'}
+                              </TableCell>
+                              <TableCell className="text-slate-600">
+                                {hExec.realization_date
+                                  ? format(new Date(hExec.realization_date), 'dd/MM/yyyy')
+                                  : '-'}
+                              </TableCell>
+                              <TableCell>
+                                {hExec.status === 'Finalizado' ? (
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="font-bold text-slate-800">
+                                      {hExec.final_score}
+                                    </span>
+                                    <span className="text-xs text-slate-500 font-medium">
+                                      / {hExec.max_score}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-sm">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-slate-600">{user?.name || '-'}</TableCell>
+                            </TableRow>
+                          )
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
