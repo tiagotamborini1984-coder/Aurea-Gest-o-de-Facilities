@@ -281,7 +281,7 @@ export default function OrgFluxogramas() {
             <Button variant="outline" onClick={() => setActiveFlow(null)}>
               <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
             </Button>
-            <Button variant="secondary" onClick={handlePrint}>
+            <Button variant="secondary" className="text-white" onClick={handlePrint}>
               <Download className="h-4 w-4 mr-2" /> Exportar PDF
             </Button>
             <Button onClick={handleSave}>
