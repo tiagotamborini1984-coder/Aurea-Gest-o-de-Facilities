@@ -27,6 +27,7 @@ export function DuplicateHeadcountDialog({
   defaultSource,
   defaultTarget,
   onSuccess,
+  tableName = 'contracted_headcount',
 }: any) {
   const [dupSource, setDupSource] = useState<string>('')
   const [dupTarget, setDupTarget] = useState<string>('')
@@ -52,7 +53,7 @@ export function DuplicateHeadcountDialog({
     try {
       if (!dupConflict) {
         const { data: existing } = await supabase
-          .from('contracted_headcount')
+          .from(tableName)
           .select('id')
           .eq('client_id', clientId)
           .eq('reference_month', `${dupTarget}-01`)
@@ -65,7 +66,7 @@ export function DuplicateHeadcountDialog({
       }
 
       const { data: sourceData } = await supabase
-        .from('contracted_headcount')
+        .from(tableName)
         .select('*')
         .eq('client_id', clientId)
         .eq('reference_month', `${dupSource}-01`)
@@ -83,13 +84,13 @@ export function DuplicateHeadcountDialog({
 
       if (dupConflict) {
         await supabase
-          .from('contracted_headcount')
+          .from(tableName)
           .delete()
           .eq('client_id', clientId)
           .eq('reference_month', `${dupTarget}-01`)
       }
 
-      const { error } = await supabase.from('contracted_headcount').insert(newEntries)
+      const { error } = await supabase.from(tableName).insert(newEntries)
       if (error) throw error
 
       toast({ title: 'Duplicado com sucesso!' })
@@ -113,8 +114,10 @@ export function DuplicateHeadcountDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Duplicar Quadro Contratado</DialogTitle>
-          <DialogDescription>Copie o headcount de um mês para outro rapidamente.</DialogDescription>
+          <DialogTitle>Duplicar Dados</DialogTitle>
+          <DialogDescription>
+            Copie os registros de um mês para outro rapidamente.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           {dupConflict && (
