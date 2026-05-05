@@ -1,17 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'
-import { useHasAccess } from '@/hooks/use-has-access'
-import { Navigate } from 'react-router-dom'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { useMasterData } from '@/hooks/use-master-data'
+import { Plus, Copy, Trash2, Edit2, Loader2, Calendar, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,674 +12,310 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Loader2, Trash2, Edit2, ClipboardList } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { DuplicateHeadcountDialog } from '@/components/gestao-terceiros/DuplicateHeadcountDialog'
+import { HeadcountFormDialog } from '@/components/gestao-terceiros/HeadcountFormDialog'
 
 export default function QuadroContratado() {
   const { profile, selectedMasterClient } = useAppStore()
-  const { plants, locations, functions, equipment, goals, companies, refetch } = useMasterData()
+  const { plants, locations, functions, equipment } = useMasterData()
   const { toast } = useToast()
 
-  const hasAccess = useHasAccess('Cadastros:Quadro Contratado')
-
+  const [activeTab, setActiveTab] = useState('colaborador')
   const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [entryType, setEntryType] = useState('colaboradores')
+  const [companies, setCompanies] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
-  const [filterPlant, setFilterPlant] = useState('all')
-  const [filterType, setFilterType] = useState('all')
-  const [filterReferenceMonth, setFilterReferenceMonth] = useState(() => {
+  const getCurrentMonth = () => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  })
+  }
 
-  const [form, setForm] = useState({
-    plant_id: '',
-    company_id: 'none',
-    location_id: 'none',
-    function_id: 'none',
-    equipment_id: 'none',
-    quantity: '',
-    reference_month: '',
-    goal_id: '',
-    value: '',
-  })
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
 
-  const loadData = async () => {
-    if (!profile) return
-    if (profile.role !== 'Master' && !profile.client_id) return
+  const getClientId = useCallback(() => {
+    if (profile?.role === 'Master' && selectedMasterClient !== 'all') return selectedMasterClient
+    return profile?.client_id
+  }, [profile, selectedMasterClient])
+
+  const fetchCompanies = useCallback(async () => {
+    const clientId = getClientId()
+    if (!clientId) return
+    const { data } = await supabase.from('companies').select('*').eq('client_id', clientId)
+    setCompanies(data || [])
+  }, [getClientId])
+
+  const fetchData = useCallback(async () => {
+    const clientId = getClientId()
+    if (!clientId) return
     setLoading(true)
-
-    let q = supabase
+    const { data: res, error } = await supabase
       .from('contracted_headcount')
       .select('*')
+      .eq('client_id', clientId)
+      .eq('reference_month', `${selectedMonth}-01`)
       .order('created_at', { ascending: false })
-
-    if (profile.role === 'Master') {
-      if (selectedMasterClient !== 'all') {
-        q = q.eq('client_id', selectedMasterClient)
-      }
-    } else {
-      q = q.eq('client_id', profile.client_id)
-    }
-
-    const { data: res } = await q
-    setData(res || [])
+    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    else setData(res || [])
     setLoading(false)
-  }
+  }, [getClientId, selectedMonth, toast])
 
   useEffect(() => {
-    if (hasAccess) loadData()
-  }, [profile, hasAccess, selectedMasterClient])
+    fetchCompanies()
+    fetchData()
+  }, [fetchData, fetchCompanies])
 
-  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<any>(null)
+  const [form, setForm] = useState<any>({})
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false)
 
-  const openAdd = () => {
-    setEditingId(null)
-    setForm({
-      plant_id: filterPlant !== 'all' ? filterPlant : '',
-      company_id: 'none',
-      location_id: 'none',
-      function_id: 'none',
-      equipment_id: 'none',
-      quantity: '',
-      reference_month: filterReferenceMonth !== 'all' ? filterReferenceMonth : '',
-      goal_id: '',
-      value: '',
-    })
-    setEntryType('colaboradores')
-    setIsModalOpen(true)
-  }
-
-  const openEdit = (item: any) => {
-    setEditingId(item.id)
-    setEntryType(item.type === 'colaborador' ? 'colaboradores' : 'equipamentos')
-    setForm({
-      plant_id: item.plant_id || '',
-      company_id: item.company_id || 'none',
-      location_id: item.location_id || 'none',
-      function_id: item.function_id || 'none',
-      equipment_id: item.equipment_id || 'none',
-      quantity: item.quantity?.toString() || '',
-      reference_month: item.reference_month ? item.reference_month.substring(0, 7) : '',
-      goal_id: '',
-      value: '',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleDuplicateMonth = async () => {
-    if (filterReferenceMonth === 'all') return
-
-    const [year, month] = filterReferenceMonth.split('-')
-    const prevDate = new Date(Number(year), Number(month) - 2, 1)
-    const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
-
-    const recordsToDuplicate = data.filter(
-      (d) =>
-        d.reference_month === `${prevMonthStr}-01` &&
-        (filterPlant === 'all' || d.plant_id === filterPlant),
-    )
-
-    if (recordsToDuplicate.length === 0) {
-      toast({
-        title: 'Aviso',
-        description: 'Nenhum registro encontrado no mês anterior para duplicar.',
-        variant: 'destructive',
-      })
+  const handleSave = async () => {
+    const clientId = getClientId()
+    if (!clientId) return
+    if (!form.plant_id || !form.quantity || !form.reference_month) {
+      toast({ title: 'Preencha os campos obrigatórios', variant: 'destructive' })
       return
     }
 
-    const currentRecords = data.filter(
-      (d) =>
-        d.reference_month === `${filterReferenceMonth}-01` &&
-        (filterPlant === 'all' || d.plant_id === filterPlant),
-    )
-
-    if (currentRecords.length > 0) {
-      toast({
-        title: 'Aviso',
-        description:
-          'Já existem registros para este mês nesta planta. Exclua-os primeiro se quiser duplicar.',
-        variant: 'destructive',
-      })
-      return
+    const payload = {
+      client_id: clientId,
+      type: form.type,
+      plant_id: form.plant_id,
+      location_id: form.location_id || null,
+      company_id: form.company_id || null,
+      function_id: form.type === 'colaborador' ? form.function_id : null,
+      equipment_id: form.type === 'equipamento' ? form.equipment_id : null,
+      quantity: Number(form.quantity),
+      reference_month: `${form.reference_month}-01`,
     }
 
-    setIsSubmitting(true)
-    try {
-      const newRecords = recordsToDuplicate.map((r) => ({
-        client_id: r.client_id,
-        company_id: r.company_id,
-        equipment_id: r.equipment_id,
-        function_id: r.function_id,
-        location_id: r.location_id,
-        plant_id: r.plant_id,
-        quantity: r.quantity,
-        type: r.type,
-        reference_month: `${filterReferenceMonth}-01`,
-      }))
+    const res = editingItem
+      ? await supabase.from('contracted_headcount').update(payload).eq('id', editingItem.id)
+      : await supabase.from('contracted_headcount').insert(payload)
 
-      const { error } = await supabase.from('contracted_headcount').insert(newRecords)
-      if (error) throw error
-
-      toast({
-        title: 'Registros duplicados',
-        description: 'O quadro do mês anterior foi copiado com sucesso.',
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-      loadData()
-      refetch()
-    } catch (err: any) {
-      toast({ title: 'Erro ao duplicar', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    try {
-      if (entryType === 'metas') {
-        if (!form.plant_id || !form.goal_id || !form.reference_month || !form.value) {
-          throw new Error('Preencha todos os campos obrigatórios de Metas.')
-        }
-        const targetClientId =
-          plants.find((p) => p.id === form.plant_id)?.client_id || profile!.client_id
-        const { error } = await supabase.from('monthly_goals_data').insert({
-          client_id: targetClientId,
-          plant_id: form.plant_id,
-          goal_id: form.goal_id,
-          reference_month: `${form.reference_month}-01`,
-          value: Number(form.value),
-        })
-        if (error) throw error
-        toast({
-          title: 'Meta lançada com sucesso',
-          className: 'bg-green-50 text-green-900 border-green-200',
-        })
-      } else {
-        if (!form.plant_id || !form.quantity || !form.reference_month) {
-          throw new Error('Preencha Planta, Quantidade e Mês de Referência.')
-        }
-        const isStaff = entryType === 'colaboradores'
-
-        const targetClientId =
-          plants.find((p) => p.id === form.plant_id)?.client_id || profile!.client_id
-        const payload = {
-          client_id: targetClientId,
-          type: isStaff ? 'colaborador' : 'equipamento',
-          plant_id: form.plant_id,
-          company_id: form.company_id !== 'none' ? form.company_id : null,
-          location_id: form.location_id !== 'none' ? form.location_id : null,
-          function_id: isStaff && form.function_id !== 'none' ? form.function_id : null,
-          equipment_id: !isStaff && form.equipment_id !== 'none' ? form.equipment_id : null,
-          quantity: Number(form.quantity),
-          reference_month: `${form.reference_month}-01`,
-        }
-
-        if (editingId) {
-          const { error } = await supabase
-            .from('contracted_headcount')
-            .update(payload)
-            .eq('id', editingId)
-          if (error) throw error
-          toast({
-            title: 'Quadro contratado atualizado',
-            className: 'bg-green-50 text-green-900 border-green-200',
-          })
-        } else {
-          const { error } = await supabase.from('contracted_headcount').insert(payload)
-          if (error) throw error
-          toast({
-            title: 'Quadro contratado salvo',
-            className: 'bg-green-50 text-green-900 border-green-200',
-          })
-        }
-        loadData()
-        refetch()
-      }
+    if (res.error) toast({ title: 'Erro', description: res.error.message, variant: 'destructive' })
+    else {
+      toast({ title: 'Salvo com sucesso' })
       setIsModalOpen(false)
-    } catch (err: any) {
-      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsSubmitting(false)
+      fetchData()
     }
   }
 
   const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza?')) return
     const { error } = await supabase.from('contracted_headcount').delete().eq('id', id)
-    if (!error) {
-      toast({
-        title: 'Registro removido',
-      })
-      loadData()
-      refetch()
+    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    else {
+      toast({ title: 'Removido com sucesso' })
+      fetchData()
     }
   }
 
-  const filteredData = data.filter((item) => {
-    if (filterPlant !== 'all' && item.plant_id !== filterPlant) return false
-    if (filterType !== 'all' && item.type !== filterType) return false
-    if (filterReferenceMonth !== 'all' && item.reference_month) {
-      if (item.reference_month.substring(0, 7) !== filterReferenceMonth) return false
+  const filteredData = data
+    .filter((d) => d.type === activeTab)
+    .filter((d) => {
+      if (!searchTerm) return true
+      const searchLow = searchTerm.toLowerCase()
+      const match =
+        activeTab === 'colaborador'
+          ? functions?.find((f: any) => f.id === d.function_id)?.name
+          : equipment?.find((e: any) => e.id === d.equipment_id)?.name
+      return match?.toLowerCase().includes(searchLow)
+    })
+
+  const monthOptions = useMemo(() => {
+    const opts = []
+    const d = new Date()
+    d.setDate(1)
+    for (let i = -12; i <= 6; i++) {
+      const nd = new Date(d)
+      nd.setMonth(d.getMonth() + i)
+      const label = nd.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      opts.push({
+        value: `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}`,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+      })
     }
-    return true
-  })
+    return opts.sort((a, b) => b.value.localeCompare(a.value))
+  }, [])
+
+  const nextMonth = useMemo(() => {
+    const nd = new Date(selectedMonth + '-01T00:00:00Z')
+    nd.setUTCMonth(nd.getUTCMonth() + 1)
+    return `${nd.getUTCFullYear()}-${String(nd.getUTCMonth() + 1).padStart(2, '0')}`
+  }, [selectedMonth])
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
-            <ClipboardList className="h-6 w-6 text-brand-deepBlue" />
-          </div>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Quadro Contratado</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Dimensionamento do contrato e metas de operação
-            </p>
-          </div>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-brand-graphite">
+            Quadro Contratado
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Gerencie o headcount de colaboradores e equipamentos por mês
+          </p>
         </div>
-        <Button onClick={openAdd} variant="tech">
-          <Plus className="w-4 h-4 mr-2" /> Novo Registro
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsDuplicateOpen(true)}>
+            <Copy className="w-4 h-4 mr-2" /> Duplicar Mês
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingItem(null)
+              setForm({ type: activeTab, quantity: 1, reference_month: selectedMonth })
+              setIsModalOpen(true)
+            }}
+            variant="tech"
+            className="shadow-sm"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Novo Registro
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-        <div className="w-full sm:w-64">
-          <Select value={filterPlant} onValueChange={setFilterPlant}>
-            <SelectTrigger className="bg-white border-gray-200 text-foreground">
-              <SelectValue placeholder="Filtrar por Planta" />
+      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex-1 w-full flex items-center px-3 gap-2 sm:border-r border-gray-100">
+          <Search className="w-5 h-5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="w-full sm:w-64 flex items-center px-3 gap-2">
+          <Calendar className="w-5 h-5 text-muted-foreground" />
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="border-0 shadow-none focus:ring-0 bg-transparent h-10">
+              <SelectValue placeholder="Mês Referência" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas as Plantas</SelectItem>
-              {plants.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
+              {monthOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="w-full sm:w-64">
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="bg-white border-gray-200 text-foreground">
-              <SelectValue placeholder="Filtrar por Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Tipos</SelectItem>
-              <SelectItem value="colaborador">Colaborador</SelectItem>
-              <SelectItem value="equipamento">Equipamento</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-full sm:w-64 flex items-center gap-2">
-          <Input
-            type="month"
-            value={filterReferenceMonth === 'all' ? '' : filterReferenceMonth}
-            onChange={(e) => setFilterReferenceMonth(e.target.value || 'all')}
-            className="bg-white"
-          />
-          {filterReferenceMonth !== 'all' && (
-            <Button
-              variant="outline"
-              onClick={handleDuplicateMonth}
-              title="Duplicar do mês anterior"
-              className="px-3"
-            >
-              Duplicar
-            </Button>
-          )}
-        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50/80 border-b border-gray-100">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
-              <TableHead className="font-semibold text-slate-600">Planta</TableHead>
-              <TableHead className="font-semibold text-slate-600">Empresa</TableHead>
-              <TableHead className="font-semibold text-slate-600">Local</TableHead>
-              <TableHead className="font-semibold text-slate-600">Equip. / Função</TableHead>
-              <TableHead className="font-semibold text-slate-600">Qtd.</TableHead>
-              <TableHead className="font-semibold text-slate-600">Mês Ref.</TableHead>
-              <TableHead className="font-semibold text-slate-600 text-right pr-6">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-10">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
-                </TableCell>
-              </TableRow>
-            ) : filteredData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="colaborador">Colaboradores</TabsTrigger>
+          <TabsTrigger value="equipamento">Equipamentos</TabsTrigger>
+        </TabsList>
+        {['colaborador', 'equipamento'].map((tab) => (
+          <TabsContent key={tab} value={tab} className="m-0">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              {loading ? (
+                <div className="flex justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-brand-deepBlue" />
+                </div>
+              ) : filteredData.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground">
                   Nenhum registro encontrado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-slate-50/50 border-gray-100">
-                  <TableCell>
-                    {item.type === 'colaborador' ? (
-                      <Badge className="bg-brand-deepBlue text-white hover:bg-brand-deepBlue/90">
-                        Colaborador
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-slate-200 text-slate-800 hover:bg-slate-300">
-                        Equipamento
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium text-slate-700">
-                    {plants.find((p) => p.id === item.plant_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-slate-600">
-                    {companies.find((c) => c.id === item.company_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-slate-600">
-                    {locations.find((l) => l.id === item.location_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="text-slate-600">
-                    {item.type === 'colaborador'
-                      ? functions.find((f) => f.id === item.function_id)?.name || '-'
-                      : equipment.find((e) => e.id === item.equipment_id)?.name || '-'}
-                  </TableCell>
-                  <TableCell className="font-bold text-slate-800">{item.quantity}</TableCell>
-                  <TableCell className="text-slate-600">
-                    {item.reference_month
-                      ? (() => {
-                          const [y, m] = item.reference_month.split('-')
-                          return `${m}/${y}`
-                        })()
-                      : '-'}
-                  </TableCell>
-                  <TableCell className="text-right pr-6">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(item)}
-                        className="text-slate-600 hover:text-brand-deepBlue hover:bg-slate-100"
-                        title="Editar"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(item.id)}
-                        className="text-slate-600 hover:text-red-600 hover:bg-red-50"
-                        title="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl bg-white border-gray-200">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">
-              {editingId ? 'Editar Registro' : 'Novo Registro'}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-5 py-2">
-            {!editingId && (
-              <RadioGroup
-                value={entryType}
-                onValueChange={setEntryType}
-                className="flex flex-wrap gap-4 bg-slate-50 p-4 rounded-xl border border-gray-200"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="colaboradores"
-                    id="r1"
-                    className="text-brand-deepBlue border-brand-deepBlue"
-                  />
-                  <Label htmlFor="r1" className="cursor-pointer text-slate-700 font-medium">
-                    Colaboradores
-                  </Label>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="equipamentos"
-                    id="r2"
-                    className="text-brand-deepBlue border-brand-deepBlue"
-                  />
-                  <Label htmlFor="r2" className="cursor-pointer text-slate-700 font-medium">
-                    Equipamentos
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="metas"
-                    id="r3"
-                    className="text-brand-deepBlue border-brand-deepBlue"
-                  />
-                  <Label htmlFor="r3" className="cursor-pointer text-slate-700 font-medium">
-                    Metas
-                  </Label>
-                </div>
-              </RadioGroup>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-slate-700">Planta *</Label>
-                <Select
-                  value={form.plant_id}
-                  onValueChange={(v) =>
-                    setForm({ ...form, plant_id: v, location_id: 'none', equipment_id: 'none' })
-                  }
-                >
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plants.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-slate-50/80 border-b border-gray-100">
+                    <TableRow>
+                      <TableHead>Planta</TableHead>
+                      <TableHead>Local</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>{tab === 'colaborador' ? 'Função' : 'Equipamento'}</TableHead>
+                      <TableHead className="text-right">Qtd.</TableHead>
+                      <TableHead className="text-right pr-6">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          {plants?.find((p: any) => p.id === item.plant_id)?.name || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {locations?.find((l: any) => l.id === item.location_id)?.name || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {companies?.find((c: any) => c.id === item.company_id)?.name || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {tab === 'colaborador'
+                            ? functions?.find((f: any) => f.id === item.function_id)?.name
+                            : equipment?.find((e: any) => e.id === item.equipment_id)?.name}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{item.quantity}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingItem(item)
+                                setForm({
+                                  ...item,
+                                  reference_month: item.reference_month.substring(0, 7),
+                                })
+                                setIsModalOpen(true)
+                              }}
+                              className="p-1.5 text-slate-600 hover:text-brand-deepBlue bg-white hover:bg-slate-100 rounded-md transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="p-1.5 text-slate-600 hover:text-red-600 bg-white hover:bg-red-50 rounded-md transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {entryType !== 'metas' && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Empresa</Label>
-                  <Select
-                    value={form.company_id}
-                    onValueChange={(v) => setForm({ ...form, company_id: v })}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhuma</SelectItem>
-                      {companies.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {entryType !== 'metas' && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Local</Label>
-                  <Select
-                    value={form.location_id}
-                    onValueChange={(v) => setForm({ ...form, location_id: v })}
-                    disabled={!form.plant_id}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {locations
-                        .filter((l) => l.plant_id === form.plant_id)
-                        .map((l) => (
-                          <SelectItem key={l.id} value={l.id}>
-                            {l.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {entryType === 'colaboradores' && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Função</Label>
-                  <Select
-                    value={form.function_id}
-                    onValueChange={(v) => setForm({ ...form, function_id: v })}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhuma</SelectItem>
-                      {functions.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {entryType === 'equipamentos' && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Equipamento *</Label>
-                  <Select
-                    value={form.equipment_id}
-                    onValueChange={(v) => setForm({ ...form, equipment_id: v })}
-                    disabled={!form.plant_id}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {equipment
-                        .filter((e) => e.plant_id === form.plant_id)
-                        .map((e) => (
-                          <SelectItem key={e.id} value={e.id}>
-                            {e.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {entryType !== 'metas' && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Mês de Referência *</Label>
-                  <Input
-                    type="month"
-                    value={form.reference_month}
-                    onChange={(e) => setForm({ ...form, reference_month: e.target.value })}
-                    className="bg-white"
-                  />
-                </div>
-              )}
-
-              {entryType === 'metas' && (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700">Meta *</Label>
-                    <Select
-                      value={form.goal_id}
-                      onValueChange={(v) => setForm({ ...form, goal_id: v })}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {goals
-                          .filter((g) => g.is_active)
-                          .map((g) => (
-                            <SelectItem key={g.id} value={g.id}>
-                              {g.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700">Mês de Referência *</Label>
-                    <Input
-                      type="month"
-                      value={form.reference_month}
-                      onChange={(e) => setForm({ ...form, reference_month: e.target.value })}
-                      className="bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700">Valor *</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={form.value}
-                      onChange={(e) => setForm({ ...form, value: e.target.value })}
-                      className="bg-white"
-                    />
-                  </div>
-                </>
-              )}
-
-              {entryType !== 'metas' && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Quantidade *</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={form.quantity}
-                    onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                    className="bg-white"
-                  />
-                </div>
+                  </TableBody>
+                </Table>
               )}
             </div>
+          </TabsContent>
+        ))}
+      </Tabs>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="tech" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <HeadcountFormDialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        form={form}
+        setForm={setForm}
+        onSave={handleSave}
+        editingItem={editingItem}
+        plants={plants}
+        locations={locations}
+        companies={companies}
+        functions={functions}
+        equipment={equipment}
+      />
+      <DuplicateHeadcountDialog
+        open={isDuplicateOpen}
+        onOpenChange={setIsDuplicateOpen}
+        clientId={getClientId()}
+        monthOptions={monthOptions}
+        defaultSource={selectedMonth}
+        defaultTarget={nextMonth}
+        onSuccess={(m: string) => {
+          setSelectedMonth(m)
+          fetchData()
+        }}
+      />
     </div>
   )
 }
