@@ -13,12 +13,20 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Search, Loader2, ClipboardCheck, Printer, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { calculateSLA } from '@/lib/sla-utils'
 
 export default function AuditoriaRealizadas() {
   const { profile } = useAppStore()
@@ -29,8 +37,10 @@ export default function AuditoriaRealizadas() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedPlant, setSelectedPlant] = useState('all')
 
   const [viewExec, setViewExec] = useState<any>(null)
+  const [viewTask, setViewTask] = useState<any>(null)
   const [viewAnswers, setViewAnswers] = useState<any[]>([])
 
   useEffect(() => {
@@ -70,11 +80,14 @@ export default function AuditoriaRealizadas() {
 
   const filteredExecutions = executions.filter((e) => {
     const searchStr = searchTerm.toLowerCase()
-    return (
+    const matchesSearch =
       e.audits?.title.toLowerCase().includes(searchStr) ||
       e.audits?.type.toLowerCase().includes(searchStr) ||
       e.status.toLowerCase().includes(searchStr)
-    )
+
+    const matchesPlant = selectedPlant === 'all' || e.plant_id === selectedPlant
+
+    return matchesSearch && matchesPlant
   })
 
   const openView = async (exec: any) => {
@@ -90,6 +103,17 @@ export default function AuditoriaRealizadas() {
       return orderA - orderB
     })
     setViewAnswers(sortedData)
+
+    if (exec.task_id) {
+      const { data: taskData } = await supabase
+        .from('tasks')
+        .select('*, task_statuses(*)')
+        .eq('id', exec.task_id)
+        .single()
+      setViewTask(taskData || null)
+    } else {
+      setViewTask(null)
+    }
   }
 
   const handlePrint = () => {
@@ -118,7 +142,21 @@ export default function AuditoriaRealizadas() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+              <SelectTrigger className="w-full sm:w-[200px] bg-white border-slate-200">
+                <SelectValue placeholder="Todas as Plantas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Plantas</SelectItem>
+                {plants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
@@ -245,7 +283,15 @@ export default function AuditoriaRealizadas() {
         </div>
       </div>
 
-      <Dialog open={!!viewExec} onOpenChange={(open) => !open && setViewExec(null)}>
+      <Dialog
+        open={!!viewExec}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewExec(null)
+            setViewTask(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto print:hidden">
           <DialogHeader className="border-b border-slate-100 pb-4">
             <div className="flex items-center justify-between pr-6">
@@ -262,13 +308,35 @@ export default function AuditoriaRealizadas() {
           </DialogHeader>
           {viewExec && (
             <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
                     Status
                   </p>
                   <p className="font-semibold text-slate-800">{viewExec.status}</p>
                 </div>
+                {viewTask && viewTask.task_statuses ? (
+                  (() => {
+                    const slaResult = calculateSLA(viewTask, viewTask.task_statuses, [])
+                    return (
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                          SLA
+                        </p>
+                        <Badge variant="outline" className={cn('font-bold', slaResult.color)}>
+                          {slaResult.text}
+                        </Badge>
+                      </div>
+                    )
+                  })()
+                ) : (
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                      SLA
+                    </p>
+                    <p className="font-semibold text-slate-400">-</p>
+                  </div>
+                )}
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
                     Score
@@ -400,6 +468,24 @@ export default function AuditoriaRealizadas() {
               <span className="block text-slate-500 text-xs font-bold uppercase mb-1">Status</span>
               <span className="font-semibold text-slate-800">{viewExec.status}</span>
             </div>
+            {viewTask && viewTask.task_statuses ? (
+              (() => {
+                const slaResult = calculateSLA(viewTask, viewTask.task_statuses, [])
+                return (
+                  <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+                    <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                      SLA
+                    </span>
+                    <span className="font-semibold text-slate-800">{slaResult.text}</span>
+                  </div>
+                )
+              })()
+            ) : (
+              <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+                <span className="block text-slate-500 text-xs font-bold uppercase mb-1">SLA</span>
+                <span className="font-semibold text-slate-400">-</span>
+              </div>
+            )}
             <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
               <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
                 Score Final
