@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, Loader2, ClipboardCheck, Printer, Eye } from 'lucide-react'
+import { Search, Loader2, ClipboardCheck, Printer, Eye, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
@@ -28,9 +28,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { calculateSLA } from '@/lib/sla-utils'
+import { useToast } from '@/hooks/use-toast'
 
 export default function AuditoriaRealizadas() {
   const { profile } = useAppStore()
+  const { toast } = useToast()
+
+  function addFrequency(date: Date, frequency: string): Date {
+    const d = new Date(date)
+    switch (frequency) {
+      case 'Diária':
+        d.setUTCDate(d.getUTCDate() + 1)
+        break
+      case 'Semanal':
+        d.setUTCDate(d.getUTCDate() + 7)
+        break
+      case 'Mensal':
+        d.setUTCMonth(d.getUTCMonth() + 1)
+        break
+      case 'Semestral':
+        d.setUTCMonth(d.getUTCMonth() + 6)
+        break
+      case 'Anual':
+        d.setUTCFullYear(d.getUTCFullYear() + 1)
+        break
+      case 'Única':
+      default:
+        break
+    }
+    return d
+  }
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Auditoria e Checklist')
 
@@ -57,7 +84,7 @@ export default function AuditoriaRealizadas() {
 
       let query = supabase
         .from('audit_executions')
-        .select('*, audits!inner(*)')
+        .select('*, audits!inner(*), tasks(due_date)')
         .eq('audits.client_id', profile.client_id)
         .order('created_at', { ascending: false })
 
@@ -138,6 +165,128 @@ export default function AuditoriaRealizadas() {
       .order('created_at', { ascending: false })
 
     setViewHistory(hData || [])
+  }
+
+  const handleForceGenerate = async (exec: any) => {
+    try {
+      setLoading(true)
+      const { data: audit } = await supabase
+        .from('audits')
+        .select('*')
+        .eq('id', exec.audit_id)
+        .single()
+      if (!audit) throw new Error('Auditoria não encontrada')
+
+      let { data: typeRes } = await supabase
+        .from('task_types')
+        .select('id')
+        .eq('client_id', audit.client_id)
+        .ilike('name', '%Auditoria%')
+        .limit(1)
+
+      let typeId = typeRes?.[0]?.id
+      if (!typeId) {
+        const { data: fallback } = await supabase
+          .from('task_types')
+          .select('id')
+          .eq('client_id', audit.client_id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+        typeId = fallback?.[0]?.id
+      }
+
+      let { data: statusRes } = await supabase
+        .from('task_statuses')
+        .select('id')
+        .eq('client_id', audit.client_id)
+        .eq('is_terminal', false)
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+      let statusId = statusRes?.[0]?.id
+
+      if (!typeId || !statusId) throw new Error('Tipo ou Status de tarefa não configurado')
+
+      const year = new Date().getFullYear()
+      const { data: latest } = await supabase
+        .from('tasks')
+        .select('task_number')
+        .eq('client_id', audit.client_id)
+        .like('task_number', `TSK-${year}-%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      let seq = 1
+      if (latest && latest.length > 0) {
+        const p = latest[0].task_number.split('-')
+        if (p.length === 3) seq = parseInt(p[2], 10) + 1
+      }
+      const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
+
+      // Create new task
+      const dueDateStr =
+        exec.tasks?.due_date ||
+        addFrequency(new Date(exec.created_at), audit.frequency).toISOString()
+
+      const { data: newTask, error: taskErr } = await supabase
+        .from('tasks')
+        .insert({
+          client_id: audit.client_id,
+          plant_id: exec.plant_id,
+          type_id: typeId,
+          status_id: statusId,
+          requester_id: profile.id,
+          assignee_id: exec.assignee_id,
+          task_number: taskNumber,
+          title: `Auditoria: ${audit.title}`,
+          description: `Por favor, realize a auditoria "${audit.title}" agendada para ${new Date(dueDateStr).toLocaleDateString('pt-BR')}. Acesse os detalhes da tarefa para preencher o checklist.`,
+          due_date: dueDateStr,
+          status_updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (taskErr) throw taskErr
+
+      if (exec.status === 'Pendente') {
+        // Just update existing execution with new task
+        await supabase.from('audit_executions').update({ task_id: newTask.id }).eq('id', exec.id)
+      } else {
+        // Create new execution
+        await supabase.from('audit_executions').insert({
+          audit_id: audit.id,
+          task_id: newTask.id,
+          assignee_id: exec.assignee_id,
+          plant_id: exec.plant_id,
+          status: 'Pendente',
+        })
+      }
+
+      toast({ title: 'Sucesso', description: 'Tarefa gerada com sucesso e vinculada à auditoria.' })
+
+      // reload
+      let query = supabase
+        .from('audit_executions')
+        .select('*, audits!inner(*), tasks(due_date)')
+        .eq('audits.client_id', profile.client_id)
+        .order('created_at', { ascending: false })
+
+      if (profile.role !== 'Administrador' && profile.role !== 'Master') {
+        const authPlants = profile.authorized_plants || []
+        if (authPlants.length > 0) {
+          query = query.in('plant_id', authPlants)
+        } else {
+          query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+        }
+      }
+
+      const { data: eData } = await query
+      setExecutions(eData || [])
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handlePrint = () => {
@@ -289,14 +438,27 @@ export default function AuditoriaRealizadas() {
                         )}
                       </TableCell>
                       <TableCell className="text-right print:hidden">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openView(exec)}
-                          className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
-                        >
-                          <Eye className="w-4 h-4 mr-2" /> Detalhes
-                        </Button>
+                        <div className="flex justify-end gap-2 items-center">
+                          {(profile.role === 'Administrador' || profile.role === 'Master') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleForceGenerate(exec)}
+                              title="Forçar Geração de Tarefa"
+                              className="text-slate-500 hover:text-brand-deepBlue px-2"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openView(exec)}
+                            className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
+                          >
+                            <Eye className="w-4 h-4 mr-2" /> Detalhes
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
