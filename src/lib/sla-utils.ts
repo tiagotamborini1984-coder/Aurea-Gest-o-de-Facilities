@@ -93,11 +93,14 @@ export function calculateSLA(task: any, currentStatus?: any, nonWorkingDays: str
     remainingSecs = slaSecs - elapsedSecs
   }
 
-  const percentage = slaSecs > 0 ? (elapsedSecs / slaSecs) * 100 : 100
+  let percentage = slaSecs > 0 ? (elapsedSecs / slaSecs) * 100 : 100
   let color = 'bg-green-100 text-green-800 border-green-200'
 
-  if (percentage >= 100) {
+  const isLate = remainingSecs < 0
+
+  if (isLate || percentage >= 100) {
     color = 'bg-red-100 text-red-800 border-red-300 shadow-sm'
+    percentage = 100
   } else if (percentage >= 80) {
     color = 'bg-amber-100 text-amber-800 border-amber-300'
   }
@@ -117,7 +120,6 @@ export function calculateSLA(task: any, currentStatus?: any, nonWorkingDays: str
     timeText = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
   }
 
-  const isLate = remainingSecs < 0
   const text = isLate ? `-${timeText}` : timeText
 
   return { text, color, percentage, isLate }
