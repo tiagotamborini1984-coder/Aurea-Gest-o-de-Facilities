@@ -1,11 +1,3 @@
 {
-  "_versions": {
-    "create-user": 5,
-    "email-reports": 2,
-    "package-notifications": 2,
-    "update-user-password": 2,
-    "delete-user": 1,
-    "process-recurring-audits": 5,
-    "process-preventive-maintenance": 1
-  }
+  "_versions": {}
 }
