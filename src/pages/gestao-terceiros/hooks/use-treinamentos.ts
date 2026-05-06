@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/components/ui/use-toast'
-import { format, addMonths, isBefore, parseISO } from 'date-fns'
+import { format, addMonths, isBefore, parseISO, isValid } from 'date-fns'
 
 export type EmployeeWithTrainings = {
   id: string
@@ -91,11 +91,16 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
               let expirationDate: string | undefined
 
               if (record) {
-                if (t.validity_months && t.validity_months > 0) {
-                  const expDate = addMonths(parseISO(record.completion_date), t.validity_months)
-                  expirationDate = format(expDate, 'yyyy-MM-dd')
-                  if (isBefore(expDate, new Date())) {
-                    status = 'expired'
+                if (t.validity_months && t.validity_months > 0 && record.completion_date) {
+                  const parsedCompDate = parseISO(record.completion_date)
+                  if (isValid(parsedCompDate)) {
+                    const expDate = addMonths(parsedCompDate, t.validity_months)
+                    expirationDate = format(expDate, 'yyyy-MM-dd')
+                    if (isBefore(expDate, new Date())) {
+                      status = 'expired'
+                    } else {
+                      status = 'valid'
+                    }
                   } else {
                     status = 'valid'
                   }

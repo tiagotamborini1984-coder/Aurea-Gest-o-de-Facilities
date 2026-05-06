@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { FileText, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, isValid } from 'date-fns'
 
 export function TreinamentosList({
   data,
@@ -112,8 +112,11 @@ export function TreinamentosList({
                               </span>
                               {t.completion_date ? (
                                 <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                  Realizado em: {format(parseISO(t.completion_date), 'dd/MM/yyyy')}
-                                  {t.expiration_date && (
+                                  Realizado em:{' '}
+                                  {isValid(parseISO(t.completion_date))
+                                    ? format(parseISO(t.completion_date), 'dd/MM/yyyy')
+                                    : 'Data inválida'}
+                                  {t.expiration_date && isValid(parseISO(t.expiration_date)) && (
                                     <>
                                       <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
                                       Vence em: {format(parseISO(t.expiration_date), 'dd/MM/yyyy')}
