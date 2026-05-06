@@ -65,10 +65,13 @@ export default function Lancamentos() {
   }, [plants, plantId])
 
   const availableCompanies = useMemo(() => {
-    if (!plantId) return []
-    const emps = employees.filter((e) => e.plant_id === plantId)
+    if (!plantId || !date) return []
+    const currentRefMonth = `${date.substring(0, 7)}-01`
+    const emps = employees.filter(
+      (e) => e.plant_id === plantId && e.reference_month === currentRefMonth,
+    )
     return Array.from(new Set(emps.map((e) => e.company_name).filter(Boolean))).sort()
-  }, [employees, plantId])
+  }, [employees, plantId, date])
 
   useEffect(() => {
     if (activeTab === 'staff' && availableCompanies.length > 0) {
@@ -193,9 +196,15 @@ export default function Lancamentos() {
           })
         }
       } else {
+        const currentRefMonth = `${date.substring(0, 7)}-01`
         const list =
           activeTab === 'staff'
-            ? employees.filter((e) => e.plant_id === plantId && e.company_name === selectedCompany)
+            ? employees.filter(
+                (e) =>
+                  e.plant_id === plantId &&
+                  e.company_name === selectedCompany &&
+                  e.reference_month === currentRefMonth,
+              )
             : equipment.filter((e) => e.plant_id === plantId)
 
         const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
@@ -238,10 +247,12 @@ export default function Lancamentos() {
         return { filteredData: [], groupedData: {}, equipmentTypes: eqTypes, summary: null }
       }
 
+      const currentRefMonth = `${date.substring(0, 7)}-01`
       const filtered = employees.filter(
         (e) =>
           e.plant_id === plantId &&
           e.company_name === selectedCompany &&
+          e.reference_month === currentRefMonth &&
           e.name.toLowerCase().includes(searchLower),
       )
       const grouped = filtered.reduce(
@@ -321,6 +332,7 @@ export default function Lancamentos() {
     equipmentFilter,
     goalFilter,
     selectedCompany,
+    date,
   ])
 
   const CustomCheckbox = ({
