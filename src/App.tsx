@@ -4,6 +4,7 @@ import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import DashboardGestor from './pages/gestao-terceiros/DashboardGestor'
 import Lancamentos from './pages/gestao-terceiros/Lancamentos'
+import Treinamentos from './pages/gestao-terceiros/Treinamentos'
 import Cadastros from './pages/gestao-terceiros/Cadastros'
 import Relatorios from './pages/gestao-terceiros/Relatorios'
 import Encomendas from './pages/gestao-terceiros/Encomendas'
@@ -103,6 +104,7 @@ const App = () => (
                     <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
                     <Route path="/gestao-terceiros" element={<DashboardGestor />} />
                     <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
+                    <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
 
                     {/* Limpeza e Jardinagem */}
                     <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />

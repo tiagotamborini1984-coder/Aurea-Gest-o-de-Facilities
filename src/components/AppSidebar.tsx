@@ -51,6 +51,7 @@ export function AppSidebar() {
       subItems: [
         { title: 'Dashboard Gestor', path: '/gestao-terceiros' },
         { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
+        { title: 'Treinamentos', path: '/gestao-terceiros/treinamentos' },
         { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
         { title: 'BI Dashboard', path: '/gestao-terceiros/bi' },
         { title: 'Email Reports', path: '/gestao-terceiros/email-reports' },
@@ -229,6 +230,7 @@ export function AppSidebar() {
           'Book de Metas',
           'Gestão de Acidentes',
           'Gestão da Manutenção',
+          'Treinamentos',
         ]
       }
 
@@ -294,7 +296,9 @@ export function AppSidebar() {
               userMenus.includes(`Auditoria e Checklist:${sub.title}`),
           )
         } else if (item.title === 'Gestão de Terceiros') {
-          filteredSubItems = item.subItems.filter((sub) => userMenus.includes(sub.title))
+          filteredSubItems = item.subItems.filter(
+            (sub) => userMenus.includes(sub.title) || sub.title === 'Treinamentos',
+          )
         }
 
         return { ...item, subItems: filteredSubItems }
