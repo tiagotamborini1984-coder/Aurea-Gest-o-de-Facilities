@@ -111,12 +111,23 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
                 status = 'pending'
               }
 
+              let docUrl = record?.document_url
+              if (docUrl && !docUrl.startsWith('http') && !docUrl.startsWith('blob:')) {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+                const cleanPath = docUrl.startsWith('/') ? docUrl.slice(1) : docUrl
+                if (!cleanPath.includes('storage/v1/object/public')) {
+                  docUrl = `${supabaseUrl}/storage/v1/object/public/${cleanPath}`
+                } else {
+                  docUrl = `${supabaseUrl}/${cleanPath}`
+                }
+              }
+
               return {
                 id: t.id,
                 name: t.name,
                 status,
                 completion_date: record?.completion_date,
-                document_url: record?.document_url,
+                document_url: docUrl,
                 expiration_date: expirationDate,
                 is_required: isRequired,
               }
