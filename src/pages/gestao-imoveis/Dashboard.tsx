@@ -202,15 +202,20 @@ export default function DashboardImoveis() {
     })
 
     filteredRes.forEach((r) => {
-      totalFaturamento += Number(r.total_amount || 0)
-
-      // Calculate exact occupied days within the selected period
       const resStart = parseISO(r.check_in_date)
       const resEnd = parseISO(r.check_out_date)
+
+      const totalResNights = Math.max(1, differenceInDays(resEnd, resStart))
+      const amountPerNight = Number(r.total_amount || 0) / totalResNights
+
+      // Calculate exact occupied days within the selected period
       const validStart = max([resStart, periodStart])
       const validEnd = min([resEnd, periodEnd])
 
       const occupiedNights = Math.max(0, differenceInDays(validEnd, validStart))
+      const periodFaturamento = amountPerNight * occupiedNights
+
+      totalFaturamento += periodFaturamento
       totalOccupiedNights += occupiedNights
 
       const propCity = Array.isArray(r.properties) ? r.properties[0]?.city : r.properties?.city
@@ -218,7 +223,7 @@ export default function DashboardImoveis() {
       const city = propCity || 'Outros'
 
       if (cityStats[city]) {
-        cityStats[city].faturamento += Number(r.total_amount || 0)
+        cityStats[city].faturamento += periodFaturamento
         cityStats[city].occupiedNights += occupiedNights
       }
 
@@ -237,7 +242,7 @@ export default function DashboardImoveis() {
 
       // Dynamic Chart Stats
       const chartKey = isShowingProperties ? propName || 'Desconhecido' : city
-      chartStats[chartKey] = (chartStats[chartKey] || 0) + Number(r.total_amount || 0)
+      chartStats[chartKey] = (chartStats[chartKey] || 0) + periodFaturamento
     })
 
     // Set Main Metrics
