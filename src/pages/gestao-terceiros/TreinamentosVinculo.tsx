@@ -215,7 +215,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                 disabled={record.is_required}
               >
                 <SelectTrigger
-                  className="bg-background"
+                  className="bg-background h-auto min-h-10 py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full"
                   title={
                     trainings.find((t) => t.id === record.training_id)?.name ||
                     'Selecione o treinamento...'
@@ -225,7 +225,12 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                 </SelectTrigger>
                 <SelectContent>
                   {trainings.map((t) => (
-                    <SelectItem key={t.id} value={t.id} title={t.name}>
+                    <SelectItem
+                      key={t.id}
+                      value={t.id}
+                      title={t.name}
+                      className="whitespace-normal break-words pr-8"
+                    >
                       {t.name}
                     </SelectItem>
                   ))}
@@ -404,7 +409,7 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
                 onValueChange={(val) => updateRecord(index, 'training_id', val)}
               >
                 <SelectTrigger
-                  className="bg-background"
+                  className="bg-background h-auto min-h-10 py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full"
                   title={
                     trainings.find((t) => t.id === record.training_id)?.name ||
                     'Selecione o treinamento...'
@@ -414,7 +419,12 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
                 </SelectTrigger>
                 <SelectContent>
                   {trainings.map((t) => (
-                    <SelectItem key={t.id} value={t.id} title={t.name}>
+                    <SelectItem
+                      key={t.id}
+                      value={t.id}
+                      title={t.name}
+                      className="whitespace-normal break-words pr-8"
+                    >
                       {t.name}
                     </SelectItem>
                   ))}

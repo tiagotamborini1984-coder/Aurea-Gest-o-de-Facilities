@@ -100,7 +100,7 @@ export function TreinamentosList({
                           >
                             <div className="flex flex-col gap-1 flex-1 min-w-0 w-full pr-0 sm:pr-4">
                               <div className="font-medium flex flex-wrap items-start sm:items-center gap-2 text-foreground">
-                                <span className="break-words line-clamp-2" title={t.name}>
+                                <span className="break-words" title={t.name}>
                                   {t.name}
                                 </span>
                                 {t.is_required && (
