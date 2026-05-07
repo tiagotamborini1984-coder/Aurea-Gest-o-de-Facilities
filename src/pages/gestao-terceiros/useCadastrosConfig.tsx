@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Building2, MapPin, Wrench, Target, GraduationCap, Building } from 'lucide-react'
+import { Building2, MapPin, Wrench, Target, GraduationCap, Building, Users } from 'lucide-react'
 
 export function useCadastrosConfig(
   type: string | undefined,
@@ -17,6 +17,53 @@ export function useCadastrosConfig(
     const equipmentOptions = equipment.map((e) => ({ value: e.id, label: e.name }))
 
     switch (type) {
+      case 'colaboradores':
+        return {
+          title: 'Colaboradores',
+          singularName: 'Colaborador',
+          subtitle: 'Cadastro de equipe e terceiros',
+          icon: Users,
+          tableName: 'employees',
+          plantField: 'plant_id',
+          searchFields: ['name', 'company_name'],
+          columns: [
+            { header: 'Nome', accessor: 'name' },
+            { header: 'Empresa', accessor: 'company_name' },
+            {
+              header: 'Função',
+              accessor: 'function_id',
+              render: (item: any) =>
+                functions.find((f: any) => f.id === item.function_id)?.name || '-',
+            },
+            {
+              header: 'Planta',
+              accessor: 'plant_id',
+              render: (item: any) => plants.find((p: any) => p.id === item.plant_id)?.name || '-',
+            },
+          ],
+          fields: [
+            { name: 'name', label: 'Nome do Colaborador', type: 'text' },
+            { name: 'company_name', label: 'Empresa / Terceiro', type: 'text' },
+            {
+              name: 'function_id',
+              label: 'Função',
+              type: 'select',
+              options: functionOptions,
+              required: false,
+            },
+            { name: 'plant_id', label: 'Planta', type: 'select', options: plantOptions },
+            {
+              name: 'location_id',
+              label: 'Local (Opcional)',
+              type: 'select',
+              options: (form: any) =>
+                locations
+                  .filter((l: any) => !form.plant_id || l.plant_id === form.plant_id)
+                  .map((l: any) => ({ value: l.id, label: l.name })),
+              required: false,
+            },
+          ],
+        }
       case 'empresas':
         return {
           title: 'Empresas Parceiras',

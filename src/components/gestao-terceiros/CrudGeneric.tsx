@@ -69,6 +69,7 @@ export function CrudGeneric({
   searchFields,
   groupBy,
   plants,
+  canAdd,
 }: any) {
   const { activeClient } = useAppStore()
   const [data, setData] = useState<any[]>([])
@@ -247,9 +248,11 @@ export function CrudGeneric({
           <h2 className="text-3xl font-bold tracking-tight text-brand-graphite">{title}</h2>
           {subtitle && <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>}
         </div>
-        <Button onClick={openAdd} variant="tech" className="shadow-sm">
-          <Plus className="w-4 h-4 mr-2" /> Novo Registro
-        </Button>
+        {canAdd !== false && (
+          <Button onClick={openAdd} variant="tech" className="shadow-sm">
+            <Plus className="w-4 h-4 mr-2" /> Novo Registro
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-gray-100">

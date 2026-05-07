@@ -7,7 +7,6 @@ import { useHasAccess } from '@/hooks/use-has-access'
 import { useCadastrosConfig } from './useCadastrosConfig'
 import QuadroContratado from './QuadroContratado'
 import CadastrosFuncoes from './CadastrosFuncoes'
-import CadastrosColaboradores from './CadastrosColaboradores'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -41,17 +40,6 @@ export default function Cadastros() {
       <QuadroContratado canAdd={true} hasAccess={hasAccess} plants={plants} locations={locations} />
     )
   if (type === 'funcoes') return <CadastrosFuncoes canAdd={true} hasAccess={hasAccess} />
-  if (type === 'colaboradores')
-    return (
-      <CadastrosColaboradores
-        canAdd={true}
-        hasAccess={hasAccess}
-        plants={plants}
-        locations={locations}
-        functions={functions}
-        equipment={equipment}
-      />
-    )
 
   // Para o CRUD genérico, validamos o acesso na rota
   if (!config) return <Navigate to="/gestao-terceiros" replace />
