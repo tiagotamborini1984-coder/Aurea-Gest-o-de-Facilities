@@ -23,14 +23,14 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
   const { toast } = useToast()
 
   useEffect(() => {
-    if (!activeClient) return
-    supabase
-      .from('trainings')
-      .select('*')
-      .eq('client_id', activeClient.id)
-      .then(({ data }) => {
-        if (data) setTrainings(data)
-      })
+    if (!activeClient)
+      return supabase
+        .from('trainings')
+        .select('*')
+        .eq('client_id', activeClient.id)
+        .then(({ data }) => {
+          if (data) setTrainings(data)
+        })
   }, [activeClient])
 
   useEffect(() => {
@@ -204,7 +204,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
             key={index}
             className="grid grid-cols-12 gap-3 items-end bg-muted/30 p-3 rounded-lg border border-border/50"
           >
-            <div className="col-span-12 md:col-span-4">
+            <div className="col-span-12 lg:col-span-5">
               <Label className="text-xs font-medium mb-1.5 block">
                 Treinamento{' '}
                 {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
@@ -214,12 +214,18 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                 onValueChange={(val) => updateRecord(index, 'training_id', val)}
                 disabled={record.is_required}
               >
-                <SelectTrigger className="bg-background">
+                <SelectTrigger
+                  className="bg-background"
+                  title={
+                    trainings.find((t) => t.id === record.training_id)?.name ||
+                    'Selecione o treinamento...'
+                  }
+                >
                   <SelectValue placeholder="Selecione o treinamento..." />
                 </SelectTrigger>
                 <SelectContent>
                   {trainings.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
+                    <SelectItem key={t.id} value={t.id} title={t.name}>
                       {t.name}
                     </SelectItem>
                   ))}
@@ -227,7 +233,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
               </Select>
             </div>
 
-            <div className="col-span-12 md:col-span-3">
+            <div className="col-span-12 sm:col-span-6 lg:col-span-3">
               <Label className="text-xs font-medium mb-1.5 block">
                 Data de Conclusão{' '}
                 {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
@@ -240,7 +246,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-4">
+            <div className="col-span-12 sm:col-span-5 lg:col-span-3">
               <Label className="text-xs font-medium mb-1.5 block">
                 Comprovante{' '}
                 {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
@@ -252,16 +258,17 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-2 text-sm text-brand-vividBlue hover:text-brand-deepBlue hover:underline truncate flex-1 font-medium"
+                    title="Ver documento anexado"
                   >
                     <FileText className="w-4 h-4 shrink-0" />
-                    <span className="truncate">Documento Anexado</span>
+                    <span className="truncate">Ver Anexo</span>
                   </a>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => updateRecord(index, 'document_url', '')}
-                    className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
                     title="Remover documento"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -277,7 +284,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
               )}
             </div>
 
-            <div className="col-span-12 md:col-span-1 flex justify-end pb-1">
+            <div className="col-span-12 sm:col-span-1 lg:col-span-1 flex sm:justify-end pb-1">
               {!record.is_required && (
                 <Button
                   type="button"
@@ -305,14 +312,14 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
   const { activeClient } = useAppStore()
 
   useEffect(() => {
-    if (!activeClient) return
-    supabase
-      .from('trainings')
-      .select('*')
-      .eq('client_id', activeClient.id)
-      .then(({ data }) => {
-        if (data) setTrainings(data)
-      })
+    if (!activeClient)
+      return supabase
+        .from('trainings')
+        .select('*')
+        .eq('client_id', activeClient.id)
+        .then(({ data }) => {
+          if (data) setTrainings(data)
+        })
   }, [activeClient])
 
   useEffect(() => {
@@ -390,18 +397,24 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
             key={index}
             className="flex gap-4 items-end bg-muted/30 p-3 rounded-lg border border-border/50"
           >
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <Label className="text-xs font-medium mb-1.5 block">Treinamento</Label>
               <Select
                 value={record.training_id}
                 onValueChange={(val) => updateRecord(index, 'training_id', val)}
               >
-                <SelectTrigger className="bg-background">
+                <SelectTrigger
+                  className="bg-background"
+                  title={
+                    trainings.find((t) => t.id === record.training_id)?.name ||
+                    'Selecione o treinamento...'
+                  }
+                >
                   <SelectValue placeholder="Selecione o treinamento..." />
                 </SelectTrigger>
                 <SelectContent>
                   {trainings.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
+                    <SelectItem key={t.id} value={t.id} title={t.name}>
                       {t.name}
                     </SelectItem>
                   ))}
