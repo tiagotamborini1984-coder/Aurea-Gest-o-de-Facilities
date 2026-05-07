@@ -151,13 +151,23 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!activeClient?.id) {
+      toast({ title: 'Erro', description: 'Cliente não selecionado.', variant: 'destructive' })
+      return
+    }
+
     const fileExt = file.name.split('.').pop()
-    const fileName = `${Math.random()}.${fileExt}`
-    const filePath = `${activeClient?.id}/trainings/${fileName}`
+    const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+    const filePath = `${activeClient.id}/trainings/${fileName}`
 
     toast({ title: 'Fazendo upload...', description: 'Aguarde o carregamento do documento.' })
 
-    const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file)
+    const { error: uploadError } = await supabase.storage
+      .from('training-documents')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+      })
 
     if (uploadError) {
       toast({
@@ -168,7 +178,9 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
       return
     }
 
-    const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath)
+    const { data: publicUrlData } = supabase.storage
+      .from('training-documents')
+      .getPublicUrl(filePath)
     updateRecord(index, 'document_url', publicUrlData.publicUrl)
     toast({ title: 'Sucesso', description: 'Documento anexado com sucesso.' })
   }
