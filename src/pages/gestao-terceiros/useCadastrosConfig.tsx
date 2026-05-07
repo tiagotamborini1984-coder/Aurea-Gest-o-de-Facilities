@@ -26,6 +26,7 @@ export function useCadastrosConfig(
           tableName: 'employees',
           plantField: 'plant_id',
           searchFields: ['name', 'company_name'],
+          hasMonthFilter: true,
           columns: [
             { header: 'Nome', accessor: 'name' },
             { header: 'Empresa', accessor: 'company_name' },

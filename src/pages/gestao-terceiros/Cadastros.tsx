@@ -4,14 +4,43 @@ import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { useState, useMemo } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Copy } from 'lucide-react'
 import { useCadastrosConfig } from './useCadastrosConfig'
 import QuadroContratado from './QuadroContratado'
 import CadastrosFuncoes from './CadastrosFuncoes'
+import { DuplicateHeadcountDialog } from '@/components/gestao-terceiros/DuplicateHeadcountDialog'
 
 export default function Cadastros() {
   const { type } = useParams()
   const { plants, locations, functions, equipment, refetch } = useMasterData()
   const { profile, selectedMasterClient } = useAppStore()
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const today = new Date()
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false)
+
+  const monthOptions = useMemo(() => {
+    const options = []
+    const today = new Date()
+    for (let i = -12; i <= 12; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1)
+      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      options.push({ value: val, label: label.charAt(0).toUpperCase() + label.slice(1) })
+    }
+    return options
+  }, [])
 
   const config = useCadastrosConfig(type, plants, locations, functions, equipment)
 
@@ -48,7 +77,7 @@ export default function Cadastros() {
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
       <CrudGeneric
-        key={`${type}-${selectedMasterClient}`}
+        key={`${type}-${selectedMasterClient}-${selectedMonth}`}
         canAdd={true}
         hasAccess={hasAccess}
         title={config.title}
@@ -61,11 +90,36 @@ export default function Cadastros() {
         searchFields={config.searchFields}
         plantField={config.plantField}
         plants={plants}
+        extraActions={
+          config.hasMonthFilter ? (
+            <>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[180px] bg-white">
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={() => setIsDuplicateOpen(true)}>
+                <Copy className="w-4 h-4 mr-2" /> Duplicar Mês
+              </Button>
+            </>
+          ) : null
+        }
         fetchQuery={async () => {
           let q = supabase
             .from(config.tableName)
             .select('*')
             .order('created_at', { ascending: false })
+
+          if (config.hasMonthFilter) {
+            q = q.eq('reference_month', `${selectedMonth}-01`)
+          }
 
           if (profile.role === 'Master') {
             if (selectedMasterClient !== 'all') {
@@ -87,6 +141,10 @@ export default function Cadastros() {
                 : profile.client_id
 
           const payload = { ...record, client_id: targetClientId }
+
+          if (config.hasMonthFilter) {
+            payload.reference_month = `${selectedMonth}-01`
+          }
 
           if (payload.is_active === undefined && config.tableName === 'goals_book') {
             payload.is_active = false
@@ -112,6 +170,26 @@ export default function Cadastros() {
           refetch()
         }}
       />
+
+      {config.hasMonthFilter && (
+        <DuplicateHeadcountDialog
+          open={isDuplicateOpen}
+          onOpenChange={setIsDuplicateOpen}
+          clientId={
+            profile.role === 'Master' && selectedMasterClient !== 'all'
+              ? selectedMasterClient
+              : profile.client_id
+          }
+          monthOptions={monthOptions}
+          defaultSource={selectedMonth}
+          defaultTarget={selectedMonth}
+          tableName={config.tableName}
+          onSuccess={(targetMonth: string) => {
+            setSelectedMonth(targetMonth)
+            refetch()
+          }}
+        />
+      )}
     </div>
   )
 }
