@@ -113,12 +113,16 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
 
               let docUrl = record?.document_url
               if (docUrl && !docUrl.startsWith('http') && !docUrl.startsWith('blob:')) {
-                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-                const cleanPath = docUrl.startsWith('/') ? docUrl.slice(1) : docUrl
-                if (!cleanPath.includes('storage/v1/object/public')) {
-                  docUrl = `${supabaseUrl}/storage/v1/object/public/${cleanPath}`
-                } else {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+                let cleanPath = docUrl.startsWith('/') ? docUrl.slice(1) : docUrl
+
+                if (cleanPath.includes('storage/v1/object/public/')) {
                   docUrl = `${supabaseUrl}/${cleanPath}`
+                } else {
+                  if (!cleanPath.startsWith('training-documents/')) {
+                    cleanPath = `training-documents/${cleanPath}`
+                  }
+                  docUrl = `${supabaseUrl}/storage/v1/object/public/${cleanPath}`
                 }
               }
 
