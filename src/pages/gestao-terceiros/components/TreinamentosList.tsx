@@ -96,29 +96,32 @@ export function TreinamentosList({
                         {emp.trainings.map((t) => (
                           <div
                             key={t.id}
-                            className="flex items-center justify-between bg-muted/30 p-3 rounded-lg border border-border/50 text-sm hover:bg-muted/50 transition-colors"
+                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-muted/30 p-3 rounded-lg border border-border/50 text-sm hover:bg-muted/50 transition-colors gap-3 sm:gap-4"
                           >
-                            <div className="flex flex-col gap-1">
-                              <span className="font-medium flex items-center gap-2 text-foreground">
-                                {t.name}
+                            <div className="flex flex-col gap-1 flex-1 min-w-0 w-full pr-0 sm:pr-4">
+                              <div className="font-medium flex flex-wrap items-start sm:items-center gap-2 text-foreground">
+                                <span className="break-words line-clamp-2" title={t.name}>
+                                  {t.name}
+                                </span>
                                 {t.is_required && (
                                   <Badge
                                     variant="secondary"
-                                    className="text-[10px] h-4.5 px-1.5 font-medium"
+                                    className="text-[10px] h-4.5 px-1.5 font-medium shrink-0 whitespace-nowrap mt-0.5 sm:mt-0"
                                   >
                                     Obrigatório
                                   </Badge>
                                 )}
-                              </span>
+                              </div>
                               {t.completion_date ? (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
                                   Realizado em:{' '}
                                   {isValid(parseISO(t.completion_date))
                                     ? format(parseISO(t.completion_date), 'dd/MM/yyyy')
                                     : 'Data inválida'}
                                   {t.expiration_date && isValid(parseISO(t.expiration_date)) && (
                                     <>
-                                      <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                                      <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-muted-foreground/30" />
+                                      <span className="sm:hidden">|</span>
                                       Vence em: {format(parseISO(t.expiration_date), 'dd/MM/yyyy')}
                                     </>
                                   )}
@@ -129,7 +132,7 @@ export function TreinamentosList({
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end shrink-0 border-t sm:border-0 border-border/50 pt-2 sm:pt-0 mt-1 sm:mt-0">
                               {t.status === 'valid' && (
                                 <span className="text-green-600 font-semibold text-xs tracking-wide uppercase">
                                   Válido
