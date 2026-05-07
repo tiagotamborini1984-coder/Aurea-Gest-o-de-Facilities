@@ -143,6 +143,21 @@ export default function Cadastros() {
           return data
         }}
         onAdd={async (record: any) => {
+          if (type === 'colaboradores' && record.training_records) {
+            const missingRequired = record.training_records.some(
+              (tr: any) => tr.is_required && (!tr.document_url || !tr.completion_date),
+            )
+            if (missingRequired) {
+              return {
+                success: false,
+                error: {
+                  message:
+                    'É obrigatório informar a data de conclusão e anexar o comprovante para os treinamentos exigidos pela função.',
+                },
+              }
+            }
+          }
+
           const targetClientId =
             config.plantField && record.plant_id
               ? plants.find((p: any) => p.id === record.plant_id)?.client_id || profile.client_id
@@ -195,6 +210,21 @@ export default function Cadastros() {
           return { success: false, error }
         }}
         onUpdate={async (id: string, record: any) => {
+          if (type === 'colaboradores' && record.training_records) {
+            const missingRequired = record.training_records.some(
+              (tr: any) => tr.is_required && (!tr.document_url || !tr.completion_date),
+            )
+            if (missingRequired) {
+              return {
+                success: false,
+                error: {
+                  message:
+                    'É obrigatório informar a data de conclusão e anexar o comprovante para os treinamentos exigidos pela função.',
+                },
+              }
+            }
+          }
+
           const { training_records, ...rest } = record
           const payload = { ...rest }
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)

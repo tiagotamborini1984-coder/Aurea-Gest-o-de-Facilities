@@ -1,233 +1,426 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Loader2 } from 'lucide-react'
+import { Trash2, Plus, FileText } from 'lucide-react'
+import { useAppStore } from '@/store/AppContext'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useToast } from '@/components/ui/use-toast'
 
-export function EmployeeTrainingsForm({ form, setForm }: { form: any; setForm: any }) {
-  const [loading, setLoading] = useState(false)
-  const [requiredTrainings, setRequiredTrainings] = useState<any[]>([])
+export function EmployeeTrainingsForm({ form, setForm }: any) {
+  const [trainings, setTrainings] = useState<any[]>([])
+  const [, setRequiredTrainings] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const { activeClient } = useAppStore()
+  const { toast } = useToast()
 
   useEffect(() => {
-    async function loadData() {
+    if (!activeClient) return
+    supabase
+      .from('trainings')
+      .select('*')
+      .eq('client_id', activeClient.id)
+      .then(({ data }) => {
+        if (data) setTrainings(data)
+      })
+  }, [activeClient])
+
+  useEffect(() => {
+    async function loadSavedRecords() {
+      if (form.id && !isInitialized) {
+        setIsLoading(true)
+        const { data } = await supabase
+          .from('employee_training_records')
+          .select('*')
+          .eq('employee_id', form.id)
+
+        if (data) {
+          const records = data.map((d) => ({
+            training_id: d.training_id,
+            completion_date: d.completion_date,
+            document_url: d.document_url,
+            is_required: false,
+          }))
+          setForm((prev: any) => ({ ...prev, training_records: records }))
+        }
+        setIsInitialized(true)
+        setIsLoading(false)
+      } else if (!form.id && !isInitialized) {
+        setIsInitialized(true)
+      }
+    }
+    loadSavedRecords()
+  }, [form.id, isInitialized, setForm])
+
+  useEffect(() => {
+    async function loadRequired() {
       if (!form.function_id) {
         setRequiredTrainings([])
-        setForm((prev: any) => ({ ...prev, training_records: [] }))
+        setForm((prev: any) => {
+          if (prev.training_records) {
+            const updated = prev.training_records.map((r: any) => ({ ...r, is_required: false }))
+            return { ...prev, training_records: updated }
+          }
+          return prev
+        })
         return
       }
 
-      setLoading(true)
-      try {
-        const { data: reqData } = await supabase
-          .from('function_required_trainings')
-          .select(`
-            training_id,
-            trainings ( id, name, validity_months )
-          `)
-          .eq('function_id', form.function_id)
+      const { data } = await supabase
+        .from('function_required_trainings')
+        .select('training_id')
+        .eq('function_id', form.function_id)
 
-        const required = reqData?.map((r) => r.trainings) || []
+      if (data) {
+        const reqIds = data.map((d) => d.training_id)
+        setRequiredTrainings(reqIds)
 
-        let existingRecords: any[] = []
-        if (form.id) {
-          const { data: recData } = await supabase
-            .from('employee_training_records')
-            .select('*')
-            .eq('employee_id', form.id)
-          existingRecords = recData || []
-        }
+        setForm((prev: any) => {
+          const currentRecords = prev.training_records || []
+          const newRecords = [...currentRecords]
+          let changed = false
 
-        const initialRecords = required.map((t: any) => {
-          const existing = existingRecords.find((r) => r.training_id === t.id)
-          return {
-            training_id: t.id,
-            name: t.name,
-            validity_months: t.validity_months,
-            document_url: existing?.document_url || '',
-            completion_date: existing?.completion_date || '',
-            completed: !!existing,
+          newRecords.forEach((r) => {
+            const isReq = reqIds.includes(r.training_id)
+            if (r.is_required !== isReq) {
+              r.is_required = isReq
+              changed = true
+            }
+          })
+
+          reqIds.forEach((reqId) => {
+            if (!newRecords.find((r) => r.training_id === reqId)) {
+              newRecords.push({
+                training_id: reqId,
+                completion_date: '',
+                document_url: '',
+                is_required: true,
+              })
+              changed = true
+            }
+          })
+
+          if (changed) {
+            return { ...prev, training_records: newRecords }
           }
+          return prev
         })
-
-        setRequiredTrainings(initialRecords)
-
-        const validRecords = initialRecords.filter((r) => r.completed)
-        setForm((prev: any) => ({ ...prev, training_records: validRecords }))
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
       }
     }
 
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.function_id, form.id])
+    if (isInitialized) {
+      loadRequired()
+    }
+  }, [form.function_id, isInitialized, setForm])
 
-  const handleUpdate = (index: number, field: string, value: any) => {
-    const updated = [...requiredTrainings]
-    updated[index] = { ...updated[index], [field]: value }
-    setRequiredTrainings(updated)
+  const records = form.training_records || []
 
-    const validRecords = updated
-      .filter((r) => r.completed)
-      .map((r) => ({
-        training_id: r.training_id,
-        document_url: r.document_url,
-        completion_date: r.completion_date,
-      }))
-    setForm((prev: any) => ({ ...prev, training_records: validRecords }))
+  const addRecord = () => {
+    setForm({
+      ...form,
+      training_records: [
+        ...records,
+        { training_id: '', completion_date: '', document_url: '', is_required: false },
+      ],
+    })
   }
 
-  if (!form.function_id) return null
+  const updateRecord = (index: number, field: string, value: any) => {
+    const newRecords = [...records]
+    newRecords[index][field] = value
+    setForm({ ...form, training_records: newRecords })
+  }
+
+  const removeRecord = (index: number) => {
+    const newRecords = [...records]
+    newRecords.splice(index, 1)
+    setForm({ ...form, training_records: newRecords })
+  }
+
+  const handleFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random()}.${fileExt}`
+    const filePath = `${activeClient?.id}/trainings/${fileName}`
+
+    toast({ title: 'Fazendo upload...', description: 'Aguarde o carregamento do documento.' })
+
+    const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file)
+
+    if (uploadError) {
+      toast({
+        title: 'Erro ao fazer upload',
+        description: uploadError.message,
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath)
+    updateRecord(index, 'document_url', publicUrlData.publicUrl)
+    toast({ title: 'Sucesso', description: 'Documento anexado com sucesso.' })
+  }
+
+  if (isLoading)
+    return (
+      <div className="p-4 text-sm text-muted-foreground animate-pulse">
+        Carregando treinamentos...
+      </div>
+    )
 
   return (
-    <div className="col-span-1 sm:col-span-2 pt-4 border-t mt-2">
-      <h3 className="text-sm font-semibold text-slate-800 mb-4">
-        Treinamentos Obrigatórios da Função
-      </h3>
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando treinamentos...
+    <div className="space-y-4 border-t pt-4 mt-4 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+        <div>
+          <Label className="text-base font-semibold">Treinamentos do Colaborador</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Treinamentos obrigatórios da função serão adicionados automaticamente.
+          </p>
         </div>
-      ) : requiredTrainings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Nenhum treinamento obrigatório vinculado a esta função.
-        </p>
-      ) : (
-        <div className="space-y-4">
-          {requiredTrainings.map((tr, idx) => (
-            <div
-              key={tr.training_id}
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 border rounded-lg bg-slate-50/50"
-            >
-              <div className="flex items-center gap-3 w-full sm:w-1/3">
-                <Checkbox
-                  checked={tr.completed}
-                  onCheckedChange={(val) => handleUpdate(idx, 'completed', val)}
-                />
-                <div>
-                  <p className="text-sm font-medium">{tr.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {tr.validity_months ? `Validade: ${tr.validity_months} meses` : 'Sem validade'}
-                  </p>
-                </div>
-              </div>
+        <Button type="button" variant="outline" size="sm" onClick={addRecord}>
+          <Plus className="w-4 h-4 mr-2" /> Adicionar Treinamento
+        </Button>
+      </div>
 
-              {tr.completed && (
-                <div className="flex-1 flex flex-col sm:flex-row gap-3 w-full">
-                  <div className="w-full sm:w-1/2">
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Data de Conclusão</Label>
-                    <Input
-                      type="date"
-                      value={tr.completion_date}
-                      onChange={(e) => handleUpdate(idx, 'completion_date', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="w-full sm:w-1/2">
-                    <Label className="text-xs text-slate-500 mb-1.5 block">
-                      URL do Certificado (Opcional)
-                    </Label>
-                    <Input
-                      type="text"
-                      placeholder="Link para o documento"
-                      value={tr.document_url}
-                      onChange={(e) => handleUpdate(idx, 'document_url', e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+      {records.length === 0 && (
+        <div className="p-4 bg-muted/50 rounded-lg border border-dashed text-sm text-muted-foreground text-center">
+          Nenhum treinamento vinculado.
         </div>
       )}
+
+      <div className="space-y-3">
+        {records.map((record: any, index: number) => (
+          <div
+            key={index}
+            className="grid grid-cols-12 gap-3 items-end bg-muted/30 p-3 rounded-lg border border-border/50"
+          >
+            <div className="col-span-12 md:col-span-4">
+              <Label className="text-xs font-medium mb-1.5 block">
+                Treinamento{' '}
+                {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
+              </Label>
+              <Select
+                value={record.training_id}
+                onValueChange={(val) => updateRecord(index, 'training_id', val)}
+                disabled={record.is_required}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Selecione o treinamento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {trainings.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-12 md:col-span-3">
+              <Label className="text-xs font-medium mb-1.5 block">
+                Data de Conclusão{' '}
+                {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
+              </Label>
+              <Input
+                type="date"
+                value={record.completion_date || ''}
+                onChange={(e) => updateRecord(index, 'completion_date', e.target.value)}
+                className="bg-background"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-4">
+              <Label className="text-xs font-medium mb-1.5 block">
+                Comprovante{' '}
+                {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
+              </Label>
+              {record.document_url ? (
+                <div className="flex items-center gap-2 h-10 px-3 bg-background border rounded-md">
+                  <a
+                    href={record.document_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 text-sm text-brand-vividBlue hover:text-brand-deepBlue hover:underline truncate flex-1 font-medium"
+                  >
+                    <FileText className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Documento Anexado</span>
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => updateRecord(index, 'document_url', '')}
+                    className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    title="Remover documento"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Input
+                  type="file"
+                  onChange={(e) => handleFileUpload(index, e)}
+                  className="bg-background file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-vividBlue/10 file:text-brand-vividBlue hover:file:bg-brand-vividBlue/20 cursor-pointer"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                />
+              )}
+            </div>
+
+            <div className="col-span-12 md:col-span-1 flex justify-end pb-1">
+              {!record.is_required && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeRecord(index)}
+                  className="text-muted-foreground hover:text-red-600 hover:bg-red-50 h-9 w-9"
+                  title="Remover treinamento"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-export function FunctionTrainingsForm({ form, setForm }: { form: any; setForm: any }) {
-  const [loading, setLoading] = useState(false)
-  const [allTrainings, setAllTrainings] = useState<any[]>([])
+export function FunctionTrainingsForm({ form, setForm }: any) {
+  const [trainings, setTrainings] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const { activeClient } = useAppStore()
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
-      try {
-        const { data: tData } = await supabase.from('trainings').select('id, name').order('name')
-        const trainingsList = tData || []
+    if (!activeClient) return
+    supabase
+      .from('trainings')
+      .select('*')
+      .eq('client_id', activeClient.id)
+      .then(({ data }) => {
+        if (data) setTrainings(data)
+      })
+  }, [activeClient])
 
-        let selectedIds: string[] = []
-        if (form.id) {
-          const { data: reqData } = await supabase
-            .from('function_required_trainings')
-            .select('training_id')
-            .eq('function_id', form.id)
-          selectedIds = reqData?.map((r) => r.training_id) || []
+  useEffect(() => {
+    async function loadSavedRecords() {
+      if (form.id && !isInitialized) {
+        setIsLoading(true)
+        const { data } = await supabase
+          .from('function_required_trainings')
+          .select('training_id')
+          .eq('function_id', form.id)
+
+        if (data) {
+          const records = data.map((d) => ({
+            training_id: d.training_id,
+          }))
+          setForm((prev: any) => ({ ...prev, training_records: records }))
         }
-
-        const initialized = trainingsList.map((t) => ({
-          ...t,
-          selected: selectedIds.includes(t.id),
-        }))
-
-        setAllTrainings(initialized)
-
-        const initialFormRecords = initialized
-          .filter((t) => t.selected)
-          .map((t) => ({ training_id: t.id }))
-        setForm((prev: any) => ({ ...prev, training_records: initialFormRecords }))
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
+        setIsInitialized(true)
+        setIsLoading(false)
+      } else if (!form.id && !isInitialized) {
+        setIsInitialized(true)
       }
     }
+    loadSavedRecords()
+  }, [form.id, isInitialized, setForm])
 
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.id])
+  const records = form.training_records || []
 
-  const toggleTraining = (id: string, checked: boolean) => {
-    const updated = allTrainings.map((t) => (t.id === id ? { ...t, selected: checked } : t))
-    setAllTrainings(updated)
-    const validRecords = updated.filter((t) => t.selected).map((t) => ({ training_id: t.id }))
-    setForm((prev: any) => ({ ...prev, training_records: validRecords }))
+  const addRecord = () => {
+    setForm({ ...form, training_records: [...records, { training_id: '' }] })
   }
 
+  const updateRecord = (index: number, field: string, value: any) => {
+    const newRecords = [...records]
+    newRecords[index][field] = value
+    setForm({ ...form, training_records: newRecords })
+  }
+
+  const removeRecord = (index: number) => {
+    const newRecords = [...records]
+    newRecords.splice(index, 1)
+    setForm({ ...form, training_records: newRecords })
+  }
+
+  if (isLoading)
+    return (
+      <div className="p-4 text-sm text-muted-foreground animate-pulse">
+        Carregando treinamentos...
+      </div>
+    )
+
   return (
-    <div className="col-span-1 sm:col-span-2 pt-4 border-t mt-2">
-      <h3 className="text-sm font-semibold text-slate-800 mb-4">Treinamentos Obrigatórios</h3>
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando treinamentos...
+    <div className="space-y-4 border-t pt-4 mt-4 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+        <div>
+          <Label className="text-base font-semibold">Treinamentos Obrigatórios da Função</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Todos os colaboradores associados a esta função precisarão realizar estes treinamentos.
+          </p>
         </div>
-      ) : allTrainings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum treinamento cadastrado no sistema.</p>
-      ) : (
-        <ScrollArea className="h-48 border rounded-md p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {allTrainings.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded-md transition-colors"
-              >
-                <Checkbox
-                  id={`tr-${t.id}`}
-                  checked={t.selected}
-                  onCheckedChange={(val) => toggleTraining(t.id, !!val)}
-                />
-                <label htmlFor={`tr-${t.id}`} className="text-sm font-medium cursor-pointer flex-1">
-                  {t.name}
-                </label>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+        <Button type="button" variant="outline" size="sm" onClick={addRecord}>
+          <Plus className="w-4 h-4 mr-2" /> Adicionar Treinamento
+        </Button>
+      </div>
+
+      {records.length === 0 && (
+        <div className="p-4 bg-muted/50 rounded-lg border border-dashed text-sm text-muted-foreground text-center">
+          Nenhum treinamento vinculado.
+        </div>
       )}
+
+      <div className="space-y-3">
+        {records.map((record: any, index: number) => (
+          <div
+            key={index}
+            className="flex gap-4 items-end bg-muted/30 p-3 rounded-lg border border-border/50"
+          >
+            <div className="flex-1">
+              <Label className="text-xs font-medium mb-1.5 block">Treinamento</Label>
+              <Select
+                value={record.training_id}
+                onValueChange={(val) => updateRecord(index, 'training_id', val)}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Selecione o treinamento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {trainings.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => removeRecord(index)}
+              className="text-muted-foreground hover:text-red-600 hover:bg-red-50 h-10 w-10 shrink-0 pb-1"
+              title="Remover treinamento"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
