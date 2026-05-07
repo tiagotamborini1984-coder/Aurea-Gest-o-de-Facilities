@@ -65,6 +65,27 @@ export function useCadastrosConfig(
             },
           ],
         }
+      case 'funcoes':
+        return {
+          title: 'Funções e Cargos',
+          singularName: 'Função',
+          subtitle: 'Gerencie as funções e associe treinamentos obrigatórios',
+          icon: Users,
+          tableName: 'functions',
+          searchFields: ['name', 'description'],
+          columns: [
+            { header: 'Nome da Função', accessor: 'name' },
+            {
+              header: 'Descrição',
+              accessor: 'description',
+              render: (item: any) => item.description || '-',
+            },
+          ],
+          fields: [
+            { name: 'name', label: 'Nome da Função', type: 'text' },
+            { name: 'description', label: 'Descrição', type: 'textarea', required: false },
+          ],
+        }
       case 'empresas':
         return {
           title: 'Empresas Parceiras',

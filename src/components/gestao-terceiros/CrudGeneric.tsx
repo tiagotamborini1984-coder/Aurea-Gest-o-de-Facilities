@@ -71,6 +71,7 @@ export function CrudGeneric({
   plants,
   canAdd,
   extraActions,
+  extraFormContent,
 }: any) {
   const { activeClient } = useAppStore()
   const [data, setData] = useState<any[]>([])
@@ -510,6 +511,7 @@ export function CrudGeneric({
                 )
               })}
             </div>
+            {extraFormContent && extraFormContent(form, setForm)}
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar

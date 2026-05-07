@@ -16,9 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Copy } from 'lucide-react'
 import { useCadastrosConfig } from './useCadastrosConfig'
 import QuadroContratado from './QuadroContratado'
-import CadastrosFuncoes from './CadastrosFuncoes'
-import CadastrosColaboradores from './CadastrosColaboradores'
 import { DuplicateHeadcountDialog } from '@/components/gestao-terceiros/DuplicateHeadcountDialog'
+import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -69,21 +68,20 @@ export default function Cadastros() {
     return (
       <QuadroContratado canAdd={true} hasAccess={hasAccess} plants={plants} locations={locations} />
     )
-  if (type === 'funcoes') return <CadastrosFuncoes canAdd={true} hasAccess={hasAccess} />
-  if (type === 'colaboradores')
-    return (
-      <CadastrosColaboradores
-        canAdd={true}
-        hasAccess={hasAccess}
-        plants={plants}
-        locations={locations}
-        functions={functions}
-      />
-    )
 
   // Para o CRUD genérico, validamos o acesso na rota
   if (!config) return <Navigate to="/gestao-terceiros" replace />
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
+
+  const renderExtraFormContent = (form: any, setForm: any) => {
+    if (type === 'colaboradores') {
+      return <EmployeeTrainingsForm form={form} setForm={setForm} />
+    }
+    if (type === 'funcoes') {
+      return <FunctionTrainingsForm form={form} setForm={setForm} />
+    }
+    return null
+  }
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
@@ -101,6 +99,7 @@ export default function Cadastros() {
         searchFields={config.searchFields}
         plantField={config.plantField}
         plants={plants}
+        extraFormContent={renderExtraFormContent}
         extraActions={
           config.hasMonthFilter ? (
             <>
@@ -151,7 +150,8 @@ export default function Cadastros() {
                 ? selectedMasterClient
                 : profile.client_id
 
-          const payload = { ...record, client_id: targetClientId }
+          const { training_records, ...rest } = record
+          const payload = { ...rest, client_id: targetClientId }
 
           if (config.hasMonthFilter) {
             payload.reference_month = `${selectedMonth}-01`
@@ -161,17 +161,68 @@ export default function Cadastros() {
             payload.is_active = false
           }
 
-          const { error } = await supabase.from(config.tableName).insert(payload)
-          if (!error) {
+          const { data, error } = await supabase
+            .from(config.tableName)
+            .insert(payload)
+            .select()
+            .single()
+          if (!error && data) {
+            if (training_records && config.tableName === 'employees') {
+              const trPayload = training_records.map((tr: any) => ({
+                client_id: targetClientId,
+                employee_id: data.id,
+                training_id: tr.training_id,
+                document_url: tr.document_url || '',
+                completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+              }))
+              if (trPayload.length > 0) {
+                await supabase.from('employee_training_records').insert(trPayload)
+              }
+            }
+            if (training_records && config.tableName === 'functions') {
+              const trPayload = training_records.map((tr: any) => ({
+                client_id: targetClientId,
+                function_id: data.id,
+                training_id: tr.training_id,
+              }))
+              if (trPayload.length > 0) {
+                await supabase.from('function_required_trainings').insert(trPayload)
+              }
+            }
             refetch()
             return { success: true }
           }
           return { success: false, error }
         }}
         onUpdate={async (id: string, record: any) => {
-          const payload = { ...record }
+          const { training_records, ...rest } = record
+          const payload = { ...rest }
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
+            if (training_records && config.tableName === 'employees') {
+              await supabase.from('employee_training_records').delete().eq('employee_id', id)
+              const trPayload = training_records.map((tr: any) => ({
+                client_id: payload.client_id || record.client_id,
+                employee_id: id,
+                training_id: tr.training_id,
+                document_url: tr.document_url || '',
+                completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+              }))
+              if (trPayload.length > 0) {
+                await supabase.from('employee_training_records').insert(trPayload)
+              }
+            }
+            if (training_records && config.tableName === 'functions') {
+              await supabase.from('function_required_trainings').delete().eq('function_id', id)
+              const trPayload = training_records.map((tr: any) => ({
+                client_id: payload.client_id || record.client_id,
+                function_id: id,
+                training_id: tr.training_id,
+              }))
+              if (trPayload.length > 0) {
+                await supabase.from('function_required_trainings').insert(trPayload)
+              }
+            }
             refetch()
             return { success: true }
           }
