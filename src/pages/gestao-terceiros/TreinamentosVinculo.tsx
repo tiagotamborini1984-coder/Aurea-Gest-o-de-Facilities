@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { cn } from '@/lib/utils'
 
 export function EmployeeTrainingsForm({ form, setForm }: any) {
   const [trainings, setTrainings] = useState<any[]>([])
@@ -215,7 +216,12 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                 disabled={record.is_required}
               >
                 <SelectTrigger
-                  className="bg-background h-auto min-h-10 py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full"
+                  className={cn(
+                    'bg-background h-auto min-h-[2.5rem] py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full text-sm transition-none',
+                    record.is_required
+                      ? '!opacity-100 font-bold text-foreground bg-accent border-accent-foreground/20 cursor-default'
+                      : 'font-medium',
+                  )}
                   title={
                     trainings.find((t) => t.id === record.training_id)?.name ||
                     'Selecione o treinamento...'
@@ -409,7 +415,7 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
                 onValueChange={(val) => updateRecord(index, 'training_id', val)}
               >
                 <SelectTrigger
-                  className="bg-background h-auto min-h-10 py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full"
+                  className="bg-background h-auto min-h-[2.5rem] py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full text-sm font-medium"
                   title={
                     trainings.find((t) => t.id === record.training_id)?.name ||
                     'Selecione o treinamento...'
