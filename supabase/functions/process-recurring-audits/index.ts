@@ -4,32 +4,33 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 function addFrequency(date: Date, frequency: string): Date {
-  const d = new Date(date);
+  const d = new Date(date)
   switch (frequency) {
     case 'Diária':
-      d.setUTCDate(d.getUTCDate() + 1);
-      break;
+      d.setUTCDate(d.getUTCDate() + 1)
+      break
     case 'Semanal':
-      d.setUTCDate(d.getUTCDate() + 7);
-      break;
+      d.setUTCDate(d.getUTCDate() + 7)
+      break
     case 'Mensal':
-      d.setUTCMonth(d.getUTCMonth() + 1);
-      break;
+      d.setUTCMonth(d.getUTCMonth() + 1)
+      break
     case 'Semestral':
-      d.setUTCMonth(d.getUTCMonth() + 6);
-      break;
+      d.setUTCMonth(d.getUTCMonth() + 6)
+      break
     case 'Anual':
-      d.setUTCFullYear(d.getUTCFullYear() + 1);
-      break;
+      d.setUTCFullYear(d.getUTCFullYear() + 1)
+      break
     case 'Única':
     default:
-      break;
+      break
   }
-  return d;
+  return d
 }
 
 Deno.serve(async (req: Request) => {
@@ -47,9 +48,7 @@ Deno.serve(async (req: Request) => {
     today.setUTCHours(0, 0, 0, 0)
     const todayStr = today.toISOString().split('T')[0]
 
-    const { data: audits, error: auditsError } = await supabaseClient
-      .from('audits')
-      .select(`
+    const { data: audits, error: auditsError } = await supabaseClient.from('audits').select(`
         *,
         audit_assignments (
           plant_id,
@@ -62,14 +61,13 @@ Deno.serve(async (req: Request) => {
     let generatedCount = 0
 
     for (const audit of audits || []) {
-      
       let { data: typeRes } = await supabaseClient
         .from('task_types')
         .select('id')
         .eq('client_id', audit.client_id)
         .ilike('name', '%Auditoria%')
         .limit(1)
-      
+
       let typeId = typeRes?.[0]?.id
 
       if (!typeId) {
@@ -89,7 +87,7 @@ Deno.serve(async (req: Request) => {
         .eq('is_terminal', false)
         .order('created_at', { ascending: true })
         .limit(1)
-      
+
       let statusId = statusRes?.[0]?.id
 
       if (!typeId || !statusId) {
@@ -105,25 +103,25 @@ Deno.serve(async (req: Request) => {
           .eq('plant_id', assign.plant_id)
           .order('created_at', { ascending: false })
 
-        const hasPending = (existingExecs || []).some(e => e.status === 'Pendente')
-        if (hasPending) continue;
+        const hasPending = (existingExecs || []).some((e) => e.status === 'Pendente')
+        if (hasPending) continue
 
-        let nextDueDate: Date;
-        
+        let nextDueDate: Date
+
         if (existingExecs && existingExecs.length > 0) {
-          if (audit.frequency === 'Única') continue;
+          if (audit.frequency === 'Única') continue
 
-          const lastExec = existingExecs.find(e => e.status === 'Finalizado') || existingExecs[0];
-          const baseDateStr = lastExec.realization_date || lastExec.created_at.split('T')[0];
-          const baseDate = new Date(baseDateStr + 'T00:00:00Z');
-          nextDueDate = addFrequency(baseDate, audit.frequency);
+          const lastExec = existingExecs.find((e) => e.status === 'Finalizado') || existingExecs[0]
+          const baseDateStr = lastExec.realization_date || lastExec.created_at.split('T')[0]
+          const baseDate = new Date(baseDateStr + 'T00:00:00Z')
+          nextDueDate = addFrequency(baseDate, audit.frequency)
         } else {
-          nextDueDate = new Date(audit.start_date + 'T00:00:00Z');
+          nextDueDate = new Date(audit.start_date + 'T00:00:00Z')
         }
 
-        const advanceNotice = audit.advance_notice_days || 0;
-        const triggerDate = new Date(nextDueDate);
-        triggerDate.setUTCDate(triggerDate.getUTCDate() - advanceNotice);
+        const advanceNotice = audit.advance_notice_days || 0
+        const triggerDate = new Date(nextDueDate)
+        triggerDate.setUTCDate(triggerDate.getUTCDate() - advanceNotice)
 
         if (today >= triggerDate) {
           const { data: createdToday } = await supabaseClient
@@ -135,7 +133,7 @@ Deno.serve(async (req: Request) => {
             .gte('created_at', todayStr + 'T00:00:00Z')
 
           if (createdToday && createdToday.length > 0) {
-            continue;
+            continue
           }
 
           const { data: adminUser } = await supabaseClient
@@ -144,7 +142,7 @@ Deno.serve(async (req: Request) => {
             .eq('client_id', audit.client_id)
             .in('role', ['Administrador', 'Master'])
             .limit(1)
-          
+
           const requesterId = adminUser?.[0]?.id || assign.assignee_id
 
           const year = new Date().getFullYear()
@@ -164,13 +162,13 @@ Deno.serve(async (req: Request) => {
           const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
           // Calculate SLA based on creation date + periodicidade
-          const creationDate = new Date();
-          creationDate.setUTCHours(0, 0, 0, 0);
-          
-          let targetDateStr = audit.start_date;
+          const creationDate = new Date()
+          creationDate.setUTCHours(0, 0, 0, 0)
+
+          let targetDateStr = audit.start_date
           if (audit.frequency !== 'Única') {
-            const slaDate = addFrequency(creationDate, audit.frequency);
-            targetDateStr = slaDate.toISOString().split('T')[0];
+            const slaDate = addFrequency(creationDate, audit.frequency)
+            targetDateStr = slaDate.toISOString().split('T')[0]
           }
 
           const { data: newTask } = await supabaseClient
