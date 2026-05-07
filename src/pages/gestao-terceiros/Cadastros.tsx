@@ -16,25 +16,53 @@ export default function Cadastros() {
 
   const config = useCadastrosConfig(type, plants, locations, functions, equipment)
 
-  const menuName = config ? `Cadastros:${config.title}` : ''
+  // Assegura que o menuName seja avaliado corretamente mesmo para componentes customizados
+  let menuName = ''
+  if (config) {
+    menuName = `Cadastros:${config.title}`
+  } else if (type === 'colaboradores') {
+    menuName = 'Cadastros:Colaboradores'
+  } else if (type === 'funcoes') {
+    menuName = 'Cadastros:Funções'
+  } else if (type === 'quadro-contratado') {
+    menuName = 'Cadastros:Quadro Contratado'
+  } else if (type === 'empresas') {
+    menuName = 'Cadastros:Empresas Parceiras'
+  }
+
   const hasAccess = useHasAccess(menuName)
 
   if (!profile) return null
   if (profile.role !== 'Master' && !profile.client_id) return null
 
-  if (type === 'quadro-contratado') return <QuadroContratado />
-  if (type === 'funcoes') return <CadastrosFuncoes />
-  if (type === 'colaboradores') return <CadastrosColaboradores />
+  // Para componentes customizados, delegamos a renderização passando as permissões e dados necessários
+  if (type === 'quadro-contratado')
+    return (
+      <QuadroContratado canAdd={true} hasAccess={hasAccess} plants={plants} locations={locations} />
+    )
+  if (type === 'funcoes') return <CadastrosFuncoes canAdd={true} hasAccess={hasAccess} />
+  if (type === 'colaboradores')
+    return (
+      <CadastrosColaboradores
+        canAdd={true}
+        hasAccess={hasAccess}
+        plants={plants}
+        locations={locations}
+        functions={functions}
+        equipment={equipment}
+      />
+    )
 
+  // Para o CRUD genérico, validamos o acesso na rota
   if (!config) return <Navigate to="/gestao-terceiros" replace />
-
-  // We need to fetch the access right here for dynamic CRUDs
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
       <CrudGeneric
         key={`${type}-${selectedMasterClient}`}
+        canAdd={true}
+        hasAccess={hasAccess}
         title={config.title}
         singularName={config.singularName}
         subtitle={config.subtitle}
