@@ -24,14 +24,15 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
   const { toast } = useToast()
 
   useEffect(() => {
-    if (!activeClient)
-      return supabase
-        .from('trainings')
-        .select('*')
-        .eq('client_id', activeClient.id)
-        .then(({ data }) => {
-          if (data) setTrainings(data)
-        })
+    if (!activeClient) return
+
+    supabase
+      .from('trainings')
+      .select('*')
+      .eq('client_id', activeClient.id)
+      .then(({ data }) => {
+        if (data) setTrainings(data)
+      })
   }, [activeClient])
 
   useEffect(() => {
@@ -219,8 +220,8 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                   className={cn(
                     'bg-background h-auto min-h-[2.5rem] py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full text-sm transition-none',
                     record.is_required
-                      ? '!opacity-100 font-bold text-foreground bg-accent border-accent-foreground/20 cursor-default'
-                      : 'font-medium',
+                      ? 'opacity-100 disabled:opacity-100 font-bold text-slate-900 bg-slate-100 border-slate-300 cursor-default'
+                      : 'font-medium text-slate-900',
                   )}
                   title={
                     trainings.find((t) => t.id === record.training_id)?.name ||
@@ -323,14 +324,15 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
   const { activeClient } = useAppStore()
 
   useEffect(() => {
-    if (!activeClient)
-      return supabase
-        .from('trainings')
-        .select('*')
-        .eq('client_id', activeClient.id)
-        .then(({ data }) => {
-          if (data) setTrainings(data)
-        })
+    if (!activeClient) return
+
+    supabase
+      .from('trainings')
+      .select('*')
+      .eq('client_id', activeClient.id)
+      .then(({ data }) => {
+        if (data) setTrainings(data)
+      })
   }, [activeClient])
 
   useEffect(() => {
@@ -415,7 +417,7 @@ export function FunctionTrainingsForm({ form, setForm }: any) {
                 onValueChange={(val) => updateRecord(index, 'training_id', val)}
               >
                 <SelectTrigger
-                  className="bg-background h-auto min-h-[2.5rem] py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full text-sm font-medium"
+                  className="bg-background h-auto min-h-[2.5rem] py-2 text-left [&>span]:line-clamp-none [&>span]:whitespace-normal [&>span]:break-words w-full text-sm font-medium text-slate-900"
                   title={
                     trainings.find((t) => t.id === record.training_id)?.name ||
                     'Selecione o treinamento...'
