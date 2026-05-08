@@ -13,7 +13,9 @@ import { format } from 'date-fns'
 import { Search } from 'lucide-react'
 import { useTreinamentos } from './hooks/use-treinamentos'
 import { TreinamentosList } from './components/TreinamentosList'
+import { TreinamentosDashboard } from './components/TreinamentosDashboard'
 import { useAppStore } from '@/store/AppContext'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Treinamentos() {
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
@@ -126,7 +128,25 @@ export default function Treinamentos() {
         </CardContent>
       </Card>
 
-      <TreinamentosList data={filteredData} loading={loading} />
+      <Tabs defaultValue="dashboard" className="w-full space-y-4">
+        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:inline-flex">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="list">Lista de Colaboradores</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="mt-0">
+          {!loading && <TreinamentosDashboard data={filteredData} />}
+          {loading && (
+            <div className="flex justify-center p-8 text-muted-foreground animate-pulse">
+              Calculando aderência...
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-0">
+          <TreinamentosList data={filteredData} loading={loading} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

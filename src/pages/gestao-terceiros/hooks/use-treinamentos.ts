@@ -9,6 +9,7 @@ export type EmployeeWithTrainings = {
   name: string
   company_name: string
   function_name: string
+  plant_id: string
   status: 'valid' | 'pending' | 'expired'
   trainings: {
     id: string
@@ -40,7 +41,7 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
 
         let query = supabase
           .from('employees')
-          .select('id, name, company_name, function_id')
+          .select('id, name, company_name, function_id, plant_id')
           .eq('client_id', activeClient.id)
           .eq('reference_month', refDate)
 
@@ -148,6 +149,7 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
             name: emp.name,
             company_name: emp.company_name,
             function_name: func?.name || 'Sem função',
+            plant_id: emp.plant_id,
             status: overallStatus,
             trainings,
           }
