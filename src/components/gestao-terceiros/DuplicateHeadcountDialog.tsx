@@ -80,6 +80,16 @@ export function DuplicateHeadcountDialog({
 
       const idMap = new Map<string, string>()
 
+      let oldData: any[] = []
+      if (dupConflict) {
+        const { data } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('client_id', clientId)
+          .eq('reference_month', `${dupTarget}-01`)
+        oldData = data || []
+      }
+
       const newEntries = sourceData.map((item) => {
         const { id, created_at, ...rest } = item
         const newId =
@@ -95,6 +105,33 @@ export function DuplicateHeadcountDialog({
       })
 
       if (dupConflict) {
+        if (tableName === 'employees' && oldData.length > 0) {
+          const logUpdates = []
+          for (const oldEmp of oldData) {
+            const newEmp = newEntries.find(
+              (e) =>
+                e.name === oldEmp.name &&
+                e.company_name === oldEmp.company_name &&
+                e.plant_id === oldEmp.plant_id,
+            )
+            if (newEmp) {
+              logUpdates.push(
+                supabase
+                  .from('daily_logs')
+                  .update({ reference_id: newEmp.id })
+                  .eq('reference_id', oldEmp.id)
+                  .eq('type', 'staff'),
+              )
+            }
+          }
+          if (logUpdates.length > 0) {
+            const batchSize = 10
+            for (let i = 0; i < logUpdates.length; i += batchSize) {
+              await Promise.all(logUpdates.slice(i, i + batchSize))
+            }
+          }
+        }
+
         await supabase
           .from(tableName)
           .delete()
