@@ -108,7 +108,8 @@ export function DuplicateHeadcountDialog({
       if (tableName === 'employees') {
         const oldIds = Array.from(idMap.keys())
         if (oldIds.length > 0) {
-          const batchSize = 200
+          // Reduzido para evitar o limite padrão de 1000 resultados do select no Supabase
+          const batchSize = 30
           for (let i = 0; i < oldIds.length; i += batchSize) {
             const batch = oldIds.slice(i, i + batchSize)
             const { data: sourceTrainings, error: trError } = await supabase
@@ -116,7 +117,12 @@ export function DuplicateHeadcountDialog({
               .select('*')
               .in('employee_id', batch)
 
-            if (!trError && sourceTrainings && sourceTrainings.length > 0) {
+            if (trError) {
+              console.error('Erro ao buscar treinamentos:', trError)
+              throw new Error('Falha ao buscar treinamentos de origem.')
+            }
+
+            if (sourceTrainings && sourceTrainings.length > 0) {
               const newTrainings = sourceTrainings.map((tr) => {
                 const { id, created_at, ...rest } = tr
                 return {
@@ -125,7 +131,14 @@ export function DuplicateHeadcountDialog({
                 }
               })
 
-              await supabase.from('employee_training_records').insert(newTrainings)
+              const { error: insertError } = await supabase
+                .from('employee_training_records')
+                .insert(newTrainings)
+
+              if (insertError) {
+                console.error('Erro ao inserir treinamentos:', insertError)
+                throw new Error('Falha ao copiar anexos e datas dos treinamentos.')
+              }
             }
           }
         }
