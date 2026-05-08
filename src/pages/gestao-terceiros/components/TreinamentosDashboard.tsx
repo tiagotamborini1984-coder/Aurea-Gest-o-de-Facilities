@@ -3,7 +3,7 @@ import { EmployeeWithTrainings } from '@/pages/gestao-terceiros/hooks/use-treina
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell } from 'recharts'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell, LabelList } from 'recharts'
 import { CheckCircle2, XCircle, FileText, Activity } from 'lucide-react'
 
 export function TreinamentosDashboard({ data }: { data: EmployeeWithTrainings[] }) {
@@ -43,6 +43,7 @@ export function TreinamentosDashboard({ data }: { data: EmployeeWithTrainings[] 
       return {
         ...stat,
         plant_name: plant?.name || 'Desconhecida',
+        plant_code: plant?.code || '---',
         adherence,
       }
     })
@@ -133,10 +134,10 @@ export function TreinamentosDashboard({ data }: { data: EmployeeWithTrainings[] 
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart data={plantsData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={plantsData} margin={{ top: 30, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                 <XAxis
-                  dataKey="plant_name"
+                  dataKey="plant_code"
                   tickLine={false}
                   axisLine={false}
                   fontSize={12}
@@ -164,6 +165,14 @@ export function TreinamentosDashboard({ data }: { data: EmployeeWithTrainings[] 
                       }
                     />
                   ))}
+                  <LabelList
+                    dataKey="adherence"
+                    position="top"
+                    formatter={(val: number) => `${val}%`}
+                    fill="hsl(var(--foreground))"
+                    fontSize={12}
+                    fontWeight="bold"
+                  />
                 </Bar>
               </BarChart>
             </ChartContainer>
