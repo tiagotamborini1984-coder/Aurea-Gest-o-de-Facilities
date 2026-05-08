@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
@@ -21,6 +21,7 @@ export default function Treinamentos() {
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [referenceMonth, setReferenceMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'valid'>('all')
+  const [selectedCompany, setSelectedCompany] = useState<string>('all')
   const [search, setSearch] = useState('')
   const { profile } = useAppStore()
   const { plants } = useMasterData()
@@ -35,9 +36,14 @@ export default function Treinamentos() {
     referenceMonth,
   )
 
+  const companies = useMemo(() => {
+    return Array.from(new Set(data.map((emp) => emp.company_name))).sort()
+  }, [data])
+
   const filteredData = data.filter((emp) => {
     if (statusFilter === 'pending' && emp.status === 'valid') return false
     if (statusFilter === 'valid' && emp.status !== 'valid') return false
+    if (selectedCompany !== 'all' && emp.company_name !== selectedCompany) return false
 
     if (search) {
       const s = search.toLowerCase()
@@ -64,7 +70,7 @@ export default function Treinamentos() {
             Refine a busca por planta, mês de referência e status do treinamento.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Mês de Referência
@@ -107,6 +113,25 @@ export default function Treinamentos() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pending">Pendentes / Vencidos</SelectItem>
                 <SelectItem value="valid">Realizados / Válidos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Empresa
+            </label>
+            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas as Empresas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Empresas</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company} value={company}>
+                    {company}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
