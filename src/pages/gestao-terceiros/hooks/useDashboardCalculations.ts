@@ -31,6 +31,8 @@ export function useDashboardCalculations(
         ? new Set(employees.filter((e) => companiesSet.has(e.company_name)).map((e) => e.id))
         : new Set(employees.map((e) => e.id))
 
+    const validEqIds = new Set(equipment.map((e) => e.id))
+
     const processedLogs = logs.map((l) => ({ ...l, date: normalizeDate(l.date) }))
 
     const filteredLogs = processedLogs.filter(
@@ -44,10 +46,9 @@ export function useDashboardCalculations(
     const activeLogs = filteredLogs.filter((l) => {
       if (l.type !== typeLog) return false
       if (typeLog === 'staff') {
-        if (selectedCompanies.length > 0) {
-          return validEmpIds.has(l.reference_id)
-        }
-        return true
+        return validEmpIds.has(l.reference_id)
+      } else if (typeLog === 'equipment') {
+        return validEqIds.has(l.reference_id)
       }
       return true
     })
@@ -413,7 +414,12 @@ export function useDashboardCalculations(
           totalEquipContractedSum += eCont
 
           const ePres = processedLogs.filter(
-            (l) => l.type === 'equipment' && l.plant_id === pid && l.date === date && l.status,
+            (l) =>
+              l.type === 'equipment' &&
+              l.plant_id === pid &&
+              l.date === date &&
+              l.status &&
+              validEqIds.has(l.reference_id),
           ).length
           totalEquipPresentCount += ePres
         }
