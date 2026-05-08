@@ -104,10 +104,7 @@ export function TreinamentosList({
                                   {t.name}
                                 </span>
                                 {t.is_required && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[10px] h-4.5 px-1.5 font-medium shrink-0 whitespace-nowrap mt-0.5 sm:mt-0"
-                                  >
+                                  <Badge className="bg-slate-600 text-white hover:bg-slate-700 border-none text-[10px] h-4.5 px-1.5 font-medium shrink-0 whitespace-nowrap mt-0.5 sm:mt-0">
                                     Obrigatório
                                   </Badge>
                                 )}
