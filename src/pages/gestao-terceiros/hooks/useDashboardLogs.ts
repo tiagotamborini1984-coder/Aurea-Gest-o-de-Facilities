@@ -8,12 +8,14 @@ export function useDashboardLogs(
   plants: any[],
 ) {
   const [logs, setLogs] = useState<any[]>([])
+  const [rawLogs, setRawLogs] = useState<any[]>([])
   const [monthlyGoals, setMonthlyGoals] = useState<any[]>([])
 
   useEffect(() => {
     const fetchLogs = async () => {
       if (plants.length === 0) {
         setLogs([])
+        setRawLogs([])
         return
       }
       const plantIds = plants.map((p: any) => p.id)
@@ -64,6 +66,7 @@ export function useDashboardLogs(
         return !nonWorkingMap[`${log.plant_id}_${logDateKey}`]
       })
 
+      setRawLogs(allData)
       setLogs(validLogs)
     }
     fetchLogs()
@@ -112,5 +115,5 @@ export function useDashboardLogs(
     fetchGoals()
   }, [referenceMonth, plants])
 
-  return { logs, monthlyGoals }
+  return { logs, rawLogs, monthlyGoals }
 }

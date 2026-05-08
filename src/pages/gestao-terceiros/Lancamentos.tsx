@@ -13,7 +13,8 @@ import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { format, addMonths, isBefore, startOfDay } from 'date-fns'
+import { format, addMonths, isBefore, startOfDay, endOfMonth } from 'date-fns'
+import { useDashboardLogs } from './hooks/useDashboardLogs'
 import {
   Search,
   Users,
@@ -35,7 +36,7 @@ export default function Lancamentos() {
   const [isNonWorkingDay, setIsNonWorkingDay] = useState(false)
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [plantId, setPlantId] = useState<string>('')
-  const [selectedCompany, setSelectedCompany] = useState<string>('')
+  const [selectedCompany, setSelectedCompany] = useState<string>('all')
   const [activeTab, setActiveTab] = useState<'staff' | 'equipment' | 'metas'>('staff')
   const [presences, setPresences] = useState<Record<string, boolean>>({})
   const [goalValues, setGoalValues] = useState<Record<string, number>>({})
@@ -75,11 +76,27 @@ export default function Lancamentos() {
 
   useEffect(() => {
     if (activeTab === 'staff' && availableCompanies.length > 0) {
-      if (selectedCompany && !availableCompanies.includes(selectedCompany)) {
-        setSelectedCompany('')
+      if (
+        selectedCompany &&
+        selectedCompany !== 'all' &&
+        !availableCompanies.includes(selectedCompany)
+      ) {
+        setSelectedCompany('all')
+      } else if (!selectedCompany) {
+        setSelectedCompany('all')
       }
     }
   }, [availableCompanies, activeTab, selectedCompany])
+
+  const activeMonth = activeTab === 'metas' ? month : date.substring(0, 7)
+  const targetPlants = useMemo(() => plants.filter((p) => p.id === plantId), [plants, plantId])
+
+  const { rawLogs: dashboardLogs, monthlyGoals: dashboardMonthlyGoals } = useDashboardLogs(
+    `${activeMonth}-01`,
+    format(endOfMonth(new Date(`${activeMonth}-01T00:00:00`)), 'yyyy-MM-dd'),
+    activeMonth,
+    targetPlants,
+  )
 
   useEffect(() => {
     if (!plantId || !profile) return
@@ -94,40 +111,25 @@ export default function Lancamentos() {
       setIsNonWorkingDay(!!data)
     }
     fetchNWD()
-
-    const fetchLogs = async () => {
-      if (activeTab === 'metas') {
-        const referenceMonth = `${month}-01`
-        const { data } = await supabase
-          .from('monthly_goals_data')
-          .select('*')
-          .eq('plant_id', plantId)
-          .eq('reference_month', referenceMonth)
-
-        const g: Record<string, number> = {}
-        if (data)
-          data.forEach((d) => {
-            g[d.goal_id] = Number(d.value)
-          })
-        setGoalValues(g)
-      } else {
-        const { data } = await supabase
-          .from('daily_logs')
-          .select('*')
-          .eq('date', date)
-          .eq('plant_id', plantId)
-          .eq('type', activeTab)
-
-        const p: Record<string, boolean> = {}
-        if (data)
-          data.forEach((d) => {
-            p[d.reference_id] = d.status
-          })
-        setPresences(p)
-      }
-    }
-    fetchLogs()
   }, [date, month, plantId, activeTab, profile])
+
+  useEffect(() => {
+    if (activeTab === 'metas') {
+      const g: Record<string, number> = {}
+      dashboardMonthlyGoals.forEach((d) => {
+        g[d.goal_id] = Number(d.value)
+      })
+      setGoalValues(g)
+    } else {
+      const p: Record<string, boolean> = {}
+      dashboardLogs.forEach((d) => {
+        if (d.date.startsWith(date) && d.type === activeTab) {
+          p[d.reference_id] = d.status
+        }
+      })
+      setPresences(p)
+    }
+  }, [dashboardLogs, dashboardMonthlyGoals, date, activeTab])
 
   const handleToggleNWD = async (checked: boolean) => {
     setIsNonWorkingDay(checked)
@@ -202,7 +204,7 @@ export default function Lancamentos() {
             ? employees.filter(
                 (e) =>
                   e.plant_id === plantId &&
-                  e.company_name === selectedCompany &&
+                  (selectedCompany === 'all' || e.company_name === selectedCompany) &&
                   e.reference_month === currentRefMonth,
               )
             : equipment.filter((e) => e.plant_id === plantId)
@@ -251,7 +253,7 @@ export default function Lancamentos() {
       const filtered = employees.filter(
         (e) =>
           e.plant_id === plantId &&
-          e.company_name === selectedCompany &&
+          (selectedCompany === 'all' || e.company_name === selectedCompany) &&
           e.reference_month === currentRefMonth &&
           e.name.toLowerCase().includes(searchLower),
       )
@@ -440,6 +442,7 @@ export default function Lancamentos() {
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Todas as empresas</SelectItem>
                   {availableCompanies.map((c) => (
                     <SelectItem key={c as string} value={c as string}>
                       {c as string}
@@ -727,6 +730,7 @@ export default function Lancamentos() {
                                   {activeTab === 'staff' && (
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5">
                                       <p className="text-xs text-slate-600">
+                                        {item.company_name} -{' '}
                                         {plants.find((p) => p.id === plantId)?.code}
                                         {locName ? ` - ${locName}` : ''}
                                       </p>
