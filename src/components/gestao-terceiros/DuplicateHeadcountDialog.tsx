@@ -70,6 +70,7 @@ export function DuplicateHeadcountDialog({
         .select('*')
         .eq('client_id', clientId)
         .eq('reference_month', `${dupSource}-01`)
+
       if (!sourceData || sourceData.length === 0) {
         toast({ title: 'Nenhum dado na origem', variant: 'destructive' })
         setIsCheckingDup(false)
@@ -77,9 +78,20 @@ export function DuplicateHeadcountDialog({
         return
       }
 
+      const idMap = new Map<string, string>()
+
       const newEntries = sourceData.map((item) => {
         const { id, created_at, ...rest } = item
-        return { ...rest, reference_month: `${dupTarget}-01` }
+        const newId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                const r = (Math.random() * 16) | 0,
+                  v = c === 'x' ? r : (r & 0x3) | 0x8
+                return v.toString(16)
+              })
+        idMap.set(id, newId)
+        return { ...rest, id: newId, reference_month: `${dupTarget}-01` }
       })
 
       if (dupConflict) {
@@ -92,6 +104,32 @@ export function DuplicateHeadcountDialog({
 
       const { error } = await supabase.from(tableName).insert(newEntries)
       if (error) throw error
+
+      if (tableName === 'employees') {
+        const oldIds = Array.from(idMap.keys())
+        if (oldIds.length > 0) {
+          const batchSize = 200
+          for (let i = 0; i < oldIds.length; i += batchSize) {
+            const batch = oldIds.slice(i, i + batchSize)
+            const { data: sourceTrainings, error: trError } = await supabase
+              .from('employee_training_records')
+              .select('*')
+              .in('employee_id', batch)
+
+            if (!trError && sourceTrainings && sourceTrainings.length > 0) {
+              const newTrainings = sourceTrainings.map((tr) => {
+                const { id, created_at, ...rest } = tr
+                return {
+                  ...rest,
+                  employee_id: idMap.get(tr.employee_id),
+                }
+              })
+
+              await supabase.from('employee_training_records').insert(newTrainings)
+            }
+          }
+        }
+      }
 
       toast({ title: 'Duplicado com sucesso!' })
       onOpenChange(false)
