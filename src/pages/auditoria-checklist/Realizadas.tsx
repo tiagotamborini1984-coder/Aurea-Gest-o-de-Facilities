@@ -372,6 +372,9 @@ export default function AuditoriaRealizadas() {
                 <TableHead className="font-semibold text-slate-800 print:text-black">
                   Score Final
                 </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Nota Final
+                </TableHead>
                 <TableHead className="font-semibold text-slate-800 text-right print:hidden">
                   Ação
                 </TableHead>
@@ -380,13 +383,13 @@ export default function AuditoriaRealizadas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
                   </TableCell>
                 </TableRow>
               ) : filteredExecutions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-slate-500">
                     Nenhuma auditoria encontrada.
                   </TableCell>
                 </TableRow>
@@ -433,6 +436,18 @@ export default function AuditoriaRealizadas() {
                               / {exec.max_score}
                             </span>
                           </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {exec.status === 'Finalizado' ? (
+                          <span className="font-bold text-slate-800">
+                            {exec.max_score
+                              ? Math.round((exec.final_score / exec.max_score) * 100)
+                              : 0}
+                            %
+                          </span>
                         ) : (
                           <span className="text-slate-400 text-sm">-</span>
                         )}
@@ -500,7 +515,7 @@ export default function AuditoriaRealizadas() {
               </TabsList>
 
               <TabsContent value="details" className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
                       Status
@@ -535,6 +550,17 @@ export default function AuditoriaRealizadas() {
                     </p>
                     <p className="font-semibold text-brand-deepBlue">
                       {viewExec.final_score || 0} / {viewExec.max_score || 0}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">
+                      Nota Final
+                    </p>
+                    <p className="font-semibold text-brand-deepBlue">
+                      {viewExec.max_score
+                        ? Math.round((viewExec.final_score / viewExec.max_score) * 100)
+                        : 0}
+                      %
                     </p>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -626,13 +652,14 @@ export default function AuditoriaRealizadas() {
                         <TableHead className="font-semibold text-slate-800">Prazo (SLA)</TableHead>
                         <TableHead className="font-semibold text-slate-800">Realizada em</TableHead>
                         <TableHead className="font-semibold text-slate-800">Score</TableHead>
+                        <TableHead className="font-semibold text-slate-800">Nota Final</TableHead>
                         <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {viewHistory.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                          <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                             Nenhum histórico encontrado.
                           </TableCell>
                         </TableRow>
@@ -685,6 +712,18 @@ export default function AuditoriaRealizadas() {
                                       / {hExec.max_score}
                                     </span>
                                   </div>
+                                ) : (
+                                  <span className="text-slate-400 text-sm">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {hExec.status === 'Finalizado' ? (
+                                  <span className="font-bold text-slate-800">
+                                    {hExec.max_score
+                                      ? Math.round((hExec.final_score / hExec.max_score) * 100)
+                                      : 0}
+                                    %
+                                  </span>
                                 ) : (
                                   <span className="text-slate-400 text-sm">-</span>
                                 )}
@@ -775,6 +814,17 @@ export default function AuditoriaRealizadas() {
                 <span className="text-sm font-medium text-slate-500">
                   / {viewExec.max_score || 0}
                 </span>
+              </span>
+            </div>
+            <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
+              <span className="block text-slate-500 text-xs font-bold uppercase mb-1">
+                Nota Final
+              </span>
+              <span className="font-black text-lg text-slate-800">
+                {viewExec.max_score
+                  ? Math.round((viewExec.final_score / viewExec.max_score) * 100)
+                  : 0}
+                %
               </span>
             </div>
           </div>
