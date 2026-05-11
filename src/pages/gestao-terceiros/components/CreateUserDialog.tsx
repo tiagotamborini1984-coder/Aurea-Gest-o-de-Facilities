@@ -532,6 +532,31 @@ export function CreateUserDialog({
               </div>
             </div>
           )}
+          {['Gestor', 'Operacional'].includes(form.role) && (
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">
+                  Filtro de Responsável (Relatórios de Tarefas)
+                </Label>
+                <p className="text-xs text-slate-500">
+                  Permite visualizar e filtrar tarefas de outros usuários.
+                </p>
+              </div>
+              <Switch
+                checked={form.accessible_menus.includes('Gestão de Tarefas:Filtro Responsável')}
+                onCheckedChange={(v) => {
+                  setForm((p) => ({
+                    ...p,
+                    accessible_menus: v
+                      ? [...p.accessible_menus, 'Gestão de Tarefas:Filtro Responsável']
+                      : p.accessible_menus.filter(
+                          (m) => m !== 'Gestão de Tarefas:Filtro Responsável',
+                        ),
+                  }))
+                }}
+              />
+            </div>
+          )}
           {form.role === 'Administrador' && (
             <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
               <strong>Acesso Total:</strong> Administradores de Cliente têm acesso irrestrito a

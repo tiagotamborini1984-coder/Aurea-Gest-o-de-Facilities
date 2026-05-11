@@ -414,7 +414,9 @@ export default function RelatoriosTarefas() {
           </Select>
         </div>
 
-        {['Administrador', 'Master'].includes(profile?.role || '') && (
+        {(['Administrador', 'Master'].includes(profile?.role || '') ||
+          (Array.isArray(profile?.accessible_menus) &&
+            profile.accessible_menus.includes('Gestão de Tarefas:Filtro Responsável'))) && (
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-700">Responsável</Label>
             <Select value={filterAssignee} onValueChange={(v) => updateSearchParam('assignee', v)}>
