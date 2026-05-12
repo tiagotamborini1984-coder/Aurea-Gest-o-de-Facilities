@@ -201,22 +201,66 @@ export default function RelatoriosTarefas() {
     if (!poDate && currentStatus === 'pedido gerado') poDate = new Date(task.status_updated_at)
     if (!closedDate && currentStatus === 'finalizado') closedDate = new Date(task.status_updated_at)
 
+    const getFrozenDaysBetween = (start: Date, end: Date) => {
+      const statusChanges = taskTl
+        .filter(
+          (t) => t.action_type === 'status_change' && t.content.includes('Status alterado para:'),
+        )
+        .map((t) => {
+          const statusName = t.content.split('Status alterado para:')[1].trim()
+          const status = taskStatuses.find((s) => s.name === statusName)
+          return {
+            date: new Date(t.created_at),
+            isFrozen: status?.freeze_sla || status?.ignore_sla || false,
+          }
+        })
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+
+      let frozenSeconds = 0
+      let currentIsFrozen = false
+      let lastDate = start
+
+      const events = statusChanges.filter((sc) => sc.date > start && sc.date < end)
+
+      for (const event of events) {
+        if (currentIsFrozen) {
+          frozenSeconds += Math.max(0, differenceInSeconds(event.date, lastDate))
+        }
+        currentIsFrozen = event.isFrozen
+        lastDate = event.date
+      }
+
+      if (currentIsFrozen) {
+        frozenSeconds += Math.max(0, differenceInSeconds(end, lastDate))
+      }
+
+      return frozenSeconds / 86400
+    }
+
     let diffRC: number | null = null
     let diffPO: number | null = null
     let diffDelivery: number | null = null
 
     if (rcDate) {
-      diffRC = Math.max(0, differenceInSeconds(rcDate, abertoDate) / 86400)
+      const grossDays = Math.max(0, differenceInSeconds(rcDate, abertoDate) / 86400)
+      const frozenDays = getFrozenDaysBetween(abertoDate, rcDate)
+      diffRC = Math.max(0, grossDays - frozenDays)
     }
 
     if (poDate && rcDate) {
-      diffPO = Math.max(0, differenceInSeconds(poDate, rcDate) / 86400)
+      const grossDays = Math.max(0, differenceInSeconds(poDate, rcDate) / 86400)
+      const frozenDays = getFrozenDaysBetween(rcDate, poDate)
+      diffPO = Math.max(0, grossDays - frozenDays)
     } else if (poDate) {
-      diffPO = Math.max(0, differenceInSeconds(poDate, abertoDate) / 86400)
+      const grossDays = Math.max(0, differenceInSeconds(poDate, abertoDate) / 86400)
+      const frozenDays = getFrozenDaysBetween(abertoDate, poDate)
+      diffPO = Math.max(0, grossDays - frozenDays)
     }
 
     if (closedDate && poDate) {
-      diffDelivery = Math.max(0, differenceInSeconds(closedDate, poDate) / 86400)
+      const grossDays = Math.max(0, differenceInSeconds(closedDate, poDate) / 86400)
+      const frozenDays = getFrozenDaysBetween(poDate, closedDate)
+      diffDelivery = Math.max(0, grossDays - frozenDays)
     }
 
     return { diffRC, diffPO, diffDelivery }
