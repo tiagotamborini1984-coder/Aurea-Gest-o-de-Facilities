@@ -27,6 +27,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
   const [profiles, setProfiles] = useState<any[]>([])
   const [types, setTypes] = useState<any[]>([])
   const [statuses, setStatuses] = useState<any[]>([])
+  const [plants, setPlants] = useState<any[]>([])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -35,6 +36,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
     type_id: '',
     status_id: '',
     due_date: '',
+    plant_id: '',
   })
 
   useEffect(() => {
@@ -56,6 +58,12 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
       .eq('client_id', activeClient.id)
       .order('order_index')
       .then(({ data }) => setStatuses(data || []))
+    supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient.id)
+      .order('name')
+      .then(({ data }) => setPlants(data || []))
 
     if (existingTask) {
       setFormData({
@@ -65,6 +73,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
         type_id: existingTask.type_id || '',
         status_id: existingTask.status_id || '',
         due_date: existingTask.due_date ? existingTask.due_date.slice(0, 16) : '',
+        plant_id: existingTask.plant_id || plantId || '',
       })
     } else {
       setFormData({
@@ -74,14 +83,18 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
         type_id: '',
         status_id: '',
         due_date: '',
+        plant_id: plantId || '',
       })
     }
-  }, [open, activeClient, existingTask])
+  }, [open, activeClient, existingTask, plantId])
 
   const handleSave = async () => {
     if (!activeClient || !profile) return
 
     try {
+      if (!formData.plant_id) {
+        throw new Error('Preencha a Planta da ação.')
+      }
       if (!formData.assignee_id) {
         throw new Error('Preencha o Responsável pela ação.')
       }
@@ -91,6 +104,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
           title: formData.title,
           description: formData.description,
           assignee_id: formData.assignee_id,
+          plant_id: formData.plant_id,
           due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
         }
         if (formData.status_id) payload.status_id = formData.status_id
@@ -139,7 +153,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
 
           const payload: any = {
             client_id: activeClient.id,
-            plant_id: plantId,
+            plant_id: formData.plant_id,
             type_id: typeId,
             status_id: statusId,
             requester_id: profile.id,
@@ -201,6 +215,24 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Planta</Label>
+              <Select
+                value={formData.plant_id || undefined}
+                onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Responsável</Label>
               <Select

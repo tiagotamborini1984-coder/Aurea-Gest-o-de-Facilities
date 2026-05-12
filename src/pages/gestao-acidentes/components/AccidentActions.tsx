@@ -27,7 +27,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
     const { data } = await supabase
       .from('tasks')
       .select(
-        '*, assignee:profiles!tasks_assignee_id_fkey(name), status:task_statuses(name, color)',
+        '*, assignee:profiles!tasks_assignee_id_fkey(name), status:task_statuses(name, color), plant:plants(name)',
       )
       .eq('client_id', activeClient.id)
       .eq('accident_id', accidentId)
@@ -69,6 +69,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
               <TableRow>
                 <TableHead>Número</TableHead>
                 <TableHead>Título</TableHead>
+                <TableHead>Planta</TableHead>
                 <TableHead>Responsável</TableHead>
                 <TableHead>Prazo</TableHead>
                 <TableHead>Status</TableHead>
@@ -80,6 +81,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
                 <TableRow key={t.id}>
                   <TableCell className="font-medium">{t.task_number}</TableCell>
                   <TableCell>{t.title}</TableCell>
+                  <TableCell>{t.plant?.name || 'N/A'}</TableCell>
                   <TableCell>{t.assignee?.name || 'N/A'}</TableCell>
                   <TableCell>
                     {t.due_date ? format(new Date(t.due_date), 'dd/MM/yyyy') : 'N/A'}
