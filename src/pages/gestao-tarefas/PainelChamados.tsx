@@ -356,8 +356,8 @@ export default function PainelChamados() {
 
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
-          const fileExt = file.name.split('.').pop()
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+          const originalName = file.name.replace(/[^a-zA-Z0-9.\- ]/g, '_')
+          const fileName = `${Date.now()}_${originalName}`
           const filePath = `${effectiveClientId}/${fileName}`
 
           const { error: uploadError } = await supabase.storage

@@ -69,7 +69,8 @@ export default function NovaSolicitacaoPublica() {
     try {
       let uploadedPhotos: string[] = []
       for (const file of files) {
-        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+        const originalName = file.name.replace(/[^a-zA-Z0-9.\- ]/g, '_')
+        const fileName = `${Date.now()}_${originalName}`
         const { data } = await supabase.storage
           .from('maintenance_attachments')
           .upload(fileName, file)

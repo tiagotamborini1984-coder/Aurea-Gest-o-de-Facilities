@@ -370,8 +370,8 @@ export function TaskDetailsSheet({
     if (!file || !profile) return
     setAuditAnswers((prev) => ({ ...prev, [actionId]: { ...prev[actionId], uploading: true } }))
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      const originalName = file.name.replace(/[^a-zA-Z0-9.\- ]/g, '_')
+      const fileName = `${Date.now()}_${originalName}`
       const filePath = `${profile.client_id}/${fileName}`
       const { error } = await supabase.storage.from('task-attachments').upload(filePath, file)
       if (error) throw error
@@ -598,8 +598,8 @@ export function TaskDetailsSheet({
       const newUrls = [...attachmentUrls]
 
       for (const file of files) {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+        const originalName = file.name.replace(/[^a-zA-Z0-9.\- ]/g, '_')
+        const fileName = `${Date.now()}_${originalName}`
         const filePath = `${profile.client_id}/${fileName}`
         const { error: uploadError } = await supabase.storage
           .from('task-attachments')
@@ -1062,8 +1062,11 @@ export function TaskDetailsSheet({
                 ) : (
                   <div className="flex flex-col gap-2">
                     {attachmentUrls.map((url, i) => {
-                      const fileName =
-                        url.split('/').pop()?.split('_').slice(1).join('_') || `Anexo ${i + 1}`
+                      const urlPart = url.split('/').pop() || ''
+                      const decodedName = decodeURIComponent(urlPart)
+                      const fileName = decodedName.includes('_')
+                        ? decodedName.split('_').slice(1).join('_')
+                        : decodedName || `Anexo ${i + 1}`
                       return (
                         <div
                           key={i}
