@@ -178,6 +178,7 @@ export function ExecucaoTab({
       Área: s.areas?.name || '-',
       Tipo: s.areas?.type === 'cleaning' ? 'Limpeza' : 'Jardinagem',
       Descrição: s.description,
+      Urgente: s.is_urgent ? 'Sim' : 'Não',
       Status: s.status,
       Justificativa: s.justification || '-',
     }))
@@ -346,7 +347,17 @@ export function ExecucaoTab({
                       </div>
                     </TableCell>
                     <TableCell className="text-base font-semibold text-slate-800 py-4 max-w-[300px]">
-                      {s.description}
+                      <div className="flex items-center gap-2">
+                        {s.description}
+                        {s.is_urgent && (
+                          <Badge
+                            variant="outline"
+                            className="bg-orange-100 text-orange-800 border-orange-300 text-xs shrink-0"
+                          >
+                            Urgente
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="py-4">
                       <Badge
@@ -412,7 +423,12 @@ export function ExecucaoTab({
           </DialogHeader>
           {selectedSched && (
             <div className="space-y-6 py-2">
-              <div className="bg-slate-100 p-4 rounded-xl border-2 border-slate-200">
+              <div className="bg-slate-100 p-4 rounded-xl border-2 border-slate-200 relative overflow-hidden">
+                {selectedSched.is_urgent && (
+                  <div className="absolute -top-4 -right-6 bg-orange-500 text-white text-[10px] font-bold px-8 py-5 rotate-45 shadow-sm">
+                    URGENTE
+                  </div>
+                )}
                 <p className="text-base text-slate-800">
                   <span className="font-extrabold">Atividade:</span> {selectedSched.description}
                 </p>

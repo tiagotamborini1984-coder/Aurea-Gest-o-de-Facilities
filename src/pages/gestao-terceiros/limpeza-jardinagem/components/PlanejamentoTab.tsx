@@ -42,7 +42,9 @@ import {
   Printer,
   FileDown,
   AlertCircle,
+  Copy,
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/hooks/use-toast'
@@ -81,6 +83,8 @@ export function PlanejamentoTab({
   const [loading, setLoading] = useState(false)
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false)
+  const [duplicateDate, setDuplicateDate] = useState('')
   const [modalData, setModalData] = useState<any>({
     date: '',
     time: '',
@@ -93,6 +97,7 @@ export function PlanejamentoTab({
     evidence_url: '',
     evidence_urls: [],
     justification: '',
+    is_urgent: false,
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -159,6 +164,7 @@ export function PlanejamentoTab({
         start_time: `${modalData.time}:00`,
         end_time: `${modalData.end_time}:00`,
         description: modalData.description,
+        is_urgent: modalData.is_urgent,
       }
       if (modalData.id) {
         const { error } = await supabase
@@ -192,6 +198,34 @@ export function PlanejamentoTab({
       fetchWeekData()
     }
     setIsSaving(false)
+  }
+
+  const handleDuplicate = async () => {
+    if (!duplicateDate || !modalData) return
+    setIsSaving(true)
+    try {
+      const payload = {
+        client_id: profile!.client_id,
+        plant_id: plantId,
+        area_id: modalData.area_id,
+        activity_date: duplicateDate,
+        start_time: `${modalData.time}:00`,
+        end_time: modalData.end_time ? `${modalData.end_time}:00` : null,
+        description: modalData.description,
+        is_urgent: modalData.is_urgent,
+        status: 'Pendente',
+      }
+      const { error } = await supabase.from('cleaning_gardening_schedules').insert(payload)
+      if (error) throw error
+      toast({ title: 'Atividade duplicada com sucesso!' })
+      setDuplicateModalOpen(false)
+      setModalOpen(false)
+      fetchWeekData()
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: err.message })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleDragStart = (e: React.DragEvent, schedId: string) => {
@@ -247,6 +281,7 @@ export function PlanejamentoTab({
       Área: s.areas?.name || '-',
       Tipo: s.areas?.type === 'cleaning' ? 'Limpeza' : 'Jardinagem',
       Descrição: s.description,
+      Urgente: s.is_urgent ? 'Sim' : 'Não',
       Status: s.status,
     }))
     exportToCSV(`planejamento_${format(weekStart, 'yyyy-MM-dd')}.csv`, data)
@@ -435,6 +470,7 @@ export function PlanejamentoTab({
                                 evidence_url: '',
                                 evidence_urls: [],
                                 justification: '',
+                                is_urgent: false,
                               })
                               setModalOpen(true)
                             }
@@ -472,20 +508,30 @@ export function PlanejamentoTab({
                                       evidence_url: cs.evidence_url,
                                       evidence_urls: cs.evidence_urls,
                                       justification: cs.justification,
+                                      is_urgent: cs.is_urgent || false,
                                     })
                                     setModalOpen(true)
                                   }}
                                   title={`${cs.description}\nStatus: ${cs.status}`}
                                   className={cn(
-                                    'relative p-3 border-2 rounded-lg shadow-sm hover:shadow-lg cursor-grab active:cursor-grabbing transition-all flex flex-col break-words whitespace-normal',
-                                    getStatusColor(cs.status),
+                                    'relative p-3 border-2 rounded-lg shadow-sm hover:shadow-lg cursor-grab active:cursor-grabbing transition-all flex flex-col break-words whitespace-normal overflow-hidden',
+                                    cs.is_urgent
+                                      ? 'bg-orange-100 border-orange-400 text-orange-900'
+                                      : getStatusColor(cs.status),
                                   )}
                                 >
-                                  <p className="font-extrabold text-sm">{cs.areas?.name}</p>
-                                  <p className="text-xs font-bold opacity-80 mt-0.5">
+                                  {cs.is_urgent && (
+                                    <div className="absolute -top-4 -right-6 bg-orange-500 text-white text-[10px] font-bold px-6 py-4 rotate-45 shadow-sm print:hidden">
+                                      URG
+                                    </div>
+                                  )}
+                                  <p className="font-extrabold text-sm relative z-10">
+                                    {cs.areas?.name}
+                                  </p>
+                                  <p className="text-xs font-bold opacity-80 mt-0.5 relative z-10">
                                     {cs.start_time.substring(0, 5)} - {cs.end_time?.substring(0, 5)}
                                   </p>
-                                  <p className="text-sm font-medium mt-1.5 leading-tight">
+                                  <p className="text-sm font-medium mt-1.5 leading-tight relative z-10">
                                     {cs.description}
                                   </p>
                                 </div>
@@ -516,20 +562,29 @@ export function PlanejamentoTab({
               <div
                 key={cs.id}
                 className={cn(
-                  'p-4 border-2 rounded-xl shadow-sm flex flex-col break-words whitespace-normal',
-                  getStatusColor(cs.status),
+                  'p-4 border-2 rounded-xl shadow-sm flex flex-col break-words whitespace-normal overflow-hidden relative',
+                  cs.is_urgent
+                    ? 'bg-orange-100 border-orange-400 text-orange-900'
+                    : getStatusColor(cs.status),
                 )}
               >
-                <div className="flex justify-between items-start mb-2">
+                {cs.is_urgent && (
+                  <div className="absolute -top-4 -right-6 bg-orange-500 text-white text-[10px] font-bold px-6 py-4 rotate-45 shadow-sm print:hidden">
+                    URG
+                  </div>
+                )}
+                <div className="flex justify-between items-start mb-2 relative z-10">
                   <p className="font-extrabold text-sm">{cs.areas?.name}</p>
-                  <Badge variant="outline" className="bg-white/50 text-xs">
+                  <Badge variant="outline" className="bg-white/50 text-xs border-current">
                     {cs.activity_date.split('-').reverse().join('/')}
                   </Badge>
                 </div>
-                <p className="text-xs font-bold opacity-80 mt-0.5">
+                <p className="text-xs font-bold opacity-80 mt-0.5 relative z-10">
                   {cs.start_time.substring(0, 5)} - {cs.end_time?.substring(0, 5)}
                 </p>
-                <p className="text-sm font-medium mt-2 leading-tight flex-1">{cs.description}</p>
+                <p className="text-sm font-medium mt-2 leading-tight flex-1 relative z-10">
+                  {cs.description}
+                </p>
               </div>
             ))}
           </div>
@@ -621,6 +676,22 @@ export function PlanejamentoTab({
               />
             </div>
 
+            <div className="flex items-center space-x-2 pt-2 pb-1">
+              <Checkbox
+                id="is_urgent"
+                checked={modalData.is_urgent}
+                onCheckedChange={(checked) => setModalData({ ...modalData, is_urgent: !!checked })}
+                disabled={modalData.readonly}
+                className="h-5 w-5 border-2 border-orange-500 data-[state=checked]:bg-orange-500 data-[state=checked]:text-white"
+              />
+              <Label
+                htmlFor="is_urgent"
+                className="text-base font-bold text-orange-600 cursor-pointer"
+              >
+                Marcar como Urgência
+              </Label>
+            </div>
+
             {modalData.readonly && (
               <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
                 <div className="flex items-center justify-between">
@@ -667,24 +738,43 @@ export function PlanejamentoTab({
           </div>
           <DialogFooter className="flex justify-between items-center w-full">
             {modalData.readonly ? (
-              <Button
-                variant="outline"
-                onClick={() => setModalOpen(false)}
-                className="font-bold text-base h-11 px-8 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300"
-              >
-                Fechar Visualização
-              </Button>
+              <div className="flex justify-between w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => setDuplicateModalOpen(true)}
+                  className="font-bold text-base h-11 px-6 bg-white hover:bg-blue-50 text-brand-deepBlue border-brand-deepBlue"
+                >
+                  <Copy className="h-5 w-5 mr-2" /> Duplicar
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setModalOpen(false)}
+                  className="font-bold text-base h-11 px-8 bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300"
+                >
+                  Fechar
+                </Button>
+              </div>
             ) : (
-              <>
+              <div className="flex justify-between w-full">
                 {modalData.id ? (
-                  <Button
-                    variant="ghost"
-                    onClick={handleDelete}
-                    disabled={isSaving}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-base"
-                  >
-                    <Trash2 className="h-5 w-5 mr-2" /> Excluir
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDuplicateModalOpen(true)}
+                      disabled={isSaving}
+                      className="font-bold text-base h-11 px-4 bg-white hover:bg-blue-50 text-brand-deepBlue border-brand-deepBlue"
+                    >
+                      <Copy className="h-4 w-4 mr-2" /> Duplicar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleDelete}
+                      disabled={isSaving}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-base h-11"
+                    >
+                      <Trash2 className="h-5 w-5 mr-2" /> Excluir
+                    </Button>
+                  </div>
                 ) : (
                   <div />
                 )}
@@ -711,8 +801,45 @@ export function PlanejamentoTab({
                     {isSaving && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Salvar
                   </Button>
                 </div>
-              </>
+              </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={duplicateModalOpen} onOpenChange={setDuplicateModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Duplicar Atividade</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-base font-bold text-slate-700">Selecione a nova data</Label>
+              <Input
+                type="date"
+                value={duplicateDate}
+                onChange={(e) => setDuplicateDate(e.target.value)}
+                className="h-12 text-base font-semibold bg-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDuplicateModalOpen(false)}
+              className="font-bold"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="tech"
+              onClick={handleDuplicate}
+              disabled={!duplicateDate || isSaving}
+              className="font-bold"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
