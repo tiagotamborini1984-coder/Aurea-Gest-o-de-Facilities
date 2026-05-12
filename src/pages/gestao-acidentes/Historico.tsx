@@ -15,9 +15,11 @@ import { format } from 'date-fns'
 import { FileText, Paperclip, Edit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
+import { AccidentReportModal } from './components/AccidentReportModal'
 
 export default function HistoricoAcidentes() {
   const { activeClient, activePlant, profile } = useAppStore()
+  const [reportAccidentId, setReportAccidentId] = useState<string | null>(null)
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
@@ -122,15 +124,26 @@ export default function HistoricoAcidentes() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {canEdit(item) && (
+                        <div className="flex items-center gap-1 justify-end">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigate(`/gestao-acidentes/registro/${item.id}`)}
+                            onClick={() => setReportAccidentId(item.id)}
+                            title="Gerar Relatório"
                           >
-                            <Edit className="w-4 h-4 text-gray-500" />
+                            <FileText className="w-4 h-4 text-blue-600" />
                           </Button>
-                        )}
+                          {canEdit(item) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => navigate(`/gestao-acidentes/registro/${item.id}`)}
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4 text-gray-500" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -140,6 +153,12 @@ export default function HistoricoAcidentes() {
           )}
         </CardContent>
       </Card>
+
+      <AccidentReportModal
+        accidentId={reportAccidentId}
+        open={!!reportAccidentId}
+        onClose={() => setReportAccidentId(null)}
+      />
     </div>
   )
 }
