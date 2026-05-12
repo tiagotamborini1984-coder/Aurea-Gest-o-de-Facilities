@@ -35,12 +35,13 @@ export default function DashboardAcidentes() {
   }, [activePlant])
 
   useEffect(() => {
-    if (!activeClient)
-      return supabase
-        .from('plants')
-        .select('id, name')
-        .eq('client_id', activeClient.id)
-        .then(({ data }) => setPlants(data || []))
+    if (!activeClient) return
+
+    supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient.id)
+      .then(({ data }) => setPlants(data || []))
   }, [activeClient])
 
   useEffect(() => {
