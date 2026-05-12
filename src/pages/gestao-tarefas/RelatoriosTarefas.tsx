@@ -238,13 +238,16 @@ export default function RelatoriosTarefas() {
     }
 
     let diffRC: number | null = null
+    let grossRC: number | null = null
+    let frozenRC: number | null = null
+
     let diffPO: number | null = null
     let diffDelivery: number | null = null
 
     if (rcDate) {
-      const grossDays = Math.max(0, differenceInSeconds(rcDate, abertoDate) / 86400)
-      const frozenDays = getFrozenDaysBetween(abertoDate, rcDate)
-      diffRC = Math.max(0, grossDays - frozenDays)
+      grossRC = Math.max(0, differenceInSeconds(rcDate, abertoDate) / 86400)
+      frozenRC = getFrozenDaysBetween(abertoDate, rcDate)
+      diffRC = Math.max(0, grossRC - frozenRC)
     }
 
     if (poDate && rcDate) {
@@ -263,7 +266,7 @@ export default function RelatoriosTarefas() {
       diffDelivery = Math.max(0, grossDays - frozenDays)
     }
 
-    return { diffRC, diffPO, diffDelivery }
+    return { diffRC, grossRC, frozenRC, diffPO, diffDelivery }
   }
 
   const comprasTasks = tasks.filter((task) => {
@@ -280,23 +283,46 @@ export default function RelatoriosTarefas() {
   const buildPlantRanking = () => {
     const plantMetrics: Record<
       string,
-      { sumToRC: number; countToRC: number; sumToPO: number; countToPO: number }
+      {
+        sumToRC: number
+        sumGrossRC: number
+        sumFrozenRC: number
+        countToRC: number
+        sumToPO: number
+        countToPO: number
+      }
     > = {}
 
     plants.forEach((p) => {
-      plantMetrics[p.id] = { sumToRC: 0, countToRC: 0, sumToPO: 0, countToPO: 0 }
+      plantMetrics[p.id] = {
+        sumToRC: 0,
+        sumGrossRC: 0,
+        sumFrozenRC: 0,
+        countToRC: 0,
+        sumToPO: 0,
+        countToPO: 0,
+      }
     })
 
     comprasTasks.forEach((task) => {
-      const { diffRC, diffPO } = getTaskDiffs(task, timelines, taskStatuses)
+      const { diffRC, grossRC, frozenRC, diffPO } = getTaskDiffs(task, timelines, taskStatuses)
       const pId = task.plant_id
 
       if (!plantMetrics[pId]) {
-        plantMetrics[pId] = { sumToRC: 0, countToRC: 0, sumToPO: 0, countToPO: 0 }
+        plantMetrics[pId] = {
+          sumToRC: 0,
+          sumGrossRC: 0,
+          sumFrozenRC: 0,
+          countToRC: 0,
+          sumToPO: 0,
+          countToPO: 0,
+        }
       }
 
-      if (diffRC !== null) {
+      if (diffRC !== null && grossRC !== null && frozenRC !== null) {
         plantMetrics[pId].sumToRC += diffRC
+        plantMetrics[pId].sumGrossRC += grossRC
+        plantMetrics[pId].sumFrozenRC += frozenRC
         plantMetrics[pId].countToRC++
       }
 
@@ -315,6 +341,8 @@ export default function RelatoriosTarefas() {
           plantName: plant?.name || 'Desconhecida',
           plantCode: plant?.code || '-',
           avgToRC: m.countToRC > 0 ? Number((m.sumToRC / m.countToRC).toFixed(2)) : null,
+          avgGrossRC: m.countToRC > 0 ? Number((m.sumGrossRC / m.countToRC).toFixed(2)) : null,
+          avgFrozenRC: m.countToRC > 0 ? Number((m.sumFrozenRC / m.countToRC).toFixed(2)) : null,
           avgToPO: m.countToPO > 0 ? Number((m.sumToPO / m.countToPO).toFixed(2)) : null,
           countToRC: m.countToRC,
           countToPO: m.countToPO,
@@ -738,18 +766,118 @@ export default function RelatoriosTarefas() {
               </div>
 
               {plantRanking.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
+                      <div className="mb-6">
+                        <h3 className="font-bold text-slate-800">Volume de RCs por Planta</h3>
+                        <p className="text-xs text-slate-500">
+                          Quantidade de Requisições de Compra criadas no período selecionado.
+                        </p>
+                      </div>
+                      <div className="h-[300px] w-full">
+                        <ChartContainer
+                          config={{
+                            count: { label: 'Qtd. RCs', color: 'hsl(var(--primary))' },
+                          }}
+                        >
+                          <BarChart data={plantRanking.filter((r) => r.countToRC > 0)}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="plantCode" />
+                            <YAxis />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  labelFormatter={(label, payload) => {
+                                    return payload?.[0]?.payload?.plantName || label
+                                  }}
+                                />
+                              }
+                            />
+                            <Bar dataKey="countToRC" radius={[4, 4, 0, 0]}>
+                              {plantRanking
+                                .filter((r) => r.countToRC > 0)
+                                .map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+                                  />
+                                ))}
+                              <LabelList
+                                dataKey="countToRC"
+                                position="top"
+                                className="fill-slate-700 font-medium text-[11px]"
+                              />
+                            </Bar>
+                          </BarChart>
+                        </ChartContainer>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+                      <div className="p-4 border-b border-gray-200 bg-slate-50">
+                        <h3 className="font-bold text-slate-800">Ranking por Planta</h3>
+                        <p className="text-xs text-slate-500">
+                          Médias de tempo para criação de RC e Pedido de Compras por unidade.
+                        </p>
+                      </div>
+                      <Table className="print:text-xs">
+                        <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+                          <TableRow>
+                            <TableHead className="font-semibold text-slate-800">Posição</TableHead>
+                            <TableHead className="font-semibold text-slate-800">Planta</TableHead>
+                            <TableHead className="font-semibold text-slate-800 text-center">
+                              Média Criação RC
+                            </TableHead>
+                            <TableHead className="font-semibold text-slate-800 text-center">
+                              Média Criação Pedido
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {plantRanking.map((rank, index) => (
+                            <TableRow
+                              key={rank.plantId}
+                              className="hover:bg-slate-50 border-gray-100 print:border-b"
+                            >
+                              <TableCell className="font-bold text-slate-500">
+                                {index + 1}º
+                              </TableCell>
+                              <TableCell className="font-semibold text-slate-800">
+                                {rank.plantName}
+                              </TableCell>
+                              <TableCell className="text-center font-medium">
+                                {rank.avgToRC !== null
+                                  ? `${formatDays(rank.avgToRC)} ${formatUnit(rank.avgToRC)}`
+                                  : '-'}
+                              </TableCell>
+                              <TableCell className="text-center font-medium">
+                                {rank.avgToPO !== null
+                                  ? `${formatDays(rank.avgToPO)} ${formatUnit(rank.avgToPO)}`
+                                  : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
                     <div className="mb-6">
-                      <h3 className="font-bold text-slate-800">Volume de RCs por Planta</h3>
+                      <h3 className="font-bold text-slate-800">
+                        Comparativo: Tempo Bruto vs. Efetivo (Criação de RC)
+                      </h3>
                       <p className="text-xs text-slate-500">
-                        Quantidade de Requisições de Compra criadas no período selecionado.
+                        Média de tempo total (bruto) comparada ao tempo efetivo (líquido),
+                        evidenciando o impacto das pausas.
                       </p>
                     </div>
                     <div className="h-[300px] w-full">
                       <ChartContainer
                         config={{
-                          count: { label: 'Qtd. RCs', color: 'hsl(var(--primary))' },
+                          avgGrossRC: { label: 'Tempo Bruto', color: '#94a3b8' },
+                          avgToRC: { label: 'Tempo Efetivo', color: 'hsl(var(--primary))' },
                         }}
                       >
                         <BarChart data={plantRanking.filter((r) => r.countToRC > 0)}>
@@ -765,72 +893,23 @@ export default function RelatoriosTarefas() {
                               />
                             }
                           />
-                          <Bar dataKey="countToRC" radius={[4, 4, 0, 0]}>
-                            {plantRanking
-                              .filter((r) => r.countToRC > 0)
-                              .map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
-                                />
-                              ))}
-                            <LabelList
-                              dataKey="countToRC"
-                              position="top"
-                              className="fill-slate-700 font-medium text-[11px]"
-                            />
-                          </Bar>
+                          <Bar
+                            dataKey="avgGrossRC"
+                            fill="#94a3b8"
+                            radius={[4, 4, 0, 0]}
+                            name="Tempo Bruto"
+                          />
+                          <Bar
+                            dataKey="avgToRC"
+                            fill="hsl(var(--primary))"
+                            radius={[4, 4, 0, 0]}
+                            name="Tempo Efetivo"
+                          />
                         </BarChart>
                       </ChartContainer>
                     </div>
                   </div>
-
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
-                    <div className="p-4 border-b border-gray-200 bg-slate-50">
-                      <h3 className="font-bold text-slate-800">Ranking por Planta</h3>
-                      <p className="text-xs text-slate-500">
-                        Médias de tempo para criação de RC e Pedido de Compras por unidade.
-                      </p>
-                    </div>
-                    <Table className="print:text-xs">
-                      <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
-                        <TableRow>
-                          <TableHead className="font-semibold text-slate-800">Posição</TableHead>
-                          <TableHead className="font-semibold text-slate-800">Planta</TableHead>
-                          <TableHead className="font-semibold text-slate-800 text-center">
-                            Média Criação RC
-                          </TableHead>
-                          <TableHead className="font-semibold text-slate-800 text-center">
-                            Média Criação Pedido
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {plantRanking.map((rank, index) => (
-                          <TableRow
-                            key={rank.plantId}
-                            className="hover:bg-slate-50 border-gray-100 print:border-b"
-                          >
-                            <TableCell className="font-bold text-slate-500">{index + 1}º</TableCell>
-                            <TableCell className="font-semibold text-slate-800">
-                              {rank.plantName}
-                            </TableCell>
-                            <TableCell className="text-center font-medium">
-                              {rank.avgToRC !== null
-                                ? `${formatDays(rank.avgToRC)} ${formatUnit(rank.avgToRC)}`
-                                : '-'}
-                            </TableCell>
-                            <TableCell className="text-center font-medium">
-                              {rank.avgToPO !== null
-                                ? `${formatDays(rank.avgToPO)} ${formatUnit(rank.avgToPO)}`
-                                : '-'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
+                </>
               )}
 
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
@@ -846,7 +925,13 @@ export default function RelatoriosTarefas() {
                       <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
                       <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
-                        T. Criação RC
+                        RC: T. Bruto
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-800 text-center">
+                        RC: Pausa
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-800 text-center">
+                        RC: T. Efetivo
                       </TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
                         T. Criação Pedido
@@ -860,7 +945,7 @@ export default function RelatoriosTarefas() {
                     {comprasTasks.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={7}
                           className="text-center py-8 text-slate-500 font-medium"
                         >
                           Nenhum chamado de compras encontrado no período.
@@ -869,7 +954,7 @@ export default function RelatoriosTarefas() {
                     ) : (
                       comprasTasks.map((task) => {
                         const type = taskTypes.find((t) => t.id === task.type_id)
-                        const { diffRC, diffPO, diffDelivery } = getTaskDiffs(
+                        const { diffRC, grossRC, frozenRC, diffPO, diffDelivery } = getTaskDiffs(
                           task,
                           timelines,
                           taskStatuses,
@@ -886,7 +971,17 @@ export default function RelatoriosTarefas() {
                             <TableCell className="text-slate-600 font-medium">
                               {type?.name}
                             </TableCell>
-                            <TableCell className="text-center font-medium">
+                            <TableCell className="text-center font-medium text-slate-500">
+                              {grossRC !== null
+                                ? `${formatDays(grossRC)} ${formatUnit(grossRC)}`
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-medium text-amber-600">
+                              {frozenRC !== null && frozenRC > 0
+                                ? `${formatDays(frozenRC)} ${formatUnit(frozenRC)}`
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-bold text-green-600">
                               {diffRC !== null
                                 ? `${formatDays(diffRC)} ${formatUnit(diffRC)}`
                                 : '-'}
