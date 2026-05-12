@@ -33,13 +33,8 @@
   ],
   "deployment": {
     "lastDevBuildRef": "08a8720",
-    "lastProdBuildRef": "1b6b9f7",
-    "publishedAt": "2026-05-12T12:03:39.041Z",
+    "lastProdBuildRef": "08a8720",
+    "publishedAt": "2026-03-18T21:39:15.980Z",
     "lastPublishedRef": "08a8720"
-  },
-  "migrations": {
-    "applied": [
-      "0001-pnpm-workspace-allow-builds"
-    ]
   }
 }
