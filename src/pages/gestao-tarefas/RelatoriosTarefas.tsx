@@ -269,6 +269,47 @@ export default function RelatoriosTarefas() {
     return { diffRC, grossRC, frozenRC, diffPO, diffDelivery }
   }
 
+  const getCadastroTime = (task: any, timelines: any[], taskStatuses: any[]) => {
+    const taskTl = timelines
+      .filter((tl) => tl.task_id === task.id)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+    const statusChanges = taskTl
+      .filter(
+        (t) => t.action_type === 'status_change' && t.content.includes('Status alterado para:'),
+      )
+      .map((t) => ({
+        date: new Date(t.created_at),
+        statusName: t.content.split('Status alterado para:')[1].trim().toLowerCase(),
+      }))
+
+    let timeInCadastro = 0
+    let lastDate = new Date(task.created_at)
+
+    const hasCadastroStatus = taskStatuses.some((s) => s.name.toLowerCase().includes('cadastro'))
+    if (!hasCadastroStatus) return null
+
+    let currentStatus = 'cadastro'
+    if (statusChanges.length > 0 && statusChanges[0].statusName.includes('cadastro')) {
+      currentStatus = 'unknown'
+    }
+
+    for (const sc of statusChanges) {
+      if (currentStatus.includes('cadastro')) {
+        timeInCadastro += Math.max(0, differenceInSeconds(sc.date, lastDate))
+      }
+      currentStatus = sc.statusName
+      lastDate = sc.date
+    }
+
+    if (currentStatus.includes('cadastro')) {
+      const end = task.closed_at ? new Date(task.closed_at) : new Date()
+      timeInCadastro += Math.max(0, differenceInSeconds(end, lastDate))
+    }
+
+    return timeInCadastro / 86400
+  }
+
   const comprasTasks = tasks.filter((task) => {
     const type = taskTypes.find((t) => t.id === task.type_id)
     if (!type) return false
@@ -287,9 +328,10 @@ export default function RelatoriosTarefas() {
         sumToRC: number
         sumGrossRC: number
         sumFrozenRC: number
+        sumCadastro: number
         countToRC: number
-        sumToPO: number
         countToPO: number
+        countCadastro: number
       }
     > = {}
 
@@ -298,14 +340,16 @@ export default function RelatoriosTarefas() {
         sumToRC: 0,
         sumGrossRC: 0,
         sumFrozenRC: 0,
+        sumCadastro: 0,
         countToRC: 0,
-        sumToPO: 0,
         countToPO: 0,
+        countCadastro: 0,
       }
     })
 
     comprasTasks.forEach((task) => {
       const { diffRC, grossRC, frozenRC, diffPO } = getTaskDiffs(task, timelines, taskStatuses)
+      const cadastroTime = getCadastroTime(task, timelines, taskStatuses)
       const pId = task.plant_id
 
       if (!plantMetrics[pId]) {
@@ -313,9 +357,10 @@ export default function RelatoriosTarefas() {
           sumToRC: 0,
           sumGrossRC: 0,
           sumFrozenRC: 0,
+          sumCadastro: 0,
           countToRC: 0,
-          sumToPO: 0,
           countToPO: 0,
+          countCadastro: 0,
         }
       }
 
@@ -329,6 +374,11 @@ export default function RelatoriosTarefas() {
       if (diffPO !== null) {
         plantMetrics[pId].sumToPO += diffPO
         plantMetrics[pId].countToPO++
+      }
+
+      if (cadastroTime !== null) {
+        plantMetrics[pId].sumCadastro += cadastroTime
+        plantMetrics[pId].countCadastro++
       }
     })
 
@@ -344,11 +394,16 @@ export default function RelatoriosTarefas() {
           avgGrossRC: m.countToRC > 0 ? Number((m.sumGrossRC / m.countToRC).toFixed(2)) : null,
           avgFrozenRC: m.countToRC > 0 ? Number((m.sumFrozenRC / m.countToRC).toFixed(2)) : null,
           avgToPO: m.countToPO > 0 ? Number((m.sumToPO / m.countToPO).toFixed(2)) : null,
+          avgCadastro:
+            m.countCadastro > 0 ? Number((m.sumCadastro / m.countCadastro).toFixed(2)) : null,
           countToRC: m.countToRC,
           countToPO: m.countToPO,
+          countCadastro: m.countCadastro,
         }
       })
-      .filter((r) => r.avgToRC !== null || r.avgToPO !== null || r.countToRC > 0)
+      .filter(
+        (r) => r.avgToRC !== null || r.avgToPO !== null || r.countToRC > 0 || r.countCadastro > 0,
+      )
 
     return ranking.sort((a, b) => {
       const aVal = a.avgToRC ?? Infinity
@@ -865,22 +920,22 @@ export default function RelatoriosTarefas() {
 
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
                     <div className="mb-6">
-                      <h3 className="font-bold text-slate-800">
-                        Comparativo: Tempo Bruto vs. Efetivo (Criação de RC)
-                      </h3>
+                      <h3 className="font-bold text-slate-800">Tempo Médio em Cadastro</h3>
                       <p className="text-xs text-slate-500">
-                        Média de tempo total (bruto) comparada ao tempo efetivo (líquido),
-                        evidenciando o impacto das pausas.
+                        Média de tempo que a tarefa permaneceu com o status "Cadastro" por planta.
                       </p>
                     </div>
                     <div className="h-[300px] w-full">
                       <ChartContainer
                         config={{
-                          avgGrossRC: { label: 'Tempo Bruto', color: '#94a3b8' },
-                          avgToRC: { label: 'Tempo Efetivo', color: 'hsl(var(--primary))' },
+                          avgCadastro: { label: 'Média (Dias)', color: 'hsl(var(--primary))' },
                         }}
                       >
-                        <BarChart data={plantRanking.filter((r) => r.countToRC > 0)}>
+                        <BarChart
+                          data={plantRanking.filter(
+                            (r) => r.avgCadastro !== null && r.avgCadastro > 0,
+                          )}
+                        >
                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
                           <XAxis dataKey="plantCode" />
                           <YAxis />
@@ -893,18 +948,22 @@ export default function RelatoriosTarefas() {
                               />
                             }
                           />
-                          <Bar
-                            dataKey="avgGrossRC"
-                            fill="#94a3b8"
-                            radius={[4, 4, 0, 0]}
-                            name="Tempo Bruto"
-                          />
-                          <Bar
-                            dataKey="avgToRC"
-                            fill="hsl(var(--primary))"
-                            radius={[4, 4, 0, 0]}
-                            name="Tempo Efetivo"
-                          />
+                          <Bar dataKey="avgCadastro" radius={[4, 4, 0, 0]}>
+                            {plantRanking
+                              .filter((r) => r.avgCadastro !== null && r.avgCadastro > 0)
+                              .map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={GLOBAL_CHART_COLORS[index % GLOBAL_CHART_COLORS.length]}
+                                />
+                              ))}
+                            <LabelList
+                              dataKey="avgCadastro"
+                              position="top"
+                              formatter={(val: number) => formatDays(val)}
+                              className="fill-slate-700 font-medium text-[11px]"
+                            />
+                          </Bar>
                         </BarChart>
                       </ChartContainer>
                     </div>
@@ -934,6 +993,9 @@ export default function RelatoriosTarefas() {
                         RC: T. Efetivo
                       </TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
+                        T. Cadastro
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-800 text-center">
                         T. Criação Pedido
                       </TableHead>
                       <TableHead className="font-semibold text-slate-800 text-center">
@@ -959,6 +1021,7 @@ export default function RelatoriosTarefas() {
                           timelines,
                           taskStatuses,
                         )
+                        const cadastroTime = getCadastroTime(task, timelines, taskStatuses)
 
                         return (
                           <TableRow
@@ -984,6 +1047,11 @@ export default function RelatoriosTarefas() {
                             <TableCell className="text-center font-bold text-green-600">
                               {diffRC !== null
                                 ? `${formatDays(diffRC)} ${formatUnit(diffRC)}`
+                                : '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-medium text-blue-600">
+                              {cadastroTime !== null
+                                ? `${formatDays(cadastroTime)} ${formatUnit(cadastroTime)}`
                                 : '-'}
                             </TableCell>
                             <TableCell className="text-center font-medium">
