@@ -39,7 +39,7 @@ export default function DashboardAcidentes() {
 
     supabase
       .from('plants')
-      .select('id, name')
+      .select('id, name, code')
       .eq('client_id', activeClient.id)
       .then(({ data }) => setPlants(data || []))
   }, [activeClient])
@@ -97,8 +97,8 @@ export default function DashboardAcidentes() {
 
   const plantCount = data.reduce(
     (acc, curr) => {
-      const plantName = plants.find((p) => p.id === curr.plant_id)?.name || 'Desconhecida'
-      acc[plantName] = (acc[plantName] || 0) + 1
+      const plantCode = plants.find((p) => p.id === curr.plant_id)?.code || 'N/A'
+      acc[plantCode] = (acc[plantCode] || 0) + 1
       return acc
     },
     {} as Record<string, number>,
@@ -132,6 +132,17 @@ export default function DashboardAcidentes() {
   const chartConfig = {
     acidentes: { label: 'Acidentes', color: 'hsl(var(--primary))' },
   }
+
+  const CHART_COLORS = [
+    '#5c8c2a',
+    '#1f758f',
+    '#f28221',
+    '#d4b341',
+    '#8b5cf6',
+    '#ef4444',
+    '#10b981',
+    '#3b82f6',
+  ]
 
   const pieConfig = {
     Grave: { label: 'Grave', color: '#ef4444' },
@@ -278,7 +289,14 @@ export default function DashboardAcidentes() {
                     <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis fontSize={12} tickLine={false} axisLine={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="total" fill="var(--color-acidentes)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                      {barData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -302,7 +320,14 @@ export default function DashboardAcidentes() {
                     <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis fontSize={12} tickLine={false} axisLine={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="total" fill="var(--color-acidentes)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                      {plantChartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
