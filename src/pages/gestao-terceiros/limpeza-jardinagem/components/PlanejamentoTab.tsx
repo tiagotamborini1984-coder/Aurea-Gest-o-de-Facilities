@@ -98,6 +98,7 @@ export function PlanejamentoTab({
     evidence_urls: [],
     justification: '',
     is_urgent: false,
+    isToday: false,
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -204,6 +205,10 @@ export function PlanejamentoTab({
     if (!duplicateDate || !modalData) return
     setIsSaving(true)
     try {
+      const dupDateObj = new Date(duplicateDate + 'T00:00:00')
+      const todayObj = startOfDay(new Date())
+      const isDupToday = isSameDay(dupDateObj, todayObj)
+
       const payload = {
         client_id: profile!.client_id,
         plant_id: plantId,
@@ -212,7 +217,7 @@ export function PlanejamentoTab({
         start_time: `${modalData.time}:00`,
         end_time: modalData.end_time ? `${modalData.end_time}:00` : null,
         description: modalData.description,
-        is_urgent: modalData.is_urgent,
+        is_urgent: isDupToday ? true : modalData.is_urgent,
         status: 'Pendente',
       }
       const { error } = await supabase.from('cleaning_gardening_schedules').insert(payload)
@@ -258,9 +263,18 @@ export function PlanejamentoTab({
         newEndStr = newSDate.toTimeString().substring(0, 5)
       }
 
+      const dropDateObj = new Date(date + 'T00:00:00')
+      const todayObj = startOfDay(new Date())
+      const isDropToday = isSameDay(dropDateObj, todayObj)
+
       const { error } = await supabase
         .from('cleaning_gardening_schedules')
-        .update({ activity_date: date, start_time: `${time}:00`, end_time: `${newEndStr}:00` })
+        .update({
+          activity_date: date,
+          start_time: `${time}:00`,
+          end_time: `${newEndStr}:00`,
+          is_urgent: isDropToday ? true : sched.is_urgent,
+        })
         .eq('id', schedId)
 
       if (error) throw error
@@ -426,32 +440,35 @@ export function PlanejamentoTab({
                         ? cScheds.slice(slot.occurrenceIndex)
                         : cScheds.slice(slot.occurrenceIndex, slot.occurrenceIndex + 1)
 
-                      const locked = isSameDay(d, new Date()) || isBefore(d, startOfDay(new Date()))
+                      const dDate = startOfDay(d)
+                      const todayDate = startOfDay(new Date())
+                      const isPast = isBefore(dDate, todayDate)
+                      const isToday = isSameDay(dDate, todayDate)
 
                       return (
                         <TableCell
                           key={d.toISOString()}
                           className={cn(
                             'border-l-2 border-gray-300 p-0 align-top transition-colors relative min-w-[150px]',
-                            colIdx % 2 === 1 && !locked && 'bg-slate-50/50',
-                            locked
+                            colIdx % 2 === 1 && !isPast && 'bg-slate-50/50',
+                            isPast
                               ? 'bg-slate-200/60 cursor-not-allowed'
                               : 'hover:bg-brand-vividBlue/5 cursor-pointer',
                           )}
                           onDragOver={(e) => e.preventDefault()}
                           onDragEnter={(e) => {
                             e.preventDefault()
-                            if (!locked) e.currentTarget.classList.add('bg-brand-vividBlue/20')
+                            if (!isPast) e.currentTarget.classList.add('bg-brand-vividBlue/20')
                           }}
                           onDragLeave={(e) =>
                             e.currentTarget.classList.remove('bg-brand-vividBlue/20')
                           }
                           onDrop={(e) => {
-                            if (!locked) handleDrop(e, cDate, time)
+                            if (!isPast) handleDrop(e, cDate, time)
                           }}
                           onClick={(e) => {
                             if ((e.target as HTMLElement).dataset.slot === 'true') {
-                              if (locked)
+                              if (isPast)
                                 return toast({
                                   title: 'Visualização',
                                   description: 'Data bloqueada.',
@@ -470,7 +487,8 @@ export function PlanejamentoTab({
                                 evidence_url: '',
                                 evidence_urls: [],
                                 justification: '',
-                                is_urgent: false,
+                                is_urgent: isToday,
+                                isToday: isToday,
                               })
                               setModalOpen(true)
                             }
@@ -485,12 +503,12 @@ export function PlanejamentoTab({
                               return (
                                 <div
                                   key={cs.id}
-                                  draggable={!locked && !isReadonly}
+                                  draggable={!isPast && !isReadonly}
                                   onDragStart={(e) => handleDragStart(e, cs.id)}
                                   onDragEnd={(e) => e.currentTarget.classList.remove('opacity-50')}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (locked && !isReadonly) {
+                                    if (isPast && !isReadonly) {
                                       return toast({
                                         title: 'Visualização',
                                         description: 'Data bloqueada.',
@@ -509,6 +527,7 @@ export function PlanejamentoTab({
                                       evidence_urls: cs.evidence_urls,
                                       justification: cs.justification,
                                       is_urgent: cs.is_urgent || false,
+                                      isToday: isToday,
                                     })
                                     setModalOpen(true)
                                   }}
@@ -676,20 +695,29 @@ export function PlanejamentoTab({
               />
             </div>
 
-            <div className="flex items-center space-x-2 pt-2 pb-1">
-              <Checkbox
-                id="is_urgent"
-                checked={modalData.is_urgent}
-                onCheckedChange={(checked) => setModalData({ ...modalData, is_urgent: !!checked })}
-                disabled={modalData.readonly}
-                className="h-5 w-5 border-2 border-orange-500 data-[state=checked]:bg-orange-500 data-[state=checked]:text-white"
-              />
-              <Label
-                htmlFor="is_urgent"
-                className="text-base font-bold text-orange-600 cursor-pointer"
-              >
-                Marcar como Urgência
-              </Label>
+            <div className="flex flex-col space-y-1 pt-2 pb-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_urgent"
+                  checked={modalData.is_urgent}
+                  onCheckedChange={(checked) =>
+                    setModalData({ ...modalData, is_urgent: !!checked })
+                  }
+                  disabled={modalData.readonly || (modalData.isToday && !modalData.id)}
+                  className="h-5 w-5 border-2 border-orange-500 data-[state=checked]:bg-orange-500 data-[state=checked]:text-white"
+                />
+                <Label
+                  htmlFor="is_urgent"
+                  className="text-base font-bold text-orange-600 cursor-pointer"
+                >
+                  Marcar como Urgência
+                </Label>
+              </div>
+              {modalData.isToday && !modalData.id && (
+                <p className="text-sm text-orange-600 font-medium pl-7">
+                  Atividades criadas para o dia de hoje são automaticamente taxadas como urgência.
+                </p>
+              )}
             </div>
 
             {modalData.readonly && (
