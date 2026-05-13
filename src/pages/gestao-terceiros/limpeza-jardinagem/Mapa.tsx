@@ -34,29 +34,39 @@ export default function MapaLJ() {
     if (!selectedPlantId || !profile) return
 
     const loadData = async () => {
-      const areasQuery = supabase
+      let areasQuery = supabase
         .from('cleaning_gardening_areas')
         .select('*')
         .eq('plant_id', selectedPlantId)
         .eq('client_id', profile.client_id)
 
-      let schedulesQuery = supabase
+      if (serviceType !== 'all') {
+        areasQuery = areasQuery.eq('type', serviceType)
+      }
+
+      const { data: areasData, error: areasError } = await areasQuery
+      if (areasError) console.error('Error fetching areas:', areasError)
+
+      const fetchedAreas = areasData || []
+      const areaIds = fetchedAreas.map((a) => a.id)
+
+      if (areaIds.length === 0) {
+        setAreas([])
+        setSchedules([])
+        return
+      }
+
+      const { data: schedulesData, error: schedulesError } = await supabase
         .from('cleaning_gardening_schedules')
-        .select('*, cleaning_gardening_areas!inner(type)')
+        .select('*')
         .eq('plant_id', selectedPlantId)
         .eq('client_id', profile.client_id)
         .eq('activity_date', selectedDate)
+        .in('area_id', areaIds)
 
-      if (serviceType !== 'all') {
-        schedulesQuery = schedulesQuery.eq('cleaning_gardening_areas.type', serviceType)
-      }
+      if (schedulesError) console.error('Error fetching schedules:', schedulesError)
 
-      const [{ data: areasData }, { data: schedulesData }] = await Promise.all([
-        areasQuery,
-        schedulesQuery,
-      ])
-
-      setAreas(areasData || [])
+      setAreas(fetchedAreas)
       setSchedules(schedulesData || [])
     }
 
