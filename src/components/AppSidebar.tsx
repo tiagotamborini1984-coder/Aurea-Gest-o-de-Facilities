@@ -63,6 +63,7 @@ export function AppSidebar() {
       title: 'Limpeza e Jardinagem',
       icon: Leaf,
       subItems: [
+        { title: 'Mapa Operacional', path: '/limpeza-jardinagem/mapa' },
         { title: 'Áreas', path: '/limpeza-jardinagem/areas' },
         { title: 'Cronograma', path: '/limpeza-jardinagem/cronograma' },
         { title: 'Dashboard', path: '/limpeza-jardinagem/dashboard' },

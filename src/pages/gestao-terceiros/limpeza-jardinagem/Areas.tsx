@@ -1,100 +1,406 @@
-import { CrudGeneric, FieldDef, ColumnDef } from '@/components/gestao-terceiros/CrudGeneric'
-import { Leaf } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Leaf, Plus, Trash2, Edit2, MapPin, UploadCloud } from 'lucide-react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useToast } from '@/hooks/use-toast'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export default function AreasLJ() {
   const { plants } = useMasterData()
   const { profile } = useAppStore()
   const hasAccess = useHasAccess('Limpeza e Jardinagem')
+  const { toast } = useToast()
+
+  const [areas, setAreas] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [formData, setFormData] = useState<any>({})
+  const [polygon, setPolygon] = useState<{ x: number; y: number }[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+
+  const [localPlants, setLocalPlants] = useState(plants)
+
+  useEffect(() => {
+    if (plants.length > 0) setLocalPlants(plants)
+  }, [plants])
+
+  const loadAreas = async () => {
+    if (!profile) return
+    const { data } = await supabase
+      .from('cleaning_gardening_areas')
+      .select('*')
+      .eq('client_id', profile.client_id)
+      .order('created_at', { ascending: false })
+    if (data) setAreas(data)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadAreas()
+  }, [profile])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
+  const selectedPlant = localPlants.find((p) => p.id === formData.plant_id)
+
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    setPolygon([...polygon, { x, y }])
+  }
+
+  const handleSave = async () => {
+    try {
+      if (!formData.name || !formData.plant_id || !formData.type) {
+        toast({
+          title: 'Campos obrigatórios',
+          description: 'Preencha todos os campos obrigatórios.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const payload = {
+        name: formData.name,
+        description: formData.description,
+        type: formData.type,
+        plant_id: formData.plant_id,
+        polygon_data: polygon,
+        client_id: profile.client_id,
+      }
+
+      if (formData.id) {
+        await supabase.from('cleaning_gardening_areas').update(payload).eq('id', formData.id)
+        toast({ title: 'Atualizado com sucesso' })
+      } else {
+        await supabase.from('cleaning_gardening_areas').insert(payload)
+        toast({ title: 'Adicionado com sucesso' })
+      }
+      setIsModalOpen(false)
+      loadAreas()
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Deseja realmente excluir esta área?')) return
+    await supabase.from('cleaning_gardening_areas').delete().eq('id', id)
+    toast({ title: 'Excluído com sucesso' })
+    loadAreas()
+  }
+
+  const handleUploadMap = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !formData.plant_id) return
+
+    setIsUploading(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${formData.plant_id}-${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage.from('plants').upload(fileName, file)
+      if (uploadError) throw uploadError
+
+      const { data: publicUrlData } = supabase.storage.from('plants').getPublicUrl(fileName)
+
+      await supabase
+        .from('plants')
+        .update({ map_url: publicUrlData.publicUrl })
+        .eq('id', formData.plant_id)
+
+      setLocalPlants((prev) =>
+        prev.map((p) =>
+          p.id === formData.plant_id ? { ...p, map_url: publicUrlData.publicUrl } : p,
+        ),
+      )
+      toast({ title: 'Mapa adicionado com sucesso' })
+    } catch (err: any) {
+      toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const openNew = () => {
+    setFormData({ type: 'cleaning' })
+    setPolygon([])
+    setIsModalOpen(true)
+  }
+
+  const openEdit = (area: any) => {
+    setFormData(area)
+    setPolygon(area.polygon_data || [])
+    setIsModalOpen(true)
+  }
+
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
-      <CrudGeneric
-        title="Áreas de Limpeza e Jardinagem"
-        singularName="Área"
-        tableName="cleaning_gardening_areas"
-        icon={Leaf as any}
-        fields={
-          [
-            {
-              name: 'plant_id',
-              label: 'Planta',
-              type: 'select',
-              required: true,
-              options: plants.map((p) => ({ value: p.id, label: p.name })),
-            },
-            { name: 'name', label: 'Nome da Área', type: 'text', required: true },
-            { name: 'description', label: 'Descrição', type: 'text', required: false },
-            {
-              name: 'type',
-              label: 'Tipo de Serviço',
-              type: 'select',
-              required: true,
-              options: [
-                { value: 'cleaning', label: 'Limpeza' },
-                { value: 'gardening', label: 'Jardinagem' },
-              ],
-            },
-          ] as FieldDef[]
-        }
-        columns={
-          [
-            { accessor: 'name', header: 'Nome' },
-            {
-              accessor: 'plant_id',
-              header: 'Planta',
-              render: (item: any) => plants.find((p) => p.id === item.plant_id)?.name || '-',
-            },
-            {
-              accessor: 'type',
-              header: 'Tipo',
-              render: (item: any) => (item.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'),
-            },
-            {
-              accessor: 'description',
-              header: 'Descrição',
-              render: (item: any) => item.description || '-',
-            },
-          ] as ColumnDef[]
-        }
-        plantField="plant_id"
-        plants={plants}
-        fetchQuery={async () => {
-          const { data } = await supabase
-            .from('cleaning_gardening_areas')
-            .select('*')
-            .eq('client_id', profile.client_id)
-            .order('created_at', { ascending: false })
-          return data
-        }}
-        onAdd={async (record: any) => {
-          if (!record.plant_id)
-            return { success: false, error: { message: 'A Planta é obrigatória.' } }
-          const payload = { ...record, client_id: profile.client_id }
-          const { error } = await supabase.from('cleaning_gardening_areas').insert(payload)
-          return { success: !error, error }
-        }}
-        onUpdate={async (id: string, record: any) => {
-          if (!record.plant_id)
-            return { success: false, error: { message: 'A Planta é obrigatória.' } }
-          const { error } = await supabase
-            .from('cleaning_gardening_areas')
-            .update(record)
-            .eq('id', id)
-          return { success: !error, error }
-        }}
-        onRemove={async (id: string) => {
-          const { error } = await supabase.from('cleaning_gardening_areas').delete().eq('id', id)
-          return { success: !error, error }
-        }}
-      />
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-2xl">
+            <Leaf className="h-6 w-6 text-brand-vividBlue" />
+            Áreas de Limpeza e Jardinagem
+          </CardTitle>
+          <Button onClick={openNew}>
+            <Plus className="h-4 w-4 mr-2" /> Nova Área
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Carregando...</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Planta</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="w-24">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {areas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      Nenhuma área cadastrada.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  areas.map((area) => (
+                    <TableRow key={area.id}>
+                      <TableCell className="font-medium">{area.name}</TableCell>
+                      <TableCell>
+                        {localPlants.find((p) => p.id === area.plant_id)?.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
+                          {area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'}
+                        </span>
+                      </TableCell>
+                      <TableCell>{area.description || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(area)}>
+                            <Edit2 className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(area.id)}
+                            className="hover:bg-red-100 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {formData.id ? 'Editar Área' : 'Nova Área'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 py-4">
+            <div className="lg:col-span-4 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Planta *</label>
+                <Select
+                  value={formData.plant_id || ''}
+                  onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a planta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {localPlants.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nome da Área *</label>
+                <Input
+                  placeholder="Ex: Refeitório Principal"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de Serviço *</label>
+                <Select
+                  value={formData.type || 'cleaning'}
+                  onValueChange={(v) => setFormData({ ...formData, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cleaning">Limpeza</SelectItem>
+                    <SelectItem value="gardening">Jardinagem</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descrição</label>
+                <Input
+                  placeholder="Detalhes adicionais..."
+                  value={formData.description || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="lg:col-span-8 space-y-4 lg:border-l lg:pl-8">
+              <h3 className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                <MapPin className="h-4 w-4" /> Marcação no Mapa (Opcional)
+              </h3>
+
+              {!formData.plant_id ? (
+                <div className="p-8 border-2 border-dashed border-gray-200 rounded-lg text-center text-muted-foreground bg-gray-50/50">
+                  Selecione uma planta primeiro para configurar o mapa.
+                </div>
+              ) : !selectedPlant?.map_url ? (
+                <div className="p-8 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center gap-4 text-center bg-gray-50/50">
+                  <p className="text-muted-foreground text-sm max-w-sm">
+                    Esta planta ainda não possui uma planta baixa cadastrada. Faça o upload da
+                    imagem do layout para ativar a marcação visual.
+                  </p>
+                  <div className="relative mt-2">
+                    <Button
+                      type="button"
+                      disabled={isUploading}
+                      className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
+                    >
+                      {isUploading ? (
+                        'Enviando Imagem...'
+                      ) : (
+                        <>
+                          <UploadCloud className="h-4 w-4 mr-2" /> Fazer Upload da Planta Baixa
+                        </>
+                      )}
+                    </Button>
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/jpg"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={handleUploadMap}
+                      disabled={isUploading}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Clique na imagem para desenhar o perímetro da área.
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => setPolygon([])}
+                    >
+                      Limpar Polígono
+                    </Button>
+                  </div>
+
+                  <div className="w-full overflow-auto flex justify-center bg-gray-100 p-2 rounded-lg border border-gray-200">
+                    <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-300">
+                      <img
+                        src={selectedPlant.map_url}
+                        alt="Mapa da Planta"
+                        className="block max-w-full h-auto cursor-crosshair"
+                        onClick={handleImageClick}
+                      />
+                      <svg
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        className="absolute inset-0 w-full h-full pointer-events-none"
+                      >
+                        {polygon.length > 0 && (
+                          <polygon
+                            points={polygon.map((p) => `${p.x},${p.y}`).join(' ')}
+                            fill="rgba(59, 130, 246, 0.4)"
+                            stroke="#3b82f6"
+                            strokeWidth="0.5"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        )}
+                        {polygon.map((p, i) => (
+                          <circle
+                            key={i}
+                            cx={p.x}
+                            cy={p.y}
+                            r="0.8"
+                            fill="#1d4ed8"
+                            stroke="#ffffff"
+                            strokeWidth="0.2"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        ))}
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="border-t pt-4 mt-2">
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSave}
+              className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
+            >
+              Salvar Área
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

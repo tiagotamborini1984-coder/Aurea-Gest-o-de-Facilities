@@ -42,6 +42,7 @@ import { AuthProvider } from './hooks/use-auth'
 import { ThemeProvider } from './components/theme-provider'
 
 // Limpeza e Jardinagem Pages
+import MapaLJ from './pages/gestao-terceiros/limpeza-jardinagem/Mapa'
 import AreasLJ from './pages/gestao-terceiros/limpeza-jardinagem/Areas'
 import CronogramaLJ from './pages/gestao-terceiros/limpeza-jardinagem/Cronograma'
 import DashboardLJ from './pages/gestao-terceiros/limpeza-jardinagem/Dashboard'
@@ -108,6 +109,7 @@ const App = () => (
                     <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
 
                     {/* Limpeza e Jardinagem */}
+                    <Route path="/limpeza-jardinagem/mapa" element={<MapaLJ />} />
                     <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
                     <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
                     <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
