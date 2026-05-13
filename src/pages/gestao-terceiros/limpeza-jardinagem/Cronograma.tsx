@@ -16,7 +16,7 @@ export default function Cronograma() {
 
   // Lifted state to synchronize filters between Planejamento and Execucao
   const [plantId, setPlantId] = useState('')
-  const [serviceType, setServiceType] = useState('cleaning')
+  const [serviceType, setServiceType] = useState('gardening')
 
   useEffect(() => {
     if (plants.length > 0 && !plantId) {

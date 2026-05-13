@@ -23,6 +23,7 @@ export default function MapaLJ() {
 
   const [selectedPlantId, setSelectedPlantId] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
+  const [serviceType, setServiceType] = useState<string>('gardening')
 
   const [areas, setAreas] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
@@ -38,13 +39,15 @@ export default function MapaLJ() {
           .from('cleaning_gardening_areas')
           .select('*')
           .eq('plant_id', selectedPlantId)
-          .eq('client_id', profile.client_id),
+          .eq('client_id', profile.client_id)
+          .eq('type', serviceType),
         supabase
           .from('cleaning_gardening_schedules')
-          .select('*')
+          .select('*, cleaning_gardening_areas!inner(type)')
           .eq('plant_id', selectedPlantId)
           .eq('client_id', profile.client_id)
-          .eq('activity_date', selectedDate),
+          .eq('activity_date', selectedDate)
+          .eq('cleaning_gardening_areas.type', serviceType),
       ])
 
       setAreas(areasData || [])
@@ -52,7 +55,7 @@ export default function MapaLJ() {
     }
 
     loadData()
-  }, [selectedPlantId, selectedDate, profile])
+  }, [selectedPlantId, selectedDate, profile, serviceType])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -81,6 +84,15 @@ export default function MapaLJ() {
           <h1 className="text-2xl font-bold text-gray-800">Mapa Operacional</h1>
         </div>
         <div className="flex flex-col sm:flex-row gap-4">
+          <Select value={serviceType} onValueChange={setServiceType}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Tipo de Serviço" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gardening">Jardinagem</SelectItem>
+              <SelectItem value="cleaning">Limpeza</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
             type="date"
             value={selectedDate}
