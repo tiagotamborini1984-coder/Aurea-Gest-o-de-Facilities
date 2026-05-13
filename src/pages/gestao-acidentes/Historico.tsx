@@ -47,6 +47,7 @@ export default function HistoricoAcidentes() {
     return (
       profile.role === 'Administrador' ||
       profile.role === 'Master' ||
+      profile.role === 'Gestor' ||
       item.created_by === profile.id
     )
   }
@@ -115,9 +116,12 @@ export default function HistoricoAcidentes() {
                       </TableCell>
                       <TableCell>
                         {item.photos && Array.isArray(item.photos) && item.photos.length > 0 ? (
-                          <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                          <Badge
+                            variant="outline"
+                            className="flex items-center gap-1 w-fit bg-blue-50 text-blue-700 border-blue-200"
+                          >
                             <Paperclip className="w-3 h-3" />
-                            {item.photos.length}
+                            {item.photos.length} {item.photos.length === 1 ? 'anexo' : 'anexos'}
                           </Badge>
                         ) : (
                           <span className="text-gray-400 text-sm">-</span>
