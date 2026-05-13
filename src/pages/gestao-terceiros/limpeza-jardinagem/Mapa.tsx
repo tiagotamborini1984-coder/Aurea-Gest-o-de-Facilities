@@ -34,35 +34,30 @@ export default function MapaLJ() {
     if (!selectedPlantId || !profile) return
 
     const loadData = async () => {
-      let areasQuery = supabase
+      // Sempre carrega todas as áreas para não "sumir" com o polígono do mapa
+      const { data: areasData, error: areasError } = await supabase
         .from('cleaning_gardening_areas')
         .select('*')
         .eq('plant_id', selectedPlantId)
         .eq('client_id', profile.client_id)
 
-      if (serviceType !== 'all') {
-        areasQuery = areasQuery.eq('type', serviceType)
-      }
-
-      const { data: areasData, error: areasError } = await areasQuery
       if (areasError) console.error('Error fetching areas:', areasError)
 
       const fetchedAreas = areasData || []
-      const areaIds = fetchedAreas.map((a) => a.id)
-
-      if (areaIds.length === 0) {
+      
+      if (fetchedAreas.length === 0) {
         setAreas([])
         setSchedules([])
         return
       }
 
+      // Busca todos os cronogramas da planta na data
       const { data: schedulesData, error: schedulesError } = await supabase
         .from('cleaning_gardening_schedules')
         .select('*')
         .eq('plant_id', selectedPlantId)
         .eq('client_id', profile.client_id)
         .eq('activity_date', selectedDate)
-        .in('area_id', areaIds)
 
       if (schedulesError) console.error('Error fetching schedules:', schedulesError)
 
@@ -77,6 +72,11 @@ export default function MapaLJ() {
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const getAreaColor = (area: any) => {
+    // Se a área não pertencer ao tipo de serviço selecionado, exibe com cor neutra/desativada
+    if (serviceType !== 'all' && area.type !== serviceType) {
+      return { fill: 'rgba(156, 163, 175, 0.1)', stroke: 'rgba(156, 163, 175, 0.5)' } // Cinza claro - Fora do escopo
+    }
+
     const areaSchedules = schedules.filter((s) => s.area_id === area.id)
     if (areaSchedules.length === 0) return { fill: 'rgba(156, 163, 175, 0.4)', stroke: '#9ca3af' } // Cinza - Sem Atividade
 
@@ -146,7 +146,7 @@ export default function MapaLJ() {
             </div>
           ) : (
             <div className="w-full overflow-auto flex justify-center bg-gray-100 p-4 rounded-lg">
-              <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200">
+              <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200" key={serviceType}>
                 <img
                   src={selectedPlant.map_url}
                   alt="Mapa da Planta"
@@ -160,6 +160,7 @@ export default function MapaLJ() {
                   {areas.map((area) => {
                     if (!area.polygon_data || area.polygon_data.length === 0) return null
                     const colors = getAreaColor(area)
+                    const isFilteredOut = serviceType !== 'all' && area.type !== serviceType
                     return (
                       <polygon
                         key={area.id}
@@ -168,11 +169,11 @@ export default function MapaLJ() {
                         stroke={colors.stroke}
                         strokeWidth="0.5"
                         vectorEffect="non-scaling-stroke"
-                        className="transition-colors duration-500 ease-in-out hover:opacity-80 cursor-pointer"
+                        className={`transition-colors duration-500 ease-in-out pointer-events-auto ${!isFilteredOut ? 'hover:opacity-80 cursor-pointer' : ''}`}
                       >
                         <title>
                           {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
-                          {schedules
+                          {!isFilteredOut && schedules
                             .filter((s) => s.area_id === area.id)
                             .map((s) => `\n- ${s.description} (${s.status})`)}
                         </title>
@@ -182,30 +183,35 @@ export default function MapaLJ() {
                 </svg>
               </div>
             </div>
-          )}
 
-          <div className="flex flex-wrap gap-4 md:gap-6 mt-8 justify-center text-sm font-medium text-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded bg-green-500 shadow-sm border border-green-600"></span>{' '}
-              Realizado
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded bg-yellow-500 shadow-sm border border-yellow-600"></span>{' '}
-              Planejado / Pendente
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded bg-red-500 shadow-sm border border-red-600"></span>{' '}
-              Não Realizado
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded bg-orange-500 shadow-sm border border-orange-600"></span>{' '}
-              Emergencial
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded bg-gray-400 shadow-sm border border-gray-500"></span>{' '}
-              Sem Atividade
-            </div>
-          </div>
+            <div className="flex flex-wrap gap-4 md:gap-6 mt-8 justify-center text-sm font-medium text-gray-700">
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded bg-green-500 shadow-sm border border-green-600"></span>{' '}
+                Realizado
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded bg-yellow-500 shadow-sm border border-yellow-600"></span>{' '}
+                Planejado / Pendente
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded bg-red-500 shadow-sm border border-red-600"></span>{' '}
+                Não Realizado
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded bg-orange-500 shadow-sm border border-orange-600"></span>{' '}
+                Emergencial
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 rounded bg-gray-400 shadow-sm border border-gray-500"></span>{' '}
+                Sem Atividade
+              </div>
+              {serviceType !== 'all' && (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-gray-200 shadow-sm border border-gray-300 opacity-50"></span>{' '}
+                  Fora do Filtro
+                </div>
+              )}
+            </div>          </div>
         </CardContent>
       </Card>
     </div>
