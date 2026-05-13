@@ -44,7 +44,7 @@ export default function MapaLJ() {
       if (areasError) console.error('Error fetching areas:', areasError)
 
       const fetchedAreas = areasData || []
-      
+
       if (fetchedAreas.length === 0) {
         setAreas([])
         setSchedules([])
@@ -147,72 +147,78 @@ export default function MapaLJ() {
           ) : (
             <div>
               <div className="w-full overflow-auto flex justify-center bg-gray-100 p-4 rounded-lg">
-                <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200" key={serviceType}>
-                <img
-                  src={selectedPlant.map_url}
-                  alt="Mapa da Planta"
-                  className="block max-w-full h-auto"
-                />
-                <svg
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  className="absolute inset-0 w-full h-full pointer-events-none"
+                <div
+                  className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200"
+                  key={serviceType}
                 >
-                  {areas.map((area) => {
-                    if (!area.polygon_data || area.polygon_data.length === 0) return null
-                    const colors = getAreaColor(area)
-                    const isFilteredOut = serviceType !== 'all' && area.type !== serviceType
-                    return (
-                      <polygon
-                        key={area.id}
-                        points={area.polygon_data.map((p: any) => `${p.x},${p.y}`).join(' ')}
-                        fill={colors.fill}
-                        stroke={colors.stroke}
-                        strokeWidth="0.5"
-                        vectorEffect="non-scaling-stroke"
-                        className={`transition-colors duration-500 ease-in-out pointer-events-auto ${!isFilteredOut ? 'hover:opacity-80 cursor-pointer' : ''}`}
-                      >
-                        <title>
-                          {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
-                          {!isFilteredOut && schedules
-                            .filter((s) => s.area_id === area.id)
-                            .map((s) => `\n- ${s.description} (${s.status})`)}
-                        </title>
-                      </polygon>
-                    )
-                  })}
-                </svg>
+                  <img
+                    src={selectedPlant.map_url}
+                    alt="Mapa da Planta"
+                    className="block max-w-full h-auto"
+                  />
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="absolute inset-0 w-full h-full pointer-events-none"
+                  >
+                    {areas.map((area) => {
+                      if (!area.polygon_data || area.polygon_data.length === 0) return null
+                      const colors = getAreaColor(area)
+                      const isFilteredOut = serviceType !== 'all' && area.type !== serviceType
+                      return (
+                        <polygon
+                          key={area.id}
+                          points={area.polygon_data.map((p: any) => `${p.x},${p.y}`).join(' ')}
+                          fill={colors.fill}
+                          stroke={colors.stroke}
+                          strokeWidth="0.5"
+                          vectorEffect="non-scaling-stroke"
+                          className={`transition-colors duration-500 ease-in-out pointer-events-auto ${!isFilteredOut ? 'hover:opacity-80 cursor-pointer' : ''}`}
+                        >
+                          <title>
+                            {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
+                            {!isFilteredOut &&
+                              schedules
+                                .filter((s) => s.area_id === area.id)
+                                .map((s) => `\n- ${s.description} (${s.status})`)}
+                          </title>
+                        </polygon>
+                      )
+                    })}
+                  </svg>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 md:gap-6 mt-8 justify-center text-sm font-medium text-gray-700">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-green-500 shadow-sm border border-green-600"></span>{' '}
+                  Realizado
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-yellow-500 shadow-sm border border-yellow-600"></span>{' '}
+                  Planejado / Pendente
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-red-500 shadow-sm border border-red-600"></span>{' '}
+                  Não Realizado
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-orange-500 shadow-sm border border-orange-600"></span>{' '}
+                  Emergencial
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-gray-400 shadow-sm border border-gray-500"></span>{' '}
+                  Sem Atividade
+                </div>
+                {serviceType !== 'all' && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded bg-gray-200 shadow-sm border border-gray-300 opacity-50"></span>{' '}
+                    Fora do Filtro
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-4 md:gap-6 mt-8 justify-center text-sm font-medium text-gray-700">
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-green-500 shadow-sm border border-green-600"></span>{' '}
-                Realizado
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-yellow-500 shadow-sm border border-yellow-600"></span>{' '}
-                Planejado / Pendente
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-red-500 shadow-sm border border-red-600"></span>{' '}
-                Não Realizado
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-orange-500 shadow-sm border border-orange-600"></span>{' '}
-                Emergencial
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-gray-400 shadow-sm border border-gray-500"></span>{' '}
-                Sem Atividade
-              </div>
-              {serviceType !== 'all' && (
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded bg-gray-200 shadow-sm border border-gray-300 opacity-50"></span>{' '}
-                  Fora do Filtro
-                </div>
-              )}
-            </div>          </div>
+          )}
         </CardContent>
       </Card>
     </div>
