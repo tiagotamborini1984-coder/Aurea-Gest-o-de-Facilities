@@ -120,6 +120,12 @@ export function useCadastrosConfig(
             { name: 'name', label: 'Nome da Planta', type: 'text' },
             { name: 'code', label: 'Código', type: 'text' },
             { name: 'city', label: 'Cidade', type: 'text' },
+            {
+              name: 'map_url',
+              label: 'Planta Baixa (Upload de Imagem)',
+              type: 'image',
+              required: false,
+            },
           ],
         }
       case 'locais':

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Leaf, Plus, Trash2, Edit2, MapPin, UploadCloud } from 'lucide-react'
+import { Leaf, Plus, Trash2, Edit2, MapPin } from 'lucide-react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
@@ -43,13 +43,6 @@ export default function AreasLJ() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [polygon, setPolygon] = useState<{ x: number; y: number }[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-
-  const [localPlants, setLocalPlants] = useState(plants)
-
-  useEffect(() => {
-    if (plants.length > 0) setLocalPlants(plants)
-  }, [plants])
 
   const loadAreas = async () => {
     if (!profile) return
@@ -69,7 +62,7 @@ export default function AreasLJ() {
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
-  const selectedPlant = localPlants.find((p) => p.id === formData.plant_id)
+  const selectedPlant = plants.find((p) => p.id === formData.plant_id)
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -117,38 +110,6 @@ export default function AreasLJ() {
     await supabase.from('cleaning_gardening_areas').delete().eq('id', id)
     toast({ title: 'Excluído com sucesso' })
     loadAreas()
-  }
-
-  const handleUploadMap = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !formData.plant_id) return
-
-    setIsUploading(true)
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${formData.plant_id}-${Date.now()}.${fileExt}`
-
-      const { error: uploadError } = await supabase.storage.from('plants').upload(fileName, file)
-      if (uploadError) throw uploadError
-
-      const { data: publicUrlData } = supabase.storage.from('plants').getPublicUrl(fileName)
-
-      await supabase
-        .from('plants')
-        .update({ map_url: publicUrlData.publicUrl })
-        .eq('id', formData.plant_id)
-
-      setLocalPlants((prev) =>
-        prev.map((p) =>
-          p.id === formData.plant_id ? { ...p, map_url: publicUrlData.publicUrl } : p,
-        ),
-      )
-      toast({ title: 'Mapa adicionado com sucesso' })
-    } catch (err: any) {
-      toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsUploading(false)
-    }
   }
 
   const openNew = () => {
@@ -201,7 +162,7 @@ export default function AreasLJ() {
                     <TableRow key={area.id}>
                       <TableCell className="font-medium">{area.name}</TableCell>
                       <TableCell>
-                        {localPlants.find((p) => p.id === area.plant_id)?.name || '-'}
+                        {plants.find((p) => p.id === area.plant_id)?.name || '-'}
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
@@ -252,7 +213,7 @@ export default function AreasLJ() {
                     <SelectValue placeholder="Selecione a planta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {localPlants.map((p) => (
+                    {plants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
                       </SelectItem>
@@ -305,31 +266,9 @@ export default function AreasLJ() {
               ) : !selectedPlant?.map_url ? (
                 <div className="p-8 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center gap-4 text-center bg-gray-50/50">
                   <p className="text-muted-foreground text-sm max-w-sm">
-                    Esta planta ainda não possui uma planta baixa cadastrada. Faça o upload da
-                    imagem do layout para ativar a marcação visual.
+                    Esta planta ainda não possui uma planta baixa cadastrada. Configure o mapa no
+                    módulo de Cadastros de Plantas para ativar a marcação visual.
                   </p>
-                  <div className="relative mt-2">
-                    <Button
-                      type="button"
-                      disabled={isUploading}
-                      className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
-                    >
-                      {isUploading ? (
-                        'Enviando Imagem...'
-                      ) : (
-                        <>
-                          <UploadCloud className="h-4 w-4 mr-2" /> Fazer Upload da Planta Baixa
-                        </>
-                      )}
-                    </Button>
-                    <input
-                      type="file"
-                      accept="image/png, image/jpeg, image/jpg"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={handleUploadMap}
-                      disabled={isUploading}
-                    />
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
