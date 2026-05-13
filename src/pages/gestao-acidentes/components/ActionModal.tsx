@@ -56,7 +56,7 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
       .from('task_statuses')
       .select('id, name')
       .eq('client_id', activeClient.id)
-      .order('order_index')
+      .order('created_at')
       .then(({ data }) => setStatuses(data || []))
     supabase
       .from('plants')
@@ -130,18 +130,38 @@ export function ActionModal({ open, onClose, accidentId, plantId, existingTask, 
         }
 
         let typeId = formData.type_id || types[0]?.id
-        let statusId = formData.status_id || statuses[0]?.id
-
         if (!typeId) {
-          throw new Error(
-            'Nenhum Tipo de Tarefa configurado. Acesse Gestão de Tarefas > Tipos e crie um tipo.',
-          )
+          const { data: newType, error: typeErr } = await supabase
+            .from('task_types')
+            .insert({
+              client_id: activeClient.id,
+              name: 'Ação de Acidente',
+              sla_hours: 48,
+            })
+            .select('id')
+            .single()
+
+          if (typeErr) throw new Error('Erro ao gerar Tipo de Tarefa padrão.')
+          typeId = newType.id
         }
 
+        let statusId = formData.status_id || statuses[0]?.id
         if (!statusId) {
-          throw new Error(
-            'Nenhum Status de Tarefa configurado. Acesse Gestão de Tarefas > Status e crie um status.',
-          )
+          const { data: newStatus, error: statusErr } = await supabase
+            .from('task_statuses')
+            .insert({
+              client_id: activeClient.id,
+              name: 'Pendente',
+              color: '#eab308',
+              is_terminal: false,
+              freeze_sla: false,
+              sla_days: 2,
+            })
+            .select('id')
+            .single()
+
+          if (statusErr) throw new Error('Erro ao gerar Status de Tarefa padrão.')
+          statusId = newStatus.id
         }
 
         let success = false
