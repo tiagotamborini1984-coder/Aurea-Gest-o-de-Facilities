@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/table'
 
 export default function AreasLJ() {
-  const { plants } = useMasterData()
+  const { plants, refetch } = useMasterData()
   const { profile } = useAppStore()
   const hasAccess = useHasAccess('Limpeza e Jardinagem')
   const { toast } = useToast()
@@ -63,6 +63,30 @@ export default function AreasLJ() {
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const selectedPlant = plants.find((p) => p.id === formData.plant_id)
+
+  const getMapUrl = (val: any): string | null => {
+    if (!val) return null
+    if (typeof val === 'string') {
+      if (val.trim().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(val)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return typeof parsed[0] === 'string' ? parsed[0] : parsed[0].url || null
+          }
+          return null
+        } catch {
+          return val
+        }
+      }
+      return val
+    }
+    if (Array.isArray(val) && val.length > 0) {
+      return typeof val[0] === 'string' ? val[0] : val[0].url || null
+    }
+    return null
+  }
+
+  const mapUrl = getMapUrl(selectedPlant?.map_url)
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -112,13 +136,15 @@ export default function AreasLJ() {
     loadAreas()
   }
 
-  const openNew = () => {
+  const openNew = async () => {
+    await refetch()
     setFormData({ type: 'cleaning' })
     setPolygon([])
     setIsModalOpen(true)
   }
 
-  const openEdit = (area: any) => {
+  const openEdit = async (area: any) => {
+    await refetch()
     setFormData(area)
     setPolygon(area.polygon_data || [])
     setIsModalOpen(true)
@@ -263,7 +289,7 @@ export default function AreasLJ() {
                 <div className="p-8 border-2 border-dashed border-gray-200 rounded-lg text-center text-muted-foreground bg-gray-50/50">
                   Selecione uma planta primeiro para configurar o mapa.
                 </div>
-              ) : !selectedPlant?.map_url ? (
+              ) : !mapUrl ? (
                 <div className="p-8 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center gap-4 text-center bg-gray-50/50">
                   <p className="text-muted-foreground text-sm max-w-sm">
                     Esta planta ainda não possui uma planta baixa cadastrada. Configure o mapa no
@@ -289,7 +315,7 @@ export default function AreasLJ() {
                   <div className="w-full overflow-auto flex justify-center bg-gray-100 p-2 rounded-lg border border-gray-200">
                     <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-300">
                       <img
-                        src={selectedPlant.map_url}
+                        src={mapUrl}
                         alt="Mapa da Planta"
                         className="block max-w-full h-auto cursor-crosshair"
                         onClick={handleImageClick}
