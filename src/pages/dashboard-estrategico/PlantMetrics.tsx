@@ -9,35 +9,27 @@ import {
   Leaf,
   Home,
   TrendingDown,
+  Medal,
 } from 'lucide-react'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-} from 'recharts'
+import { LineChart, Line, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { cn } from '@/lib/utils'
 
 export function PlantMetrics({ data }: { data: StrategicData }) {
-  const { metrics, insights } = data
+  const { metrics, insights, rankings, plant } = data
+  const isConsolidated = plant.id === 'all'
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
+      {/* Resumo Rápido */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <MetricCard
           title="Absenteísmo"
           icon={Users}
-          value={`${metrics.absenteismo.taxa.toFixed(1)}%`}
+          value={`${metrics.terceiros.absenteismo.toFixed(1)}%`}
           trend="Média diária"
           color="text-blue-600"
         />
@@ -46,7 +38,7 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
           icon={Wrench}
           value={metrics.tarefas.concluidas}
           trend={`${metrics.tarefas.atrasadas} atrasadas`}
-          color="text-green-600"
+          color="text-emerald-600"
         />
         <MetricCard
           title="Acidentes"
@@ -56,10 +48,10 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
           color="text-amber-500"
         />
         <MetricCard
-          title="Budget Usado"
+          title="Budget Realizado"
           icon={DollarSign}
-          value={`${((metrics.budget.realizado / metrics.budget.orcado) * 100).toFixed(1)}%`}
-          trend={formatCurrency(metrics.budget.realizado)}
+          value={formatCurrency(metrics.budget.realizado)}
+          trend={`${((metrics.budget.realizado / (metrics.budget.orcado || 1)) * 100).toFixed(1)}% do orçado`}
           color="text-purple-600"
         />
         <MetricCard
@@ -67,7 +59,7 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
           icon={Leaf}
           value={metrics.limpeza.concluidas}
           trend={`${metrics.limpeza.pendentes} pendentes`}
-          color="text-emerald-500"
+          color="text-green-500"
         />
         <MetricCard
           title="Ocupação Imóveis"
@@ -78,8 +70,158 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 shadow-sm border-gray-100">
+      {/* Rankings na Visão Consolidada */}
+      {isConsolidated && rankings && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in-up">
+          <RankingCard
+            title="Menor Absenteísmo"
+            data={rankings.absenteismo}
+            valueFormatter={(v) => `${v.toFixed(1)}%`}
+          />
+          <RankingCard
+            title="Mais Tarefas Concluídas"
+            data={rankings.tarefas}
+            valueFormatter={(v) => v.toString()}
+          />
+          <RankingCard
+            title="Maior Uso do Budget"
+            data={rankings.budget}
+            valueFormatter={(v) => `${v.toFixed(1)}%`}
+          />
+        </div>
+      )}
+
+      {/* Análise por Módulos */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="h-6 w-6 text-brand-vividBlue" />
+          Análise Detalhada por Módulo
+        </h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ModuleCard title="Gestão de Terceiros" icon={Users} color="bg-blue-50 text-blue-600">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-500">Headcount</p>
+                <p className="text-2xl font-bold text-gray-900">{metrics.terceiros.headcount}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Taxa de Absenteísmo</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics.terceiros.absenteismo.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+            <InsightList items={insights.terceiros} />
+          </ModuleCard>
+
+          <ModuleCard
+            title="Gestão de Tarefas"
+            icon={Wrench}
+            color="bg-emerald-50 text-emerald-600"
+          >
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-500">Concluídas</p>
+                <p className="text-2xl font-bold text-emerald-600">{metrics.tarefas.concluidas}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Pendentes</p>
+                <p className="text-2xl font-bold text-amber-500">{metrics.tarefas.pendentes}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Atrasadas</p>
+                <p className="text-2xl font-bold text-red-500">{metrics.tarefas.atrasadas}</p>
+              </div>
+            </div>
+            <InsightList items={insights.tarefas} />
+          </ModuleCard>
+
+          <ModuleCard
+            title="Gestão de Budget"
+            icon={DollarSign}
+            color="bg-purple-50 text-purple-600"
+          >
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-500">Orçado</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(metrics.budget.orcado)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Realizado</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(metrics.budget.realizado)}
+                </p>
+              </div>
+            </div>
+            <InsightList items={insights.budget} />
+          </ModuleCard>
+
+          <ModuleCard title="Limpeza e Jardinagem" icon={Leaf} color="bg-green-50 text-green-600">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-500">Concluídas</p>
+                <p className="text-2xl font-bold text-gray-900">{metrics.limpeza.concluidas}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Pendentes</p>
+                <p className="text-2xl font-bold text-gray-900">{metrics.limpeza.pendentes}</p>
+              </div>
+            </div>
+            <InsightList items={insights.limpeza} />
+          </ModuleCard>
+
+          <ModuleCard
+            title="Gestão de Acidentes"
+            icon={AlertTriangle}
+            color="bg-amber-50 text-amber-600"
+          >
+            <div className="grid grid-cols-4 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-500">Total</p>
+                <p className="text-2xl font-bold text-gray-900">{metrics.acidentes.total}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Leves</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {metrics.acidentes.gravidade.leve}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Moderados</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {metrics.acidentes.gravidade.moderado}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Graves</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {metrics.acidentes.gravidade.grave}
+                </p>
+              </div>
+            </div>
+            <InsightList items={insights.acidentes} />
+          </ModuleCard>
+
+          <ModuleCard title="Gestão de Imóveis" icon={Home} color="bg-indigo-50 text-indigo-600">
+            <div className="grid grid-cols-1 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-gray-500">Taxa de Ocupação Média</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics.imoveis.ocupacao.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+            <InsightList items={insights.imoveis} />
+          </ModuleCard>
+        </div>
+      </div>
+
+      {/* Gráfico e IA Geral */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm border-gray-100">
           <CardHeader>
             <CardTitle className="text-gray-800 flex items-center gap-2">
               <TrendingDown className="h-5 w-5 text-gray-500" />
@@ -89,10 +231,10 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
           <CardContent>
             <ChartContainer
               config={{ value: { label: 'Absenteísmo %', color: 'hsl(var(--chart-1))' } }}
-              className="h-[300px] w-full"
+              className="h-[250px] w-full"
             >
               <LineChart
-                data={metrics.absenteismo.evolution}
+                data={metrics.terceiros.evolution}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
@@ -121,21 +263,14 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Sparkles className="h-5 w-5 text-yellow-300" />
-              Insights da IA
+              Diagnóstico Estratégico Global (IA)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {insights.map((insight, idx) => (
-              <div
-                key={idx}
-                className="bg-white/10 p-4 rounded-lg backdrop-blur-sm border border-white/10"
-              >
-                <p className="text-sm text-blue-50 leading-relaxed">{insight}</p>
-              </div>
-            ))}
-            <div className="pt-2">
+            <InsightList items={insights.geral} textClass="text-blue-50 text-base" />
+            <div className="pt-6">
               <div className="text-xs text-blue-200 uppercase tracking-wider font-semibold mb-2">
-                Diagnóstico Geral
+                Saúde Operacional
               </div>
               <div className="flex items-center gap-3">
                 <div className="h-2 flex-1 bg-white/20 rounded-full overflow-hidden">
@@ -144,83 +279,6 @@ export function PlantMetrics({ data }: { data: StrategicData }) {
                 <span className="text-sm font-medium">85% Saúde</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm border-gray-100">
-          <CardHeader>
-            <CardTitle className="text-gray-800">Status de Tarefas de Manutenção</CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <ChartContainer
-              config={{
-                concluidas: { label: 'Concluídas', color: '#10b981' },
-                pendentes: { label: 'Pendentes', color: '#f59e0b' },
-                atrasadas: { label: 'Atrasadas', color: '#ef4444' },
-              }}
-              className="h-[250px] w-full"
-            >
-              <RechartsPieChart>
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie
-                  data={[
-                    { name: 'Concluídas', value: metrics.tarefas.concluidas },
-                    { name: 'Pendentes', value: metrics.tarefas.pendentes },
-                    { name: 'Atrasadas', value: metrics.tarefas.atrasadas },
-                  ]}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                >
-                  <Cell fill="#10b981" />
-                  <Cell fill="#f59e0b" />
-                  <Cell fill="#ef4444" />
-                </Pie>
-              </RechartsPieChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-gray-100">
-          <CardHeader>
-            <CardTitle className="text-gray-800">Execução Financeira (Budget)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                orcado: { label: 'Orçado', color: 'hsl(var(--chart-2))' },
-                realizado: { label: 'Realizado', color: 'hsl(var(--chart-1))' },
-              }}
-              className="h-[250px] w-full"
-            >
-              <BarChart
-                data={[
-                  {
-                    name: 'Budget Mensal',
-                    orcado: metrics.budget.orcado,
-                    realizado: metrics.budget.realizado,
-                  },
-                ]}
-                margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `R$${value / 1000}k`}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="orcado" fill="var(--color-orcado)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="realizado" fill="var(--color-realizado)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
           </CardContent>
         </Card>
       </div>
@@ -245,7 +303,7 @@ function MetricCard({
     <Card className="shadow-sm border-gray-100 transition-all hover:shadow-md">
       <CardContent className="p-5">
         <div className="flex justify-between items-start">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <p className="text-sm font-medium text-gray-500">{title}</p>
             <p className="text-2xl font-bold text-gray-900">{value}</p>
           </div>
@@ -254,9 +312,95 @@ function MetricCard({
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <p className="text-xs text-gray-500">{trend}</p>
+          <p className="text-xs text-gray-500 truncate">{trend}</p>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function RankingCard({
+  title,
+  data,
+  valueFormatter,
+}: {
+  title: string
+  data: { plantName: string; value: number }[]
+  valueFormatter: (v: number) => string
+}) {
+  return (
+    <Card className="shadow-sm border-gray-100 bg-gray-50/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-gray-800 flex items-center gap-2 uppercase tracking-wide">
+          <Medal className="h-4 w-4 text-brand-vividBlue" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3 mt-2">
+          {data.slice(0, 5).map((item, idx) => (
+            <div
+              key={idx}
+              className="flex justify-between items-center text-sm border-b border-gray-200/50 pb-2 last:border-0 last:pb-0"
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-gray-400 font-mono w-4">{idx + 1}.</span>
+                <span
+                  className="font-medium text-gray-700 truncate max-w-[150px]"
+                  title={item.plantName}
+                >
+                  {item.plantName}
+                </span>
+              </span>
+              <span className="font-semibold text-gray-900">{valueFormatter(item.value)}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ModuleCard({
+  title,
+  icon: Icon,
+  color,
+  children,
+}: {
+  title: string
+  icon: any
+  color: string
+  children: React.ReactNode
+}) {
+  return (
+    <Card className="shadow-sm border-gray-100 hover:shadow-md transition-shadow h-full flex flex-col">
+      <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0 border-b border-gray-50">
+        <CardTitle className="text-base text-gray-800 font-semibold">{title}</CardTitle>
+        <div className={cn('p-2 rounded-lg', color)}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4 flex-1">{children}</CardContent>
+    </Card>
+  )
+}
+
+function InsightList({
+  items,
+  textClass = 'text-gray-600',
+}: {
+  items: string[]
+  textClass?: string
+}) {
+  if (!items || items.length === 0) return null
+  return (
+    <ul className="space-y-2 mt-4 pt-4 border-t border-black/5">
+      {items.map((item, idx) => (
+        <li key={idx} className="flex items-start gap-2 text-sm leading-relaxed">
+          <Sparkles className="h-4 w-4 shrink-0 text-brand-vividBlue mt-0.5 opacity-70" />
+          <span className={textClass}>{item}</span>
+        </li>
+      ))}
+    </ul>
   )
 }

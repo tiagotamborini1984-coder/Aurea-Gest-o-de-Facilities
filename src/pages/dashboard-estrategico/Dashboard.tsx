@@ -10,11 +10,16 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useDashboardEstrategico } from '@/hooks/use-dashboard-estrategico'
 import { PlantMetrics } from './PlantMetrics'
+import { DateRange } from 'react-day-picker'
 
 export default function DashboardEstrategico() {
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date())
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date(),
+  })
+
   const [isExporting, setIsExporting] = useState(false)
-  const { data, loading } = useDashboardEstrategico(selectedMonth)
+  const { data, loading } = useDashboardEstrategico(dateRange)
 
   const handleExportPPTX = async () => {
     setIsExporting(true)
@@ -31,7 +36,10 @@ export default function DashboardEstrategico() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Apresentacao_Gerencial_${format(selectedMonth, 'MMM_yyyy')}.pptx`
+
+    const dateStr = dateRange?.from ? format(dateRange.from, 'MMM_yyyy', { locale: ptBR }) : 'Geral'
+    a.download = `Apresentacao_Gerencial_${dateStr}.pptx`
+
     a.click()
     URL.revokeObjectURL(url)
 
@@ -48,7 +56,7 @@ export default function DashboardEstrategico() {
             Dashboard Estratégico
           </h1>
           <p className="text-gray-500 mt-1">
-            Visão consolidada de todas as plantas com insights gerados por IA
+            Visão consolidada e análises geradas por IA, organizadas por módulo e unidade
           </p>
         </div>
 
@@ -58,25 +66,26 @@ export default function DashboardEstrategico() {
               <Button
                 variant="outline"
                 className={cn(
-                  'w-[240px] justify-start text-left font-normal bg-white border-gray-200',
-                  !selectedMonth && 'text-muted-foreground',
+                  'w-[280px] justify-start text-left font-normal bg-white border-gray-200',
+                  !dateRange && 'text-muted-foreground',
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4 text-brand-vividBlue" />
-                {selectedMonth ? (
-                  format(selectedMonth, 'MMMM yyyy', { locale: ptBR })
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
+                    </>
+                  ) : (
+                    format(dateRange.from, 'dd/MM/yyyy')
+                  )
                 ) : (
-                  <span>Selecione o mês</span>
+                  <span>Selecione o período</span>
                 )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedMonth}
-                onSelect={(d) => d && setSelectedMonth(d)}
-                initialFocus
-              />
+              <Calendar mode="range" selected={dateRange} onSelect={setDateRange} initialFocus />
             </PopoverContent>
           </Popover>
 
@@ -102,7 +111,7 @@ export default function DashboardEstrategico() {
       ) : data.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <Presentation className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">Nenhuma planta encontrada</h3>
+          <h3 className="text-lg font-medium text-gray-900">Nenhum dado encontrado</h3>
           <p className="text-gray-500">Cadastre plantas para visualizar o dashboard estratégico.</p>
         </div>
       ) : (
