@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils'
 export type FieldDef = {
   name: string
   label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'toggle'
+  type: 'text' | 'textarea' | 'number' | 'select' | 'toggle' | 'image'
   options?: { value: string; label: string }[] | ((form: any) => { value: string; label: string }[])
   required?: boolean
   hidden?: (form: any) => boolean
@@ -415,7 +415,7 @@ export function CrudGeneric({
                       'space-y-2',
                       f.type === 'toggle'
                         ? 'col-span-1 sm:col-span-2 flex items-center justify-between border border-gray-200 p-3 rounded-lg'
-                        : f.type === 'textarea'
+                        : f.type === 'textarea' || f.type === 'image'
                           ? 'col-span-1 sm:col-span-2'
                           : '',
                     )}
@@ -506,6 +506,66 @@ export function CrudGeneric({
                           disabled={f.disabled ? f.disabled(form) : false}
                         />
                       </>
+                    )}
+                    {f.type === 'image' && (
+                      <div className="space-y-2 mt-1">
+                        {form[f.name] && (
+                          <div className="relative w-full sm:w-1/2 h-40 bg-slate-50 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center">
+                            <img
+                              src={form[f.name]}
+                              alt="Preview"
+                              className="max-w-full max-h-full object-contain"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setForm({ ...form, [f.name]: null })}
+                              className="absolute top-2 right-2 bg-white text-red-500 hover:text-red-600 p-1.5 rounded-full shadow-md border border-gray-100 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        {!form[f.name] && (
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              try {
+                                const fileExt = file.name.split('.').pop()
+                                const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+                                const { data, error } = await supabase.storage
+                                  .from('images')
+                                  .upload(`plants/${fileName}`, file, {
+                                    cacheControl: '3600',
+                                    upsert: false,
+                                  })
+                                if (error) throw error
+                                if (data) {
+                                  const { data: urlData } = supabase.storage
+                                    .from('images')
+                                    .getPublicUrl(`plants/${fileName}`)
+                                  setForm({ ...form, [f.name]: urlData.publicUrl })
+                                  if (formErrors[f.name])
+                                    setFormErrors({ ...formErrors, [f.name]: false })
+                                }
+                              } catch (err: any) {
+                                toast({
+                                  title: 'Erro no upload',
+                                  description: err.message,
+                                  variant: 'destructive',
+                                })
+                              }
+                            }}
+                            disabled={f.disabled ? f.disabled(form) : false}
+                            className={cn(
+                              'cursor-pointer file:cursor-pointer',
+                              formErrors[f.name] && 'border-red-500',
+                            )}
+                          />
+                        )}
+                      </div>
                     )}
                   </div>
                 )
