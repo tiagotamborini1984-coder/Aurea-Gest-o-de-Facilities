@@ -145,8 +145,9 @@ export default function MapaLJ() {
               Esta planta não possui um mapa cadastrado. Configure-o no módulo de Áreas.
             </div>
           ) : (
-            <div className="w-full overflow-auto flex justify-center bg-gray-100 p-4 rounded-lg">
-              <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200" key={serviceType}>
+            <div>
+              <div className="w-full overflow-auto flex justify-center bg-gray-100 p-4 rounded-lg">
+                <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200" key={serviceType}>
                 <img
                   src={selectedPlant.map_url}
                   alt="Mapa da Planta"
