@@ -25,6 +25,7 @@ import ColaboradoresLockers from './pages/gestao-lockers/Colaboradores'
 import OcupacaoLockers from './pages/gestao-lockers/Ocupacao'
 
 import DashboardImoveis from './pages/gestao-imoveis/Dashboard'
+import DashboardEstrategico from './pages/dashboard-estrategico/Dashboard'
 import OcupacaoImoveis from './pages/gestao-imoveis/Ocupacao'
 import Imoveis from './pages/gestao-imoveis/Imoveis'
 import Hospedes from './pages/gestao-imoveis/Hospedes'
@@ -130,6 +131,9 @@ const App = () => (
                       element={<AuditoriaRealizadas />}
                     />
                     <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+
+                    {/* Dashboard Estratégico */}
+                    <Route path="/dashboard-estrategico" element={<DashboardEstrategico />} />
 
                     {/* Organograma e Fluxos */}
                     <Route path="/organograma/dashboard" element={<OrgDashboard />} />

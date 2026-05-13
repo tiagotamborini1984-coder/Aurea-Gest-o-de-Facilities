@@ -17,6 +17,7 @@ import {
   Network,
   AlertTriangle,
   Wrench,
+  PieChart,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -179,6 +180,11 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Dashboard Estratégico',
+      icon: PieChart,
+      path: '/dashboard-estrategico',
+    },
+    {
       title: 'Book de Metas',
       icon: Target,
       path: '/gestao-terceiros/metas',
@@ -194,6 +200,11 @@ export function AppSidebar() {
     .map((item) => {
       if (item.title === 'Gestão de Clientes') {
         if (role !== 'Master') return null
+        return item
+      }
+
+      if (item.title === 'Dashboard Estratégico') {
+        if (role !== 'Master' && role !== 'Administrador') return null
         return item
       }
 
