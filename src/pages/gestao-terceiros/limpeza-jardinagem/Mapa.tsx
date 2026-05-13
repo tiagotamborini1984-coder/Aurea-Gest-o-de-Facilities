@@ -23,7 +23,7 @@ export default function MapaLJ() {
 
   const [selectedPlantId, setSelectedPlantId] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
-  const [serviceType, setServiceType] = useState<string>('gardening')
+  const [serviceType, setServiceType] = useState<string>('all')
 
   const [areas, setAreas] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
@@ -34,20 +34,26 @@ export default function MapaLJ() {
     if (!selectedPlantId || !profile) return
 
     const loadData = async () => {
+      const areasQuery = supabase
+        .from('cleaning_gardening_areas')
+        .select('*')
+        .eq('plant_id', selectedPlantId)
+        .eq('client_id', profile.client_id)
+
+      let schedulesQuery = supabase
+        .from('cleaning_gardening_schedules')
+        .select('*, cleaning_gardening_areas!inner(type)')
+        .eq('plant_id', selectedPlantId)
+        .eq('client_id', profile.client_id)
+        .eq('activity_date', selectedDate)
+
+      if (serviceType !== 'all') {
+        schedulesQuery = schedulesQuery.eq('cleaning_gardening_areas.type', serviceType)
+      }
+
       const [{ data: areasData }, { data: schedulesData }] = await Promise.all([
-        supabase
-          .from('cleaning_gardening_areas')
-          .select('*')
-          .eq('plant_id', selectedPlantId)
-          .eq('client_id', profile.client_id)
-          .eq('type', serviceType),
-        supabase
-          .from('cleaning_gardening_schedules')
-          .select('*, cleaning_gardening_areas!inner(type)')
-          .eq('plant_id', selectedPlantId)
-          .eq('client_id', profile.client_id)
-          .eq('activity_date', selectedDate)
-          .eq('cleaning_gardening_areas.type', serviceType),
+        areasQuery,
+        schedulesQuery,
       ])
 
       setAreas(areasData || [])
@@ -85,12 +91,13 @@ export default function MapaLJ() {
         </div>
         <div className="flex flex-col sm:flex-row gap-4">
           <Select value={serviceType} onValueChange={setServiceType}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue placeholder="Tipo de Serviço" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="gardening">Jardinagem</SelectItem>
-              <SelectItem value="cleaning">Limpeza</SelectItem>
+              <SelectItem value="all">Ambos</SelectItem>
+              <SelectItem value="gardening">Apenas Jardinagem</SelectItem>
+              <SelectItem value="cleaning">Apenas Limpeza</SelectItem>
             </SelectContent>
           </Select>
           <Input
@@ -151,8 +158,15 @@ export default function MapaLJ() {
                         stroke={colors.stroke}
                         strokeWidth="0.5"
                         vectorEffect="non-scaling-stroke"
-                        className="transition-colors duration-500 ease-in-out"
-                      />
+                        className="transition-colors duration-500 ease-in-out hover:opacity-80 cursor-pointer"
+                      >
+                        <title>
+                          {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
+                          {schedules
+                            .filter((s) => s.area_id === area.id)
+                            .map((s) => `\n- ${s.description} (${s.status})`)}
+                        </title>
+                      </polygon>
                     )
                   })}
                 </svg>
