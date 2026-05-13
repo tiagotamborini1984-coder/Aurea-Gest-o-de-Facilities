@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { Map as MapIcon } from 'lucide-react'
+import { Map as MapIcon, AlertTriangle, Info } from 'lucide-react'
 import { format } from 'date-fns'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
@@ -23,7 +23,7 @@ export default function MapaLJ() {
 
   const [selectedPlantId, setSelectedPlantId] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
-  const [serviceType, setServiceType] = useState<string>('all')
+  const [serviceType, setServiceType] = useState<string>('gardening')
 
   const [areas, setAreas] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
@@ -66,18 +66,14 @@ export default function MapaLJ() {
     }
 
     loadData()
-  }, [selectedPlantId, selectedDate, profile, serviceType])
+  }, [selectedPlantId, selectedDate, profile])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
   const getAreaColor = (area: any) => {
-    // Se a área não pertencer ao tipo de serviço selecionado, exibe com cor neutra/desativada
-    if (serviceType !== 'all' && area.type !== serviceType) {
-      return { fill: 'rgba(156, 163, 175, 0.1)', stroke: 'rgba(156, 163, 175, 0.5)' } // Cinza claro - Fora do escopo
-    }
-
     const areaSchedules = schedules.filter((s) => s.area_id === area.id)
+
     if (areaSchedules.length === 0) return { fill: 'rgba(156, 163, 175, 0.4)', stroke: '#9ca3af' } // Cinza - Sem Atividade
 
     const hasUrgent = areaSchedules.some((s) => s.is_urgent)
@@ -92,6 +88,14 @@ export default function MapaLJ() {
     return { fill: 'rgba(34, 197, 94, 0.6)', stroke: '#16a34a' } // Verde - Realizado
   }
 
+  // Helper variables to show messages
+  const hasGardeningAreas = areas.some(
+    (a) => a.type === 'gardening' && a.polygon_data && a.polygon_data.length > 0,
+  )
+  const hasGardeningSchedules = schedules.some(
+    (s) => areas.find((a) => a.id === s.area_id)?.type === 'gardening',
+  )
+
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -105,9 +109,9 @@ export default function MapaLJ() {
               <SelectValue placeholder="Tipo de Serviço" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Ambos</SelectItem>
               <SelectItem value="gardening">Apenas Jardinagem</SelectItem>
               <SelectItem value="cleaning">Apenas Limpeza</SelectItem>
+              <SelectItem value="all">Ambos</SelectItem>
             </SelectContent>
           </Select>
           <Input
@@ -146,11 +150,34 @@ export default function MapaLJ() {
             </div>
           ) : (
             <div>
+              {serviceType === 'gardening' && !hasGardeningAreas && (
+                <div className="flex items-start gap-3 bg-yellow-50 text-yellow-800 p-4 rounded-md mb-4 text-sm font-medium border border-yellow-200">
+                  <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="mb-1">
+                      <strong>Nenhuma área de Jardinagem encontrada no mapa.</strong>
+                    </p>
+                    <p className="text-yellow-700 font-normal">
+                      Se você cadastrou um cronograma na área "Utilidades" (ou outra) e ele não
+                      aparece, é provável que essa área esteja cadastrada como "Limpeza". Áreas de
+                      Limpeza ficam ocultas quando o filtro "Apenas Jardinagem" está ativo.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {serviceType === 'gardening' && hasGardeningAreas && !hasGardeningSchedules && (
+                <div className="flex items-center gap-3 bg-blue-50 text-blue-800 p-4 rounded-md mb-4 text-sm font-medium border border-blue-200">
+                  <Info className="h-5 w-5 shrink-0" />
+                  <p>
+                    As áreas de Jardinagem estão visíveis, mas não há atividades agendadas para a
+                    data selecionada ({format(new Date(selectedDate + 'T00:00:00'), 'dd/MM/yyyy')}).
+                  </p>
+                </div>
+              )}
+
               <div className="w-full overflow-auto flex justify-center bg-gray-100 p-4 rounded-lg">
-                <div
-                  className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200"
-                  key={serviceType}
-                >
+                <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200">
                   <img
                     src={selectedPlant.map_url}
                     alt="Mapa da Planta"
@@ -163,8 +190,11 @@ export default function MapaLJ() {
                   >
                     {areas.map((area) => {
                       if (!area.polygon_data || area.polygon_data.length === 0) return null
-                      const colors = getAreaColor(area)
+
                       const isFilteredOut = serviceType !== 'all' && area.type !== serviceType
+                      if (isFilteredOut) return null // Oculta completamente áreas fora do filtro
+
+                      const colors = getAreaColor(area)
                       return (
                         <polygon
                           key={area.id}
@@ -173,14 +203,13 @@ export default function MapaLJ() {
                           stroke={colors.stroke}
                           strokeWidth="0.5"
                           vectorEffect="non-scaling-stroke"
-                          className={`transition-colors duration-500 ease-in-out pointer-events-auto ${!isFilteredOut ? 'hover:opacity-80 cursor-pointer' : ''}`}
+                          className="transition-colors duration-500 ease-in-out pointer-events-auto hover:opacity-80 cursor-pointer"
                         >
                           <title>
                             {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
-                            {!isFilteredOut &&
-                              schedules
-                                .filter((s) => s.area_id === area.id)
-                                .map((s) => `\n- ${s.description} (${s.status})`)}
+                            {schedules
+                              .filter((s) => s.area_id === area.id)
+                              .map((s) => `\n- ${s.description} (${s.status})`)}
                           </title>
                         </polygon>
                       )
@@ -210,12 +239,6 @@ export default function MapaLJ() {
                   <span className="w-4 h-4 rounded bg-gray-400 shadow-sm border border-gray-500"></span>{' '}
                   Sem Atividade
                 </div>
-                {serviceType !== 'all' && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 rounded bg-gray-200 shadow-sm border border-gray-300 opacity-50"></span>{' '}
-                    Fora do Filtro
-                  </div>
-                )}
               </div>
             </div>
           )}
