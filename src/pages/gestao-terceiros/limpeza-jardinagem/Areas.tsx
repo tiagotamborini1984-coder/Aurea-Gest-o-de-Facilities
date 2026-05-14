@@ -1,5 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { Leaf, Plus, Trash2, Edit2, MapPin } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import {
+  Leaf,
+  Plus,
+  Trash2,
+  Edit2,
+  MapPin,
+  Maximize,
+  Minimize,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
@@ -44,6 +55,9 @@ export default function AreasLJ() {
   const [formData, setFormData] = useState<any>({})
   const [polygon, setPolygon] = useState<{ x: number; y: number }[]>([])
   const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('all')
+  const [zoom, setZoom] = useState(1)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
 
   const authorizedPlants = useMemo(() => {
     if (!profile) return []
@@ -72,6 +86,14 @@ export default function AreasLJ() {
   useEffect(() => {
     loadAreas()
   }, [profile, selectedPlantFilter])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
@@ -154,6 +176,8 @@ export default function AreasLJ() {
     await refetch()
     setFormData({ type: 'cleaning' })
     setPolygon([])
+    setZoom(1)
+    setIsFullscreen(false)
     setIsModalOpen(true)
   }
 
@@ -161,7 +185,23 @@ export default function AreasLJ() {
     await refetch()
     setFormData(area)
     setPolygon(area.polygon_data || [])
+    setZoom(1)
+    setIsFullscreen(false)
     setIsModalOpen(true)
+  }
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (mapContainerRef.current?.requestFullscreen) {
+        mapContainerRef.current.requestFullscreen().catch((err) => {
+          console.warn(`Error attempting to enable fullscreen: ${err.message}`)
+        })
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      }
+    }
   }
 
   return (
@@ -327,55 +367,113 @@ export default function AreasLJ() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Clique na imagem para desenhar o perímetro da área.
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => setPolygon([])}
-                    >
-                      Limpar Polígono
-                    </Button>
-                  </div>
+                  <span className="text-muted-foreground text-sm block">
+                    Clique na imagem para desenhar o perímetro da área.
+                  </span>
 
-                  <div className="w-full overflow-auto flex justify-center bg-gray-100 p-2 rounded-lg border border-gray-200">
-                    <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-300">
-                      <img
-                        src={mapUrl}
-                        alt="Mapa da Planta"
-                        className="block max-w-full h-auto cursor-crosshair"
-                        onClick={handleImageClick}
-                      />
-                      <svg
-                        viewBox="0 0 100 100"
-                        preserveAspectRatio="none"
-                        className="absolute inset-0 w-full h-full pointer-events-none"
-                      >
+                  <div
+                    ref={mapContainerRef}
+                    className={cn(
+                      'flex flex-col bg-gray-50 border border-gray-200 rounded-lg overflow-hidden',
+                      isFullscreen ? 'w-screen h-screen' : 'h-[400px]',
+                    )}
+                  >
+                    <div className="flex items-center justify-between p-2 bg-white border-b border-gray-200 shrink-0">
+                      <span className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        {isFullscreen ? 'Modo Tela Cheia' : 'Mapa'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setZoom((z) => Math.max(0.5, z - 0.2))}
+                        >
+                          <ZoomOut className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs w-12 text-center font-medium">
+                          {Math.round(zoom * 100)}%
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
+                        >
+                          <ZoomIn className="h-4 w-4" />
+                        </Button>
+                        <div className="w-px h-4 bg-gray-300 mx-1" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={toggleFullscreen}
+                        >
+                          {isFullscreen ? (
+                            <Minimize className="h-4 w-4" />
+                          ) : (
+                            <Maximize className="h-4 w-4" />
+                          )}
+                        </Button>
                         {polygon.length > 0 && (
-                          <polygon
-                            points={polygon.map((p) => `${p.x},${p.y}`).join(' ')}
-                            fill="rgba(59, 130, 246, 0.4)"
-                            stroke="#3b82f6"
-                            strokeWidth="0.5"
-                            vectorEffect="non-scaling-stroke"
-                          />
+                          <>
+                            <div className="w-px h-4 bg-gray-300 mx-1" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8"
+                              onClick={() => setPolygon([])}
+                            >
+                              Limpar Polígono
+                            </Button>
+                          </>
                         )}
-                        {polygon.map((p, i) => (
-                          <circle
-                            key={i}
-                            cx={p.x}
-                            cy={p.y}
-                            r="0.8"
-                            fill="#1d4ed8"
-                            stroke="#ffffff"
-                            strokeWidth="0.2"
-                            vectorEffect="non-scaling-stroke"
+                      </div>
+                    </div>
+
+                    <div className="flex-1 w-full overflow-auto bg-gray-100 p-4 relative">
+                      <div className="min-w-full min-h-full flex items-center justify-center">
+                        <div
+                          className="relative shadow-sm bg-white border border-gray-300 transition-all duration-200"
+                          style={{ width: `${Math.round(zoom * 100)}%`, minWidth: 'min-content' }}
+                        >
+                          <img
+                            src={mapUrl}
+                            alt="Mapa da Planta"
+                            className="block w-full h-auto cursor-crosshair max-w-none"
+                            onClick={handleImageClick}
+                            draggable={false}
                           />
-                        ))}
-                      </svg>
+                          <svg
+                            viewBox="0 0 100 100"
+                            preserveAspectRatio="none"
+                            className="absolute inset-0 w-full h-full pointer-events-none"
+                          >
+                            {polygon.length > 0 && (
+                              <polygon
+                                points={polygon.map((p) => `${p.x},${p.y}`).join(' ')}
+                                fill="rgba(59, 130, 246, 0.4)"
+                                stroke="#3b82f6"
+                                strokeWidth="0.5"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            )}
+                            {polygon.map((p, i) => (
+                              <circle
+                                key={i}
+                                cx={p.x}
+                                cy={p.y}
+                                r="0.8"
+                                fill="#1d4ed8"
+                                stroke="#ffffff"
+                                strokeWidth="0.2"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            ))}
+                          </svg>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
