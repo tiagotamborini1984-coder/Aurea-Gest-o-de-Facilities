@@ -21,6 +21,7 @@ import {
   Minimize,
   ZoomIn,
   ZoomOut,
+  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Navigate } from 'react-router-dom'
@@ -40,6 +41,7 @@ export default function MapaLJ() {
 
   const [zoom, setZoom] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
 
   const selectedPlant = plants.find((p) => p.id === selectedPlantId)
@@ -85,6 +87,7 @@ export default function MapaLJ() {
 
       setAreas(fetchedAreas)
       setSchedules(schedulesData || [])
+      setSelectedAreaDetails(null)
     }
 
     loadData()
@@ -215,7 +218,7 @@ export default function MapaLJ() {
               <div
                 ref={mapContainerRef}
                 className={cn(
-                  'flex flex-col bg-gray-50 border border-gray-200 rounded-lg overflow-hidden',
+                  'flex flex-col bg-gray-50 border border-gray-200 rounded-lg overflow-hidden relative',
                   isFullscreen ? 'w-screen h-screen' : 'h-[600px] w-full',
                 )}
               >
@@ -293,6 +296,7 @@ export default function MapaLJ() {
                               strokeWidth="0.5"
                               vectorEffect="non-scaling-stroke"
                               className="transition-colors duration-500 ease-in-out pointer-events-auto hover:opacity-80 cursor-pointer"
+                              onClick={() => setSelectedAreaDetails(area)}
                             >
                               <title>
                                 {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
@@ -307,6 +311,81 @@ export default function MapaLJ() {
                     </div>
                   </div>
                 </div>
+
+                {/* Popup de Detalhes da Área */}
+                {selectedAreaDetails && (
+                  <div className="absolute top-14 right-4 w-80 bg-white shadow-2xl rounded-lg border border-gray-200 z-50 flex flex-col max-h-[calc(100%-4rem)] animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="flex items-center justify-between p-3 border-b border-gray-100 bg-gray-50/80 rounded-t-lg shrink-0">
+                      <div>
+                        <h3 className="font-semibold text-gray-800 text-sm line-clamp-1">
+                          {selectedAreaDetails.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedAreaDetails.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setSelectedAreaDetails(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="p-3 overflow-y-auto flex-1 bg-white rounded-b-lg space-y-3">
+                      {schedules.filter((s) => s.area_id === selectedAreaDetails.id).length > 0 ? (
+                        schedules
+                          .filter((s) => s.area_id === selectedAreaDetails.id)
+                          .map((schedule) => (
+                            <div
+                              key={schedule.id}
+                              className="text-sm border rounded-md p-3 bg-gray-50/50 shadow-sm"
+                            >
+                              <div className="font-medium text-gray-800 mb-1">
+                                {schedule.description}
+                              </div>
+                              <div className="text-xs text-gray-600 flex justify-between items-center mb-2">
+                                <span>
+                                  {schedule.start_time.substring(0, 5)}{' '}
+                                  {schedule.end_time
+                                    ? `às ${schedule.end_time.substring(0, 5)}`
+                                    : ''}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 rounded-full font-medium text-[10px]',
+                                    schedule.status === 'Realizado'
+                                      ? 'bg-green-100 text-green-700'
+                                      : schedule.status === 'Não Realizado'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-yellow-100 text-yellow-700',
+                                  )}
+                                >
+                                  {schedule.status}
+                                </span>
+                              </div>
+                              {schedule.is_urgent && (
+                                <div className="text-xs text-orange-600 font-medium flex items-center gap-1 bg-orange-50 w-fit px-1.5 py-0.5 rounded">
+                                  <AlertTriangle className="h-3 w-3" /> Emergencial
+                                </div>
+                              )}
+                              {schedule.justification && (
+                                <div className="mt-2 text-xs text-gray-600 bg-white p-2 border rounded">
+                                  <span className="font-semibold block mb-0.5">Justificativa:</span>
+                                  {schedule.justification}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                      ) : (
+                        <p className="text-sm text-gray-500 italic text-center py-4">
+                          Nenhuma atividade agendada para esta área na data selecionada.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-4 md:gap-6 mt-8 justify-center text-sm font-medium text-gray-700">
