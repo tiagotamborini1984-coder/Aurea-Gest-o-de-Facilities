@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -8,10 +8,20 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { Map as MapIcon, AlertTriangle, Info } from 'lucide-react'
+import {
+  Map as MapIcon,
+  AlertTriangle,
+  Info,
+  Maximize,
+  Minimize,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
@@ -86,6 +96,20 @@ export default function MapaLJ() {
     if (hasPendente) return { fill: 'rgba(234, 179, 8, 0.6)', stroke: '#ca8a04' } // Amarelo - Pendente / Planejado
 
     return { fill: 'rgba(34, 197, 94, 0.6)', stroke: '#16a34a' } // Verde - Realizado
+  }
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (mapContainerRef.current?.requestFullscreen) {
+        mapContainerRef.current.requestFullscreen().catch((err) => {
+          console.warn(`Error attempting to enable fullscreen: ${err.message}`)
+        })
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      }
+    }
   }
 
   // Helper variables to show messages
@@ -176,45 +200,100 @@ export default function MapaLJ() {
                 </div>
               )}
 
-              <div className="w-full overflow-auto flex justify-center bg-gray-100 p-4 rounded-lg">
-                <div className="relative inline-block max-w-full shadow-sm bg-white border border-gray-200">
-                  <img
-                    src={selectedPlant.map_url}
-                    alt="Mapa da Planta"
-                    className="block max-w-full h-auto"
-                  />
-                  <svg
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                    className="absolute inset-0 w-full h-full pointer-events-none"
-                  >
-                    {areas.map((area) => {
-                      if (!area.polygon_data || area.polygon_data.length === 0) return null
+              <div
+                ref={mapContainerRef}
+                className={cn(
+                  'flex flex-col bg-gray-50 border border-gray-200 rounded-lg overflow-hidden',
+                  isFullscreen ? 'w-screen h-screen' : 'h-[600px] w-full',
+                )}
+              >
+                <div className="flex items-center justify-between p-2 bg-white border-b border-gray-200 shrink-0">
+                  <span className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                    <MapIcon className="h-4 w-4" />
+                    {isFullscreen ? 'Modo Tela Cheia' : 'Mapa'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setZoom((z) => Math.max(0.5, z - 0.2))}
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs w-12 text-center font-medium">
+                      {Math.round(zoom * 100)}%
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                    <div className="w-px h-4 bg-gray-300 mx-1" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={toggleFullscreen}
+                    >
+                      {isFullscreen ? (
+                        <Minimize className="h-4 w-4" />
+                      ) : (
+                        <Maximize className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
 
-                      const isFilteredOut = serviceType !== 'all' && area.type !== serviceType
-                      if (isFilteredOut) return null // Oculta completamente áreas fora do filtro
+                <div className="flex-1 w-full overflow-auto bg-gray-100 p-4 relative">
+                  <div className="min-w-full min-h-full flex items-center justify-center">
+                    <div
+                      className="relative shadow-sm bg-white border border-gray-300 transition-all duration-200"
+                      style={{ width: `${Math.round(zoom * 100)}%`, minWidth: 'min-content' }}
+                    >
+                      <img
+                        src={selectedPlant.map_url}
+                        alt="Mapa da Planta"
+                        className="block w-full h-auto max-w-none"
+                        draggable={false}
+                      />
+                      <svg
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        className="absolute inset-0 w-full h-full pointer-events-none"
+                      >
+                        {areas.map((area) => {
+                          if (!area.polygon_data || area.polygon_data.length === 0) return null
 
-                      const colors = getAreaColor(area)
-                      return (
-                        <polygon
-                          key={area.id}
-                          points={area.polygon_data.map((p: any) => `${p.x},${p.y}`).join(' ')}
-                          fill={colors.fill}
-                          stroke={colors.stroke}
-                          strokeWidth="0.5"
-                          vectorEffect="non-scaling-stroke"
-                          className="transition-colors duration-500 ease-in-out pointer-events-auto hover:opacity-80 cursor-pointer"
-                        >
-                          <title>
-                            {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
-                            {schedules
-                              .filter((s) => s.area_id === area.id)
-                              .map((s) => `\n- ${s.description} (${s.status})`)}
-                          </title>
-                        </polygon>
-                      )
-                    })}
-                  </svg>
+                          const isFilteredOut = serviceType !== 'all' && area.type !== serviceType
+                          if (isFilteredOut) return null // Oculta completamente áreas fora do filtro
+
+                          const colors = getAreaColor(area)
+                          return (
+                            <polygon
+                              key={area.id}
+                              points={area.polygon_data.map((p: any) => `${p.x},${p.y}`).join(' ')}
+                              fill={colors.fill}
+                              stroke={colors.stroke}
+                              strokeWidth="0.5"
+                              vectorEffect="non-scaling-stroke"
+                              className="transition-colors duration-500 ease-in-out pointer-events-auto hover:opacity-80 cursor-pointer"
+                            >
+                              <title>
+                                {area.name} ({area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'})
+                                {schedules
+                                  .filter((s) => s.area_id === area.id)
+                                  .map((s) => `\n- ${s.description} (${s.status})`)}
+                              </title>
+                            </polygon>
+                          )
+                        })}
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
 
