@@ -38,7 +38,19 @@ export default function MapaLJ() {
   const [areas, setAreas] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
 
+  const [zoom, setZoom] = useState(1)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+
   const selectedPlant = plants.find((p) => p.id === selectedPlantId)
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   useEffect(() => {
     if (!selectedPlantId || !profile) return
