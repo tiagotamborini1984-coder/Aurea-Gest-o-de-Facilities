@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Leaf, Plus, Trash2, Edit2, MapPin } from 'lucide-react'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
@@ -43,26 +43,40 @@ export default function AreasLJ() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [polygon, setPolygon] = useState<{ x: number; y: number }[]>([])
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('all')
+
+  const authorizedPlants = useMemo(() => {
+    if (!profile) return []
+    if (profile.role === 'Master' || profile.role === 'Administrador') return plants
+    return plants.filter((p) => profile.authorized_plants?.includes(p.id))
+  }, [plants, profile])
 
   const loadAreas = async () => {
     if (!profile) return
-    const { data } = await supabase
+    setLoading(true)
+    let query = supabase
       .from('cleaning_gardening_areas')
       .select('*')
       .eq('client_id', profile.client_id)
       .order('created_at', { ascending: false })
+
+    if (selectedPlantFilter !== 'all') {
+      query = query.eq('plant_id', selectedPlantFilter)
+    }
+
+    const { data } = await query
     if (data) setAreas(data)
     setLoading(false)
   }
 
   useEffect(() => {
     loadAreas()
-  }, [profile])
+  }, [profile, selectedPlantFilter])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
 
-  const selectedPlant = plants.find((p) => p.id === formData.plant_id)
+  const selectedPlant = authorizedPlants.find((p) => p.id === formData.plant_id)
 
   const getMapUrl = (val: any): string | null => {
     if (!val) return null
@@ -153,14 +167,29 @@ export default function AreasLJ() {
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2 text-2xl">
             <Leaf className="h-6 w-6 text-brand-vividBlue" />
             Áreas de Limpeza e Jardinagem
           </CardTitle>
-          <Button onClick={openNew}>
-            <Plus className="h-4 w-4 mr-2" /> Nova Área
-          </Button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+            <Select value={selectedPlantFilter} onValueChange={setSelectedPlantFilter}>
+              <SelectTrigger className="w-[200px] bg-white">
+                <SelectValue placeholder="Todas as Plantas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Plantas</SelectItem>
+                {authorizedPlants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={openNew}>
+              <Plus className="h-4 w-4 mr-2" /> Nova Área
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -188,7 +217,7 @@ export default function AreasLJ() {
                     <TableRow key={area.id}>
                       <TableCell className="font-medium">{area.name}</TableCell>
                       <TableCell>
-                        {plants.find((p) => p.id === area.plant_id)?.name || '-'}
+                        {authorizedPlants.find((p) => p.id === area.plant_id)?.name || '-'}
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
@@ -239,7 +268,7 @@ export default function AreasLJ() {
                     <SelectValue placeholder="Selecione a planta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {plants.map((p) => (
+                    {authorizedPlants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
                       </SelectItem>
