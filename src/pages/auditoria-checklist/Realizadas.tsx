@@ -224,9 +224,12 @@ export default function AuditoriaRealizadas() {
       const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
 
       // Create new task
+      const baseDate = exec.realization_date
+        ? new Date(exec.realization_date + 'T00:00:00Z')
+        : new Date(exec.created_at)
+
       const dueDateStr =
-        exec.tasks?.due_date ||
-        addFrequency(new Date(exec.created_at), audit.frequency).toISOString()
+        exec.tasks?.due_date || addFrequency(baseDate, audit.frequency).toISOString()
 
       const { data: newTask, error: taskErr } = await supabase
         .from('tasks')
