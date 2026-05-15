@@ -398,48 +398,99 @@ export default function PainelChamados() {
         const parts = latest[0].task_number.split('-')
         if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
       }
-      const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-
       // Filter statuses for this specific client to ensure we pick a valid one
       const clientStatuses = taskStatuses.filter((s) => s.client_id === effectiveClientId)
       const initialStatus = clientStatuses[0]?.id
 
       if (!initialStatus) throw new Error('Nenhum status configurado para este cliente.')
 
-      const { data: newTask, error } = await supabase
+      // Verificar se já existe uma tarefa aberta com a mesma planta, tipo e título (Upsert Logic)
+      const openStatuses = clientStatuses.filter((s) => !s.is_terminal).map((s) => s.id)
+
+      const { data: existingTasks } = await supabase
         .from('tasks')
-        .insert({
-          client_id: effectiveClientId as string,
-          plant_id: form.plant_id,
-          type_id: form.type_id,
-          status_id: initialStatus,
-          requester_id: profile.id,
-          assignee_id: form.assignee_id,
-          task_number: taskNumber,
-          title: form.title,
-          description: form.description,
-          attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
-          attachment_urls,
-          status_updated_at: new Date().toISOString(),
-          participants_ids: form.participants_ids,
-        } as any)
-        .select()
-        .single()
+        .select('*')
+        .eq('client_id', effectiveClientId)
+        .eq('plant_id', form.plant_id)
+        .eq('type_id', form.type_id)
+        .eq('title', form.title)
+        .in('status_id', openStatuses)
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      if (error) throw error
+      if (existingTasks && existingTasks.length > 0) {
+        const existingTask = existingTasks[0]
 
-      await supabase.from('task_timeline').insert({
-        task_id: newTask.id,
-        user_id: profile.id,
-        content: `Chamado aberto.`,
-        action_type: 'comment',
-      })
+        const updatedUrls =
+          attachment_urls.length > 0
+            ? [...new Set([...(existingTask.attachment_urls || []), ...attachment_urls])]
+            : existingTask.attachment_urls
 
-      toast({
-        title: 'Chamado criado com sucesso!',
-        description: `Protocolo: ${taskNumber}`,
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            assignee_id: form.assignee_id,
+            description: form.description,
+            attachment_url:
+              attachment_urls.length > 0 ? attachment_urls[0] : existingTask.attachment_url,
+            attachment_urls: updatedUrls,
+            participants_ids: form.participants_ids,
+            // SLA properties (due_date, created_at, status_updated_at) are intentionally PRESERVED
+          } as any)
+          .eq('id', existingTask.id)
+
+        if (error) throw error
+
+        await supabase.from('task_timeline').insert({
+          task_id: existingTask.id,
+          user_id: profile.id,
+          content: `Chamado atualizado para evitar duplicidade. SLA e prazos originais preservados.`,
+          action_type: 'comment',
+        })
+
+        toast({
+          title: 'Chamado atualizado com sucesso!',
+          description: `Protocolo existente atualizado: ${existingTask.task_number}`,
+          className: 'bg-blue-50 text-blue-900 border-blue-200',
+        })
+      } else {
+        const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
+
+        const { data: newTask, error } = await supabase
+          .from('tasks')
+          .insert({
+            client_id: effectiveClientId as string,
+            plant_id: form.plant_id,
+            type_id: form.type_id,
+            status_id: initialStatus,
+            requester_id: profile.id,
+            assignee_id: form.assignee_id,
+            task_number: taskNumber,
+            title: form.title,
+            description: form.description,
+            attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
+            attachment_urls,
+            status_updated_at: new Date().toISOString(),
+            participants_ids: form.participants_ids,
+          } as any)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        await supabase.from('task_timeline').insert({
+          task_id: newTask.id,
+          user_id: profile.id,
+          content: `Chamado aberto.`,
+          action_type: 'comment',
+        })
+
+        toast({
+          title: 'Chamado criado com sucesso!',
+          description: `Protocolo: ${taskNumber}`,
+          className: 'bg-green-50 text-green-900 border-green-200',
+        })
+      }
       setIsModalOpen(false)
       loadData()
     } catch (err: any) {

@@ -490,38 +490,71 @@ export function TaskDetailsSheet({
             if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
           }
 
+          const openStatuses = statuses.map((s) => s.id)
+
           for (const nc of ncActions) {
-            const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-            seq++
-
             const ans = auditAnswers[nc.id]
+            const ncTitle = `Não Conformidade: ${nc.title.substring(0, 50)}${nc.title.length > 50 ? '...' : ''}`
+            const ncDescription = `Foi identificada uma Não Conformidade durante a auditoria "${auditExecution.audits?.title}".\n\nAção Avaliada: ${nc.title}\nNota: ${ans.score}\nObservações: ${ans.observations || 'Nenhuma'}\n\nFavor providenciar correção até a data limite.`
 
-            const { data: newTask } = await supabase
+            // Verifique se já existe tarefa aberta para essa NC na mesma planta para não duplicar
+            const { data: existingNC } = await supabase
               .from('tasks')
-              .insert({
-                client_id: profile.client_id,
-                plant_id: auditExecution.plant_id,
-                type_id: ncType.id,
-                status_id: initialStatusId,
-                requester_id: profile.id,
-                assignee_id: auditExecution.assignee_id,
-                task_number: taskNumber,
-                title: `Não Conformidade: ${nc.title.substring(0, 50)}${nc.title.length > 50 ? '...' : ''}`,
-                description: `Foi identificada uma Não Conformidade durante a auditoria "${auditExecution.audits?.title}".\n\nAção Avaliada: ${nc.title}\nNota: ${ans.score}\nObservações: ${ans.observations || 'Nenhuma'}\n\nFavor providenciar correção até a data limite.`,
-                due_date: dueDate.toISOString(),
-                status_updated_at: new Date().toISOString(),
-                participants_ids: [],
-              } as any)
-              .select()
-              .single()
+              .select('id, task_number')
+              .eq('client_id', profile.client_id)
+              .eq('plant_id', auditExecution.plant_id)
+              .eq('type_id', ncType.id)
+              .eq('title', ncTitle)
+              .in('status_id', openStatuses)
+              .limit(1)
 
-            if (newTask) {
+            if (existingNC && existingNC.length > 0) {
+              // Update existing, PRESERVE SLA
+              await supabase
+                .from('tasks')
+                .update({
+                  description: ncDescription,
+                  assignee_id: auditExecution.assignee_id,
+                })
+                .eq('id', existingNC[0].id)
+
               await supabase.from('task_timeline').insert({
-                task_id: newTask.id,
+                task_id: existingNC[0].id,
                 user_id: profile.id,
-                content: `Tarefa gerada automaticamente devido à nota ${ans.score} na auditoria ${auditExecution.audits?.title}.`,
+                content: `Tarefa atualizada via reavaliação de auditoria (Nota ${ans.score}). SLA mantido.`,
                 action_type: 'comment',
               })
+            } else {
+              const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
+              seq++
+
+              const { data: newTask } = await supabase
+                .from('tasks')
+                .insert({
+                  client_id: profile.client_id,
+                  plant_id: auditExecution.plant_id,
+                  type_id: ncType.id,
+                  status_id: initialStatusId,
+                  requester_id: profile.id,
+                  assignee_id: auditExecution.assignee_id,
+                  task_number: taskNumber,
+                  title: ncTitle,
+                  description: ncDescription,
+                  due_date: dueDate.toISOString(),
+                  status_updated_at: new Date().toISOString(),
+                  participants_ids: [],
+                } as any)
+                .select()
+                .single()
+
+              if (newTask) {
+                await supabase.from('task_timeline').insert({
+                  task_id: newTask.id,
+                  user_id: profile.id,
+                  content: `Tarefa gerada automaticamente devido à nota ${ans.score} na auditoria ${auditExecution.audits?.title}.`,
+                  action_type: 'comment',
+                })
+              }
             }
           }
         }
