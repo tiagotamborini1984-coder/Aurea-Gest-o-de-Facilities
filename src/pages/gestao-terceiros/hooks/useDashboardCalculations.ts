@@ -274,6 +274,7 @@ export function useDashboardCalculations(
         return {
           id: loc.id,
           name: loc.name,
+          plant_id: loc.plant_id,
           plantName: plants.find((p) => p.id === loc.plant_id)?.name,
           presentes: formatStr(lPres),
           ausentes: formatStr(lAbs),

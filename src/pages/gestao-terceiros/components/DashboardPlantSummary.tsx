@@ -124,13 +124,18 @@ const TrendChartDialog = ({ item, isEq, target }: { item: any; isEq: boolean; ta
   )
 }
 
-const TableRow = ({ item, isEq, target }: any) => (
+const TableRow = ({ item, isEq, target, isNonWorking, isSingleDay }: any) => (
   <div className="px-4 lg:px-5 py-2.5 lg:py-3 grid grid-cols-12 gap-2 lg:gap-4 items-center hover:bg-muted/50 transition-colors">
     <div
       className="col-span-4 font-semibold text-xs lg:text-sm text-foreground flex items-center truncate"
       title={item.name}
     >
       <span className="truncate">{item.name}</span>
+      {isNonWorking && isSingleDay && (
+        <span className="ml-2 bg-muted text-muted-foreground text-[10px] font-medium px-1.5 py-0.5 rounded border border-border shrink-0">
+          Não Útil
+        </span>
+      )}
     </div>
     <div className="col-span-2 flex justify-center">
       <span className="bg-green-500/10 text-green-600 border border-green-500/20 text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded">
@@ -161,8 +166,13 @@ export default function DashboardPlantSummary({
   locationStats,
   activeTab,
   absenteeismTarget,
+  nonWorkingDays = [],
+  dateFrom,
+  dateTo,
 }: any) {
   const isEq = activeTab === 'equipamentos'
+  const isSingleDay = dateFrom && dateFrom === dateTo
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
       <Card className="shadow-subtle border-border flex flex-col h-full bg-card">
@@ -175,9 +185,21 @@ export default function DashboardPlantSummary({
                 Sem dados
               </div>
             ) : (
-              plantStats.map((p: any) => (
-                <TableRow key={p.id} item={p} isEq={isEq} target={absenteeismTarget} />
-              ))
+              plantStats.map((p: any) => {
+                const isNonWorking =
+                  isSingleDay &&
+                  nonWorkingDays.some((n: any) => n.plant_id === p.id && n.date === dateFrom)
+                return (
+                  <TableRow
+                    key={p.id}
+                    item={p}
+                    isEq={isEq}
+                    target={absenteeismTarget}
+                    isNonWorking={isNonWorking}
+                    isSingleDay={isSingleDay}
+                  />
+                )
+              })
             )}
           </div>
         </CardContent>
@@ -192,9 +214,21 @@ export default function DashboardPlantSummary({
                 Sem dados
               </div>
             ) : (
-              locationStats.map((l: any) => (
-                <TableRow key={l.id} item={l} isEq={isEq} target={absenteeismTarget} />
-              ))
+              locationStats.map((l: any) => {
+                const isNonWorking =
+                  isSingleDay &&
+                  nonWorkingDays.some((n: any) => n.plant_id === l.plant_id && n.date === dateFrom)
+                return (
+                  <TableRow
+                    key={l.id}
+                    item={l}
+                    isEq={isEq}
+                    target={absenteeismTarget}
+                    isNonWorking={isNonWorking}
+                    isSingleDay={isSingleDay}
+                  />
+                )
+              })
             )}
           </div>
         </CardContent>

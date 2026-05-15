@@ -18,6 +18,7 @@ import DashboardDetails from './components/DashboardDetails'
 import DashboardAureaAI from './components/DashboardAureaAI'
 import { useDashboardSchedules } from './hooks/useDashboardSchedules'
 import { Link } from 'react-router-dom'
+import { supabase } from '@/lib/supabase/client'
 
 export default function DashboardGestor() {
   const { activeClient, profile, selectedMasterClient } = useAppStore()
@@ -47,10 +48,29 @@ export default function DashboardGestor() {
   const filteredEmployees = employees || []
   const filteredEquipment = equipment || []
 
+  const [nonWorkingDays, setNonWorkingDays] = useState<any[]>([])
+
   useEffect(() => {
     setSelectedPlants([])
     setSelectedCompanies([])
   }, [selectedMasterClient])
+
+  useEffect(() => {
+    async function fetchNWD() {
+      if (!activeClient?.id) return
+      const { data } = await supabase
+        .from('plant_non_working_days')
+        .select('*')
+        .eq('client_id', activeClient.id)
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+
+      if (data) {
+        setNonWorkingDays(data)
+      }
+    }
+    fetchNWD()
+  }, [activeClient?.id, dateFrom, dateTo, selectedMasterClient])
 
   const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
@@ -155,6 +175,9 @@ export default function DashboardGestor() {
             locationStats={locationStats}
             activeTab={activeTab}
             absenteeismTarget={absenteeismTarget}
+            nonWorkingDays={nonWorkingDays}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
           />
           <DashboardDetails
             activeTab={activeTab}
