@@ -7,6 +7,7 @@ export function useCadastrosConfig(
   locations: any[],
   functions: any[],
   equipment: any[],
+  companies: any[] = [],
 ) {
   return useMemo(() => {
     if (!type) return null
@@ -15,6 +16,7 @@ export function useCadastrosConfig(
     const locationOptions = locations.map((l) => ({ value: l.id, label: l.name }))
     const functionOptions = functions.map((f) => ({ value: f.id, label: f.name }))
     const equipmentOptions = equipment.map((e) => ({ value: e.id, label: e.name }))
+    const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }))
 
     switch (type) {
       case 'colaboradores':
@@ -29,7 +31,14 @@ export function useCadastrosConfig(
           hasMonthFilter: true,
           columns: [
             { header: 'Nome', accessor: 'name' },
-            { header: 'Empresa', accessor: 'company_name' },
+            {
+              header: 'Empresa',
+              accessor: 'company_id',
+              render: (item: any) =>
+                companies.find((c: any) => c.id === item.company_id)?.name ||
+                item.company_name ||
+                '-',
+            },
             {
               header: 'Função',
               accessor: 'function_id',
@@ -44,7 +53,13 @@ export function useCadastrosConfig(
           ],
           fields: [
             { name: 'name', label: 'Nome do Colaborador', type: 'text' },
-            { name: 'company_name', label: 'Empresa / Terceiro', type: 'text' },
+            {
+              name: 'company_id',
+              label: 'Empresa / Terceiro',
+              type: 'select',
+              options: companyOptions,
+              required: true,
+            },
             {
               name: 'function_id',
               label: 'Função',
@@ -246,5 +261,5 @@ export function useCadastrosConfig(
       default:
         return null
     }
-  }, [type, plants, locations, functions, equipment])
+  }, [type, plants, locations, functions, equipment, companies])
 }

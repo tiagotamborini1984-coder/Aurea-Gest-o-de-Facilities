@@ -4,7 +4,7 @@ import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useHasAccess } from '@/hooks/use-has-access'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Select,
   SelectContent,
@@ -23,6 +23,22 @@ export default function Cadastros() {
   const { type } = useParams()
   const { plants, locations, functions, equipment, refetch } = useMasterData()
   const { profile, selectedMasterClient } = useAppStore()
+  const [companies, setCompanies] = useState<any[]>([])
+
+  useEffect(() => {
+    async function fetchCompanies() {
+      if (!profile) return
+      let q = supabase.from('companies').select('*').order('name')
+      if (profile.role === 'Master' && selectedMasterClient !== 'all') {
+        q = q.eq('client_id', selectedMasterClient)
+      } else if (profile.role !== 'Master') {
+        q = q.eq('client_id', profile.client_id)
+      }
+      const { data } = await q
+      if (data) setCompanies(data)
+    }
+    fetchCompanies()
+  }, [profile, selectedMasterClient])
 
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const today = new Date()
@@ -42,7 +58,7 @@ export default function Cadastros() {
     return options
   }, [])
 
-  const config = useCadastrosConfig(type, plants, locations, functions, equipment)
+  const config = useCadastrosConfig(type, plants, locations, functions, equipment, companies)
 
   // Assegura que o menuName seja avaliado corretamente mesmo para componentes customizados
   let menuName = ''
@@ -168,6 +184,13 @@ export default function Cadastros() {
           const { training_records, ...rest } = record
           const payload = { ...rest, client_id: targetClientId }
 
+          if (type === 'colaboradores' && payload.company_id) {
+            const comp = companies.find((c: any) => c.id === payload.company_id)
+            if (comp) {
+              payload.company_name = comp.name
+            }
+          }
+
           if (config.hasMonthFilter) {
             payload.reference_month = `${selectedMonth}-01`
           }
@@ -227,6 +250,14 @@ export default function Cadastros() {
 
           const { training_records, ...rest } = record
           const payload = { ...rest }
+
+          if (type === 'colaboradores' && payload.company_id) {
+            const comp = companies.find((c: any) => c.id === payload.company_id)
+            if (comp) {
+              payload.company_name = comp.name
+            }
+          }
+
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
             if (training_records && config.tableName === 'employees') {
