@@ -228,8 +228,16 @@ export default function AuditoriaRealizadas() {
         ? new Date(exec.realization_date + 'T00:00:00Z')
         : new Date(exec.created_at)
 
-      const dueDateStr =
-        exec.tasks?.due_date || addFrequency(baseDate, audit.frequency).toISOString()
+      let nextDue = addFrequency(baseDate, audit.frequency)
+      if (audit.frequency !== 'Única') {
+        const todayUtc = new Date()
+        todayUtc.setUTCHours(0, 0, 0, 0)
+        while (nextDue < todayUtc) {
+          nextDue = addFrequency(nextDue, audit.frequency)
+        }
+      }
+
+      const dueDateStr = nextDue.toISOString()
 
       const { data: newTask, error: taskErr } = await supabase
         .from('tasks')
