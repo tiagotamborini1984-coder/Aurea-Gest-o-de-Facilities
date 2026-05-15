@@ -63,7 +63,7 @@ export default function DashboardGestor() {
         .select('*')
         .eq('client_id', activeClient.id)
         .gte('date', dateFrom)
-        .lte('date', dateTo)
+        .lte('date', dateTo + 'T23:59:59.999Z')
 
       if (data) {
         setNonWorkingDays(data)
@@ -100,6 +100,7 @@ export default function DashboardGestor() {
     absenteeismTarget,
     schedules,
     areas,
+    nonWorkingDays,
   )
 
   if (!profile) return null

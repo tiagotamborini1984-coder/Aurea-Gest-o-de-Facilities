@@ -18,6 +18,7 @@ export function useDashboardCalculations(
   absenteeismTarget: number = 4,
   schedules: any[] = [],
   areas: any[] = [],
+  nonWorkingDays: any[] = [],
 ) {
   return useMemo(() => {
     // Normaliza datas para garantir que logs com timestamp sejam considerados corretamente
@@ -284,7 +285,15 @@ export function useDashboardCalculations(
           dailyTrend,
         }
       })
-      .filter((l) => l.contratado > 0 || parseFloat(l.presentes) > 0)
+      .filter((l) => {
+        const isNonWorking = nonWorkingDays.some(
+          (n: any) =>
+            n.plant_id === l.plant_id &&
+            n.date.split('T')[0] >= dateFrom &&
+            n.date.split('T')[0] <= dateTo,
+        )
+        return l.contratado > 0 || parseFloat(l.presentes) > 0 || isNonWorking
+      })
 
     const equipmentStats =
       activeTab !== 'equipamentos'
@@ -534,5 +543,6 @@ export function useDashboardCalculations(
     absenteeismTarget,
     schedules,
     areas,
+    nonWorkingDays,
   ])
 }
