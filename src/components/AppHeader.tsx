@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DynamicBreadcrumb } from './DynamicBreadcrumb'
 
 export function AppHeader() {
   const navigate = useNavigate()
@@ -45,9 +46,7 @@ export function AppHeader() {
           {isMobile && (
             <SidebarTrigger className="text-muted-foreground hover:text-foreground hover:bg-muted" />
           )}
-          <h1 className="text-base lg:text-lg font-semibold tracking-tight hidden sm:block text-foreground">
-            Gestão de Facilities
-          </h1>
+          <DynamicBreadcrumb />
           {profile?.role === 'Master' && (
             <div className="hidden md:flex items-center ml-4">
               <Select value={selectedMasterClient} onValueChange={setSelectedMasterClient}>
