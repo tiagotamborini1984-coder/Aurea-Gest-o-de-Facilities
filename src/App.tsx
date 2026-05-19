@@ -11,8 +11,8 @@ import Encomendas from './pages/gestao-terceiros/Encomendas'
 import TiposEncomenda from './pages/gestao-terceiros/TiposEncomenda'
 import ConfiguracoesEncomendas from './pages/gestao-terceiros/ConfiguracoesEncomendas'
 import BIDashboard from './pages/gestao-terceiros/BIDashboard'
-import Auditoria from './pages/gestao-terceiros/Auditoria'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
+import Auditoria from './pages/admin/Auditoria'
 import EmailReports from './pages/gestao-terceiros/EmailReports'
 import BookMetas from './pages/gestao-terceiros/BookMetas'
 import Clientes from './pages/admin/Clientes'
@@ -197,7 +197,7 @@ const App = () => (
                     <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
                     <Route path="/gestao-terceiros/metas" element={<BookMetas />} />
                     <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
-                    <Route path="/gestao-terceiros/auditoria" element={<Auditoria />} />
+                    <Route path="/admin/auditoria" element={<Auditoria />} />
                     <Route path="/usuarios" element={<Usuarios />} />
                   </Route>
                 </Route>

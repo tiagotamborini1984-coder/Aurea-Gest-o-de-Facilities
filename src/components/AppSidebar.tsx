@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Wrench,
   PieChart,
+  ClipboardList,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -56,7 +57,6 @@ export function AppSidebar() {
         { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
         { title: 'BI Dashboard', path: '/gestao-terceiros/bi' },
         { title: 'Email Reports', path: '/gestao-terceiros/email-reports' },
-        { title: 'Log de Auditoria', path: '/gestao-terceiros/auditoria' },
       ],
     },
     {
@@ -195,6 +195,11 @@ export function AppSidebar() {
       icon: Users,
       path: '/usuarios',
     },
+    {
+      title: 'Log de Auditoria',
+      icon: ClipboardList,
+      path: '/admin/auditoria',
+    },
   ]
 
   const visibleItems = navItems
@@ -205,6 +210,11 @@ export function AppSidebar() {
       }
 
       if (item.title === 'Dashboard Estratégico') {
+        if (role !== 'Master' && role !== 'Administrador') return null
+        return item
+      }
+
+      if (item.title === 'Log de Auditoria') {
         if (role !== 'Master' && role !== 'Administrador') return null
         return item
       }

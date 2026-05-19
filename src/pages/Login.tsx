@@ -55,6 +55,25 @@ export default function Login() {
         description: 'Credenciais inválidas ou não autorizadas.',
       })
       setIsSubmitting(false)
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('client_id')
+          .eq('id', user.id)
+          .single()
+        if (profile?.client_id) {
+          await supabase.from('audit_logs').insert({
+            client_id: profile.client_id,
+            user_id: user.id,
+            action_type: 'Acesso',
+            details: 'Usuário realizou login no sistema',
+          })
+        }
+      }
     }
   }
 
