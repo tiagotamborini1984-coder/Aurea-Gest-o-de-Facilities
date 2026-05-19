@@ -69,8 +69,8 @@ export default function Login() {
           await supabase.from('audit_logs').insert({
             client_id: profile.client_id,
             user_id: user.id,
-            action_type: 'Acesso',
-            details: 'Usuário realizou login no sistema',
+            action_type: 'Login',
+            details: 'Usuário entrou no sistema',
           })
         }
       }

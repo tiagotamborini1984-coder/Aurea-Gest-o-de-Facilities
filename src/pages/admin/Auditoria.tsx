@@ -146,7 +146,7 @@ export default function Auditoria() {
         return 'text-blue-600 bg-blue-50 border-blue-200'
       case 'Exclusão':
         return 'text-red-600 bg-red-50 border-red-200'
-      case 'Acesso':
+      case 'Login':
         return 'text-purple-600 bg-purple-50 border-purple-200'
       default:
         return 'text-gray-600 bg-gray-50 border-gray-200'
@@ -209,7 +209,7 @@ export default function Auditoria() {
                 <SelectItem value="Inclusão">Inclusão</SelectItem>
                 <SelectItem value="Atualização">Atualização</SelectItem>
                 <SelectItem value="Exclusão">Exclusão</SelectItem>
-                <SelectItem value="Acesso">Acesso</SelectItem>
+                <SelectItem value="Login">Login</SelectItem>
               </SelectContent>
             </Select>
 
@@ -285,7 +285,7 @@ export default function Auditoria() {
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <FileText className="h-10 w-10 mb-2 opacity-20" />
-                        Nenhum registro encontrado.
+                        Nenhum log de atividade encontrado.
                       </div>
                     </TableCell>
                   </TableRow>
