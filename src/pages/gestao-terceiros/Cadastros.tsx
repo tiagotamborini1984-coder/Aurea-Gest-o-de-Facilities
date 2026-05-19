@@ -62,16 +62,22 @@ export default function Cadastros() {
 
   // Assegura que o menuName seja avaliado corretamente mesmo para componentes customizados
   let menuName = ''
-  if (config) {
+  const typeMenuMap: Record<string, string> = {
+    colaboradores: 'Cadastros:Colaboradores',
+    funcoes: 'Cadastros:Funções',
+    'quadro-contratado': 'Cadastros:Quadro Contratado',
+    empresas: 'Cadastros:Empresas',
+    plantas: 'Cadastros:Plantas',
+    locais: 'Cadastros:Locais',
+    equipamentos: 'Cadastros:Equipamentos',
+    treinamentos: 'Cadastros:Treinamentos',
+    'book-metas': 'Cadastros:Book de Metas',
+  }
+
+  if (type && typeMenuMap[type]) {
+    menuName = typeMenuMap[type]
+  } else if (config) {
     menuName = `Cadastros:${config.title}`
-  } else if (type === 'colaboradores') {
-    menuName = 'Cadastros:Colaboradores'
-  } else if (type === 'funcoes') {
-    menuName = 'Cadastros:Funções'
-  } else if (type === 'quadro-contratado') {
-    menuName = 'Cadastros:Quadro Contratado'
-  } else if (type === 'empresas') {
-    menuName = 'Cadastros:Empresas Parceiras'
   }
 
   const hasAccess = useHasAccess(menuName)
