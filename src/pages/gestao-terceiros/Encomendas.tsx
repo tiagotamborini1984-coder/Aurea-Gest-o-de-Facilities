@@ -261,91 +261,36 @@ export default function Encomendas() {
         setIsModalOpen(false)
         loadPackages()
       } else {
-        const year = new Date(form.arrival_date).getFullYear()
-
         const targetClientId =
           plants.find((p) => p.id === form.plant_id)?.client_id || profile!.client_id
 
-        const { data: latest } = await supabase
-          .from('packages' as any)
-          .select('protocol_number')
-          .eq('client_id', targetClientId)
-          .like('protocol_number', `ENC-${year}-%`)
-          .order('protocol_number', { ascending: false })
-          .limit(1)
-
-        let seq = 1
-        if (latest && latest.length > 0) {
-          const parts = latest[0].protocol_number.split('-')
-          if (parts.length === 3) {
-            seq = parseInt(parts[2], 10) + 1
-          }
+        const payload = {
+          client_id: targetClientId,
+          plant_id: form.plant_id,
+          package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
+          arrival_date: form.arrival_date,
+          sender: form.sender,
+          recipient_name: form.recipient_name,
+          recipient_email: form.recipient_email,
+          tracking_code: form.tracking_code,
+          observations: form.observations,
+          status: form.status,
+          attachment_url,
         }
 
-        let success = false
-        let retries = 0
-        let finalProtocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
+        const { data: resData, error } = await supabase.rpc('create_package' as any, {
+          p_payload: payload,
+        })
 
-        while (!success && retries < 20) {
-          const payload = {
-            client_id: targetClientId,
-            plant_id: form.plant_id,
-            package_type_id: form.package_type_id !== 'none' ? form.package_type_id : null,
-            protocol_number: finalProtocol,
-            arrival_date: form.arrival_date,
-            sender: form.sender,
-            recipient_name: form.recipient_name,
-            recipient_email: form.recipient_email,
-            tracking_code: form.tracking_code,
-            observations: form.observations,
-            status: form.status,
-            attachment_url,
-          }
-
-          const { error } = await supabase.from('packages' as any).insert(payload)
-
-          if (error) {
-            if (
-              error.code === '23505' ||
-              error.message?.includes('duplicate key') ||
-              error.message?.includes('packages_client_id_protocol_number_key')
-            ) {
-              if (retries > 0 && retries % 5 === 0) {
-                // Re-fetch the latest to jump ahead if we are failing repeatedly
-                const { data: jumpLatest } = await supabase
-                  .from('packages' as any)
-                  .select('protocol_number')
-                  .eq('client_id', targetClientId)
-                  .like('protocol_number', `ENC-${year}-%`)
-                  .order('protocol_number', { ascending: false })
-                  .limit(1)
-
-                if (jumpLatest && jumpLatest.length > 0) {
-                  const parts = jumpLatest[0].protocol_number.split('-')
-                  if (parts.length === 3) {
-                    const jumpSeq = parseInt(parts[2], 10)
-                    if (jumpSeq >= seq) seq = jumpSeq + 1
-                    else seq++
-                  } else seq++
-                } else seq++
-              } else {
-                seq++
-              }
-              finalProtocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
-              retries++
-            } else {
-              throw error
-            }
-          } else {
-            success = true
-          }
+        if (error) {
+          throw new Error(error.message)
         }
 
-        if (!success) {
-          throw new Error('Não foi possível gerar um número de protocolo único. Tente novamente.')
+        if (!resData || !resData.success) {
+          throw new Error('Não foi possível gerar o protocolo. Tente novamente.')
         }
 
-        const protocol = finalProtocol
+        const protocol = resData.protocol_number
 
         toast({
           title: 'Encomenda registrada com sucesso!',
