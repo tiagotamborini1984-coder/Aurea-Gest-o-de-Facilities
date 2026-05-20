@@ -271,7 +271,7 @@ export default function Encomendas() {
           .select('protocol_number')
           .eq('client_id', targetClientId)
           .like('protocol_number', `ENC-${year}-%`)
-          .order('created_at', { ascending: false })
+          .order('protocol_number', { ascending: false })
           .limit(1)
 
         let seq = 1
@@ -282,12 +282,11 @@ export default function Encomendas() {
           }
         }
 
-        let protocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
         let success = false
         let retries = 0
-        let finalProtocol = protocol
+        let finalProtocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
 
-        while (!success && retries < 10) {
+        while (!success && retries < 20) {
           const payload = {
             client_id: targetClientId,
             plant_id: form.plant_id,
@@ -306,8 +305,32 @@ export default function Encomendas() {
           const { error } = await supabase.from('packages' as any).insert(payload)
 
           if (error) {
-            if (error.code === '23505' || error.message?.includes('duplicate key')) {
-              seq++
+            if (
+              error.code === '23505' ||
+              error.message?.includes('duplicate key') ||
+              error.message?.includes('packages_client_id_protocol_number_key')
+            ) {
+              if (retries > 0 && retries % 5 === 0) {
+                // Re-fetch the latest to jump ahead if we are failing repeatedly
+                const { data: jumpLatest } = await supabase
+                  .from('packages' as any)
+                  .select('protocol_number')
+                  .eq('client_id', targetClientId)
+                  .like('protocol_number', `ENC-${year}-%`)
+                  .order('protocol_number', { ascending: false })
+                  .limit(1)
+
+                if (jumpLatest && jumpLatest.length > 0) {
+                  const parts = jumpLatest[0].protocol_number.split('-')
+                  if (parts.length === 3) {
+                    const jumpSeq = parseInt(parts[2], 10)
+                    if (jumpSeq >= seq) seq = jumpSeq + 1
+                    else seq++
+                  } else seq++
+                } else seq++
+              } else {
+                seq++
+              }
               finalProtocol = `ENC-${year}-${seq.toString().padStart(4, '0')}`
               retries++
             } else {
@@ -322,7 +345,7 @@ export default function Encomendas() {
           throw new Error('Não foi possível gerar um número de protocolo único. Tente novamente.')
         }
 
-        protocol = finalProtocol
+        const protocol = finalProtocol
 
         toast({
           title: 'Encomenda registrada com sucesso!',
