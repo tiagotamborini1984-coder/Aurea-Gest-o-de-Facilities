@@ -97,7 +97,7 @@ export default function PlanejamentoManutencao() {
     let query = supabase
       .from('maintenance_tickets')
       .select(`
-      id, ticket_number, description, planned_start, planned_end, assignee_id, plant_id, area_id, sublocation_id, asset_id, photos,
+      id, ticket_number, origin, description, planned_start, planned_end, assignee_id, plant_id, area_id, sublocation_id, asset_id, photos,
       assignee:profiles!maintenance_tickets_assignee_id_fkey(id, name),
       status:maintenance_statuses(step),
       area:maintenance_areas(name),
@@ -307,6 +307,11 @@ export default function PlanejamentoManutencao() {
                       <div className="flex items-center gap-2">
                         <GripHorizontal className="h-4 w-4 text-gray-400" />
                         <span className="text-xs font-bold text-gray-600">{t.ticket_number}</span>
+                        {t.origin === 'Preventiva' && (
+                          <span className="text-[9px] font-bold bg-purple-100 text-purple-700 px-1 rounded-sm border border-purple-200">
+                            PREV
+                          </span>
+                        )}
                       </div>
                       {t.asset && (
                         <span className="text-[10px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded truncate max-w-[100px]">
@@ -362,7 +367,16 @@ export default function PlanejamentoManutencao() {
                     >
                       <CardContent className="p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-bold text-blue-700">{t.ticket_number}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-blue-700">
+                              {t.ticket_number}
+                            </span>
+                            {t.origin === 'Preventiva' && (
+                              <span className="text-[9px] font-bold bg-purple-100 text-purple-700 px-1 rounded-sm border border-purple-200">
+                                PREV
+                              </span>
+                            )}
+                          </div>
                           {t.asset && (
                             <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded truncate max-w-[100px]">
                               {t.asset.name}
@@ -391,7 +405,14 @@ export default function PlanejamentoManutencao() {
       <Sheet open={!!selectedTicket} onOpenChange={(v) => !v && setSelectedTicket(null)}>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Agendar OS: {selectedTicket?.ticket_number}</SheetTitle>
+            <SheetTitle className="flex items-center gap-2">
+              Agendar OS: {selectedTicket?.ticket_number}
+              {selectedTicket?.origin === 'Preventiva' && (
+                <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-sm border border-purple-200 tracking-wide uppercase">
+                  Preventiva
+                </span>
+              )}
+            </SheetTitle>
           </SheetHeader>
           {selectedTicket && (
             <div className="mt-6 space-y-5">

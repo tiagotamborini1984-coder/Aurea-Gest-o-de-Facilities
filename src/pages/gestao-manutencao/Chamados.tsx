@@ -758,6 +758,14 @@ export default function ChamadosManutencao() {
                               {ticket.type.name}
                             </Badge>
                           )}
+                          {ticket.origin === 'Preventiva' && (
+                            <Badge
+                              variant="outline"
+                              className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] px-1.5 h-5 font-semibold tracking-wide"
+                            >
+                              Preventiva
+                            </Badge>
+                          )}
                         </div>
                         {ticket.priority && (
                           <Badge
@@ -857,6 +865,11 @@ export default function ChamadosManutencao() {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               OS: {selectedTicket?.ticket_number}
+              {selectedTicket?.origin === 'Preventiva' && (
+                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-transparent">
+                  Preventiva
+                </Badge>
+              )}
               {selectedTicket &&
                 (() => {
                   const sla = getTicketSLA(selectedTicket, now)
