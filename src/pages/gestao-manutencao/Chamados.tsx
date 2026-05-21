@@ -4,9 +4,26 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Wrench, MapPin, Plus, Filter, Paperclip, X, Clock } from 'lucide-react'
+import {
+  Wrench,
+  MapPin,
+  Plus,
+  Filter,
+  Paperclip,
+  X,
+  Clock,
+  Check,
+  AlertTriangle,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
@@ -17,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -110,8 +128,15 @@ export default function ChamadosManutencao() {
     actual_start: '',
     actual_end: '',
   })
+  const [checklistResponses, setChecklistResponses] = useState<any[]>([])
   const [updating, setUpdating] = useState(false)
   const [now, setNow] = useState(new Date())
+
+  const [correctiveModalOpen, setCorrectiveModalOpen] = useState(false)
+  const [correctiveForm, setCorrectiveForm] = useState({
+    description: '',
+    priority_id: 'none',
+  })
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000)
@@ -155,6 +180,7 @@ export default function ChamadosManutencao() {
   useEffect(() => {
     loadAuxData()
   }, [])
+
   useEffect(() => {
     loadTickets()
   }, [selectedPlant, selectedArea, selectedType])
@@ -175,6 +201,7 @@ export default function ChamadosManutencao() {
         actual_start: toLocalDatetime(selectedTicket.actual_start),
         actual_end: toLocalDatetime(selectedTicket.actual_end),
       })
+      setChecklistResponses(selectedTicket.checklist_responses || [])
     }
   }, [selectedTicket])
 
@@ -344,6 +371,7 @@ export default function ChamadosManutencao() {
         planned_end: editForm.planned_end ? new Date(editForm.planned_end).toISOString() : null,
         actual_start: editForm.actual_start ? new Date(editForm.actual_start).toISOString() : null,
         actual_end: editForm.actual_end ? new Date(editForm.actual_end).toISOString() : null,
+        checklist_responses: checklistResponses,
       }
       const { error } = await supabase
         .from('maintenance_tickets')
@@ -368,6 +396,57 @@ export default function ChamadosManutencao() {
       toast.error(e.message)
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleChecklistStatusChange = (index: number, newStatus: string) => {
+    const newResponses = [...checklistResponses]
+    newResponses[index] = { ...newResponses[index], status: newStatus }
+    setChecklistResponses(newResponses)
+  }
+
+  const handleCreateCorrective = async () => {
+    if (!correctiveForm.description) return toast.error('Informe a descrição do problema')
+
+    try {
+      const year = new Date().getFullYear()
+      const { data: latest } = await supabase
+        .from('maintenance_tickets')
+        .select('ticket_number')
+        .eq('client_id', selectedTicket.client_id)
+        .like('ticket_number', `MAN-${year}-%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      let seq = latest?.length ? parseInt(latest[0].ticket_number.split('-')[2], 10) + 1 : 1
+      const ticketNumber = `MAN-${year}-${seq.toString().padStart(4, '0')}`
+
+      const initStatus = statuses.find((s) => s.step === 'Aberto') || statuses[0]
+      const corretivaType = types.find((t) => t.name.toLowerCase().includes('corretiva'))
+
+      const { error } = await supabase.from('maintenance_tickets').insert({
+        client_id: selectedTicket.client_id,
+        plant_id: selectedTicket.plant_id,
+        area_id: selectedTicket.area_id,
+        sublocation_id: selectedTicket.sublocation_id,
+        asset_id: selectedTicket.asset_id,
+        type_id: corretivaType?.id || null,
+        priority_id: correctiveForm.priority_id !== 'none' ? correctiveForm.priority_id : null,
+        status_id: initStatus?.id || null,
+        ticket_number: ticketNumber,
+        description: `[Gerado por Preventiva OS ${selectedTicket.ticket_number}]\n\n${correctiveForm.description}`,
+        origin: 'Preventiva',
+        parent_ticket_id: selectedTicket.id,
+        requester_name: user?.email,
+      })
+
+      if (error) throw error
+      toast.success('OS Corretiva gerada com sucesso!')
+      setCorrectiveModalOpen(false)
+      setCorrectiveForm({ description: '', priority_id: 'none' })
+      loadTickets()
+    } catch (err: any) {
+      toast.error(err.message)
     }
   }
 
@@ -800,9 +879,76 @@ export default function ChamadosManutencao() {
             <div className="mt-6 space-y-4">
               <div>
                 <Label className="text-gray-500">Descrição</Label>
-                <p className="text-sm font-medium mt-1">{selectedTicket.description}</p>
+                <p className="text-sm font-medium mt-1 whitespace-pre-wrap">
+                  {selectedTicket.description}
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Checklist Section */}
+              {checklistResponses.length > 0 && (
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-base font-semibold">Checklist de Preventiva</Label>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                      {checklistResponses.filter((r) => r.status === 'ok').length} /{' '}
+                      {checklistResponses.length} Concluídos
+                    </Badge>
+                  </div>
+                  <div className="space-y-3">
+                    {checklistResponses.map((item, index) => (
+                      <div
+                        key={item.item_id || index}
+                        className="p-3 border rounded-lg bg-gray-50/50"
+                      >
+                        <p className="text-sm font-medium mb-3">{item.description}</p>
+                        <div className="flex flex-wrap gap-2 items-center justify-between">
+                          <ToggleGroup
+                            type="single"
+                            size="sm"
+                            value={item.status}
+                            onValueChange={(v) => {
+                              if (v) handleChecklistStatusChange(index, v)
+                            }}
+                          >
+                            <ToggleGroupItem
+                              value="ok"
+                              className="data-[state=on]:bg-green-100 data-[state=on]:text-green-800 text-xs"
+                            >
+                              <Check className="w-3.5 h-3.5 mr-1" /> OK
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                              value="fail"
+                              className="data-[state=on]:bg-red-100 data-[state=on]:text-red-800 text-xs"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Falha
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+
+                          {(item.status === 'fail' || item.status === 'pending') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-8 border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                              onClick={() => {
+                                setCorrectiveForm({
+                                  description: `Falha identificada no item: ${item.description}`,
+                                  priority_id: 'none',
+                                })
+                                setCorrectiveModalOpen(true)
+                              }}
+                            >
+                              <Plus className="w-3.5 h-3.5 mr-1" />
+                              Gerar Corretiva
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div className="col-span-2">
                   <Label className="text-gray-500">Planta</Label>
                   <Select
@@ -1066,6 +1212,56 @@ export default function ChamadosManutencao() {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={correctiveModalOpen} onOpenChange={setCorrectiveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerar OS Corretiva</DialogTitle>
+            <DialogDescription>
+              Uma nova Ordem de Serviço será criada e vinculada a esta Preventiva.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Descrição do Problema Encontrado *</Label>
+              <Textarea
+                rows={3}
+                value={correctiveForm.description}
+                onChange={(e) =>
+                  setCorrectiveForm({ ...correctiveForm, description: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Criticidade (Opcional)</Label>
+              <Select
+                value={correctiveForm.priority_id}
+                onValueChange={(v) => setCorrectiveForm({ ...correctiveForm, priority_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Padrão</SelectItem>
+                  {priorities.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setCorrectiveModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateCorrective} className="bg-brand-vividBlue">
+                Criar Corretiva
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

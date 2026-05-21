@@ -4,7 +4,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -35,7 +36,6 @@ Deno.serve(async (req: Request) => {
     for (const plan of plans || []) {
       // Very simplified check: if last_generated is not today
       if (plan.last_generated_date !== todayStr) {
-        
         // Generate OS Number
         const year = new Date().getFullYear()
         const { data: latest } = await supabaseClient
@@ -61,6 +61,21 @@ Deno.serve(async (req: Request) => {
           .order('order_index', { ascending: true })
           .limit(1)
 
+        // Get checklist items
+        const { data: checklistItems } = await supabaseClient
+          .from('maintenance_plan_checklist_items')
+          .select('id, description, order_index')
+          .eq('plan_id', plan.id)
+          .order('order_index', { ascending: true })
+
+        const initialChecklist =
+          checklistItems?.map((item) => ({
+            item_id: item.id,
+            description: item.description,
+            status: 'pending',
+            notes: '',
+          })) || []
+
         const { data: newTicket } = await supabaseClient
           .from('maintenance_tickets')
           .insert({
@@ -74,7 +89,8 @@ Deno.serve(async (req: Request) => {
             assignee_id: plan.assignee_id,
             ticket_number: ticketNumber,
             description: `[PREVENTIVA] ${plan.title}\n\n${plan.description || ''}`,
-            origin: 'Preventiva'
+            origin: 'Preventiva',
+            checklist_responses: initialChecklist,
           } as any)
           .select()
 
