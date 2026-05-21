@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import heroImage from '@/assets/chatgpt-image-21-de-mai.de-2026-161932-16216.png'
 
 export default function LandingPage() {
   const allModules = [
@@ -195,7 +196,7 @@ export default function LandingPage() {
               </div>
             </div>
             <img
-              src="https://img.usecurling.com/p/1200/600?q=modern%20saas%20dashboard%20interface&color=blue&dpr=2"
+              src={heroImage}
               alt="Áurea Dashboard Mockup"
               className="w-full object-cover max-h-[600px] border-b border-slate-100"
             />
