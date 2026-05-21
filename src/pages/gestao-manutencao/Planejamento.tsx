@@ -303,15 +303,23 @@ export default function PlanejamentoManutencao() {
                   className="cursor-pointer active:cursor-move border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-all"
                 >
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <GripHorizontal className="h-4 w-4 text-gray-400" />
-                      <span className="text-xs font-bold text-gray-600">{t.ticket_number}</span>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <GripHorizontal className="h-4 w-4 text-gray-400" />
+                        <span className="text-xs font-bold text-gray-600">{t.ticket_number}</span>
+                      </div>
+                      {t.asset && (
+                        <span className="text-[10px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded truncate max-w-[100px]">
+                          {t.asset.name}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm line-clamp-2" title={t.description}>
                       {t.description}
                     </p>
                     {t.assignee && (
-                      <div className="text-[10px] text-gray-500 mt-1 truncate">
+                      <div className="text-[10px] text-gray-500 mt-1 truncate flex items-center gap-1">
+                        <User className="w-3 h-3" />
                         {t.assignee.name}
                       </div>
                     )}
@@ -353,8 +361,17 @@ export default function PlanejamentoManutencao() {
                       className="border-l-4 border-l-blue-500 shadow-sm bg-blue-50/50 cursor-pointer active:cursor-move"
                     >
                       <CardContent className="p-3">
-                        <span className="text-xs font-bold text-blue-700">{t.ticket_number}</span>
-                        <p className="text-xs font-medium line-clamp-2 my-1">{t.description}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-blue-700">{t.ticket_number}</span>
+                          {t.asset && (
+                            <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded truncate max-w-[100px]">
+                              {t.asset.name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-medium line-clamp-2 my-1" title={t.description}>
+                          {t.description}
+                        </p>
                         {t.assignee && (
                           <div className="text-[10px] text-gray-500 mt-1 truncate flex items-center gap-1">
                             <User className="w-3 h-3" />

@@ -4,7 +4,32 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+}
+
+function addFrequency(date: Date, frequency: string): Date {
+  const d = new Date(date)
+  switch (frequency) {
+    case 'Diária':
+      d.setUTCDate(d.getUTCDate() + 1)
+      break
+    case 'Semanal':
+      d.setUTCDate(d.getUTCDate() + 7)
+      break
+    case 'Mensal':
+      d.setUTCMonth(d.getUTCMonth() + 1)
+      break
+    case 'Semestral':
+      d.setUTCMonth(d.getUTCMonth() + 6)
+      break
+    case 'Anual':
+      d.setUTCFullYear(d.getUTCFullYear() + 1)
+      break
+    default:
+      d.setUTCMonth(d.getUTCMonth() + 1)
+  }
+  return d
 }
 
 Deno.serve(async (req: Request) => {
@@ -18,11 +43,10 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().split('T')[0]
 
-    // Fetch active plans that need generating
-    // A real implementation would check dates precisely based on frequency
-    // Here we just fetch them and simulate generation for the POC
     const { data: plans, error: plansError } = await supabaseClient
       .from('maintenance_preventive_plans')
       .select('*')
@@ -33,9 +57,14 @@ Deno.serve(async (req: Request) => {
     let generatedCount = 0
 
     for (const plan of plans || []) {
-      // Very simplified check: if last_generated is not today
-      if (plan.last_generated_date !== todayStr) {
-        
+      let nextDate = new Date(plan.start_date + 'T00:00:00Z')
+
+      if (plan.last_generated_date) {
+        const lastGen = new Date(plan.last_generated_date + 'T00:00:00Z')
+        nextDate = addFrequency(lastGen, plan.frequency)
+      }
+
+      if (today >= nextDate || !plan.last_generated_date) {
         // Generate OS Number
         const year = new Date().getFullYear()
         const { data: latest } = await supabaseClient
@@ -68,12 +97,17 @@ Deno.serve(async (req: Request) => {
           .eq('plan_id', plan.id)
           .order('order_index', { ascending: true })
 
-        const initialChecklist = checklistItems?.map(item => ({
-          item_id: item.id,
-          description: item.description,
-          status: 'pending',
-          notes: ''
-        })) || []
+        const initialChecklist =
+          checklistItems?.map((item) => ({
+            item_id: item.id,
+            description: item.description,
+            status: 'pending',
+            notes: '',
+          })) || []
+
+        const plannedStart = nextDate.toISOString()
+        const endDate = addFrequency(nextDate, plan.frequency)
+        const plannedEnd = endDate.toISOString()
 
         const { data: newTicket } = await supabaseClient
           .from('maintenance_tickets')
@@ -89,14 +123,17 @@ Deno.serve(async (req: Request) => {
             ticket_number: ticketNumber,
             description: `[PREVENTIVA] ${plan.title}\n\n${plan.description || ''}`,
             origin: 'Preventiva',
-            checklist_responses: initialChecklist
+            plan_id: plan.id,
+            planned_start: plannedStart,
+            planned_end: plannedEnd,
+            checklist_responses: initialChecklist,
           } as any)
           .select()
 
         if (newTicket) {
           await supabaseClient
             .from('maintenance_preventive_plans')
-            .update({ last_generated_date: todayStr })
+            .update({ last_generated_date: nextDate.toISOString().split('T')[0] })
             .eq('id', plan.id)
           generatedCount++
         }
