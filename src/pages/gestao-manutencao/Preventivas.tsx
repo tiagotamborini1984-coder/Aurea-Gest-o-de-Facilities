@@ -1,7 +1,17 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCcw, Plus, Settings2, Calendar, Trash2, GripVertical } from 'lucide-react'
+import {
+  RefreshCcw,
+  Plus,
+  Settings2,
+  Calendar,
+  Trash2,
+  GripVertical,
+  Sparkles,
+  Bot,
+  CheckCircle2,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
@@ -40,6 +50,11 @@ export default function PreventivasManutencao() {
   })
 
   const [checklist, setChecklist] = useState<{ id: string; description: string }[]>([])
+
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiPlantId, setAiPlantId] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([])
 
   useEffect(() => {
     loadPlans()
@@ -86,6 +101,84 @@ export default function PreventivasManutencao() {
 
   const handleChecklistChange = (id: string, value: string) => {
     setChecklist(checklist.map((item) => (item.id === id ? { ...item, description: value } : item)))
+  }
+
+  const handleAnalyzeAI = async () => {
+    if (!aiPlantId) return toast.error('Selecione uma planta para análise.')
+    setAiLoading(true)
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('client_id')
+        .eq('id', user?.id)
+        .single()
+      if (!profile?.client_id) throw new Error('Cliente não encontrado')
+
+      const { data, error } = await supabase.functions.invoke('maintenance-ai-advisor', {
+        body: { plant_id: aiPlantId, client_id: profile.client_id },
+      })
+
+      if (error) throw error
+      if (!data?.success) throw new Error(data?.error || 'Erro ao gerar sugestões')
+
+      if (data.suggestions && data.suggestions.length === 0) {
+        toast.info('Nenhuma lacuna de manutenção encontrada para esta planta.')
+      }
+
+      setAiSuggestions(data.suggestions || [])
+    } catch (error: any) {
+      toast.error(error.message)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleAcceptSuggestion = async (suggestion: any, index: number) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('client_id')
+        .eq('id', user?.id)
+        .single()
+      if (!profile?.client_id) throw new Error('Cliente não encontrado')
+
+      const { data: newPlan, error } = await supabase
+        .from('maintenance_preventive_plans')
+        .insert({
+          client_id: profile.client_id,
+          plant_id: aiPlantId,
+          area_id: suggestion.scope === 'area' ? suggestion.area_id : null,
+          asset_id: suggestion.scope === 'asset' ? suggestion.asset_id : null,
+          title: suggestion.title,
+          frequency: suggestion.frequency,
+          start_date: new Date().toISOString().split('T')[0],
+          description: suggestion.description,
+          is_active: true,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      if (suggestion.checklist && suggestion.checklist.length > 0 && newPlan) {
+        const checklistInserts = suggestion.checklist.map((c: string, idx: number) => ({
+          plan_id: newPlan.id,
+          description: c,
+          order_index: idx,
+        }))
+        const { error: checklistError } = await supabase
+          .from('maintenance_plan_checklist_items')
+          .insert(checklistInserts)
+
+        if (checklistError) throw checklistError
+      }
+
+      toast.success('Plano sugerido aceito e criado com sucesso!')
+      setAiSuggestions((prev) => prev.filter((_, i) => i !== index))
+      loadPlans()
+    } catch (err: any) {
+      toast.error(err.message)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,207 +261,303 @@ export default function PreventivasManutencao() {
           </p>
         </div>
 
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
-            <Button className="bg-brand-vividBlue">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Plano
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto pb-10">
-            <SheetHeader>
-              <SheetTitle>Novo Plano Preventivo</SheetTitle>
-            </SheetHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2">
-                  <Label>Planta *</Label>
-                  <Select
-                    required
-                    value={form.plant_id}
-                    onValueChange={(v) =>
-                      setForm({ ...form, plant_id: v, area_id: 'none', asset_id: 'none' })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plants.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
+        <div className="flex gap-2">
+          <Sheet open={aiOpen} onOpenChange={setAiOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                className="text-purple-600 border-purple-200 hover:bg-purple-50 bg-white"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Consultor IA
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:max-w-xl overflow-y-auto pb-10">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Bot className="h-6 w-6 text-purple-600" />
+                  Especialista IA
+                </SheetTitle>
+              </SheetHeader>
+              <div className="mt-6 space-y-6">
+                <p className="text-sm text-gray-500">
+                  O Especialista IA analisa seus ativos e áreas cadastrados, identificando lacunas
+                  na manutenção preventiva e sugerindo planos com checklists pré-configurados.
+                </p>
+                <div className="space-y-3">
+                  <Label>Selecione a Planta para Análise</Label>
+                  <div className="flex gap-2">
+                    <Select value={aiPlantId} onValueChange={setAiPlantId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plants.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={handleAnalyzeAI}
+                      disabled={aiLoading}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      {aiLoading ? 'Analisando...' : 'Analisar'}
+                    </Button>
+                  </div>
+                </div>
+
+                {aiSuggestions.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-600" /> Sugestões Encontradas
+                    </h3>
+                    <div className="space-y-4">
+                      {aiSuggestions.map((sug, index) => (
+                        <Card key={index} className="border-purple-100 bg-purple-50/30">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base text-purple-900">{sug.title}</CardTitle>
+                            <p className="text-sm text-purple-700">
+                              Alvo:{' '}
+                              <span className="font-medium">
+                                {sug.asset_name || sug.area_name || 'Geral'}
+                              </span>
+                            </p>
+                          </CardHeader>
+                          <CardContent className="space-y-3 pb-4 text-sm text-gray-700">
+                            <p>{sug.description}</p>
+                            <div>
+                              <span className="font-medium">Periodicidade:</span> {sug.frequency}
+                            </div>
+                            <div>
+                              <span className="font-medium">Checklist sugerido:</span>
+                              <ul className="list-disc pl-5 mt-1 space-y-1">
+                                {sug.checklist.map((item: string, i: number) => (
+                                  <li key={i}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <Button
+                              onClick={() => handleAcceptSuggestion(sug, index)}
+                              className="w-full mt-2 bg-purple-600 hover:bg-purple-700"
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              Criar Este Plano
+                            </Button>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 col-span-2 sm:col-span-1">
-                  <Label>Escopo da Preventiva</Label>
-                  <Select
-                    value={form.scope}
-                    onValueChange={(v) =>
-                      setForm({ ...form, scope: v, area_id: 'none', asset_id: 'none' })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="area">Por Área/Local</SelectItem>
-                      <SelectItem value="asset">Por Equipamento (Ativo)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 col-span-2 sm:col-span-1">
-                  {form.scope === 'area' ? (
-                    <>
-                      <Label>Área *</Label>
-                      <Select
-                        disabled={!form.plant_id}
-                        value={form.area_id}
-                        onValueChange={(v) => setForm({ ...form, area_id: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Selecione uma área</SelectItem>
-                          {formAreas.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </>
-                  ) : (
-                    <>
-                      <Label>Equipamento *</Label>
-                      <Select
-                        disabled={!form.plant_id}
-                        value={form.asset_id}
-                        onValueChange={(v) => setForm({ ...form, asset_id: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Selecione um ativo</SelectItem>
-                          {formAssets.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t">
-                <Label>Título do Plano *</Label>
-                <Input
-                  required
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Ex: Revisão Mensal HVAC"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Periodicidade</Label>
-                  <Select
-                    value={form.frequency}
-                    onValueChange={(v) => setForm({ ...form, frequency: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Diária">Diária</SelectItem>
-                      <SelectItem value="Semanal">Semanal</SelectItem>
-                      <SelectItem value="Mensal">Mensal</SelectItem>
-                      <SelectItem value="Semestral">Semestral</SelectItem>
-                      <SelectItem value="Anual">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Data de Início</Label>
-                  <Input
-                    type="date"
-                    required
-                    value={form.start_date}
-                    onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Escopo / Descrição (Opcional)</Label>
-                <Textarea
-                  rows={2}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Instruções gerais..."
-                />
-              </div>
-
-              <div className="pt-4 border-t space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Checklist de Execução</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddChecklistItem}
-                  >
-                    <Plus className="h-4 w-4 mr-2" /> Adicionar Item
-                  </Button>
-                </div>
-                {checklist.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">
-                    Nenhum item de checklist adicionado.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {checklist.map((item, index) => (
-                      <div key={item.id} className="flex items-center gap-2">
-                        <div className="flex-none cursor-move text-gray-400">
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-                        <div className="flex-none w-6 text-sm text-gray-500 font-mono text-right">
-                          {index + 1}.
-                        </div>
-                        <Input
-                          value={item.description}
-                          onChange={(e) => handleChecklistChange(item.id, e.target.value)}
-                          placeholder="Ex: Verificar nível de óleo..."
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveChecklistItem(item.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>
+            </SheetContent>
+          </Sheet>
 
-              <div className="pt-4">
-                <Button type="submit" className="w-full bg-brand-vividBlue">
-                  Salvar Plano
-                </Button>
-              </div>
-            </form>
-          </SheetContent>
-        </Sheet>
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+              <Button className="bg-brand-vividBlue">
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Plano
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:max-w-xl overflow-y-auto pb-10">
+              <SheetHeader>
+                <SheetTitle>Novo Plano Preventivo</SheetTitle>
+              </SheetHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <Label>Planta *</Label>
+                    <Select
+                      required
+                      value={form.plant_id}
+                      onValueChange={(v) =>
+                        setForm({ ...form, plant_id: v, area_id: 'none', asset_id: 'none' })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plants.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <Label>Escopo da Preventiva</Label>
+                    <Select
+                      value={form.scope}
+                      onValueChange={(v) =>
+                        setForm({ ...form, scope: v, area_id: 'none', asset_id: 'none' })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="area">Por Área/Local</SelectItem>
+                        <SelectItem value="asset">Por Equipamento (Ativo)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    {form.scope === 'area' ? (
+                      <>
+                        <Label>Área *</Label>
+                        <Select
+                          disabled={!form.plant_id}
+                          value={form.area_id}
+                          onValueChange={(v) => setForm({ ...form, area_id: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Selecione uma área</SelectItem>
+                            {formAreas.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      <>
+                        <Label>Equipamento *</Label>
+                        <Select
+                          disabled={!form.plant_id}
+                          value={form.asset_id}
+                          onValueChange={(v) => setForm({ ...form, asset_id: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Selecione um ativo</SelectItem>
+                            {formAssets.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t">
+                  <Label>Título do Plano *</Label>
+                  <Input
+                    required
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="Ex: Revisão Mensal HVAC"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Periodicidade</Label>
+                    <Select
+                      value={form.frequency}
+                      onValueChange={(v) => setForm({ ...form, frequency: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Diária">Diária</SelectItem>
+                        <SelectItem value="Semanal">Semanal</SelectItem>
+                        <SelectItem value="Mensal">Mensal</SelectItem>
+                        <SelectItem value="Semestral">Semestral</SelectItem>
+                        <SelectItem value="Anual">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data de Início</Label>
+                    <Input
+                      type="date"
+                      required
+                      value={form.start_date}
+                      onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Escopo / Descrição (Opcional)</Label>
+                  <Textarea
+                    rows={2}
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="Instruções gerais..."
+                  />
+                </div>
+
+                <div className="pt-4 border-t space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Checklist de Execução</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddChecklistItem}
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Adicionar Item
+                    </Button>
+                  </div>
+                  {checklist.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">
+                      Nenhum item de checklist adicionado.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {checklist.map((item, index) => (
+                        <div key={item.id} className="flex items-center gap-2">
+                          <div className="flex-none cursor-move text-gray-400">
+                            <GripVertical className="h-4 w-4" />
+                          </div>
+                          <div className="flex-none w-6 text-sm text-gray-500 font-mono text-right">
+                            {index + 1}.
+                          </div>
+                          <Input
+                            value={item.description}
+                            onChange={(e) => handleChecklistChange(item.id, e.target.value)}
+                            placeholder="Ex: Verificar nível de óleo..."
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveChecklistItem(item.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4">
+                  <Button type="submit" className="w-full bg-brand-vividBlue">
+                    Salvar Plano
+                  </Button>
+                </div>
+              </form>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       {loading ? (
