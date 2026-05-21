@@ -115,7 +115,7 @@ export function AccidentForm({ initialData }: { initialData?: any }) {
 
     supabase
       .from('plants')
-      .select('id, name')
+      .select('id, name, code, city')
       .eq('client_id', activeClient.id)
       .then(({ data }) => setPlants(data || []))
 
@@ -129,6 +129,15 @@ export function AccidentForm({ initialData }: { initialData?: any }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeClient || !profile) return
+
+    if (!formData.plant_id) {
+      toast({
+        title: 'Aviso',
+        description: 'Por favor, selecione a planta onde o acidente ocorreu.',
+        variant: 'destructive',
+      })
+      return
+    }
 
     const payload = {
       ...formData,
@@ -209,19 +218,19 @@ export function AccidentForm({ initialData }: { initialData?: any }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Planta</Label>
+                <Label>Planta de Ocorrência</Label>
                 <Select
                   value={formData.plant_id}
                   onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
+                    <SelectValue placeholder="Selecione a planta de destino..." />
                   </SelectTrigger>
                   <SelectContent>
                     {plants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                        {p.name} {p.code && p.city ? `(${p.code} - ${p.city})` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
