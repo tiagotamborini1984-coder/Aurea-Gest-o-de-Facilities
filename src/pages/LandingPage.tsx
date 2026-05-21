@@ -18,11 +18,12 @@ import {
 import { cn } from '@/lib/utils'
 
 export default function LandingPage() {
-  const coreModules = [
+  const allModules = [
     {
       icon: Lock,
       title: 'Gestão de Lockers',
-      desc: 'Smart locker management com distribuição inteligente, controle de chaves e auditoria de ocupação em tempo real.',
+      desc: 'Smart locker management com distribuição inteligente e auditoria em tempo real.',
+      features: ['Distribuição inteligente', 'Controle de chaves', 'Auditoria de ocupação'],
       gradient: 'from-blue-500/10 to-cyan-500/10',
       iconColor: 'text-cyan-600',
       border: 'group-hover:border-cyan-200',
@@ -30,7 +31,8 @@ export default function LandingPage() {
     {
       icon: Home,
       title: 'Gestão de Imóveis',
-      desc: 'Administração completa de housing corporativo, reservas avançadas, controle de capacidade e faturamento.',
+      desc: 'Administração completa de housing corporativo, reservas e controle de capacidade.',
+      features: ['Reservas avançadas', 'Controle de capacidade', 'Gestão de faturamento'],
       gradient: 'from-purple-500/10 to-pink-500/10',
       iconColor: 'text-purple-600',
       border: 'group-hover:border-purple-200',
@@ -38,7 +40,8 @@ export default function LandingPage() {
     {
       icon: Users,
       title: 'Gestão de Terceiros',
-      desc: 'Controle absoluto sobre provedores de serviços externos, headcount, documentação e treinamentos (NRs).',
+      desc: 'Controle absoluto sobre provedores externos, documentação e treinamentos.',
+      features: ['Controle de headcount', 'Gestão de documentação', 'Treinamentos e NRs'],
       gradient: 'from-orange-500/10 to-red-500/10',
       iconColor: 'text-orange-600',
       border: 'group-hover:border-orange-200',
@@ -46,18 +49,48 @@ export default function LandingPage() {
     {
       icon: PieChart,
       title: 'Gestão de Budget',
-      desc: 'Acompanhamento financeiro robusto com centros de custo flexíveis, contas orçamentárias e comparativo previsto vs realizado.',
+      desc: 'Acompanhamento financeiro robusto com centros de custo flexíveis e comparativo.',
+      features: ['Centros de custo', 'Contas orçamentárias', 'Previsto vs Realizado'],
       gradient: 'from-emerald-500/10 to-teal-500/10',
       iconColor: 'text-emerald-600',
       border: 'group-hover:border-emerald-200',
     },
-  ]
-
-  const extraModules = [
-    { icon: Wrench, title: 'Gestão de Manutenção' },
-    { icon: ShieldCheck, title: 'Auditoria e Qualidade' },
-    { icon: Package, title: 'Central de Encomendas' },
-    { icon: Leaf, title: 'Limpeza e Jardinagem' },
+    {
+      icon: Wrench,
+      title: 'Gestão de Manutenção',
+      desc: 'Controle de chamados de manutenção predial e rotinas preventivas.',
+      features: ['Controle de tickets (OS)', 'Planejamento preventivo', 'Gestão de ativos'],
+      gradient: 'from-indigo-500/10 to-blue-500/10',
+      iconColor: 'text-indigo-600',
+      border: 'group-hover:border-indigo-200',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Auditoria e Qualidade',
+      desc: 'Acompanhamento rigoroso de conformidade e auditorias em todas as áreas.',
+      features: ['Execução de checklists', 'Acompanhamento de notas', 'Planos de ação'],
+      gradient: 'from-rose-500/10 to-red-500/10',
+      iconColor: 'text-rose-600',
+      border: 'group-hover:border-rose-200',
+    },
+    {
+      icon: Package,
+      title: 'Central de Encomendas',
+      desc: 'Logística interna corporativa automatizada para recebimento de pacotes.',
+      features: ['Registro de chegada', 'Rastreamento de pacotes', 'Protocolos de entrega'],
+      gradient: 'from-amber-500/10 to-yellow-500/10',
+      iconColor: 'text-amber-600',
+      border: 'group-hover:border-amber-200',
+    },
+    {
+      icon: Leaf,
+      title: 'Limpeza e Jardinagem',
+      desc: 'Padronização e roteirização das atividades contínuas de conservação.',
+      features: ['Gestão de cronogramas', 'Monitoramento de áreas', 'Registro de evidências'],
+      gradient: 'from-green-500/10 to-emerald-500/10',
+      iconColor: 'text-green-600',
+      border: 'group-hover:border-green-200',
+    },
   ]
 
   return (
@@ -162,7 +195,7 @@ export default function LandingPage() {
               </div>
             </div>
             <img
-              src="https://img.usecurling.com/p/1200/600?q=dashboard%20analytics%20software%20interface&color=blue&dpr=2"
+              src="https://img.usecurling.com/p/1200/600?q=modern%20saas%20dashboard%20interface&color=blue&dpr=2"
               alt="Áurea Dashboard Mockup"
               className="w-full object-cover max-h-[600px] border-b border-slate-100"
             />
@@ -184,12 +217,12 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            {coreModules.map((mod, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            {allModules.map((mod, i) => (
               <div
                 key={i}
                 className={cn(
-                  'group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl p-8 shadow-sm hover:shadow-xl transition-all duration-500',
+                  'group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl p-6 lg:p-8 shadow-sm hover:shadow-xl transition-all duration-500 flex flex-col',
                   mod.border,
                 )}
               >
@@ -202,25 +235,25 @@ export default function LandingPage() {
                 <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 group-hover:scale-110 transition-transform duration-500">
                   <mod.icon className={cn('h-7 w-7', mod.iconColor)} />
                 </div>
-                <h3 className="mb-3 text-2xl font-bold text-brand-graphite tracking-tight">
+                <h3 className="mb-3 text-xl font-bold text-brand-graphite tracking-tight">
                   {mod.title}
                 </h3>
-                <p className="text-slate-600 leading-relaxed font-medium text-lg">{mod.desc}</p>
-                <div className="mt-6 flex items-center text-sm font-bold text-brand-vividBlue opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                <p className="text-slate-600 leading-relaxed font-medium text-sm mb-6 flex-grow">
+                  {mod.desc}
+                </p>
+
+                <ul className="space-y-2 mb-6">
+                  {mod.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start text-sm text-slate-600">
+                      <CheckCircle2 className="mr-2 h-4 w-4 text-brand-vividBlue shrink-0 mt-0.5" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-auto flex items-center text-sm font-bold text-brand-vividBlue opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
                   Explorar Módulo <ChevronRight className="ml-1 h-4 w-4" />
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-16 flex flex-wrap justify-center gap-4 max-w-4xl mx-auto">
-            {extraModules.map((mod, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-50 border border-slate-200/60 text-slate-700 font-semibold shadow-sm hover:bg-slate-100 transition-colors"
-              >
-                <mod.icon className="w-4 h-4 text-brand-vividBlue" />
-                {mod.title}
               </div>
             ))}
           </div>
