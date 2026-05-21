@@ -32,13 +32,18 @@ export default function PreventivasManutencao() {
   const [plans, setPlans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [editPlanId, setEditPlanId] = useState<string | null>(null)
   const { user } = useAuth()
+  const [profile, setProfile] = useState<{ role: string; client_id: string } | null>(null)
 
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
   const [assets, setAssets] = useState<any[]>([])
+  const [types, setTypes] = useState<any[]>([])
+  const [priorities, setPriorities] = useState<any[]>([])
+  const [assignees, setAssignees] = useState<any[]>([])
 
-  const [form, setForm] = useState({
+  const initialForm = {
     title: '',
     frequency: 'Mensal',
     start_date: '',
@@ -47,7 +52,11 @@ export default function PreventivasManutencao() {
     scope: 'area', // 'area' | 'asset'
     area_id: 'none',
     asset_id: 'none',
-  })
+    type_id: 'none',
+    priority_id: 'none',
+    assignee_id: 'none',
+  }
+  const [form, setForm] = useState(initialForm)
 
   const [checklist, setChecklist] = useState<{ id: string; description: string }[]>([])
 
@@ -57,20 +66,55 @@ export default function PreventivasManutencao() {
   const [aiSuggestions, setAiSuggestions] = useState<any[]>([])
 
   useEffect(() => {
-    loadPlans()
-    loadAuxData()
-  }, [])
+    if (user) {
+      loadPlans()
+      loadAuxData()
+    }
+  }, [user])
 
   const loadAuxData = async () => {
-    const [pRes, aRes, asRes] = await Promise.all([
-      supabase.from('plants').select('id, name').order('name'),
-      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
-      supabase.from('maintenance_assets').select('id, name, plant_id, area_id').order('name'),
-    ])
-    if (pRes.data) setPlants(pRes.data)
-    if (aRes.data) setAreas(aRes.data)
-    if (asRes.data) setAssets(asRes.data)
+    if (!user) return
+
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('role, client_id')
+      .eq('id', user.id)
+      .single()
+
+    if (userProfile) {
+      setProfile(userProfile)
+
+      const [pRes, aRes, asRes, typesRes, prioRes, assigneesRes] = await Promise.all([
+        supabase.from('plants').select('id, name').order('name'),
+        supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
+        supabase.from('maintenance_assets').select('id, name, plant_id, area_id').order('name'),
+        supabase
+          .from('maintenance_types')
+          .select('id, name')
+          .eq('client_id', userProfile.client_id)
+          .order('name'),
+        supabase
+          .from('maintenance_priorities')
+          .select('id, name')
+          .eq('client_id', userProfile.client_id)
+          .order('name'),
+        supabase
+          .from('profiles')
+          .select('id, name, role')
+          .eq('client_id', userProfile.client_id)
+          .order('name'),
+      ])
+
+      if (pRes.data) setPlants(pRes.data)
+      if (aRes.data) setAreas(aRes.data)
+      if (asRes.data) setAssets(asRes.data)
+      if (typesRes.data) setTypes(typesRes.data)
+      if (prioRes.data) setPriorities(prioRes.data)
+      if (assigneesRes.data) setAssignees(assigneesRes.data)
+    }
   }
+
+  const isAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
 
   const loadPlans = async () => {
     setLoading(true)
@@ -107,11 +151,6 @@ export default function PreventivasManutencao() {
     if (!aiPlantId) return toast.error('Selecione uma planta para análise.')
     setAiLoading(true)
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id')
-        .eq('id', user?.id)
-        .single()
       if (!profile?.client_id) throw new Error('Cliente não encontrado')
 
       const { data, error } = await supabase.functions.invoke('maintenance-ai-advisor', {
@@ -135,11 +174,6 @@ export default function PreventivasManutencao() {
 
   const handleAcceptSuggestion = async (suggestion: any, index: number) => {
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id')
-        .eq('id', user?.id)
-        .single()
       if (!profile?.client_id) throw new Error('Cliente não encontrado')
 
       const { data: newPlan, error } = await supabase
@@ -181,67 +215,134 @@ export default function PreventivasManutencao() {
     }
   }
 
+  const handleEdit = async (plan: any) => {
+    setEditPlanId(plan.id)
+    setForm({
+      title: plan.title,
+      frequency: plan.frequency,
+      start_date: plan.start_date,
+      description: plan.description || '',
+      plant_id: plan.plant_id,
+      scope: plan.asset_id ? 'asset' : 'area',
+      area_id: plan.area_id || 'none',
+      asset_id: plan.asset_id || 'none',
+      type_id: plan.type_id || 'none',
+      priority_id: plan.priority_id || 'none',
+      assignee_id: plan.assignee_id || 'none',
+    })
+
+    try {
+      const { data } = await supabase
+        .from('maintenance_plan_checklist_items')
+        .select('*')
+        .eq('plan_id', plan.id)
+        .order('order_index')
+
+      setChecklist(data?.map((c) => ({ id: c.id, description: c.description })) || [])
+    } catch (err: any) {
+      toast.error('Erro ao carregar checklist.')
+    }
+    setOpen(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (
+      window.confirm(
+        'Tem certeza que deseja excluir este plano de manutenção? Esta ação não pode ser desfeita.',
+      )
+    ) {
+      try {
+        const { error } = await supabase.from('maintenance_preventive_plans').delete().eq('id', id)
+        if (error) throw error
+        toast.success('Plano excluído com sucesso!')
+        loadPlans()
+      } catch (err: any) {
+        toast.error(err.message)
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.plant_id) return toast.error('Selecione uma planta')
     if (form.scope === 'area' && form.area_id === 'none') return toast.error('Selecione uma área')
     if (form.scope === 'asset' && form.asset_id === 'none')
       return toast.error('Selecione um equipamento')
+    if (!profile?.client_id) return toast.error('Cliente não encontrado')
 
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id')
-        .eq('id', user?.id)
-        .single()
-      if (!profile?.client_id) throw new Error('Cliente não encontrado')
-
       const validChecklist = checklist.filter((c) => c.description.trim())
 
-      const { data: newPlan, error } = await supabase
-        .from('maintenance_preventive_plans')
-        .insert({
-          client_id: profile.client_id,
-          plant_id: form.plant_id,
-          area_id: form.scope === 'area' ? form.area_id : null,
-          asset_id: form.scope === 'asset' ? form.asset_id : null,
-          title: form.title,
-          frequency: form.frequency,
-          start_date: form.start_date || new Date().toISOString().split('T')[0],
-          description: form.description,
-          is_active: true,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      if (validChecklist.length > 0 && newPlan) {
-        const checklistInserts = validChecklist.map((c, idx) => ({
-          plan_id: newPlan.id,
-          description: c.description.trim(),
-          order_index: idx,
-        }))
-        const { error: checklistError } = await supabase
-          .from('maintenance_plan_checklist_items')
-          .insert(checklistInserts)
-
-        if (checklistError) throw checklistError
+      const payload = {
+        plant_id: form.plant_id,
+        area_id: form.scope === 'area' && form.area_id !== 'none' ? form.area_id : null,
+        asset_id: form.scope === 'asset' && form.asset_id !== 'none' ? form.asset_id : null,
+        type_id: form.type_id !== 'none' ? form.type_id : null,
+        priority_id: form.priority_id !== 'none' ? form.priority_id : null,
+        assignee_id: form.assignee_id !== 'none' ? form.assignee_id : null,
+        title: form.title,
+        frequency: form.frequency,
+        start_date: form.start_date || new Date().toISOString().split('T')[0],
+        description: form.description,
       }
 
-      toast.success('Plano criado com sucesso!')
+      if (editPlanId) {
+        const { error } = await supabase
+          .from('maintenance_preventive_plans')
+          .update(payload)
+          .eq('id', editPlanId)
+
+        if (error) throw error
+
+        await supabase.from('maintenance_plan_checklist_items').delete().eq('plan_id', editPlanId)
+
+        if (validChecklist.length > 0) {
+          const checklistInserts = validChecklist.map((c, idx) => ({
+            plan_id: editPlanId,
+            description: c.description.trim(),
+            order_index: idx,
+          }))
+          const { error: checklistError } = await supabase
+            .from('maintenance_plan_checklist_items')
+            .insert(checklistInserts)
+
+          if (checklistError) throw checklistError
+        }
+
+        toast.success('Plano atualizado com sucesso!')
+      } else {
+        const { data: newPlan, error } = await supabase
+          .from('maintenance_preventive_plans')
+          .insert({
+            ...payload,
+            client_id: profile.client_id,
+            is_active: true,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+
+        if (validChecklist.length > 0 && newPlan) {
+          const checklistInserts = validChecklist.map((c, idx) => ({
+            plan_id: newPlan.id,
+            description: c.description.trim(),
+            order_index: idx,
+          }))
+          const { error: checklistError } = await supabase
+            .from('maintenance_plan_checklist_items')
+            .insert(checklistInserts)
+
+          if (checklistError) throw checklistError
+        }
+
+        toast.success('Plano criado com sucesso!')
+      }
+
       setOpen(false)
-      setForm({
-        title: '',
-        frequency: 'Mensal',
-        start_date: '',
-        description: '',
-        plant_id: '',
-        scope: 'area',
-        area_id: 'none',
-        asset_id: 'none',
-      })
+      setForm(initialForm)
       setChecklist([])
+      setEditPlanId(null)
       loadPlans()
     } catch (err: any) {
       toast.error(err.message)
@@ -356,16 +457,34 @@ export default function PreventivasManutencao() {
             </SheetContent>
           </Sheet>
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button className="bg-brand-vividBlue">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Plano
-              </Button>
-            </SheetTrigger>
+          <Sheet
+            open={open}
+            onOpenChange={(val) => {
+              setOpen(val)
+              if (!val) {
+                setEditPlanId(null)
+                setForm(initialForm)
+                setChecklist([])
+              }
+            }}
+          >
+            <Button
+              className="bg-brand-vividBlue"
+              onClick={() => {
+                setEditPlanId(null)
+                setForm(initialForm)
+                setChecklist([])
+                setOpen(true)
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Plano
+            </Button>
             <SheetContent className="w-full sm:max-w-xl overflow-y-auto pb-10">
               <SheetHeader>
-                <SheetTitle>Novo Plano Preventivo</SheetTitle>
+                <SheetTitle>
+                  {editPlanId ? 'Editar Plano Preventivo' : 'Novo Plano Preventivo'}
+                </SheetTitle>
               </SheetHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-6">
                 <div className="grid grid-cols-2 gap-4">
@@ -452,10 +571,67 @@ export default function PreventivasManutencao() {
                       </>
                     )}
                   </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <Label>Tipo de Manutenção</Label>
+                    <Select
+                      value={form.type_id}
+                      onValueChange={(v) => setForm({ ...form, type_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Selecione um tipo</SelectItem>
+                        {types.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <Label>Prioridade</Label>
+                    <Select
+                      value={form.priority_id}
+                      onValueChange={(v) => setForm({ ...form, priority_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Selecione uma prioridade</SelectItem>
+                        {priorities.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Responsável</Label>
+                    <Select
+                      value={form.assignee_id}
+                      onValueChange={(v) => setForm({ ...form, assignee_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Selecione um responsável</SelectItem>
+                        {assignees.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-2 pt-2 border-t">
-                  <Label>Título do Plano *</Label>
+                  <Label>Título do Plano *</Label>{' '}
                   <Input
                     required
                     value={form.title}
@@ -551,7 +727,7 @@ export default function PreventivasManutencao() {
 
                 <div className="pt-4">
                   <Button type="submit" className="w-full bg-brand-vividBlue">
-                    Salvar Plano
+                    {editPlanId ? 'Atualizar Plano' : 'Salvar Plano'}
                   </Button>
                 </div>
               </form>
@@ -598,10 +774,30 @@ export default function PreventivasManutencao() {
                   <span className="text-gray-500">Início:</span>
                   <span className="font-medium flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {new Date(plan.start_date).toLocaleDateString()}
+                    {new Date(plan.start_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                   </span>
                 </div>
               </CardContent>
+              {isAdmin && (
+                <div className="p-4 border-t bg-gray-50/50 flex gap-2 rounded-b-lg">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleEdit(plan)}
+                  >
+                    <Settings2 className="h-4 w-4 mr-2" /> Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => handleDelete(plan.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                  </Button>
+                </div>
+              )}
             </Card>
           ))}
         </div>
