@@ -7,6 +7,7 @@
     "delete-user": 1,
     "process-recurring-audits": 9,
     "process-preventive-maintenance": 2,
-    "handle-subscription-webhook": 1
+    "handle-subscription-webhook": 1,
+    "maintenance-ai-advisor": 1
   }
 }
