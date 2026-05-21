@@ -38,7 +38,6 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AccessGuard } from './components/AccessGuard'
 import { MasterGuard } from './components/MasterGuard'
 import { SubscriptionGuard } from './components/SubscriptionGuard'
-import ComingSoon from './pages/ComingSoon'
 // import LandingPage from './pages/LandingPage'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
@@ -96,8 +95,8 @@ const App = () => (
             <Toaster />
             <Sonner />
             <Routes>
-              <Route path="/" element={<ComingSoon />} />
-              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Navigate to="/" replace />} />
 
               <Route path="/m/:slug/nova-solicitacao" element={<NovaSolicitacaoPublica />} />
 
