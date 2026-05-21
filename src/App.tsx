@@ -37,6 +37,8 @@ import Login from './pages/Login'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AccessGuard } from './components/AccessGuard'
 import { MasterGuard } from './components/MasterGuard'
+import { SubscriptionGuard } from './components/SubscriptionGuard'
+import LandingPage from './pages/LandingPage'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
 import { ThemeProvider } from './components/theme-provider'
@@ -93,112 +95,132 @@ const App = () => (
             <Toaster />
             <Sonner />
             <Routes>
+              <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
 
               <Route path="/m/:slug/nova-solicitacao" element={<NovaSolicitacaoPublica />} />
 
               <Route element={<ProtectedRoute />}>
-                <Route element={<Layout />}>
-                  <Route element={<MasterGuard />}>
-                    <Route path="/admin/clientes" element={<Clientes />} />
-                  </Route>
-                  <Route element={<AccessGuard />}>
-                    <Route path="/" element={<Navigate to="/gestao-terceiros" replace />} />
-                    <Route path="/gestao-terceiros" element={<DashboardGestor />} />
-                    <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
-                    <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
+                <Route element={<SubscriptionGuard />}>
+                  <Route element={<Layout />}>
+                    <Route element={<MasterGuard />}>
+                      <Route path="/admin/clientes" element={<Clientes />} />
+                    </Route>
+                    <Route element={<AccessGuard />}>
+                      <Route path="/gestao-terceiros" element={<DashboardGestor />} />
+                      <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
+                      <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
 
-                    {/* Limpeza e Jardinagem */}
-                    <Route path="/limpeza-jardinagem/mapa" element={<MapaLJ />} />
-                    <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
-                    <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
-                    <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
-                    <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
+                      {/* Limpeza e Jardinagem */}
+                      <Route path="/limpeza-jardinagem/mapa" element={<MapaLJ />} />
+                      <Route path="/limpeza-jardinagem/areas" element={<AreasLJ />} />
+                      <Route path="/limpeza-jardinagem/cronograma" element={<CronogramaLJ />} />
+                      <Route path="/limpeza-jardinagem/dashboard" element={<DashboardLJ />} />
+                      <Route path="/limpeza-jardinagem/relatorios" element={<RelatoriosLJ />} />
 
-                    {/* Gestão de Tarefas */}
-                    <Route path="/gestao-tarefas" element={<PainelChamados />} />
-                    <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
-                    <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
-                    <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
+                      {/* Gestão de Tarefas */}
+                      <Route path="/gestao-tarefas" element={<PainelChamados />} />
+                      <Route path="/gestao-tarefas/tipos" element={<TiposChamado />} />
+                      <Route path="/gestao-tarefas/status" element={<StatusChamado />} />
+                      <Route path="/gestao-tarefas/relatorios" element={<RelatoriosTarefas />} />
 
-                    {/* Auditoria e Checklist */}
-                    <Route path="/auditoria-checklist/configuracao" element={<AuditoriaConfig />} />
-                    <Route
-                      path="/auditoria-checklist/configuracao/:id"
-                      element={<AuditoriaConfig />}
-                    />
-                    <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
-                    <Route
-                      path="/auditoria-checklist/realizadas"
-                      element={<AuditoriaRealizadas />}
-                    />
-                    <Route path="/auditoria-checklist/dashboard" element={<AuditoriaDashboard />} />
+                      {/* Auditoria e Checklist */}
+                      <Route
+                        path="/auditoria-checklist/configuracao"
+                        element={<AuditoriaConfig />}
+                      />
+                      <Route
+                        path="/auditoria-checklist/configuracao/:id"
+                        element={<AuditoriaConfig />}
+                      />
+                      <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
+                      <Route
+                        path="/auditoria-checklist/realizadas"
+                        element={<AuditoriaRealizadas />}
+                      />
+                      <Route
+                        path="/auditoria-checklist/dashboard"
+                        element={<AuditoriaDashboard />}
+                      />
 
-                    {/* Dashboard Estratégico */}
-                    <Route path="/dashboard-estrategico" element={<DashboardEstrategico />} />
+                      {/* Dashboard Estratégico */}
+                      <Route path="/dashboard-estrategico" element={<DashboardEstrategico />} />
 
-                    {/* Organograma e Fluxos */}
-                    <Route path="/organograma/dashboard" element={<OrgDashboard />} />
-                    <Route path="/organograma/cadastros" element={<OrgCadastros />} />
-                    <Route path="/organograma/fluxogramas" element={<OrgFluxogramas />} />
+                      {/* Organograma e Fluxos */}
+                      <Route path="/organograma/dashboard" element={<OrgDashboard />} />
+                      <Route path="/organograma/cadastros" element={<OrgCadastros />} />
+                      <Route path="/organograma/fluxogramas" element={<OrgFluxogramas />} />
 
-                    {/* Gestão de Acidentes */}
-                    <Route path="/gestao-acidentes/dashboard" element={<DashboardAcidentes />} />
-                    <Route path="/gestao-acidentes/registro" element={<RegistroAcidente />} />
-                    <Route path="/gestao-acidentes/registro/:id" element={<RegistroAcidente />} />
-                    <Route path="/gestao-acidentes/historico" element={<HistoricoAcidentes />} />
+                      {/* Gestão de Acidentes */}
+                      <Route path="/gestao-acidentes/dashboard" element={<DashboardAcidentes />} />
+                      <Route path="/gestao-acidentes/registro" element={<RegistroAcidente />} />
+                      <Route path="/gestao-acidentes/registro/:id" element={<RegistroAcidente />} />
+                      <Route path="/gestao-acidentes/historico" element={<HistoricoAcidentes />} />
 
-                    {/* Gestão de Budget */}
-                    <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
-                    <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
-                    <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
-                    <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
+                      {/* Gestão de Budget */}
+                      <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
+                      <Route path="/gestao-budget/centros-custo" element={<CentrosCustoBudget />} />
+                      <Route path="/gestao-budget/contas" element={<ContasContabeisBudget />} />
+                      <Route path="/gestao-budget/lancamentos" element={<LancamentosBudget />} />
 
-                    {/* Gestão de Manutenção */}
-                    <Route path="/gestao-manutencao/dashboard" element={<DashboardManutencao />} />
-                    <Route path="/gestao-manutencao/chamados" element={<ChamadosManutencao />} />
-                    <Route
-                      path="/gestao-manutencao/planejamento"
-                      element={<PlanejamentoManutencao />}
-                    />
-                    <Route
-                      path="/gestao-manutencao/preventivas"
-                      element={<PreventivasManutencao />}
-                    />
-                    <Route path="/gestao-manutencao/cadastros" element={<CadastrosManutencao />} />
+                      {/* Gestão de Manutenção */}
+                      <Route
+                        path="/gestao-manutencao/dashboard"
+                        element={<DashboardManutencao />}
+                      />
+                      <Route path="/gestao-manutencao/chamados" element={<ChamadosManutencao />} />
+                      <Route
+                        path="/gestao-manutencao/planejamento"
+                        element={<PlanejamentoManutencao />}
+                      />
+                      <Route
+                        path="/gestao-manutencao/preventivas"
+                        element={<PreventivasManutencao />}
+                      />
+                      <Route
+                        path="/gestao-manutencao/cadastros"
+                        element={<CadastrosManutencao />}
+                      />
 
-                    {/* Gestão de Lockers */}
-                    <Route path="/gestao-lockers/dashboard" element={<DashboardLockers />} />
-                    <Route path="/gestao-lockers/ocupacao" element={<OcupacaoLockers />} />
-                    <Route path="/gestao-lockers/lockers" element={<Lockers />} />
-                    <Route
-                      path="/gestao-lockers/colaboradores"
-                      element={<ColaboradoresLockers />}
-                    />
+                      {/* Gestão de Lockers */}
+                      <Route path="/gestao-lockers/dashboard" element={<DashboardLockers />} />
+                      <Route path="/gestao-lockers/ocupacao" element={<OcupacaoLockers />} />
+                      <Route path="/gestao-lockers/lockers" element={<Lockers />} />
+                      <Route
+                        path="/gestao-lockers/colaboradores"
+                        element={<ColaboradoresLockers />}
+                      />
 
-                    {/* Gestão de Imóveis */}
-                    <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
-                    <Route path="/gestao-imoveis/ocupacao" element={<OcupacaoImoveis />} />
-                    <Route path="/gestao-imoveis/imoveis" element={<Imoveis />} />
-                    <Route path="/gestao-imoveis/hospedes" element={<Hospedes />} />
-                    <Route path="/gestao-imoveis/centros-custo" element={<CentrosCustoImoveis />} />
-                    <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
+                      {/* Gestão de Imóveis */}
+                      <Route path="/gestao-imoveis/dashboard" element={<DashboardImoveis />} />
+                      <Route path="/gestao-imoveis/ocupacao" element={<OcupacaoImoveis />} />
+                      <Route path="/gestao-imoveis/imoveis" element={<Imoveis />} />
+                      <Route path="/gestao-imoveis/hospedes" element={<Hospedes />} />
+                      <Route
+                        path="/gestao-imoveis/centros-custo"
+                        element={<CentrosCustoImoveis />}
+                      />
+                      <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
 
-                    {/* Gestão de Encomendas */}
-                    <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
-                    <Route path="/gestao-terceiros/encomendas/tipos" element={<TiposEncomenda />} />
-                    <Route
-                      path="/gestao-terceiros/encomendas/configuracoes"
-                      element={<ConfiguracoesEncomendas />}
-                    />
+                      {/* Gestão de Encomendas */}
+                      <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
+                      <Route
+                        path="/gestao-terceiros/encomendas/tipos"
+                        element={<TiposEncomenda />}
+                      />
+                      <Route
+                        path="/gestao-terceiros/encomendas/configuracoes"
+                        element={<ConfiguracoesEncomendas />}
+                      />
 
-                    <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
-                    <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
-                    <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
-                    <Route path="/gestao-terceiros/metas" element={<BookMetas />} />
-                    <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
-                    <Route path="/admin/auditoria" element={<Auditoria />} />
-                    <Route path="/usuarios" element={<Usuarios />} />
+                      <Route path="/gestao-terceiros/cadastros/:type" element={<Cadastros />} />
+                      <Route path="/gestao-terceiros/relatorios" element={<Relatorios />} />
+                      <Route path="/gestao-terceiros/bi" element={<BIDashboard />} />
+                      <Route path="/gestao-terceiros/metas" element={<BookMetas />} />
+                      <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
+                      <Route path="/admin/auditoria" element={<Auditoria />} />
+                      <Route path="/usuarios" element={<Usuarios />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>
