@@ -211,13 +211,51 @@ export function CrudGeneric({
 
   const confirmDelete = async () => {
     if (!itemToDelete) return
-    const { error } = await supabase.from(tableName).delete().eq('id', itemToDelete)
+
+    let error = null
+
+    if (onRemove) {
+      const res = await onRemove(itemToDelete)
+      error = res?.error
+    } else {
+      const res = await supabase.from(tableName).delete().eq('id', itemToDelete)
+      error = res.error
+
+      if (
+        error &&
+        (error.message?.includes('lançamentos') ||
+          error.message?.includes('histórico') ||
+          error.code === 'P0001' ||
+          error.code === '23503')
+      ) {
+        if (tableName === 'employees' || tableName === 'equipment') {
+          const updateRes = await supabase
+            .from(tableName)
+            .update({ status: 'Inativo' })
+            .eq('id', itemToDelete)
+          if (!updateRes.error) {
+            toast({
+              title:
+                'Não é possível excluir este registro pois ele possui histórico de uso. O registro foi inativado automaticamente.',
+              variant: 'destructive',
+            })
+            load()
+            setItemToDelete(null)
+            return
+          }
+        }
+      }
+    }
+
     if (!error) {
       toast({ title: 'Removido com sucesso' })
-      if (onRemove) onRemove(itemToDelete)
       load()
     } else {
-      toast({ title: 'Erro ao remover. Verifique as dependências.', variant: 'destructive' })
+      toast({
+        title: error.message || 'Erro ao remover. Verifique as dependências.',
+        variant: 'destructive',
+      })
+      load()
     }
     setItemToDelete(null)
   }
@@ -369,12 +407,12 @@ export function CrudGeneric({
                     className="text-white px-3 py-1 border-0"
                     style={{
                       backgroundColor:
-                        item.is_active !== false
+                        item.is_active !== false && item.status !== 'Inativo'
                           ? activeClient?.primaryColor || '#1e3a8a'
                           : '#94a3b8',
                     }}
                   >
-                    {item.is_active !== false ? 'Ativo' : 'Inativo'}
+                    {item.is_active !== false && item.status !== 'Inativo' ? 'Ativo' : 'Inativo'}
                   </Badge>
                   <div className="flex gap-2">
                     <button

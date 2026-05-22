@@ -153,6 +153,10 @@ export default function Cadastros() {
             q = q.eq('reference_month', `${selectedMonth}-01`)
           }
 
+          if (type === 'colaboradores' || type === 'equipamentos') {
+            q = q.eq('status', 'Ativo')
+          }
+
           if (profile.role === 'Master') {
             if (selectedMasterClient !== 'all') {
               q = q.eq('client_id', selectedMasterClient)
@@ -295,8 +299,39 @@ export default function Cadastros() {
           }
           return { success: false, error }
         }}
-        onRemove={async () => {
+        onRemove={async (id: string) => {
+          if (type === 'colaboradores' || type === 'equipamentos') {
+            const { error } = await supabase
+              .from(config.tableName)
+              .update({ status: 'Inativo' })
+              .eq('id', id)
+            if (error) return { success: false, error }
+            refetch()
+            return { success: true }
+          }
+
+          const { error } = await supabase.from(config.tableName).delete().eq('id', id)
+          if (
+            error &&
+            (error.message?.includes('lançamentos') ||
+              error.code === 'P0001' ||
+              error.code === '23503')
+          ) {
+            if (config.tableName === 'employees' || config.tableName === 'equipment') {
+              await supabase.from(config.tableName).update({ status: 'Inativo' }).eq('id', id)
+              refetch()
+              return {
+                success: false,
+                error: {
+                  message:
+                    'Não é possível excluir este registro pois ele possui histórico de uso. O registro foi inativado automaticamente.',
+                },
+              }
+            }
+          }
+          if (error) return { success: false, error }
           refetch()
+          return { success: true }
         }}
       />
 

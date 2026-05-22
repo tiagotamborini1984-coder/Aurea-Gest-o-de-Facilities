@@ -16,6 +16,10 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     setLoading(true)
     let q = supabase.from(tableName).select(defaultSelect).order('created_at', { ascending: false })
 
+    if (tableName === 'employees' || tableName === 'equipment') {
+      q = q.eq('status', 'Ativo')
+    }
+
     if (profile.role === 'Master') {
       if (selectedMasterClient !== 'all') {
         q = q.eq('client_id', selectedMasterClient)
@@ -58,6 +62,28 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
 
   const remove = async (id: string) => {
     const { error } = await supabase.from(tableName).delete().eq('id', id)
+
+    if (
+      error &&
+      (error.message?.includes('lançamentos') || error.code === 'P0001' || error.code === '23503')
+    ) {
+      if (tableName === 'employees' || tableName === 'equipment') {
+        const { error: updateError } = await supabase
+          .from(tableName)
+          .update({ status: 'Inativo' })
+          .eq('id', id)
+        if (!updateError) {
+          setData((prev) => prev.filter((item: any) => item.id !== id))
+          return {
+            success: true,
+            softDeleted: true,
+            message:
+              'Não é possível excluir este registro pois ele possui histórico de uso. O registro foi inativado automaticamente.',
+          }
+        }
+      }
+    }
+
     if (!error) {
       setData((prev) => prev.filter((item: any) => item.id !== id))
       return { success: true }
