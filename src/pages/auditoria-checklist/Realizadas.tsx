@@ -225,7 +225,7 @@ export default function AuditoriaRealizadas() {
         .select('task_number')
         .eq('client_id', audit.client_id)
         .like('task_number', `TSK-${year}-%`)
-        .order('created_at', { ascending: false })
+        .order('task_number', { ascending: false })
         .limit(1)
 
       let seq = 1
