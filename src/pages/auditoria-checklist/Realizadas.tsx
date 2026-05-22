@@ -121,17 +121,29 @@ export default function AuditoriaRealizadas() {
 
   const openView = async (exec: any) => {
     setViewExec(exec)
-    const { data } = await supabase
+    const { data: actions } = await supabase
+      .from('audit_actions')
+      .select('*')
+      .eq('audit_id', exec.audit_id)
+      .order('order_index', { ascending: true })
+
+    const { data: answers } = await supabase
       .from('audit_execution_answers')
-      .select('*, audit_actions(*)')
+      .select('*')
       .eq('execution_id', exec.id)
 
-    const sortedData = (data || []).sort((a: any, b: any) => {
-      const orderA = a.audit_actions?.order_index || 0
-      const orderB = b.audit_actions?.order_index || 0
-      return orderA - orderB
+    const formattedAnswers = (actions || []).map((action) => {
+      const ans = (answers || []).find((a) => a.action_id === action.id)
+      return {
+        id: ans?.id || action.id,
+        score: ans?.score ?? '-',
+        observations: ans?.observations || '',
+        evidence_url: ans?.evidence_url || null,
+        audit_actions: action,
+      }
     })
-    setViewAnswers(sortedData)
+
+    setViewAnswers(formattedAnswers)
 
     const { data: pendingExec } = await supabase
       .from('audit_executions')
@@ -603,9 +615,7 @@ export default function AuditoriaRealizadas() {
                 <div>
                   <h4 className="font-bold text-slate-800 mb-3 text-lg border-b pb-2">Respostas</h4>
                   {viewAnswers.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      Nenhuma resposta registrada (Auditoria Pendente).
-                    </p>
+                    <p className="text-sm text-slate-500">No items found for this checklist.</p>
                   ) : (
                     <div className="space-y-4">
                       {viewAnswers.map((ans, idx) => (
@@ -848,7 +858,7 @@ export default function AuditoriaRealizadas() {
               Detalhes das Respostas
             </h3>
             {viewAnswers.length === 0 ? (
-              <p className="text-slate-500 italic">Nenhuma resposta registrada.</p>
+              <p className="text-slate-500 italic">No items found for this checklist.</p>
             ) : (
               <table className="w-full text-left border-collapse mt-4">
                 <thead>
