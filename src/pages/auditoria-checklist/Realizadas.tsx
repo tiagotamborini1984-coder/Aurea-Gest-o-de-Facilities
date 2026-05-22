@@ -84,7 +84,7 @@ export default function AuditoriaRealizadas() {
 
       let query = supabase
         .from('audit_executions')
-        .select('*, audits!inner(*), tasks(due_date)')
+        .select('*, audits!inner(*), tasks(due_date), plants(name)')
         .eq('audits.client_id', profile.client_id)
         .eq('status', 'Finalizado')
         .order('created_at', { ascending: false })
@@ -290,8 +290,9 @@ export default function AuditoriaRealizadas() {
       // reload
       let query = supabase
         .from('audit_executions')
-        .select('*, audits!inner(*), tasks(due_date)')
+        .select('*, audits!inner(*), tasks(due_date), plants(name)')
         .eq('audits.client_id', profile.client_id)
+        .eq('status', 'Finalizado')
         .order('created_at', { ascending: false })
 
       if (profile.role !== 'Administrador' && profile.role !== 'Master') {
@@ -387,6 +388,9 @@ export default function AuditoriaRealizadas() {
                   Planta
                 </TableHead>
                 <TableHead className="font-semibold text-slate-800 print:text-black">
+                  Data de Realização
+                </TableHead>
+                <TableHead className="font-semibold text-slate-800 print:text-black">
                   Responsável
                 </TableHead>
                 <TableHead className="font-semibold text-slate-800 print:text-black">
@@ -406,19 +410,20 @@ export default function AuditoriaRealizadas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
                   </TableCell>
                 </TableRow>
               ) : filteredExecutions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-slate-500">
-                    Nenhuma auditoria encontrada.
+                  <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                    Nenhuma auditoria realizada encontrada.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredExecutions.map((exec) => {
-                  const plant = plants.find((p) => p.id === exec.plant_id)
+                  const plantName =
+                    exec.plants?.name || plants.find((p) => p.id === exec.plant_id)?.name
                   const user = users.find((u) => u.id === exec.assignee_id)
                   return (
                     <TableRow
@@ -427,14 +432,14 @@ export default function AuditoriaRealizadas() {
                     >
                       <TableCell className="font-medium text-slate-800">
                         {exec.audits?.title}
-                        {exec.realization_date && (
-                          <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                            Realizada em: {format(new Date(exec.realization_date), 'dd/MM/yyyy')}
-                          </div>
-                        )}
                       </TableCell>
                       <TableCell className="text-slate-600">{exec.audits?.type}</TableCell>
-                      <TableCell className="text-slate-600">{plant?.name || '-'}</TableCell>
+                      <TableCell className="text-slate-600">{plantName || '-'}</TableCell>
+                      <TableCell className="text-slate-600">
+                        {exec.realization_date
+                          ? format(new Date(exec.realization_date), 'dd/MM/yyyy')
+                          : '-'}
+                      </TableCell>
                       <TableCell className="text-slate-600">{user?.name || '-'}</TableCell>
                       <TableCell>
                         <Badge
@@ -778,7 +783,9 @@ export default function AuditoriaRealizadas() {
             <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
               <span className="block text-slate-500 text-xs font-bold uppercase mb-1">Planta</span>
               <span className="font-semibold text-slate-800">
-                {plants.find((p) => p.id === viewExec.plant_id)?.name || '-'}
+                {viewExec.plants?.name ||
+                  plants.find((p) => p.id === viewExec.plant_id)?.name ||
+                  '-'}
               </span>
             </div>
             <div className="p-3 bg-slate-50 rounded border border-slate-200 break-inside-avoid">
