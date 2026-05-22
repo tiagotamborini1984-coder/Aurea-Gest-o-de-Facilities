@@ -86,6 +86,7 @@ export default function AuditoriaRealizadas() {
         .from('audit_executions')
         .select('*, audits!inner(*), tasks(due_date)')
         .eq('audits.client_id', profile.client_id)
+        .eq('status', 'Finalizado')
         .order('created_at', { ascending: false })
 
       if (profile.role !== 'Administrador' && profile.role !== 'Master') {
@@ -111,8 +112,7 @@ export default function AuditoriaRealizadas() {
     const searchStr = searchTerm.toLowerCase()
     const matchesSearch =
       e.audits?.title.toLowerCase().includes(searchStr) ||
-      e.audits?.type.toLowerCase().includes(searchStr) ||
-      e.status.toLowerCase().includes(searchStr)
+      e.audits?.type.toLowerCase().includes(searchStr)
 
     const matchesPlant = selectedPlant === 'all' || e.plant_id === selectedPlant
 
@@ -439,13 +439,16 @@ export default function AuditoriaRealizadas() {
                       </TableCell>
                       <TableCell>
                         {exec.status === 'Finalizado' ? (
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-bold text-brand-deepBlue text-lg">
-                              {exec.final_score}
-                            </span>
-                            <span className="text-xs text-slate-500 font-medium">
-                              / {exec.max_score}
-                            </span>
+                          <div className="flex flex-col">
+                            <span className="text-xs text-slate-500 mb-0.5">Pontuação:</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-bold text-brand-deepBlue text-lg">
+                                {exec.final_score}
+                              </span>
+                              <span className="text-xs text-slate-500 font-medium">
+                                / {exec.max_score}
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <span className="text-slate-400 text-sm">-</span>
@@ -560,7 +563,7 @@ export default function AuditoriaRealizadas() {
                       Score
                     </p>
                     <p className="font-semibold text-brand-deepBlue">
-                      {viewExec.final_score || 0} / {viewExec.max_score || 0}
+                      Pontuação: {viewExec.final_score || 0} / {viewExec.max_score || 0}
                     </p>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -821,7 +824,7 @@ export default function AuditoriaRealizadas() {
                 Score Final
               </span>
               <span className="font-black text-lg text-slate-800">
-                {viewExec.final_score || 0}{' '}
+                Pontuação: {viewExec.final_score || 0}{' '}
                 <span className="text-sm font-medium text-slate-500">
                   / {viewExec.max_score || 0}
                 </span>
