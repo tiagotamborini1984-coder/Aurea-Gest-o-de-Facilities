@@ -384,20 +384,6 @@ export default function PainelChamados() {
         }
       }
 
-      const year = new Date().getFullYear()
-      const { data: latest } = await supabase
-        .from('tasks')
-        .select('task_number')
-        .eq('client_id', effectiveClientId)
-        .like('task_number', `TSK-${year}-%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      let seq = 1
-      if (latest && latest.length > 0) {
-        const parts = latest[0].task_number.split('-')
-        if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
-      }
       // Filter statuses for this specific client to ensure we pick a valid one
       const clientStatuses = taskStatuses.filter((s) => s.client_id === effectiveClientId)
       const initialStatus = clientStatuses[0]?.id
@@ -454,8 +440,6 @@ export default function PainelChamados() {
           className: 'bg-blue-50 text-blue-900 border-blue-200',
         })
       } else {
-        const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-
         const { data: newTask, error } = await supabase
           .from('tasks')
           .insert({
@@ -465,7 +449,7 @@ export default function PainelChamados() {
             status_id: initialStatus,
             requester_id: profile.id,
             assignee_id: form.assignee_id,
-            task_number: taskNumber,
+            task_number: 'GERANDO...',
             title: form.title,
             description: form.description,
             attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
@@ -487,7 +471,7 @@ export default function PainelChamados() {
 
         toast({
           title: 'Chamado criado com sucesso!',
-          description: `Protocolo: ${taskNumber}`,
+          description: `Protocolo: ${newTask.task_number}`,
           className: 'bg-green-50 text-green-900 border-green-200',
         })
       }
