@@ -475,21 +475,6 @@ export function TaskDetailsSheet({
         const initialStatusId = statuses?.[0]?.id
 
         if (ncType && initialStatusId) {
-          const year = new Date().getFullYear()
-          const { data: latest } = await supabase
-            .from('tasks')
-            .select('task_number')
-            .eq('client_id', profile.client_id)
-            .like('task_number', `TSK-${year}-%`)
-            .order('created_at', { ascending: false })
-            .limit(1)
-
-          let seq = 1
-          if (latest && latest.length > 0) {
-            const parts = latest[0].task_number.split('-')
-            if (parts.length === 3) seq = parseInt(parts[2], 10) + 1
-          }
-
           const openStatuses = statuses.map((s) => s.id)
 
           for (const nc of ncActions) {
@@ -525,9 +510,6 @@ export function TaskDetailsSheet({
                 action_type: 'comment',
               })
             } else {
-              const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-              seq++
-
               const { data: newTask } = await supabase
                 .from('tasks')
                 .insert({
@@ -537,7 +519,7 @@ export function TaskDetailsSheet({
                   status_id: initialStatusId,
                   requester_id: profile.id,
                   assignee_id: auditExecution.assignee_id,
-                  task_number: taskNumber,
+                  task_number: 'GERANDO...',
                   title: ncTitle,
                   description: ncDescription,
                   due_date: dueDate.toISOString(),

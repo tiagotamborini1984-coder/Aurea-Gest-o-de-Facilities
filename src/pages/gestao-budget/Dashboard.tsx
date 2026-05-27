@@ -1,621 +1,487 @@
-import { useState, useEffect, useMemo } from 'react'
-import {
-  DollarSign,
-  TrendingUp,
-  AlertTriangle,
-  Wallet,
-  Sparkles,
-  ArrowRight,
-  CheckCircle,
-} from 'lucide-react'
-import { useAppStore } from '@/store/AppContext'
+import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppStore } from '@/store/AppContext'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
+import { Check, ChevronsUpDown, DollarSign, Target, TrendingDown, TrendingUp } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { format, startOfMonth, subMonths } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  LabelList,
-} from 'recharts'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+
+interface BudgetEntry {
+  id: string
+  account_id: string
+  cost_center_id: string
+  budgeted_amount: number
+  realized_amount: number
+  reference_month: string
+}
+
+interface CostCenter {
+  id: string
+  name: string
+  code: string | null
+}
+
+interface Account {
+  id: string
+  name: string
+  code: string | null
+  type: string
+}
 
 export default function DashboardBudget() {
-  const { profile } = useAppStore()
-  const [allEntries, setAllEntries] = useState<any[]>([])
-  const [costCenters, setCostCenters] = useState<any[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7))
-  const [selectedCC, setSelectedCC] = useState<string>('all')
+  const { activeClient } = useAppStore()
+
+  const [months, setMonths] = useState<{ value: string; label: string }[]>([])
+  const [selectedMonths, setSelectedMonths] = useState<string[]>(() => {
+    const saved = sessionStorage.getItem('budgetDashboardMonths')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+    return []
+  })
+
+  const [entries, setEntries] = useState<BudgetEntry[]>([])
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  // Init months
+  useEffect(() => {
+    const opts = []
+    const current = new Date()
+    for (let i = 0; i < 12; i++) {
+      const d = startOfMonth(subMonths(current, i))
+      opts.push({
+        value: format(d, 'yyyy-MM-dd'),
+        label: format(d, 'MMMM yyyy', { locale: ptBR }).replace(/^\w/, (c) => c.toUpperCase()),
+      })
+    }
+    setMonths(opts)
+    if (selectedMonths.length === 0) {
+      const initial = [opts[0].value]
+      setSelectedMonths(initial)
+      sessionStorage.setItem('budgetDashboardMonths', JSON.stringify(initial))
+    }
+  }, [])
 
   useEffect(() => {
-    if (!profile?.client_id) return
+    if (selectedMonths.length > 0) {
+      sessionStorage.setItem('budgetDashboardMonths', JSON.stringify(selectedMonths))
+    }
+  }, [selectedMonths])
 
-    supabase
-      .from('budget_cost_centers')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .then(({ data }) => setCostCenters(data || []))
-
-    supabase
-      .from('budget_accounts')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .then(({ data }) => setAccounts(data || []))
-  }, [profile?.client_id])
-
+  // Fetch data
   useEffect(() => {
-    if (!profile?.client_id) return
+    if (!activeClient || selectedMonths.length === 0) return
+
+    const fetchData = async () => {
+      setLoading(true)
+
+      const [ccRes, accRes, entriesRes] = await Promise.all([
+        supabase.from('budget_cost_centers').select('*').eq('client_id', activeClient.id),
+        supabase.from('budget_accounts').select('*').eq('client_id', activeClient.id),
+        supabase
+          .from('budget_entries')
+          .select('*')
+          .eq('client_id', activeClient.id)
+          .in('reference_month', selectedMonths),
+      ])
+
+      if (ccRes.data) setCostCenters(ccRes.data as CostCenter[])
+      if (accRes.data) setAccounts(accRes.data as Account[])
+      if (entriesRes.data) setEntries(entriesRes.data as BudgetEntry[])
+
+      setLoading(false)
+    }
+
     fetchData()
-  }, [profile?.client_id, selectedMonth])
+  }, [activeClient, selectedMonths])
 
-  const fetchData = async () => {
-    let query = supabase.from('budget_entries').select('*').eq('client_id', profile!.client_id)
-    if (selectedMonth) {
-      query = query.eq('reference_month', `${selectedMonth}-01`)
-    }
-    const { data } = await query
-    setAllEntries(data || [])
-  }
+  const { totalBudgeted, totalRealized, variance, variancePercentage } = useMemo(() => {
+    let budgeted = 0
+    let realized = 0
 
-  const entries = useMemo(() => {
-    if (selectedCC === 'all') return allEntries
-    return allEntries.filter((e) => e.cost_center_id === selectedCC)
-  }, [allEntries, selectedCC])
-
-  const insights = useMemo(() => {
-    if (!allEntries.length || costCenters.length === 0) return []
-    const msgs = []
-
-    const ccTotals = costCenters.map((cc) => {
-      const ccEntries = allEntries.filter((e) => e.cost_center_id === cc.id)
-      const budgeted = ccEntries.reduce((acc, e) => acc + Number(e.budgeted_amount), 0)
-      const realized = ccEntries.reduce((acc, e) => acc + Number(e.realized_amount), 0)
-      return { ...cc, budgeted, realized, percent: budgeted > 0 ? (realized / budgeted) * 100 : 0 }
-    })
-
-    const overBudget = ccTotals.filter((c) => c.percent > 100).sort((a, b) => b.percent - a.percent)
-    const nearBudget = ccTotals
-      .filter((c) => c.percent >= 90 && c.percent <= 100)
-      .sort((a, b) => b.percent - a.percent)
-
-    if (overBudget.length > 0) {
-      const worstCC = overBudget[0]
-      const ccEntries = allEntries.filter((e) => e.cost_center_id === worstCC.id)
-      const worstEntry = [...ccEntries].sort(
-        (a, b) => Number(b.realized_amount) - Number(a.realized_amount),
-      )[0]
-      const worstAccount = accounts.find((a) => a.id === worstEntry?.account_id)
-
-      msgs.push({
-        type: 'danger',
-        title: 'Atenção Crítica: Orçamento Estourado',
-        description: `O centro de custo ${worstCC.code || worstCC.name} excedeu o orçamento em ${(
-          worstCC.percent - 100
-        ).toFixed(1)}%. A conta "${worstAccount?.name || 'Desconhecida'}" é a que mais gastou.`,
-        action: 'Revisar Lançamentos',
-      })
-    }
-
-    if (nearBudget.length > 0) {
-      const nearCC = nearBudget[0]
-      msgs.push({
-        type: 'warning',
-        title: 'Alerta de Consumo Elevado',
-        description: `O centro de custo ${nearCC.code || nearCC.name} já consumiu ${nearCC.percent.toFixed(
-          1,
-        )}% do orçamento planejado para este mês. Fique atento.`,
-        action: 'Ajustar Orçamento',
-      })
-    }
-
-    if (msgs.length === 0) {
-      msgs.push({
-        type: 'success',
-        title: 'Orçamento Saudável',
-        description:
-          'Todos os centros de custo estão operando dentro ou abaixo da margem planejada. Excelente gestão financeira!',
-        action: null,
-      })
-    }
-
-    const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
-    if (isAdmin) {
-      const totalB = ccTotals.reduce((acc, c) => acc + c.budgeted, 0)
-      const totalR = ccTotals.reduce((acc, c) => acc + c.realized, 0)
-      const trend = totalB > 0 ? totalR / totalB : 1
-      const forecast = totalR * (trend > 1 ? 1.05 : 0.95)
-
-      msgs.push({
-        type: 'forecast',
-        title: 'Aurea AI Forecast (Mês Seguinte)',
-        description: `Projeção de gastos para o próximo mês: ${new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL',
-        }).format(forecast)}. Baseado no KPI Orçado x Realizado atual.`,
-        action: 'Planejar Próximo Mês',
-      })
-    }
-
-    return msgs
-  }, [allEntries, costCenters, accounts, profile])
-
-  const { totalBudgeted, totalRealized, diff, diffPercent } = useMemo(() => {
-    let b = 0,
-      r = 0
     entries.forEach((e) => {
-      b += Number(e.budgeted_amount)
-      r += Number(e.realized_amount)
+      budgeted += Number(e.budgeted_amount || 0)
+      realized += Number(e.realized_amount || 0)
     })
+
+    const varAmount = realized - budgeted
+    const varPerc = budgeted > 0 ? (varAmount / budgeted) * 100 : 0
+
     return {
-      totalBudgeted: b,
-      totalRealized: r,
-      diff: b - r, // Saldo positivo se orçado > realizado
-      diffPercent: b > 0 ? (r / b) * 100 : 0,
+      totalBudgeted: budgeted,
+      totalRealized: realized,
+      variance: varAmount,
+      variancePercentage: varPerc,
     }
   }, [entries])
 
-  const costCenterChartData = useMemo(() => {
-    const map: Record<string, { name: string; Orcado: number; Realizado: number }> = {}
-    allEntries.forEach((e) => {
-      const ccObj = costCenters.find((c) => c.id === e.cost_center_id)
-      const cc = ccObj?.code || ccObj?.name || 'Outros'
-      if (!map[cc]) map[cc] = { name: cc, Orcado: 0, Realizado: 0 }
-      map[cc].Orcado += Number(e.budgeted_amount)
-      map[cc].Realizado += Number(e.realized_amount)
-    })
-    return Object.values(map).sort((a, b) => b.Orcado - a.Orcado)
-  }, [allEntries, costCenters])
+  const chartDataByCostCenter = useMemo(() => {
+    const dataMap: Record<string, { name: string; Orcado: number; Realizado: number }> = {}
 
-  const accountChartData = useMemo(() => {
-    const map: Record<string, { name: string; Orcado: number; Realizado: number }> = {}
-    entries.forEach((e) => {
-      const acc = accounts.find((a) => a.id === e.account_id)?.name || 'Outras'
-      if (!map[acc]) map[acc] = { name: acc, Orcado: 0, Realizado: 0 }
-      map[acc].Orcado += Number(e.budgeted_amount)
-      map[acc].Realizado += Number(e.realized_amount)
+    costCenters.forEach((cc) => {
+      dataMap[cc.id] = {
+        name: cc.code ? `${cc.code} - ${cc.name}` : cc.name,
+        Orcado: 0,
+        Realizado: 0,
+      }
     })
-    return Object.values(map).sort((a, b) => b.Orcado - a.Orcado)
+
+    entries.forEach((e) => {
+      if (dataMap[e.cost_center_id]) {
+        dataMap[e.cost_center_id].Orcado += Number(e.budgeted_amount || 0)
+        dataMap[e.cost_center_id].Realizado += Number(e.realized_amount || 0)
+      }
+    })
+
+    return Object.values(dataMap).filter((d) => d.Orcado > 0 || d.Realizado > 0)
+  }, [entries, costCenters])
+
+  const tableDataByAccount = useMemo(() => {
+    const dataMap: Record<string, { account: Account; budgeted: number; realized: number }> = {}
+
+    accounts.forEach((acc) => {
+      dataMap[acc.id] = { account: acc, budgeted: 0, realized: 0 }
+    })
+
+    entries.forEach((e) => {
+      if (dataMap[e.account_id]) {
+        dataMap[e.account_id].budgeted += Number(e.budgeted_amount || 0)
+        dataMap[e.account_id].realized += Number(e.realized_amount || 0)
+      }
+    })
+
+    return Object.values(dataMap)
+      .filter((d) => d.budgeted > 0 || d.realized > 0)
+      .map((d) => ({
+        ...d,
+        variance: d.realized - d.budgeted,
+        variancePerc: d.budgeted > 0 ? ((d.realized - d.budgeted) / d.budgeted) * 100 : 0,
+      }))
+      .sort((a, b) => b.budgeted - a.budgeted)
   }, [entries, accounts])
 
-  const chartConfig = {
-    Orcado: {
-      label: 'Orçado',
-      color: '#16798a',
-    },
-    Realizado: {
-      label: 'Realizado',
-      color: '#618c21',
-    },
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
   }
 
+  const toggleMonth = (val: string) => {
+    setSelectedMonths((prev) => {
+      if (prev.includes(val)) {
+        if (prev.length === 1) return prev
+        return prev.filter((m) => m !== val)
+      }
+      return [...prev, val]
+    })
+  }
+
+  const selectAll = () => {
+    setSelectedMonths(months.map((m) => m.value))
+  }
+
+  const clearSelection = () => {
+    if (months.length > 0) {
+      setSelectedMonths([months[0].value])
+    }
+  }
+
+  const filterLabel =
+    selectedMonths.length === 0
+      ? 'Selecione o(s) mês(es)'
+      : selectedMonths.length === 1
+        ? months.find((m) => m.value === selectedMonths[0])?.label
+        : `${selectedMonths.length} meses selecionados`
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in-up">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-8 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Wallet className="h-6 w-6 text-brand-vividBlue" />
-            Dashboard de Budget
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Acompanhamento financeiro: Orçado vs Realizado.
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard de Budget</h1>
+          <p className="text-muted-foreground">
+            Acompanhe o orçado vs realizado do período selecionado
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Mês</Label>
-            <Input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="h-9 w-40"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
-            <Select value={selectedCC} onValueChange={setSelectedCC}>
-              <SelectTrigger className="h-9 w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Centros</SelectItem>
-                {costCenters.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
 
-      {insights.length > 0 && (
-        <div className="space-y-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-brand-vividBlue">
-            <Sparkles className="h-5 w-5" />
-            Aurea AI Insights
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {insights.map((insight, idx) => (
-              <Card
-                key={idx}
-                className={`shadow-sm border-l-4 ${
-                  insight.type === 'danger'
-                    ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20'
-                    : insight.type === 'warning'
-                      ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                      : insight.type === 'forecast'
-                        ? 'border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20'
-                        : 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
-                }`}
-              >
-                <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      {insight.type === 'danger' && (
-                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      )}
-                      {insight.type === 'warning' && (
-                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      )}
-                      {insight.type === 'forecast' && (
-                        <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                      )}
-                      {insight.type === 'success' && (
-                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      )}
-                      <span
-                        className={`font-semibold text-sm ${
-                          insight.type === 'danger'
-                            ? 'text-red-700 dark:text-red-400'
-                            : insight.type === 'warning'
-                              ? 'text-amber-700 dark:text-amber-400'
-                              : insight.type === 'forecast'
-                                ? 'text-purple-700 dark:text-purple-400'
-                                : 'text-green-700 dark:text-green-400'
-                        }`}
-                      >
-                        {insight.title}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{insight.description}</p>
-                  </div>
-                  {insight.action && (
-                    <Button variant="outline" size="sm" className="w-fit gap-2 h-8">
-                      {insight.action}
-                      <ArrowRight className="h-3 w-3" />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-[280px] justify-between"
+            >
+              {filterLabel}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[280px] p-0" align="end">
+            <Command>
+              <CommandInput placeholder="Buscar mês..." />
+              <CommandList>
+                <CommandEmpty>Nenhum mês encontrado.</CommandEmpty>
+                <CommandGroup>
+                  <div className="flex items-center justify-between px-2 pb-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAll}
+                      className="h-8 px-2 text-xs"
+                    >
+                      Selecionar Todos
                     </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelection}
+                      className="h-8 px-2 text-xs"
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                  <CommandSeparator />
+                  {months.map((month) => (
+                    <CommandItem
+                      key={month.value}
+                      value={month.label}
+                      onSelect={() => toggleMonth(month.value)}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          selectedMonths.includes(month.value) ? 'opacity-100' : 'opacity-0',
+                        )}
+                      />
+                      {month.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
 
-      <div
-        className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in-up"
-        style={{ animationDelay: '200ms' }}
-      >
-        <Card className="bg-blue-50/50 dark:bg-blue-950/20 shadow-sm border-blue-100 dark:border-blue-900">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Orçado</p>
-                <p className="text-3xl font-bold mt-2 text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    totalBudgeted,
-                  )}
-                </p>
-              </div>
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-              </div>
-            </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Orçado</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatCurrency(totalBudgeted)}</div>
+            )}
           </CardContent>
         </Card>
-
-        <Card className="bg-amber-50/50 dark:bg-amber-950/20 shadow-sm border-amber-100 dark:border-amber-900">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  Total Realizado
-                </p>
-                <p className="text-3xl font-bold mt-2 text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    totalRealized,
-                  )}
-                </p>
-              </div>
-              <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-300" />
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Realizado</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold">{formatCurrency(totalRealized)}</div>
+            )}
           </CardContent>
         </Card>
-
-        <Card
-          className={`shadow-sm ${diff < 0 ? 'bg-red-50/50 border-red-100 dark:bg-red-950/20 dark:border-red-900' : 'bg-green-50/50 border-green-100 dark:bg-green-950/20 dark:border-green-900'}`}
-        >
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p
-                  className={`text-sm font-medium ${diff < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}
-                >
-                  Diferença (Saldo)
-                </p>
-                <p className="text-3xl font-bold mt-2 text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    diff,
-                  )}
-                </p>
-              </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Variação (R$)</CardTitle>
+            {variance > 0 ? (
+              <TrendingUp className="h-4 w-4 text-destructive" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-emerald-500" />
+            )}
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
               <div
-                className={`p-2 rounded-lg ${diff < 0 ? 'bg-red-100 dark:bg-red-900' : 'bg-green-100 dark:bg-green-900'}`}
+                className={cn(
+                  'text-2xl font-bold',
+                  variance > 0 ? 'text-destructive' : 'text-emerald-500',
+                )}
               >
-                <AlertTriangle
-                  className={`h-5 w-5 ${diff < 0 ? 'text-red-600 dark:text-red-300' : 'text-green-600 dark:text-green-300'}`}
-                />
+                {variance > 0 ? '+' : ''}
+                {formatCurrency(variance)}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
-
-        <Card className="bg-card shadow-sm border-border">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">% do Budget Utilizado</p>
-                <p
-                  className={`text-3xl font-bold mt-2 ${diffPercent > 100 ? 'text-red-600 dark:text-red-400' : 'text-brand-vividBlue dark:text-blue-400'}`}
-                >
-                  {diffPercent.toFixed(1)}%
-                </p>
-              </div>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-1.5 mt-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Variação (%)</CardTitle>
+            {variancePercentage > 0 ? (
+              <TrendingUp className="h-4 w-4 text-destructive" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-emerald-500" />
+            )}
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
               <div
-                className={`h-1.5 rounded-full ${diffPercent > 100 ? 'bg-red-500 dark:bg-red-500' : 'bg-brand-vividBlue dark:bg-blue-500'}`}
-                style={{ width: `${Math.min(diffPercent, 100)}%` }}
-              ></div>
-            </div>
+                className={cn(
+                  'text-2xl font-bold',
+                  variancePercentage > 0 ? 'text-destructive' : 'text-emerald-500',
+                )}
+              >
+                {variancePercentage > 0 ? '+' : ''}
+                {variancePercentage.toFixed(2)}%
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1 flex flex-col shadow-sm border-border">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mb-6">
+        <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Consolidado Geral</CardTitle>
+            <CardTitle>Orçado vs Realizado por Centro de Custo</CardTitle>
+            <CardDescription>Comparativo financeiro no período selecionado</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1">
-            <ChartContainer config={chartConfig} className="h-[400px] w-full">
-              <BarChart
-                data={[{ name: 'Total', Orcado: totalBudgeted, Realizado: totalRealized }]}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[350px] w-full" />
+            ) : chartDataByCostCenter.length === 0 ? (
+              <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+                Nenhum dado encontrado
+              </div>
+            ) : (
+              <ChartContainer
+                config={{
+                  Orcado: { label: 'Orçado', color: 'hsl(var(--primary))' },
+                  Realizado: { label: 'Realizado', color: 'hsl(var(--destructive))' },
+                }}
+                className="h-[350px] w-full"
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  tickFormatter={(v) => `R$ ${v / 1000}k`}
-                />
-                <ChartTooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(val) =>
-                        new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        }).format(val as number)
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={chartDataByCostCenter}
+                    margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) =>
+                        value.length > 15 ? value.substring(0, 15) + '...' : value
                       }
                     />
-                  }
-                />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar
-                  dataKey="Orcado"
-                  name="Orçado"
-                  fill="var(--color-Orcado)"
-                  radius={[4, 4, 0, 0]}
-                  barSize={60}
-                >
-                  <LabelList
-                    dataKey="Orcado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-                <Bar
-                  dataKey="Realizado"
-                  name="Realizado"
-                  fill="var(--color-Realizado)"
-                  radius={[4, 4, 0, 0]}
-                  barSize={60}
-                >
-                  <LabelList
-                    dataKey="Realizado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2 flex flex-col shadow-sm border-border">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">
-              Orçado vs Realizado por Centro de Custo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <ChartContainer config={chartConfig} className="h-[400px] w-full">
-              <BarChart
-                data={costCenterChartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  tickFormatter={(v) => `R$ ${v / 1000}k`}
-                />
-                <ChartTooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(val) =>
-                        new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        }).format(val as number)
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value) => formatCurrency(value as number)}
+                        />
                       }
                     />
-                  }
-                />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar
-                  dataKey="Orcado"
-                  name="Orçado"
-                  fill="var(--color-Orcado)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={60}
-                >
-                  <LabelList
-                    dataKey="Orcado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-                <Bar
-                  dataKey="Realizado"
-                  name="Realizado"
-                  fill="var(--color-Realizado)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={60}
-                >
-                  <LabelList
-                    dataKey="Realizado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {selectedCC !== 'all' && accountChartData.length > 0 && (
-          <Card className="animate-fade-in lg:col-span-3 shadow-sm border-border">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">
-                Detalhamento por Conta Contábil
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[400px] w-full">
-                <BarChart
-                  data={accountChartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    tickFormatter={(v) => `R$ ${v / 1000}k`}
-                  />
-                  <ChartTooltip
-                    cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                    content={
-                      <ChartTooltipContent
-                        formatter={(val) =>
-                          new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(val as number)
-                        }
-                      />
-                    }
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar
-                    dataKey="Orcado"
-                    name="Orçado"
-                    fill="var(--color-Orcado)"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    <LabelList
-                      dataKey="Orcado"
-                      position="top"
-                      className="fill-foreground text-[10px] font-medium"
-                      formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                    />
-                  </Bar>
-                  <Bar
-                    dataKey="Realizado"
-                    name="Realizado"
-                    fill="var(--color-Realizado)"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    <LabelList
-                      dataKey="Realizado"
-                      position="top"
-                      className="fill-foreground text-[10px] font-medium"
-                      formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                    />
-                  </Bar>
-                </BarChart>
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar dataKey="Orcado" fill="var(--color-Orcado)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Realizado" fill="var(--color-Realizado)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </ChartContainer>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Detalhamento por Conta</CardTitle>
+            <CardDescription>Consolidado das contas no período</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[350px] w-full" />
+            ) : tableDataByAccount.length === 0 ? (
+              <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+                Nenhum dado encontrado
+              </div>
+            ) : (
+              <ScrollArea className="h-[350px] pr-4">
+                <div className="space-y-4">
+                  {tableDataByAccount.map((row) => (
+                    <div
+                      key={row.account.id}
+                      className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                    >
+                      <div className="space-y-1 w-1/2">
+                        <p
+                          className="text-sm font-medium leading-none truncate"
+                          title={row.account.name}
+                        >
+                          {row.account.code ? `${row.account.code} - ` : ''}
+                          {row.account.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{row.account.type}</p>
+                      </div>
+                      <div className="text-right w-1/2">
+                        <p className="text-sm font-medium">
+                          <span className="text-muted-foreground mr-2 text-xs">Real:</span>
+                          {formatCurrency(row.realized)}
+                        </p>
+                        <div className="flex items-center justify-end gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            Orç: {formatCurrency(row.budgeted)}
+                          </span>
+                          <Badge
+                            variant={row.variance > 0 ? 'destructive' : 'secondary'}
+                            className="text-[10px] px-1 py-0 h-4"
+                          >
+                            {row.variance > 0 ? '+' : ''}
+                            {row.variancePerc.toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
