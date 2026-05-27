@@ -4313,10 +4313,6 @@ export const Constants = {
 //     v_status_id uuid;
 //     v_requester_id uuid;
 //     v_next_date timestamptz;
-//     v_year text;
-//     v_latest_task text;
-//     v_seq int;
-//     v_task_number text;
 //     v_target_date timestamptz;
 //   BEGIN
 //     -- Only run if status changed to Finalizado
@@ -4380,31 +4376,13 @@ export const Constants = {
 //             -- Requester (use assignee or a system user)
 //             v_requester_id := NEW.assignee_id;
 //
-//             -- Generate task number
-//             v_year := to_char(CURRENT_DATE, 'YYYY');
-//
-//             SELECT task_number INTO v_latest_task
-//             FROM public.tasks
-//             WHERE client_id = v_audit.client_id
-//               AND task_number LIKE 'TSK-' || v_year || '-%'
-//             ORDER BY task_number DESC
-//             LIMIT 1;
-//
-//             IF v_latest_task IS NOT NULL THEN
-//               v_seq := cast(substring(v_latest_task from 'TSK-\d{4}-(\d+)') as integer) + 1;
-//             ELSE
-//               v_seq := 1;
-//             END IF;
-//
-//             v_task_number := 'TSK-' || v_year || '-' || lpad(v_seq::text, 4, '0');
-//
 //             WITH inserted_task AS (
 //               INSERT INTO public.tasks (
 //                 client_id, plant_id, type_id, status_id, requester_id, assignee_id,
 //                 task_number, title, description, due_date, status_updated_at
 //               ) VALUES (
 //                 v_audit.client_id, NEW.plant_id, v_type_id, v_status_id, v_requester_id, NEW.assignee_id,
-//                 v_task_number, 'Auditoria: ' || v_audit.title,
+//                 'GERANDO...', 'Auditoria: ' || v_audit.title,
 //                 'Por favor, realize a auditoria "' || v_audit.title || '" agendada para ' || to_char(v_next_date, 'DD/MM/YYYY') || '. Acesse os detalhes da tarefa para preencher o checklist.',
 //                 v_target_date, CURRENT_TIMESTAMP
 //               ) RETURNING id
@@ -4659,6 +4637,50 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION set_task_number()
+//   CREATE OR REPLACE FUNCTION public.set_task_number()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_year TEXT;
+//     v_seq INT;
+//     v_max_retries INT := 3;
+//     v_attempts INT := 0;
+//   BEGIN
+//     -- We use an advisory lock to prevent concurrent inserts for the same client
+//     PERFORM pg_advisory_xact_lock(hashtext(NEW.client_id::text));
+//
+//     v_year := to_char(COALESCE(NEW.created_at, CURRENT_TIMESTAMP), 'YYYY');
+//
+//     LOOP
+//       -- Calculate the next sequence for the given year
+//       SELECT COALESCE(
+//         MAX(
+//           SUBSTRING(task_number FROM 'TSK-\d{4}-([0-9]+)')::INT
+//         ), 0
+//       ) + 1 INTO v_seq
+//       FROM public.tasks
+//       WHERE client_id = NEW.client_id AND task_number LIKE 'TSK-' || v_year || '-%';
+//
+//       NEW.task_number := 'TSK-' || v_year || '-' || LPAD(v_seq::TEXT, 4, '0');
+//
+//       -- Edge case check to retry if it already exists, as requested
+//       IF NOT EXISTS (SELECT 1 FROM public.tasks WHERE client_id = NEW.client_id AND task_number = NEW.task_number) THEN
+//         EXIT;
+//       END IF;
+//
+//       v_attempts := v_attempts + 1;
+//       IF v_attempts >= v_max_retries THEN
+//         RAISE EXCEPTION 'Failed to generate a unique task number after % attempts.', v_max_retries;
+//       END IF;
+//     END LOOP;
+//
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION submit_audit_execution(uuid, jsonb, text)
 //   CREATE OR REPLACE FUNCTION public.submit_audit_execution(p_execution_id uuid, p_answers jsonb, p_participants text)
 //    RETURNS jsonb
@@ -4818,6 +4840,7 @@ export const Constants = {
 //   audit_task_types: CREATE TRIGGER audit_task_types AFTER INSERT OR DELETE OR UPDATE ON public.task_types FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: tasks
 //   audit_tasks: CREATE TRIGGER audit_tasks AFTER INSERT OR DELETE OR UPDATE ON public.tasks FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+//   on_task_insert: CREATE TRIGGER on_task_insert BEFORE INSERT ON public.tasks FOR EACH ROW EXECUTE FUNCTION set_task_number()
 //   on_task_status_change: CREATE TRIGGER on_task_status_change BEFORE UPDATE ON public.tasks FOR EACH ROW EXECUTE FUNCTION handle_task_status_change()
 
 // --- INDEXES ---

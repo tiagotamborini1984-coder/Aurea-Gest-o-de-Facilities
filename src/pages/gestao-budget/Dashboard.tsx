@@ -1,622 +1,349 @@
-import { useState, useEffect, useMemo } from 'react'
-import {
-  DollarSign,
-  TrendingUp,
-  AlertTriangle,
-  Wallet,
-  Sparkles,
-  ArrowRight,
-  CheckCircle,
-} from 'lucide-react'
-import { useAppStore } from '@/store/AppContext'
-import { supabase } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useSearchParams } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  LabelList,
-} from 'recharts'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Check,
+  ChevronsUpDown,
+  Filter,
+  Loader2,
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight,
+  Target,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useDashboardBudget } from '@/hooks/use-dashboard-budget'
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  ChartConfig,
+} from '@/components/ui/chart'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { useAppStore } from '@/store/AppContext'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function DashboardBudget() {
-  const { profile } = useAppStore()
-  const [allEntries, setAllEntries] = useState<any[]>([])
-  const [costCenters, setCostCenters] = useState<any[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7))
-  const [selectedCC, setSelectedCC] = useState<string>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedMonths = searchParams.getAll('month')
+  const selectedCostCenters = searchParams.getAll('cc')
 
-  useEffect(() => {
-    if (!profile?.client_id) return
+  const { data, costCenters, availableMonths, loading } = useDashboardBudget(
+    selectedMonths,
+    selectedCostCenters,
+  )
+  const { activeClient } = useAppStore()
 
-    supabase
-      .from('budget_cost_centers')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .then(({ data }) => setCostCenters(data || []))
+  const primaryColor = activeClient?.primary_color || 'hsl(var(--primary))'
+  const secondaryColor = activeClient?.secondary_color || '#10b981'
 
-    supabase
-      .from('budget_accounts')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .then(({ data }) => setAccounts(data || []))
-  }, [profile?.client_id])
-
-  useEffect(() => {
-    if (!profile?.client_id) return
-    fetchData()
-  }, [profile?.client_id, selectedMonth])
-
-  const fetchData = async () => {
-    let query = supabase.from('budget_entries').select('*').eq('client_id', profile!.client_id)
-    if (selectedMonth) {
-      query = query.eq('reference_month', `${selectedMonth}-01`)
-    }
-    const { data } = await query
-    setAllEntries(data || [])
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
   }
 
-  const entries = useMemo(() => {
-    if (selectedCC === 'all') return allEntries
-    return allEntries.filter((e) => e.cost_center_id === selectedCC)
-  }, [allEntries, selectedCC])
-
-  const insights = useMemo(() => {
-    if (!allEntries.length || costCenters.length === 0) return []
-    const msgs = []
-
-    const ccTotals = costCenters.map((cc) => {
-      const ccEntries = allEntries.filter((e) => e.cost_center_id === cc.id)
-      const budgeted = ccEntries.reduce((acc, e) => acc + Number(e.budgeted_amount), 0)
-      const realized = ccEntries.reduce((acc, e) => acc + Number(e.realized_amount), 0)
-      return { ...cc, budgeted, realized, percent: budgeted > 0 ? (realized / budgeted) * 100 : 0 }
-    })
-
-    const overBudget = ccTotals.filter((c) => c.percent > 100).sort((a, b) => b.percent - a.percent)
-    const nearBudget = ccTotals
-      .filter((c) => c.percent >= 90 && c.percent <= 100)
-      .sort((a, b) => b.percent - a.percent)
-
-    if (overBudget.length > 0) {
-      const worstCC = overBudget[0]
-      const ccEntries = allEntries.filter((e) => e.cost_center_id === worstCC.id)
-      const worstEntry = [...ccEntries].sort(
-        (a, b) => Number(b.realized_amount) - Number(a.realized_amount),
-      )[0]
-      const worstAccount = accounts.find((a) => a.id === worstEntry?.account_id)
-
-      msgs.push({
-        type: 'danger',
-        title: 'Atenção Crítica: Orçamento Estourado',
-        description: `O centro de custo ${worstCC.code || worstCC.name} excedeu o orçamento em ${(
-          worstCC.percent - 100
-        ).toFixed(1)}%. A conta "${worstAccount?.name || 'Desconhecida'}" é a que mais gastou.`,
-        action: 'Revisar Lançamentos',
-      })
+  const formatMonth = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), 'MMM/yyyy', { locale: ptBR })
+    } catch {
+      return dateStr
     }
+  }
 
-    if (nearBudget.length > 0) {
-      const nearCC = nearBudget[0]
-      msgs.push({
-        type: 'warning',
-        title: 'Alerta de Consumo Elevado',
-        description: `O centro de custo ${nearCC.code || nearCC.name} já consumiu ${nearCC.percent.toFixed(
-          1,
-        )}% do orçamento planejado para este mês. Fique atento.`,
-        action: 'Ajustar Orçamento',
-      })
-    }
+  const toggleMonth = (month: string) => {
+    const next = selectedMonths.includes(month)
+      ? selectedMonths.filter((m) => m !== month)
+      : [...selectedMonths, month]
 
-    if (msgs.length === 0) {
-      msgs.push({
-        type: 'success',
-        title: 'Orçamento Saudável',
-        description:
-          'Todos os centros de custo estão operando dentro ou abaixo da margem planejada. Excelente gestão financeira!',
-        action: null,
-      })
-    }
+    const newParams = new URLSearchParams(searchParams)
+    newParams.delete('month')
+    next.forEach((m) => newParams.append('month', m))
+    setSearchParams(newParams, { replace: true })
+  }
 
-    const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
-    if (isAdmin) {
-      const totalB = ccTotals.reduce((acc, c) => acc + c.budgeted, 0)
-      const totalR = ccTotals.reduce((acc, c) => acc + c.realized, 0)
-      const trend = totalB > 0 ? totalR / totalB : 1
-      const forecast = totalR * (trend > 1 ? 1.05 : 0.95)
+  const toggleCostCenter = (id: string) => {
+    const next = selectedCostCenters.includes(id)
+      ? selectedCostCenters.filter((c) => c !== id)
+      : [...selectedCostCenters, id]
 
-      msgs.push({
-        type: 'forecast',
-        title: 'Aurea AI Forecast (Mês Seguinte)',
-        description: `Projeção de gastos para o próximo mês: ${new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL',
-        }).format(forecast)}. Baseado no KPI Orçado x Realizado atual.`,
-        action: 'Planejar Próximo Mês',
-      })
-    }
-
-    return msgs
-  }, [allEntries, costCenters, accounts, profile])
-
-  const { totalBudgeted, totalRealized, diff, diffPercent } = useMemo(() => {
-    let b = 0,
-      r = 0
-    entries.forEach((e) => {
-      b += Number(e.budgeted_amount)
-      r += Number(e.realized_amount)
-    })
-    return {
-      totalBudgeted: b,
-      totalRealized: r,
-      diff: b - r, // Saldo positivo se orçado > realizado
-      diffPercent: b > 0 ? (r / b) * 100 : 0,
-    }
-  }, [entries])
-
-  const costCenterChartData = useMemo(() => {
-    const map: Record<string, { name: string; Orcado: number; Realizado: number }> = {}
-    allEntries.forEach((e) => {
-      const ccObj = costCenters.find((c) => c.id === e.cost_center_id)
-      const cc = ccObj?.code || ccObj?.name || 'Outros'
-      if (!map[cc]) map[cc] = { name: cc, Orcado: 0, Realizado: 0 }
-      map[cc].Orcado += Number(e.budgeted_amount)
-      map[cc].Realizado += Number(e.realized_amount)
-    })
-    return Object.values(map).sort((a, b) => b.Orcado - a.Orcado)
-  }, [allEntries, costCenters])
-
-  const accountChartData = useMemo(() => {
-    const map: Record<string, { name: string; Orcado: number; Realizado: number }> = {}
-    entries.forEach((e) => {
-      const acc = accounts.find((a) => a.id === e.account_id)?.name || 'Outras'
-      if (!map[acc]) map[acc] = { name: acc, Orcado: 0, Realizado: 0 }
-      map[acc].Orcado += Number(e.budgeted_amount)
-      map[acc].Realizado += Number(e.realized_amount)
-    })
-    return Object.values(map).sort((a, b) => b.Orcado - a.Orcado)
-  }, [entries, accounts])
+    const newParams = new URLSearchParams(searchParams)
+    newParams.delete('cc')
+    next.forEach((c) => newParams.append('cc', c))
+    setSearchParams(newParams, { replace: true })
+  }
 
   const chartConfig = {
-    Orcado: {
+    budgeted: {
       label: 'Orçado',
-      color: '#16798a',
+      color: primaryColor,
     },
-    Realizado: {
+    realized: {
       label: 'Realizado',
-      color: '#618c21',
+      color: secondaryColor,
     },
-  }
+  } satisfies ChartConfig
+
+  const chartData =
+    data?.monthlyData?.map((d: any) => ({
+      ...d,
+      monthLabel: formatMonth(d.month),
+    })) || []
+
+  const totalBudgeted = data?.totalBudgeted || 0
+  const totalRealized = data?.totalRealized || 0
+  const balance = totalBudgeted - totalRealized
+  const variance = totalBudgeted > 0 ? ((totalRealized - totalBudgeted) / totalBudgeted) * 100 : 0
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in-up">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Wallet className="h-6 w-6 text-brand-vividBlue" />
-            Dashboard de Budget
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Acompanhamento financeiro: Orçado vs Realizado.
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard de Budget</h2>
+          <p className="text-muted-foreground">Visão geral do orçamento planejado vs realizado</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-[220px] justify-between">
+                {selectedMonths.length === 0
+                  ? 'Todos os Meses'
+                  : `${selectedMonths.length} meses selecionados`}
+                <Filter className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[220px]">
+              <ScrollArea className="h-64">
+                {availableMonths.map((m) => (
+                  <DropdownMenuCheckboxItem
+                    key={m}
+                    checked={selectedMonths.includes(m)}
+                    onCheckedChange={() => toggleMonth(m)}
+                  >
+                    {formatMonth(m)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-[250px] justify-between">
+                {selectedCostCenters.length === 0
+                  ? 'Todos os Centros de Custo'
+                  : `${selectedCostCenters.length} CCs selecionados`}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-0" align="end">
+              <Command>
+                <CommandInput placeholder="Buscar centro de custo..." />
+                <CommandList>
+                  <CommandEmpty>Nenhum encontrado.</CommandEmpty>
+                  <CommandGroup>
+                    <ScrollArea className="h-64">
+                      {costCenters.map((cc) => (
+                        <CommandItem
+                          key={cc.id}
+                          value={cc.name}
+                          onSelect={() => toggleCostCenter(cc.id)}
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-4 w-4',
+                              selectedCostCenters.includes(cc.id) ? 'opacity-100' : 'opacity-0',
+                            )}
+                          />
+                          {cc.name}
+                        </CommandItem>
+                      ))}
+                    </ScrollArea>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : !data ? (
+        <div className="flex justify-center items-center h-64 border rounded-xl border-dashed">
+          <p className="text-muted-foreground">
+            Nenhum dado encontrado para os filtros selecionados.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Mês</Label>
-            <Input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="h-9 w-40"
-            />
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Orçado</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(totalBudgeted)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Realizado</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(totalRealized)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Saldo (Orçado - Realizado)</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={cn(
+                    'text-2xl font-bold',
+                    balance >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                  )}
+                >
+                  {formatCurrency(balance)}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Variação %</CardTitle>
+                {variance > 0 ? (
+                  <ArrowUpRight className="h-4 w-4 text-rose-600" />
+                ) : (
+                  <ArrowDownRight className="h-4 w-4 text-emerald-600" />
+                )}
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={cn(
+                    'text-2xl font-bold',
+                    variance <= 0 ? 'text-emerald-600' : 'text-rose-600',
+                  )}
+                >
+                  {variance > 0 ? '+' : ''}
+                  {variance.toFixed(2)}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Em relação ao orçado</p>
+              </CardContent>
+            </Card>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Centro de Custo</Label>
-            <Select value={selectedCC} onValueChange={setSelectedCC}>
-              <SelectTrigger className="h-9 w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Centros</SelectItem>
-                {costCenters.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
 
-      {insights.length > 0 && (
-        <div className="space-y-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-brand-vividBlue">
-            <Sparkles className="h-5 w-5" />
-            Aurea AI Insights
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {insights.map((insight, idx) => (
-              <Card
-                key={idx}
-                className={`shadow-sm border-l-4 ${
-                  insight.type === 'danger'
-                    ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20'
-                    : insight.type === 'warning'
-                      ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                      : insight.type === 'forecast'
-                        ? 'border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20'
-                        : 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
-                }`}
-              >
-                <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      {insight.type === 'danger' && (
-                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      )}
-                      {insight.type === 'warning' && (
-                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      )}
-                      {insight.type === 'forecast' && (
-                        <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                      )}
-                      {insight.type === 'success' && (
-                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      )}
-                      <span
-                        className={`font-semibold text-sm ${
-                          insight.type === 'danger'
-                            ? 'text-red-700 dark:text-red-400'
-                            : insight.type === 'warning'
-                              ? 'text-amber-700 dark:text-amber-400'
-                              : insight.type === 'forecast'
-                                ? 'text-purple-700 dark:text-purple-400'
-                                : 'text-green-700 dark:text-green-400'
-                        }`}
-                      >
-                        {insight.title}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{insight.description}</p>
-                  </div>
-                  {insight.action && (
-                    <Button variant="outline" size="sm" className="w-fit gap-2 h-8">
-                      {insight.action}
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div
-        className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in-up"
-        style={{ animationDelay: '200ms' }}
-      >
-        <Card className="bg-blue-50/50 dark:bg-blue-950/20 shadow-sm border-blue-100 dark:border-blue-900">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Orçado</p>
-                <p className="text-3xl font-bold mt-2 text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    totalBudgeted,
-                  )}
-                </p>
-              </div>
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-amber-50/50 dark:bg-amber-950/20 shadow-sm border-amber-100 dark:border-amber-900">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  Total Realizado
-                </p>
-                <p className="text-3xl font-bold mt-2 text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    totalRealized,
-                  )}
-                </p>
-              </div>
-              <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-300" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className={`shadow-sm ${diff < 0 ? 'bg-red-50/50 border-red-100 dark:bg-red-950/20 dark:border-red-900' : 'bg-green-50/50 border-green-100 dark:bg-green-950/20 dark:border-green-900'}`}
-        >
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p
-                  className={`text-sm font-medium ${diff < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}
-                >
-                  Diferença (Saldo)
-                </p>
-                <p className="text-3xl font-bold mt-2 text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    diff,
-                  )}
-                </p>
-              </div>
-              <div
-                className={`p-2 rounded-lg ${diff < 0 ? 'bg-red-100 dark:bg-red-900' : 'bg-green-100 dark:bg-green-900'}`}
-              >
-                <AlertTriangle
-                  className={`h-5 w-5 ${diff < 0 ? 'text-red-600 dark:text-red-300' : 'text-green-600 dark:text-green-300'}`}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card shadow-sm border-border">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">% do Budget Utilizado</p>
-                <p
-                  className={`text-3xl font-bold mt-2 ${diffPercent > 100 ? 'text-red-600 dark:text-red-400' : 'text-brand-vividBlue dark:text-blue-400'}`}
-                >
-                  {diffPercent.toFixed(1)}%
-                </p>
-              </div>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-1.5 mt-4">
-              <div
-                className={`h-1.5 rounded-full ${diffPercent > 100 ? 'bg-red-500 dark:bg-red-500' : 'bg-brand-vividBlue dark:bg-blue-500'}`}
-                style={{ width: `${Math.min(diffPercent, 100)}%` }}
-              ></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1 flex flex-col shadow-sm border-border">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">Consolidado Geral</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <ChartContainer config={chartConfig} className="h-[400px] w-full">
-              <BarChart
-                data={[{ name: 'Total', Orcado: totalBudgeted, Realizado: totalRealized }]}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  tickFormatter={(v) => `R$ ${v / 1000}k`}
-                />
-                <ChartTooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(val) =>
-                        new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        }).format(val as number)
-                      }
-                    />
-                  }
-                />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar
-                  dataKey="Orcado"
-                  name="Orçado"
-                  fill="var(--color-Orcado)"
-                  radius={[4, 4, 0, 0]}
-                  barSize={60}
-                >
-                  <LabelList
-                    dataKey="Orcado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-                <Bar
-                  dataKey="Realizado"
-                  name="Realizado"
-                  fill="var(--color-Realizado)"
-                  radius={[4, 4, 0, 0]}
-                  barSize={60}
-                >
-                  <LabelList
-                    dataKey="Realizado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2 flex flex-col shadow-sm border-border">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">
-              Orçado vs Realizado por Centro de Custo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <ChartContainer config={chartConfig} className="h-[400px] w-full">
-              <BarChart
-                data={costCenterChartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  tickFormatter={(v) => `R$ ${v / 1000}k`}
-                />
-                <ChartTooltip
-                  cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(val) =>
-                        new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        }).format(val as number)
-                      }
-                    />
-                  }
-                />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar
-                  dataKey="Orcado"
-                  name="Orçado"
-                  fill="var(--color-Orcado)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={60}
-                >
-                  <LabelList
-                    dataKey="Orcado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-                <Bar
-                  dataKey="Realizado"
-                  name="Realizado"
-                  fill="var(--color-Realizado)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={60}
-                >
-                  <LabelList
-                    dataKey="Realizado"
-                    position="top"
-                    className="fill-foreground text-[10px] font-medium"
-                    formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                  />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {selectedCC !== 'all' && accountChartData.length > 0 && (
-          <Card className="animate-fade-in lg:col-span-3 shadow-sm border-border">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">
-                Detalhamento por Conta Contábil
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-[400px] w-full">
-                <BarChart
-                  data={accountChartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    tickFormatter={(v) => `R$ ${v / 1000}k`}
-                  />
-                  <ChartTooltip
-                    cursor={{ fill: 'hsl(var(--muted)/0.5)' }}
-                    content={
-                      <ChartTooltipContent
-                        formatter={(val) =>
-                          new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(val as number)
-                        }
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Orçado vs Realizado por Mês</CardTitle>
+                <CardDescription>Evolução mensal do orçamento</CardDescription>
+              </CardHeader>
+              <CardContent className="pl-2">
+                {chartData.length > 0 ? (
+                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                    <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="monthLabel"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        fontSize={12}
                       />
-                    }
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar
-                    dataKey="Orcado"
-                    name="Orçado"
-                    fill="var(--color-Orcado)"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    <LabelList
-                      dataKey="Orcado"
-                      position="top"
-                      className="fill-foreground text-[10px] font-medium"
-                      formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                    />
-                  </Bar>
-                  <Bar
-                    dataKey="Realizado"
-                    name="Realizado"
-                    fill="var(--color-Realizado)"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    <LabelList
-                      dataKey="Realizado"
-                      position="top"
-                      className="fill-foreground text-[10px] font-medium"
-                      formatter={(val: number) => `R$ ${Math.round(val / 1000)}k`}
-                    />
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                      <YAxis
+                        tickFormatter={(v) => `R$ ${v / 1000}k`}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        fontSize={12}
+                        width={80}
+                      />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent indicator="dashed" />}
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="budgeted" fill="var(--color-budgeted)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="realized" fill="var(--color-realized)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                ) : (
+                  <div className="flex h-[300px] items-center justify-center border-dashed border rounded-md">
+                    <p className="text-muted-foreground text-sm">
+                      Dados insuficientes para o gráfico.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Por Centro de Custo</CardTitle>
+                <CardDescription>Maiores despesas por área</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[300px] pr-4">
+                  <div className="space-y-4">
+                    {data?.costCenterData?.map((cc: any, i: number) => {
+                      const perc = cc.budgeted > 0 ? (cc.realized / cc.budgeted) * 100 : 0
+                      return (
+                        <div key={i} className="flex items-center">
+                          <div className="flex-1 space-y-1">
+                            <p className="text-sm font-medium leading-none">{cc.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Orçado: {formatCurrency(cc.budgeted)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{formatCurrency(cc.realized)}</p>
+                            <p
+                              className={cn(
+                                'text-xs',
+                                perc <= 100 ? 'text-emerald-500' : 'text-rose-500',
+                              )}
+                            >
+                              {perc.toFixed(1)}% do Orçado
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {data?.costCenterData?.length === 0 && (
+                      <p className="text-muted-foreground text-sm text-center py-4">
+                        Nenhum dado encontrado.
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   )
 }
