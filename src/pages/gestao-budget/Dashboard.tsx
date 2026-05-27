@@ -1,209 +1,172 @@
-import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
+import { useDashboardBudget } from '@/hooks/use-dashboard-budget'
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Check,
-  ChevronsUpDown,
-  Filter,
-  Loader2,
-  DollarSign,
-  ArrowUpRight,
-  ArrowDownRight,
-  Target,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { useDashboardBudget } from '@/hooks/use-dashboard-budget'
-import { format, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { Filter, Loader2, DollarSign, TrendingDown, TrendingUp, AlertCircle } from 'lucide-react'
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
-  ChartConfig,
 } from '@/components/ui/chart'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import { useAppStore } from '@/store/AppContext'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts'
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 export default function DashboardBudget() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const selectedMonths = searchParams.getAll('month')
-  const selectedCostCenters = searchParams.getAll('cc')
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([])
+  const [selectedCostCenters, setSelectedCostCenters] = useState<string[]>([])
 
   const { data, costCenters, availableMonths, loading } = useDashboardBudget(
     selectedMonths,
     selectedCostCenters,
   )
-  const { activeClient } = useAppStore()
-
-  const primaryColor = activeClient?.primary_color || 'hsl(var(--primary))'
-  const secondaryColor = activeClient?.secondary_color || '#10b981'
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-  }
-
-  const formatMonth = (dateStr: string) => {
-    try {
-      return format(parseISO(dateStr), 'MMM/yyyy', { locale: ptBR })
-    } catch {
-      return dateStr
-    }
-  }
 
   const toggleMonth = (month: string) => {
-    const next = selectedMonths.includes(month)
-      ? selectedMonths.filter((m) => m !== month)
-      : [...selectedMonths, month]
-
-    const newParams = new URLSearchParams(searchParams)
-    newParams.delete('month')
-    next.forEach((m) => newParams.append('month', m))
-    setSearchParams(newParams, { replace: true })
+    setSelectedMonths((prev) =>
+      prev.includes(month) ? prev.filter((m) => m !== month) : [...prev, month],
+    )
   }
 
-  const toggleCostCenter = (id: string) => {
-    const next = selectedCostCenters.includes(id)
-      ? selectedCostCenters.filter((c) => c !== id)
-      : [...selectedCostCenters, id]
+  const toggleCostCenter = (ccId: string) => {
+    setSelectedCostCenters((prev) =>
+      prev.includes(ccId) ? prev.filter((id) => id !== ccId) : [...prev, ccId],
+    )
+  }
 
-    const newParams = new URLSearchParams(searchParams)
-    newParams.delete('cc')
-    next.forEach((c) => newParams.append('cc', c))
-    setSearchParams(newParams, { replace: true })
+  const formatBRL = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value)
+  }
+
+  const formatMonth = (monthStr: string) => {
+    try {
+      return format(parseISO(monthStr), 'MMM/yyyy', { locale: ptBR })
+    } catch {
+      return monthStr
+    }
   }
 
   const chartConfig = {
     budgeted: {
       label: 'Orçado',
-      color: primaryColor,
+      color: '#1f2937',
     },
     realized: {
       label: 'Realizado',
-      color: secondaryColor,
+      color: '#1e3a8a',
     },
-  } satisfies ChartConfig
+  }
 
-  const chartData =
-    data?.monthlyData?.map((d: any) => ({
-      ...d,
-      monthLabel: formatMonth(d.month),
-    })) || []
-
-  const totalBudgeted = data?.totalBudgeted || 0
-  const totalRealized = data?.totalRealized || 0
-  const balance = totalBudgeted - totalRealized
-  const variance = totalBudgeted > 0 ? ((totalRealized - totalBudgeted) / totalBudgeted) * 100 : 0
+  const variance = data ? data.totalBudgeted - data.totalRealized : 0
+  const variancePercentage = data?.totalBudgeted
+    ? ((data.totalRealized / data.totalBudgeted) * 100).toFixed(1)
+    : 0
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard de Budget</h2>
-          <p className="text-muted-foreground">Visão geral do orçamento planejado vs realizado</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-2">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard Budget</h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-[220px] justify-between">
-                {selectedMonths.length === 0
-                  ? 'Todos os Meses'
-                  : `${selectedMonths.length} meses selecionados`}
-                <Filter className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              <Button variant="outline" className="w-full sm:w-[180px] justify-between">
+                <span className="truncate">
+                  {selectedMonths.length === 0
+                    ? 'Todos os Meses'
+                    : `${selectedMonths.length} selecionado(s)`}
+                </span>
+                <Filter className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[220px]">
-              <ScrollArea className="h-64">
-                {availableMonths.map((m) => (
-                  <DropdownMenuCheckboxItem
-                    key={m}
-                    checked={selectedMonths.includes(m)}
-                    onCheckedChange={() => toggleMonth(m)}
-                  >
-                    {formatMonth(m)}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </ScrollArea>
+            <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel>Filtrar por Mês</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {availableMonths.map((month) => (
+                <DropdownMenuCheckboxItem
+                  key={month}
+                  checked={selectedMonths.includes(month)}
+                  onCheckedChange={() => toggleMonth(month)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {formatMonth(month)}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {availableMonths.length === 0 && (
+                <div className="p-2 text-sm text-muted-foreground text-center">Nenhum mês</div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-[250px] justify-between">
-                {selectedCostCenters.length === 0
-                  ? 'Todos os Centros de Custo'
-                  : `${selectedCostCenters.length} CCs selecionados`}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-[200px] justify-between">
+                <span className="truncate">
+                  {selectedCostCenters.length === 0
+                    ? 'Todos Centros de Custo'
+                    : `${selectedCostCenters.length} selecionado(s)`}
+                </span>
+                <Filter className="ml-2 h-4 w-4 opacity-50" />
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[250px] p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Buscar centro de custo..." />
-                <CommandList>
-                  <CommandEmpty>Nenhum encontrado.</CommandEmpty>
-                  <CommandGroup>
-                    <ScrollArea className="h-64">
-                      {costCenters.map((cc) => (
-                        <CommandItem
-                          key={cc.id}
-                          value={cc.name}
-                          onSelect={() => toggleCostCenter(cc.id)}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              selectedCostCenters.includes(cc.id) ? 'opacity-100' : 'opacity-0',
-                            )}
-                          />
-                          {cc.name}
-                        </CommandItem>
-                      ))}
-                    </ScrollArea>
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel>Centros de Custo</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <div className="max-h-[300px] overflow-y-auto">
+                {costCenters.map((cc) => (
+                  <DropdownMenuCheckboxItem
+                    key={cc.id}
+                    checked={selectedCostCenters.includes(cc.id)}
+                    onCheckedChange={() => toggleCostCenter(cc.id)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {cc.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {costCenters.length === 0 && (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    Nenhum centro de custo
+                  </div>
+                )}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex h-[400px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : !data ? (
-        <div className="flex justify-center items-center h-64 border rounded-xl border-dashed">
-          <p className="text-muted-foreground">
-            Nenhum dado encontrado para os filtros selecionados.
+        <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground">
+          <AlertCircle className="h-10 w-10 mb-4 opacity-50" />
+          <p className="text-lg font-medium text-center px-4">
+            Nenhum dado encontrado para os filtros selecionados
           </p>
+          <p className="text-sm mt-2">Tente alterar os meses ou centros de custo.</p>
         </div>
       ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Orçado</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(totalBudgeted)}</div>
+                <div className="text-2xl font-bold">{formatBRL(data.totalBudgeted)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -212,137 +175,119 @@ export default function DashboardBudget() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(totalRealized)}</div>
+                <div className="text-2xl font-bold">{formatBRL(data.totalRealized)}</div>
+                <p className="text-xs text-muted-foreground">{variancePercentage}% do orçado</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Saldo (Orçado - Realizado)</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div
-                  className={cn(
-                    'text-2xl font-bold',
-                    balance >= 0 ? 'text-emerald-600' : 'text-rose-600',
-                  )}
-                >
-                  {formatCurrency(balance)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Variação %</CardTitle>
-                {variance > 0 ? (
-                  <ArrowUpRight className="h-4 w-4 text-rose-600" />
+                <CardTitle className="text-sm font-medium">Variação (Orçado - Realizado)</CardTitle>
+                {variance >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-green-500" />
                 ) : (
-                  <ArrowDownRight className="h-4 w-4 text-emerald-600" />
+                  <TrendingDown className="h-4 w-4 text-red-500" />
                 )}
               </CardHeader>
               <CardContent>
                 <div
-                  className={cn(
-                    'text-2xl font-bold',
-                    variance <= 0 ? 'text-emerald-600' : 'text-rose-600',
-                  )}
+                  className={`text-2xl font-bold ${
+                    variance >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}
                 >
-                  {variance > 0 ? '+' : ''}
-                  {variance.toFixed(2)}%
+                  {formatBRL(Math.abs(variance))} {variance >= 0 ? 'Positivo' : 'Negativo'}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Em relação ao orçado</p>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="col-span-1">
               <CardHeader>
-                <CardTitle>Orçado vs Realizado por Mês</CardTitle>
-                <CardDescription>Evolução mensal do orçamento</CardDescription>
+                <CardTitle>Orçado vs Realizado (Mensal)</CardTitle>
               </CardHeader>
               <CardContent className="pl-2">
-                {chartData.length > 0 ? (
-                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                    <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={data.monthlyData}
+                      margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
-                        dataKey="monthLabel"
-                        tickLine={false}
+                        dataKey="month"
+                        tickFormatter={formatMonth}
                         axisLine={false}
-                        tickMargin={8}
-                        fontSize={12}
+                        tickLine={false}
+                        tickMargin={10}
                       />
                       <YAxis
-                        tickFormatter={(v) => `R$ ${v / 1000}k`}
-                        tickLine={false}
+                        tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
                         axisLine={false}
-                        tickMargin={8}
-                        fontSize={12}
-                        width={80}
+                        tickLine={false}
+                        tickMargin={10}
                       />
                       <ChartTooltip
-                        cursor={false}
-                        content={<ChartTooltipContent indicator="dashed" />}
+                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value: any) => formatBRL(Number(value))}
+                          />
+                        }
                       />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="budgeted" fill="var(--color-budgeted)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="realized" fill="var(--color-realized)" radius={[4, 4, 0, 0]} />
                     </BarChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex h-[300px] items-center justify-center border-dashed border rounded-md">
-                    <p className="text-muted-foreground text-sm">
-                      Dados insuficientes para o gráfico.
-                    </p>
-                  </div>
-                )}
+                  </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
             </Card>
 
-            <Card className="col-span-3">
+            <Card className="col-span-1">
               <CardHeader>
                 <CardTitle>Por Centro de Custo</CardTitle>
-                <CardDescription>Maiores despesas por área</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[300px] pr-4">
-                  <div className="space-y-4">
-                    {data?.costCenterData?.map((cc: any, i: number) => {
-                      const perc = cc.budgeted > 0 ? (cc.realized / cc.budgeted) * 100 : 0
-                      return (
-                        <div key={i} className="flex items-center">
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium leading-none">{cc.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Orçado: {formatCurrency(cc.budgeted)}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">{formatCurrency(cc.realized)}</p>
-                            <p
-                              className={cn(
-                                'text-xs',
-                                perc <= 100 ? 'text-emerald-500' : 'text-rose-500',
-                              )}
-                            >
-                              {perc.toFixed(1)}% do Orçado
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {data?.costCenterData?.length === 0 && (
-                      <p className="text-muted-foreground text-sm text-center py-4">
-                        Nenhum dado encontrado.
-                      </p>
-                    )}
-                  </div>
-                </ScrollArea>
+              <CardContent className="pl-2">
+                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={data.costCenterData}
+                      layout="vertical"
+                      margin={{ top: 10, right: 10, left: 40, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12 }}
+                        width={100}
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value: any) => formatBRL(Number(value))}
+                          />
+                        }
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="budgeted" fill="var(--color-budgeted)" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="realized" fill="var(--color-realized)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
             </Card>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

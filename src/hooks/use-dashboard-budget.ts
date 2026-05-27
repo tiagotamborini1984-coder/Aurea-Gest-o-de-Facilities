@@ -32,8 +32,14 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
     fetchFilters()
   }, [activeClient])
 
+  const selectedMonthsKey = selectedMonths.join(',')
+  const selectedCostCentersKey = selectedCostCenters.join(',')
+
   useEffect(() => {
-    if (!activeClient) return
+    if (!activeClient) {
+      setLoading(false)
+      return
+    }
 
     const fetchData = async () => {
       setLoading(true)
@@ -51,9 +57,11 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
           query = query.in('cost_center_id', selectedCostCenters)
         }
 
-        const { data: entries } = await query
+        const { data: entries, error } = await query
 
-        if (!entries) {
+        if (error) throw error
+
+        if (!entries || entries.length === 0) {
           setData(null)
           return
         }
@@ -114,13 +122,14 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
         })
       } catch (error) {
         console.error('Error fetching budget data', error)
+        setData(null)
       } finally {
         setLoading(false)
       }
     }
 
     fetchData()
-  }, [activeClient, selectedMonths, selectedCostCenters])
+  }, [activeClient, selectedMonthsKey, selectedCostCentersKey])
 
   return { data, costCenters, availableMonths, loading }
 }
