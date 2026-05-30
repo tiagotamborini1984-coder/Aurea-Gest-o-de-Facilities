@@ -1,5 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Eye, Search, Trash2 } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+
 import { supabase } from '@/lib/supabase/client'
+import { useToast } from '@/components/ui/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -11,127 +17,134 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Search, AlertCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
-export default function Realizadas() {
-  const [executions, setExecutions] = useState<any[]>([])
+export default function AuditoriaRealizadas() {
+  const [audits, setAudits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const navigate = useNavigate()
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const { toast } = useToast()
 
   useEffect(() => {
-    fetchExecutions()
+    fetchUserRole()
+    fetchAudits()
   }, [])
 
-  const fetchExecutions = async () => {
+  const fetchUserRole = async () => {
+    const { data } = await supabase.rpc('get_user_role')
+    setUserRole(data)
+  }
+
+  const fetchAudits = async () => {
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('audit_executions')
         .select(`
           id,
           status,
           realization_date,
-          created_at,
           final_score,
           max_score,
           audits (
-            id,
             title,
-            scoring_settings,
-            audit_actions (
-              id,
-              weight
-            )
+            type
           ),
           plants (
-            name,
-            code
+            name
           ),
           profiles!audit_executions_assignee_id_fkey (
             name
           )
         `)
-        .in('status', ['Finalizado', 'Rascunho'])
+        .eq('status', 'Finalizado')
         .order('realization_date', { ascending: false })
-        .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      // Dynamic calculation fallback for max_score
-      const formattedData = (data || []).map((exec: any) => {
-        let calculatedMaxScore = exec.max_score
-
-        if (!calculatedMaxScore || calculatedMaxScore === 0) {
-          const scoringSettings = exec.audits?.scoring_settings || []
-          let maxScale = 5
-          if (Array.isArray(scoringSettings) && scoringSettings.length > 0) {
-            maxScale = Math.max(...scoringSettings.map((s: any) => Number(s.score) || 5))
-          }
-
-          const actions = exec.audits?.audit_actions || []
-          const totalWeight = actions.reduce(
-            (sum: number, action: any) => sum + (Number(action.weight) || 1),
-            0,
-          )
-
-          calculatedMaxScore = totalWeight * maxScale
-        }
-
-        return {
-          ...exec,
-          calculated_max_score: calculatedMaxScore,
-        }
+      setAudits(data || [])
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar as auditorias realizadas.',
+        variant: 'destructive',
       })
-
-      setExecutions(formattedData)
-    } catch (error) {
-      console.error('Error fetching executions:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredExecutions = executions.filter(
-    (exec) =>
-      exec.audits?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exec.plants?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exec.profiles?.name?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const handleDelete = async () => {
+    if (!deleteId) return
 
-  const getScoreColor = (score: number, maxScore: number) => {
-    if (!maxScore || maxScore === 0) return 'bg-red-500 hover:bg-red-600'
-    const percentage = score / maxScore
-    if (percentage >= 0.8) return 'bg-green-500 hover:bg-green-600'
-    if (percentage >= 0.6) return 'bg-yellow-500 hover:bg-yellow-600'
-    return 'bg-red-500 hover:bg-red-600'
+    try {
+      setIsDeleting(true)
+      const { error } = await supabase.from('audit_executions').delete().eq('id', deleteId)
+
+      if (error) throw error
+
+      toast({
+        title: 'Sucesso',
+        description: 'Auditoria excluída com sucesso.',
+      })
+
+      setAudits((prev) => prev.filter((a) => a.id !== deleteId))
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro ao excluir a auditoria.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDeleting(false)
+      setDeleteId(null)
+    }
   }
 
+  const filteredAudits = audits.filter((audit) => {
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      audit.audits?.title?.toLowerCase().includes(searchLower) ||
+      audit.plants?.name?.toLowerCase().includes(searchLower) ||
+      audit.profiles?.name?.toLowerCase().includes(searchLower)
+    )
+  })
+
+  const canDelete = userRole === 'Master' || userRole === 'Administrador'
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#0F4C81]">
-            Auditorias Realizadas
-          </h1>
-          <p className="text-muted-foreground mt-1">Histórico de todas as auditorias finalizadas</p>
+          <h2 className="text-2xl font-bold tracking-tight">Auditorias Realizadas</h2>
+          <p className="text-muted-foreground">Histórico de todas as auditorias finalizadas</p>
         </div>
       </div>
 
-      <Card className="shadow-sm border-t-4 border-t-[#0F4C81]">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-              Histórico
-            </CardTitle>
-            <div className="relative w-full sm:w-72">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Listagem</CardTitle>
+            <div className="relative w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar auditoria, planta ou responsável..."
-                className="pl-9 bg-muted/50 border-muted-foreground/20 focus-visible:ring-[#0F4C81]"
+                placeholder="Buscar por título, planta ou auditor..."
+                className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -139,87 +152,111 @@ export default function Realizadas() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="font-semibold text-foreground">Auditoria</TableHead>
-                  <TableHead className="font-semibold text-foreground">Planta</TableHead>
-                  <TableHead className="font-semibold text-foreground">Responsável</TableHead>
-                  <TableHead className="font-semibold text-foreground">Data</TableHead>
-                  <TableHead className="text-center font-semibold text-foreground">
-                    Pontuação
-                  </TableHead>
-                  <TableHead className="text-center font-semibold text-foreground">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+          {loading ? (
+            <div className="py-8 text-center text-muted-foreground">Carregando auditorias...</div>
+          ) : filteredAudits.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              Nenhuma auditoria realizada encontrada.
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      Carregando...
-                    </TableCell>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Planta</TableHead>
+                    <TableHead>Auditor</TableHead>
+                    <TableHead>Data de Realização</TableHead>
+                    <TableHead>Pontuação</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ) : filteredExecutions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10">
-                      <div className="flex flex-col items-center justify-center text-muted-foreground">
-                        <AlertCircle className="h-8 w-8 mb-2 opacity-20" />
-                        <p>Nenhuma auditoria encontrada</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredExecutions.map((exec) => (
-                    <TableRow key={exec.id} className="hover:bg-muted/30 transition-colors">
-                      <TableCell className="font-medium text-foreground">
-                        {exec.audits?.title || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                          {exec.plants?.code || '-'}
-                        </span>
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {exec.plants?.name || '-'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {exec.profiles?.name || '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {exec.realization_date
-                          ? format(new Date(exec.realization_date + 'T12:00:00'), 'dd/MM/yyyy', {
-                              locale: ptBR,
-                            })
-                          : format(new Date(exec.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          className={`font-semibold shadow-sm text-white border-none ${getScoreColor(exec.final_score || 0, exec.calculated_max_score)}`}
-                        >
-                          {Math.round(exec.final_score || 0)} /{' '}
-                          {Math.round(exec.calculated_max_score || 0)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-[#0F4C81] hover:bg-blue-50 transition-colors"
-                          onClick={() => navigate(`/auditoria-checklist/detalhes/${exec.id}`)}
-                          title="Ver Detalhes"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredAudits.map((audit) => {
+                    const scorePercentage =
+                      audit.max_score > 0 ? (audit.final_score / audit.max_score) * 100 : 0
+
+                    return (
+                      <TableRow key={audit.id}>
+                        <TableCell className="font-medium">{audit.audits?.title}</TableCell>
+                        <TableCell>{audit.plants?.name}</TableCell>
+                        <TableCell>{audit.profiles?.name}</TableCell>
+                        <TableCell>
+                          {audit.realization_date
+                            ? format(
+                                new Date(audit.realization_date + 'T00:00:00Z'),
+                                'dd/MM/yyyy',
+                                { locale: ptBR },
+                              )
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              scorePercentage >= 80
+                                ? 'default'
+                                : scorePercentage >= 50
+                                  ? 'secondary'
+                                  : 'destructive'
+                            }
+                          >
+                            {audit.final_score} / {audit.max_score} ({scorePercentage.toFixed(1)}%)
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="icon" asChild>
+                              <Link to={`/auditoria-checklist/detalhes/${audit.id}`}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Ver detalhes</span>
+                              </Link>
+                            </Button>
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteId(audit.id)}
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Excluir</span>
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Auditoria</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir esta auditoria? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={isDeleting}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
