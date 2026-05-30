@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -13,515 +13,477 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Trash2, Plus, ArrowLeft, Save, FileText } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
-import { useAuth } from '@/hooks/use-auth'
-import { Loader2, Plus, Trash2, ArrowLeft } from 'lucide-react'
-
-interface ScoringSetting {
-  score: number
-  description: string
-  trigger_task: boolean
-}
-
-interface AuditAction {
-  id?: string
-  title: string
-  evidence_required: boolean
-  comments_required: boolean
-  weight: number
-  order_index: number
-}
-
-const DEFAULT_SCORING: ScoringSetting[] = [
-  { score: 1, description: 'Muito Ruim', trigger_task: true },
-  { score: 2, description: 'Ruim', trigger_task: true },
-  { score: 3, description: 'Regular', trigger_task: false },
-  { score: 4, description: 'Bom', trigger_task: false },
-  { score: 5, description: 'Excelente', trigger_task: false },
-]
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { toast } = useToast()
   const { user } = useAuth()
+  const { toast } = useToast()
 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [clientId, setClientId] = useState<string | null>(null)
 
+  const [plants, setPlants] = useState<any[]>([])
+  const [profiles, setProfiles] = useState<any[]>([])
+
+  // Audit Form State
   const [title, setTitle] = useState('')
   const [type, setType] = useState('Geral')
   const [frequency, setFrequency] = useState('Única')
   const [startDate, setStartDate] = useState('')
-  const [advanceNoticeDays, setAdvanceNoticeDays] = useState(0)
+  const [advanceNoticeDays, setAdvanceNoticeDays] = useState<number>(0)
+  const [scoringSettings, setScoringSettings] = useState<any>(null)
 
-  const [scoringSettings, setScoringSettings] = useState<ScoringSetting[]>(DEFAULT_SCORING)
-  const [actions, setActions] = useState<AuditAction[]>([])
+  const [actions, setActions] = useState<any[]>([])
+  const [assignments, setAssignments] = useState<any[]>([])
 
   useEffect(() => {
-    const fetchClientAndData = async () => {
-      setLoading(true)
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('client_id')
-          .eq('id', user?.id)
-          .single()
-
-        if (profile?.client_id) {
-          setClientId(profile.client_id)
-        }
-
-        if (id) {
-          const { data: audit, error: auditError } = await supabase
-            .from('audits')
-            .select('*')
-            .eq('id', id)
-            .single()
-
-          if (auditError) throw auditError
-
-          if (audit) {
-            setTitle(audit.title)
-            setType(audit.type)
-            setFrequency(audit.frequency)
-            setStartDate(audit.start_date)
-            setAdvanceNoticeDays(audit.advance_notice_days || 0)
-
-            try {
-              if (audit.scoring_settings && Array.isArray(audit.scoring_settings)) {
-                setScoringSettings(audit.scoring_settings as ScoringSetting[])
-              }
-            } catch {
-              toast({
-                variant: 'destructive',
-                title: 'Erro',
-                description: 'Estrutura JSON de pontuação corrompida.',
-              })
-            }
-
-            const { data: actionsData, error: actionsError } = await supabase
-              .from('audit_actions')
-              .select('*')
-              .eq('audit_id', id)
-              .order('order_index', { ascending: true })
-
-            if (actionsError) throw actionsError
-
-            if (actionsData && actionsData.length > 0) {
-              setActions(
-                actionsData.map((a) => ({
-                  id: a.id,
-                  title: a.title,
-                  evidence_required: a.evidence_required,
-                  comments_required: a.comments_required,
-                  weight: Number(a.weight),
-                  order_index: a.order_index,
-                })),
-              )
-            } else {
-              setActions([
-                {
-                  title: '',
-                  evidence_required: false,
-                  comments_required: false,
-                  weight: 1,
-                  order_index: 0,
-                },
-              ])
-            }
-          }
-        } else {
-          setStartDate(new Date().toISOString().split('T')[0])
-          setActions([
-            {
-              title: '',
-              evidence_required: false,
-              comments_required: false,
-              weight: 1,
-              order_index: 0,
-            },
-          ])
-        }
-      } catch (error: any) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro',
-          description: 'Não foi possível carregar os dados.',
-        })
-      } finally {
-        setLoading(false)
-      }
+    fetchDependencies()
+    if (id) {
+      fetchAudit()
     }
+  }, [id])
 
-    if (user) {
-      fetchClientAndData()
-    }
-  }, [id, user, toast])
-
-  const handleAddAction = () => {
-    setActions([
-      ...actions,
-      {
-        title: '',
-        evidence_required: false,
-        comments_required: false,
-        weight: 1,
-        order_index: actions.length,
-      },
+  const fetchDependencies = async () => {
+    const [plantsRes, profilesRes] = await Promise.all([
+      supabase.from('plants').select('id, name').order('name'),
+      supabase.from('profiles').select('id, name, email').order('name'),
     ])
+    if (plantsRes.data) setPlants(plantsRes.data)
+    if (profilesRes.data) setProfiles(profilesRes.data)
   }
 
-  const handleRemoveAction = (index: number) => {
-    setActions(actions.filter((_, i) => i !== index))
-  }
+  const fetchAudit = async () => {
+    setLoading(true)
+    try {
+      const { data: audit, error } = await supabase.from('audits').select('*').eq('id', id).single()
+      if (error) throw error
+      if (audit) {
+        setTitle(audit.title)
+        setType(audit.type)
+        setFrequency(audit.frequency)
+        setStartDate(audit.start_date)
+        setAdvanceNoticeDays(audit.advance_notice_days || 0)
+        setScoringSettings(audit.scoring_settings)
 
-  const handleActionChange = (index: number, field: keyof AuditAction, value: any) => {
-    const newActions = [...actions]
-    newActions[index] = { ...newActions[index], [field]: value }
-    setActions(newActions)
-  }
+        const [actionsRes, assignmentsRes] = await Promise.all([
+          supabase.from('audit_actions').select('*').eq('audit_id', id).order('order_index'),
+          supabase.from('audit_assignments').select('*').eq('audit_id', id),
+        ])
 
-  const handleAddScore = () => {
-    const nextScore =
-      scoringSettings.length > 0 ? Math.max(...scoringSettings.map((s) => s.score)) + 1 : 1
-    setScoringSettings([
-      ...scoringSettings,
-      { score: nextScore, description: '', trigger_task: false },
-    ])
-  }
-
-  const handleRemoveScore = (index: number) => {
-    setScoringSettings(scoringSettings.filter((_, i) => i !== index))
-  }
-
-  const handleScoreChange = (index: number, field: keyof ScoringSetting, value: any) => {
-    const newScores = [...scoringSettings]
-    newScores[index] = { ...newScores[index], [field]: value }
-    setScoringSettings(newScores)
-  }
-
-  const validate = (isPublish: boolean) => {
-    if (!title.trim()) return 'O título é obrigatório.'
-    if (!startDate) return 'A data de início é obrigatória.'
-
-    if (scoringSettings.length === 0) return 'Defina pelo menos um nível de pontuação.'
-    for (const score of scoringSettings) {
-      if (!score.description.trim()) return `A descrição da pontuação ${score.score} é obrigatória.`
-      if (typeof score.score !== 'number' || isNaN(score.score))
-        return 'A pontuação deve ser um número válido.'
-    }
-
-    if (isPublish) {
-      if (actions.length === 0) return 'Adicione pelo menos um item ao checklist para publicar.'
-      for (const action of actions) {
-        if (!action.title.trim()) return 'Todos os itens do checklist devem ter uma descrição.'
+        if (actionsRes.data) setActions(actionsRes.data)
+        if (assignmentsRes.data) setAssignments(assignmentsRes.data)
       }
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao carregar auditoria',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
-
-    return null
   }
 
-  const handleSave = async (status: 'Rascunho' | 'Ativo') => {
-    const validationError = validate(status === 'Ativo')
-    if (validationError) {
-      toast({ variant: 'destructive', title: 'Atenção', description: validationError })
+  const handleSave = async (status: string) => {
+    if (!title || !startDate) {
+      toast({
+        title: 'Aviso',
+        description: 'Título e Data de Início são obrigatórios.',
+        variant: 'destructive',
+      })
       return
     }
-
-    if (!clientId) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Client ID não encontrado.' })
+    if (actions.some((a) => !a.title)) {
+      toast({
+        title: 'Aviso',
+        description: 'Preencha o título de todas as ações no checklist.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (assignments.some((a) => !a.plant_id || !a.assignee_id)) {
+      toast({
+        title: 'Aviso',
+        description: 'Preencha Planta e Responsável para todas as distribuições.',
+        variant: 'destructive',
+      })
       return
     }
 
     setSaving(true)
     try {
-      const auditData = {
-        client_id: clientId,
+      let auditId = id
+      const auditPayload = {
         title,
         type,
         frequency,
         start_date: startDate,
         advance_notice_days: advanceNoticeDays,
-        scoring_settings: scoringSettings,
         status,
+        ...(scoringSettings ? { scoring_settings: scoringSettings } : {}),
       }
 
-      let currentAuditId = id
-
-      if (id) {
-        const { error } = await supabase.from('audits').update(auditData).eq('id', id)
+      if (auditId) {
+        const { error } = await supabase.from('audits').update(auditPayload).eq('id', auditId)
         if (error) throw error
       } else {
-        const { data, error } = await supabase.from('audits').insert([auditData]).select().single()
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('client_id')
+          .eq('id', user?.id)
+          .single()
+        if (!profile?.client_id) throw new Error('Client ID não encontrado no perfil do usuário.')
+
+        const { data, error } = await supabase
+          .from('audits')
+          .insert({
+            ...auditPayload,
+            client_id: profile.client_id,
+          })
+          .select()
+          .single()
         if (error) throw error
-        currentAuditId = data.id
+        auditId = data.id
       }
 
-      if (currentAuditId) {
-        const { data: existingActions } = await supabase
-          .from('audit_actions')
-          .select('id')
-          .eq('audit_id', currentAuditId)
-        const existingIds = existingActions?.map((a) => a.id) || []
-        const currentIds = actions.map((a) => a.id).filter(Boolean) as string[]
-        const idsToDelete = existingIds.filter((eid) => !currentIds.includes(eid))
-
-        if (idsToDelete.length > 0) {
-          await supabase.from('audit_actions').delete().in('id', idsToDelete)
+      if (auditId) {
+        // Actions
+        await supabase.from('audit_actions').delete().eq('audit_id', auditId)
+        if (actions.length > 0) {
+          const actionsPayload = actions.map((a, i) => ({
+            audit_id: auditId,
+            title: a.title,
+            evidence_required: a.evidence_required || false,
+            comments_required: a.comments_required || false,
+            weight: Number(a.weight) || 1,
+            order_index: i,
+          }))
+          const { error } = await supabase.from('audit_actions').insert(actionsPayload)
+          if (error) throw error
         }
 
-        for (let i = 0; i < actions.length; i++) {
-          const actionData = {
-            audit_id: currentAuditId,
-            title: actions[i].title,
-            evidence_required: actions[i].evidence_required,
-            comments_required: actions[i].comments_required,
-            weight: actions[i].weight,
-            order_index: i,
-          }
-
-          if (actions[i].id) {
-            await supabase.from('audit_actions').update(actionData).eq('id', actions[i].id)
-          } else {
-            await supabase.from('audit_actions').insert([actionData])
-          }
+        // Assignments
+        await supabase.from('audit_assignments').delete().eq('audit_id', auditId)
+        if (assignments.length > 0) {
+          const assignmentsPayload = assignments.map((a) => ({
+            audit_id: auditId,
+            plant_id: a.plant_id,
+            assignee_id: a.assignee_id,
+          }))
+          const { error } = await supabase.from('audit_assignments').insert(assignmentsPayload)
+          if (error) throw error
         }
       }
 
       toast({
         title: 'Sucesso',
-        description: `Auditoria ${status === 'Rascunho' ? 'salva como rascunho' : 'publicada'} com sucesso!`,
+        description: `Auditoria ${status === 'Rascunho' ? 'salva como rascunho' : 'publicada'} com sucesso.`,
       })
-      navigate('/auditoria-checklist/dashboard')
+      navigate('/auditoria-checklist/criadas')
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error.message })
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <div className="p-8">Carregando...</div>
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/auditoria-checklist/dashboard')}
-          >
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h2 className="text-3xl font-bold tracking-tight">
             {id ? 'Editar Auditoria' : 'Nova Auditoria'}
-          </h1>
+          </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
           <Button variant="outline" onClick={() => handleSave('Rascunho')} disabled={saving}>
-            Salvar como Rascunho
+            <Save className="mr-2 h-4 w-4" />
+            Salvar Rascunho
           </Button>
           <Button onClick={() => handleSave('Ativo')} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <FileText className="mr-2 h-4 w-4" />
             Publicar
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Configurações Gerais</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Título da Auditoria</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Auditoria de 5S"
-              />
-            </div>
+      <Tabs defaultValue="geral" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="geral">Geral</TabsTrigger>
+          <TabsTrigger value="checklist">Checklist</TabsTrigger>
+          <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
+        </TabsList>
 
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Geral">Geral</SelectItem>
-                  <SelectItem value="Qualidade">Qualidade</SelectItem>
-                  <SelectItem value="Segurança">Segurança (SSMA)</SelectItem>
-                  <SelectItem value="Meio Ambiente">Meio Ambiente</SelectItem>
-                  <SelectItem value="Operacional">Operacional</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Frequência</Label>
-              <Select value={frequency} onValueChange={setFrequency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Única">Única</SelectItem>
-                  <SelectItem value="Diária">Diária</SelectItem>
-                  <SelectItem value="Semanal">Semanal</SelectItem>
-                  <SelectItem value="Mensal">Mensal</SelectItem>
-                  <SelectItem value="Semestral">Semestral</SelectItem>
-                  <SelectItem value="Anual">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Início</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Aviso Prévio (dias)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={advanceNoticeDays}
-                  onChange={(e) => setAdvanceNoticeDays(parseInt(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Configuração de Pontuação</CardTitle>
-            <CardDescription>
-              Defina a escala de notas e quais delas devem gerar um plano de ação (Corretiva)
-              automaticamente.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {scoringSettings.map((score, index) => (
-              <div key={index} className="flex items-center gap-3 bg-muted/50 p-3 rounded-md">
-                <div className="w-16">
-                  <Label className="text-xs text-muted-foreground mb-1 block">Nota</Label>
+        <TabsContent value="geral">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações Gerais</CardTitle>
+              <CardDescription>Defina as informações básicas da auditoria.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Título da Auditoria</Label>
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Ex: Auditoria 5S Mensal"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={type} onValueChange={setType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Geral">Geral</SelectItem>
+                      <SelectItem value="5S">5S</SelectItem>
+                      <SelectItem value="Segurança">Segurança</SelectItem>
+                      <SelectItem value="Qualidade">Qualidade</SelectItem>
+                      <SelectItem value="Ambiental">Ambiental</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Frequência</Label>
+                  <Select value={frequency} onValueChange={setFrequency}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a frequência" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Única">Única</SelectItem>
+                      <SelectItem value="Diária">Diária</SelectItem>
+                      <SelectItem value="Semanal">Semanal</SelectItem>
+                      <SelectItem value="Mensal">Mensal</SelectItem>
+                      <SelectItem value="Semestral">Semestral</SelectItem>
+                      <SelectItem value="Anual">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Data de Início</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dias de Antecedência (Notificação)</Label>
                   <Input
                     type="number"
-                    value={score.score}
-                    onChange={(e) =>
-                      handleScoreChange(index, 'score', parseInt(e.target.value) || 0)
-                    }
+                    min={0}
+                    value={advanceNoticeDays}
+                    onChange={(e) => setAdvanceNoticeDays(parseInt(e.target.value))}
                   />
-                </div>
-                <div className="flex-1">
-                  <Label className="text-xs text-muted-foreground mb-1 block">Descrição</Label>
-                  <Input
-                    value={score.description}
-                    onChange={(e) => handleScoreChange(index, 'description', e.target.value)}
-                    placeholder="Ex: Bom"
-                  />
-                </div>
-                <div className="flex flex-col items-center justify-center pt-5">
-                  <Label className="text-xs text-muted-foreground mb-1">Ação?</Label>
-                  <Switch
-                    checked={score.trigger_task}
-                    onCheckedChange={(checked) => handleScoreChange(index, 'trigger_task', checked)}
-                  />
-                </div>
-                <div className="pt-5">
-                  <Button variant="ghost" size="icon" onClick={() => handleRemoveScore(index)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
                 </div>
               </div>
-            ))}
-            <Button variant="outline" size="sm" className="w-full" onClick={handleAddScore}>
-              <Plus className="h-4 w-4 mr-2" /> Adicionar Nível de Pontuação
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Itens do Checklist</CardTitle>
-          <CardDescription>Defina as perguntas ou itens a serem inspecionados.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {actions.map((action, index) => (
-            <div key={index} className="flex gap-4 items-start border p-4 rounded-lg bg-card">
-              <div className="flex-1 space-y-4">
-                <div className="space-y-2">
-                  <Label>Item {index + 1}</Label>
-                  <Input
-                    value={action.title}
-                    onChange={(e) => handleActionChange(index, 'title', e.target.value)}
-                    placeholder="Ex: O ambiente está limpo e organizado?"
-                  />
-                </div>
-                <div className="flex items-center gap-6 flex-wrap">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id={`evidence-${index}`}
-                      checked={action.evidence_required}
-                      onCheckedChange={(checked) =>
-                        handleActionChange(index, 'evidence_required', checked)
-                      }
-                    />
-                    <Label htmlFor={`evidence-${index}`}>Exigir Foto/Evidência</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id={`comments-${index}`}
-                      checked={action.comments_required}
-                      onCheckedChange={(checked) =>
-                        handleActionChange(index, 'comments_required', checked)
-                      }
-                    />
-                    <Label htmlFor={`comments-${index}`}>Exigir Comentário</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 w-32">
-                    <Label>Peso</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={action.weight}
-                      onChange={(e) =>
-                        handleActionChange(index, 'weight', parseFloat(e.target.value) || 1)
-                      }
-                    />
-                  </div>
-                </div>
+        <TabsContent value="checklist">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Ações (Checklist)</CardTitle>
+                <CardDescription>
+                  Defina os itens que serão verificados nesta auditoria.
+                </CardDescription>
               </div>
               <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleRemoveAction(index)}
-                className="mt-6"
+                onClick={() =>
+                  setActions([
+                    ...actions,
+                    { title: '', weight: 1, evidence_required: false, comments_required: false },
+                  ])
+                }
+                size="sm"
               >
-                <Trash2 className="h-5 w-5 text-destructive" />
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar Item
               </Button>
-            </div>
-          ))}
-          <Button variant="outline" className="w-full" onClick={handleAddAction}>
-            <Plus className="h-4 w-4 mr-2" /> Adicionar Novo Item
-          </Button>
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent>
+              {actions.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum item adicionado.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {actions.map((action, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col md:flex-row gap-4 items-start md:items-center p-4 border rounded-lg bg-card"
+                    >
+                      <div className="flex-1 space-y-2 w-full">
+                        <Label>Descrição do Item</Label>
+                        <Input
+                          value={action.title}
+                          onChange={(e) => {
+                            const newActions = [...actions]
+                            newActions[index].title = e.target.value
+                            setActions(newActions)
+                          }}
+                          placeholder="O que deve ser verificado?"
+                        />
+                      </div>
+                      <div className="w-full md:w-24 space-y-2">
+                        <Label>Peso</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={action.weight}
+                          onChange={(e) => {
+                            const newActions = [...actions]
+                            newActions[index].weight = Number(e.target.value)
+                            setActions(newActions)
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-4 pt-6">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={action.evidence_required}
+                            onCheckedChange={(c) => {
+                              const newActions = [...actions]
+                              newActions[index].evidence_required = c
+                              setActions(newActions)
+                            }}
+                          />
+                          <Label className="text-sm">Exigir Evidência</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={action.comments_required}
+                            onCheckedChange={(c) => {
+                              const newActions = [...actions]
+                              newActions[index].comments_required = c
+                              setActions(newActions)
+                            }}
+                          />
+                          <Label className="text-sm">Exigir Comentário</Label>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setActions(actions.filter((_, i) => i !== index))}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="distribuicao">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Distribuição entre Plantas e Responsáveis</CardTitle>
+                <CardDescription>
+                  Determine em quais plantas esta auditoria ocorrerá e quem será o responsável por
+                  executá-la.
+                </CardDescription>
+              </div>
+              <Button
+                onClick={() => setAssignments([...assignments, { plant_id: '', assignee_id: '' }])}
+                size="sm"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar Distribuição
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {assignments.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhuma distribuição configurada.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {assignments.map((assignment, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col md:flex-row gap-4 items-end p-4 border rounded-lg bg-card"
+                    >
+                      <div className="flex-1 space-y-2 w-full">
+                        <Label>Planta</Label>
+                        <Select
+                          value={assignment.plant_id}
+                          onValueChange={(v) => {
+                            const newAssignments = [...assignments]
+                            newAssignments[index].plant_id = v
+                            setAssignments(newAssignments)
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a planta" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {plants.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 space-y-2 w-full">
+                        <Label>Responsável (Auditor)</Label>
+                        <Select
+                          value={assignment.assignee_id}
+                          onValueChange={(v) => {
+                            const newAssignments = [...assignments]
+                            newAssignments[index].assignee_id = v
+                            setAssignments(newAssignments)
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o responsável" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {profiles.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} ({p.email})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setAssignments(assignments.filter((_, i) => i !== index))}
+                        className="text-destructive mb-0.5"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
