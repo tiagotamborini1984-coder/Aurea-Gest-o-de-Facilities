@@ -180,4 +180,8 @@
   .print-break-inside-avoid {
     break-inside: avoid;
   }
+
+  .print-hide {
+    display: none !important;
+  }
 }
