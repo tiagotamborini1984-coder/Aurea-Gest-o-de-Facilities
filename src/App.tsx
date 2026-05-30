@@ -45,6 +45,7 @@ import { SubscriptionGuard } from './components/SubscriptionGuard'
 import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
 import { ThemeProvider } from './components/theme-provider'
+import { AutoLogout } from './components/AutoLogout'
 
 // Limpeza e Jardinagem Pages
 import MapaLJ from './pages/gestao-terceiros/limpeza-jardinagem/Mapa'
@@ -94,6 +95,7 @@ const App = () => (
     <AuthProvider>
       <AppProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AutoLogout />
           <TooltipProvider>
             <Toaster />
             <Sonner />
