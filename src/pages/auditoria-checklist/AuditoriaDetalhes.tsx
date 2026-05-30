@@ -1,240 +1,272 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useAppStore } from '@/store/AppContext'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, CheckCircle2, AlertTriangle, XCircle, FileText, Loader2 } from 'lucide-react'
-import { useToast } from '@/components/ui/use-toast'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ArrowLeft, Calendar, Info, RefreshCw, History } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export default function AuditoriaDetalhes() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { toast } = useToast()
-
+  const { profile } = useAppStore()
+  const [audit, setAudit] = useState<any>(null)
+  const [executions, setExecutions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [execution, setExecution] = useState<any>(null)
-  const [answers, setAnswers] = useState<any[]>([])
+
+  const isAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
 
   useEffect(() => {
-    if (id) fetchDetails()
+    if (id) {
+      fetchData()
+    }
   }, [id])
 
-  const fetchDetails = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
-      const { data: execData, error: execError } = await supabase
-        .from('audit_executions')
-        .select(`
-          *,
-          audits (title, type, scoring_settings),
-          plants (name),
-          profiles (name)
-        `)
+
+      const { data: auditData, error: auditError } = await supabase
+        .from('audits')
+        .select('*')
         .eq('id', id)
         .single()
 
-      if (execError) throw execError
-      setExecution(execData)
+      if (auditError) throw auditError
+      setAudit(auditData)
 
-      const { data: answersData, error: answersError } = await supabase
-        .from('audit_execution_answers')
-        .select(`
-          *,
-          audit_actions (title, order_index, weight)
-        `)
-        .eq('execution_id', id)
-        .order('order_index', { referencedTable: 'audit_actions', ascending: true })
+      if (isAdmin) {
+        const { data: execData, error: execError } = await supabase
+          .from('audit_executions')
+          .select(`
+            *,
+            assignee:profiles!audit_executions_assignee_id_fkey(name),
+            plant:plants!audit_executions_plant_id_fkey(name)
+          `)
+          .eq('audit_id', id)
+          .order('created_at', { ascending: false })
 
-      if (answersError) throw answersError
-      setAnswers(answersData || [])
-    } catch (err: any) {
-      toast({ title: 'Erro ao carregar', description: err.message, variant: 'destructive' })
+        if (execError) throw execError
+        setExecutions(execData || [])
+      }
+    } catch (error) {
+      console.error('Error fetching audit details:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  let averageScore = 0
-  let maxScale = 5
-
-  if (execution?.audits?.scoring_settings) {
-    const scores = (execution.audits.scoring_settings as any[]).map((s) => Number(s.score) || 5)
-    if (scores.length > 0) {
-      maxScale = Math.max(...scores)
-    }
+  const getPercentage = (final: number | null, max: number | null) => {
+    if (final == null || max == null || max === 0) return 0
+    return Math.round((final / max) * 100)
   }
 
-  if (execution?.final_score !== null && execution?.max_score) {
-    averageScore = (execution.final_score / execution.max_score) * maxScale
+  const getScoreColor = (percentage: number) => {
+    if (percentage >= 80) return 'bg-green-500 hover:bg-green-600 text-white border-transparent'
+    if (percentage >= 60) return 'bg-yellow-500 hover:bg-yellow-600 text-white border-transparent'
+    return 'bg-red-500 hover:bg-red-600 text-white border-transparent'
   }
 
   const getStatusColor = (status: string) => {
-    if (status === 'Finalizado') return 'bg-green-500 hover:bg-green-600 text-white'
-    return 'bg-blue-500 hover:bg-blue-600 text-white'
-  }
-
-  const getScoreColor = (score: number | null) => {
-    if (score === null || score === undefined) return 'bg-gray-200 text-gray-800 border-gray-300'
-    if (score >= 4) return 'bg-green-500 text-white border-green-600'
-    if (score >= 3) return 'bg-yellow-500 text-white border-yellow-600'
-    return 'bg-red-500 text-white border-red-600'
-  }
-
-  const getOverallBgColor = (score: number) => {
-    if (execution?.final_score === null || !execution?.max_score)
-      return 'bg-muted text-muted-foreground'
-    if (score >= 4) return 'bg-green-500 text-white'
-    if (score >= 3) return 'bg-yellow-500 text-white'
-    return 'bg-red-500 text-white'
+    if (status === 'Finalizado')
+      return 'bg-green-500 hover:bg-green-600 text-white border-transparent'
+    if (status === 'Pendente')
+      return 'bg-yellow-500 hover:bg-yellow-600 text-white border-transparent'
+    if (status === 'Rascunho') return 'bg-gray-500 hover:bg-gray-600 text-white border-transparent'
+    return 'bg-blue-500 hover:bg-blue-600 text-white border-transparent'
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <div className="p-6 text-center text-muted-foreground">Carregando...</div>
   }
 
-  if (!execution) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <AlertTriangle className="h-12 w-12 text-yellow-500" />
-        <h2 className="text-xl font-semibold">Auditoria não encontrada</h2>
-        <Button onClick={() => navigate('/auditoria-checklist/realizadas')}>Voltar</Button>
-      </div>
-    )
+  if (!audit) {
+    return <div className="p-6 text-center text-muted-foreground">Auditoria não encontrada.</div>
+  }
+
+  let nextDate = null
+  if (audit.status === 'Ativo' && audit.frequency !== 'Única') {
+    const lastExec = executions.find((e) => e.status === 'Finalizado')
+    if (lastExec) {
+      const baseDateStr = lastExec.realization_date || lastExec.created_at.split('T')[0]
+      const d = new Date(baseDateStr + 'T00:00:00')
+      if (audit.frequency === 'Diária') d.setDate(d.getDate() + 1)
+      if (audit.frequency === 'Semanal') d.setDate(d.getDate() + 7)
+      if (audit.frequency === 'Mensal') d.setMonth(d.getMonth() + 1)
+      if (audit.frequency === 'Semestral') d.setMonth(d.getMonth() + 6)
+      if (audit.frequency === 'Anual') d.setFullYear(d.getFullYear() + 1)
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      while (d < today) {
+        if (audit.frequency === 'Diária') d.setDate(d.getDate() + 1)
+        if (audit.frequency === 'Semanal') d.setDate(d.getDate() + 7)
+        if (audit.frequency === 'Mensal') d.setMonth(d.getMonth() + 1)
+        if (audit.frequency === 'Semestral') d.setMonth(d.getMonth() + 6)
+        if (audit.frequency === 'Anual') d.setFullYear(d.getFullYear() + 1)
+      }
+      nextDate = d
+    } else {
+      nextDate = new Date(audit.start_date + 'T00:00:00')
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      while (nextDate < today && audit.frequency !== 'Única') {
+        if (audit.frequency === 'Diária') nextDate.setDate(nextDate.getDate() + 1)
+        if (audit.frequency === 'Semanal') nextDate.setDate(nextDate.getDate() + 7)
+        if (audit.frequency === 'Mensal') nextDate.setMonth(nextDate.getMonth() + 1)
+        if (audit.frequency === 'Semestral') nextDate.setMonth(nextDate.getMonth() + 6)
+        if (audit.frequency === 'Anual') nextDate.setFullYear(nextDate.getFullYear() + 1)
+      }
+    }
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 h-full">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{execution.audits?.title}</h1>
-          <p className="text-muted-foreground">
-            Planta: {execution.plants?.name} | Responsável: {execution.profiles?.name}
-          </p>
-        </div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Detalhes da Auditoria</h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge className={getStatusColor(execution.status)}>{execution.status}</Badge>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Data de Realização
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Info className="h-5 w-5 text-primary" />
+              Informações Gerais
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {execution.realization_date
-                ? new Date(execution.realization_date + 'T00:00:00').toLocaleDateString('pt-BR')
-                : '-'}
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Título</p>
+              <p className="font-medium text-base">{audit.title}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Tipo</p>
+              <p className="font-medium">{audit.type}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Status</p>
+              <Badge variant="secondary" className="font-medium">
+                {audit.status}
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pontuação (Bruta)
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Calendar className="h-5 w-5 text-primary" />
+              Agendamento
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {execution.final_score !== null ? execution.final_score : '-'} /{' '}
-              {execution.max_score !== null ? execution.max_score : '-'}
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Data de Início</p>
+              <p className="font-medium">
+                {audit.start_date
+                  ? format(new Date(audit.start_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })
+                  : '-'}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className={`${getOverallBgColor(averageScore)} border-0`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium opacity-90">
-              Resultado Geral (0 a {maxScale})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {execution.final_score !== null && execution.max_score
-                ? averageScore.toFixed(2)
-                : 'N/A'}
+            <div>
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Frequência
+              </p>
+              <p className="font-medium">{audit.frequency}</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <Card className="flex-1">
-        <CardHeader>
-          <CardTitle>Detalhes do Checklist</CardTitle>
-          <CardDescription>Respostas e pontuações por item</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[500px] pr-4">
-            <div className="space-y-4">
-              {answers.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Nenhuma resposta registrada.
+            {isAdmin && nextDate && (
+              <div className="pt-2 border-t">
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  Data da Próxima Auditoria
                 </p>
-              ) : (
-                answers.map((answer) => (
-                  <div key={answer.id} className="flex flex-col gap-2 p-4 border rounded-lg">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="font-medium flex-1">{answer.audit_actions?.title}</div>
-                      <div
-                        className={`px-3 py-1 rounded-md border font-bold flex items-center gap-2 whitespace-nowrap ${getScoreColor(answer.score)}`}
-                      >
-                        {answer.score === null ? (
-                          'N/A'
-                        ) : (
-                          <>
-                            {answer.score >= 4 && <CheckCircle2 className="h-4 w-4" />}
-                            {answer.score === 3 && <AlertTriangle className="h-4 w-4" />}
-                            {answer.score <= 2 && <XCircle className="h-4 w-4" />}
-                            Nota: {answer.score}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {answer.observations && (
-                      <div className="text-sm text-muted-foreground mt-2 bg-muted p-3 rounded-md">
-                        <strong className="block mb-1 text-foreground">Observações:</strong>
-                        {answer.observations}
-                      </div>
-                    )}
-                    {answer.evidence_url && (
-                      <div className="mt-2">
-                        <a
-                          href={answer.evidence_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 w-fit"
-                        >
-                          <FileText className="h-4 w-4" />
-                          Visualizar Evidência
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                <div className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
+                  {format(nextDate, 'dd/MM/yyyy', { locale: ptBR })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <History className="h-5 w-5 text-primary" />
+              Histórico de Realizações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {executions.length === 0 ? (
+              <div className="py-8 text-center bg-muted/20 rounded-lg border border-dashed">
+                <p className="text-muted-foreground">
+                  Nenhuma realização encontrada para esta auditoria.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Data</TableHead>
+                      <TableHead>Planta</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Resultado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {executions.map((exec) => {
+                      const percentage = getPercentage(exec.final_score, exec.max_score)
+                      return (
+                        <TableRow key={exec.id}>
+                          <TableCell className="font-medium">
+                            {exec.realization_date
+                              ? format(
+                                  new Date(exec.realization_date + 'T00:00:00'),
+                                  'dd/MM/yyyy',
+                                  { locale: ptBR },
+                                )
+                              : format(new Date(exec.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>{exec.plant?.name || '-'}</TableCell>
+                          <TableCell>{exec.assignee?.name || '-'}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(exec.status)}>{exec.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {exec.status === 'Finalizado' ? (
+                              <Badge className={getScoreColor(percentage)}>{percentage}%</Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
