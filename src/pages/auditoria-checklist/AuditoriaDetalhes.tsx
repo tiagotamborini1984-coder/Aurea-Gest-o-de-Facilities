@@ -1,413 +1,282 @@
-import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Printer, ArrowLeft } from 'lucide-react'
+import { useAppStore } from '@/store/AppContext'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { useAuth } from '@/hooks/use-auth'
-import {
-  ArrowLeft,
-  Calendar,
-  CheckCircle,
-  ClipboardList,
-  Building,
-  User,
-  History,
-  XCircle,
-  CalendarDays,
-} from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 
 export default function AuditoriaDetalhes() {
-  const { id } = useParams<{ id: string }>()
+  const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { profile } = useAppStore()
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [execution, setExecution] = useState<any>(null)
+  const [audit, setAudit] = useState<any>(null)
+  const [answers, setAnswers] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const [plant, setPlant] = useState<any>(null)
+  const [assignee, setAssignee] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!id || !user) return
+    async function loadData() {
+      if (!id) return
+      setLoading(true)
 
-    async function fetchData() {
-      try {
-        setLoading(true)
-        setError(false)
+      const { data: execData } = await supabase
+        .from('audit_executions')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user!.id)
-          .single()
-
-        const role = profile?.role || 'Operacional'
-        setUserRole(role)
-
-        const { data: execData, error: execError } = await supabase
-          .from('audit_executions')
-          .select(`
-            *,
-            audits (*),
-            plants (name),
-            profiles!audit_executions_assignee_id_fkey (name),
-            audit_execution_answers (
-              id,
-              score,
-              observations,
-              audit_actions (title, weight)
-            )
-          `)
-          .eq('id', id)
-          .single()
-
-        if (execError || !execData) {
-          setError(true)
-          setLoading(false)
-          return
-        }
-
-        setExecution(execData)
-
-        if (role === 'Master' || role === 'Administrador') {
-          const { data: historyData } = await supabase
-            .from('audit_executions')
-            .select('id, status, realization_date, created_at, final_score, max_score')
-            .eq('audit_id', execData.audit_id)
-            .eq('plant_id', execData.plant_id)
-            .neq('id', execData.id)
-            .order('created_at', { ascending: false })
-            .limit(10)
-
-          if (historyData) setHistory(historyData)
-        }
-
+      if (!execData) {
         setLoading(false)
-      } catch (err) {
-        setError(true)
-        setLoading(false)
+        return
       }
+
+      setExecution(execData)
+
+      const { data: auditData } = await supabase
+        .from('audits')
+        .select('*')
+        .eq('id', execData.audit_id)
+        .single()
+
+      setAudit(auditData)
+
+      const { data: plantData } = await supabase
+        .from('plants')
+        .select('*')
+        .eq('id', execData.plant_id)
+        .single()
+      setPlant(plantData)
+
+      const { data: assigneeData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', execData.assignee_id)
+        .single()
+      setAssignee(assigneeData)
+
+      const { data: answersData } = await supabase
+        .from('audit_execution_answers')
+        .select(`*, audit_actions (*)`)
+        .eq('execution_id', id)
+
+      setAnswers(answersData || [])
+
+      if (profile?.role === 'Administrador' || profile?.role === 'Master') {
+        const { data: historyData } = await supabase
+          .from('audit_executions')
+          .select(`*, profiles:assignee_id (name)`)
+          .eq('audit_id', execData.audit_id)
+          .eq('plant_id', execData.plant_id)
+          .order('created_at', { ascending: false })
+
+        setHistory(historyData || [])
+      }
+
+      setLoading(false)
     }
 
-    fetchData()
-  }, [id, user])
+    loadData()
+  }, [id, profile])
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <Skeleton className="h-48 w-full rounded-xl" />
-            <Skeleton className="h-64 w-full rounded-xl" />
-          </div>
-          <div className="space-y-6">
-            <Skeleton className="h-48 w-full rounded-xl" />
-            <Skeleton className="h-64 w-full rounded-xl" />
-          </div>
-        </div>
+      <div className="p-6 space-y-4 max-w-5xl mx-auto">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-40 w-full" />
       </div>
     )
   }
 
-  if (error || !execution) {
+  if (!execution) {
     return (
-      <div className="container mx-auto p-6 max-w-6xl animate-fade-in">
-        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-          <XCircle className="h-16 w-16 text-destructive" />
-          <h1 className="text-2xl font-bold">Auditoria não encontrada</h1>
-          <p className="text-muted-foreground">
-            O registro solicitado não existe ou você não tem permissão para visualizá-lo.
-          </p>
-          <Button onClick={() => navigate('/auditoria-checklist/realizadas')} className="mt-4">
-            Voltar para Auditorias
-          </Button>
-        </div>
+      <div className="p-6 text-center text-muted-foreground">
+        <p>Auditoria não encontrada.</p>
+        <Button variant="link" onClick={() => navigate(-1)} className="mt-4">
+          Voltar
+        </Button>
       </div>
     )
   }
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'Finalizado') {
-      return <Badge className="bg-green-500 hover:bg-green-600 border-none">Finalizado</Badge>
-    }
-    if (status === 'Pendente') {
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-yellow-500 text-white hover:bg-yellow-600 border-none"
-        >
-          Pendente
-        </Badge>
-      )
-    }
-    if (status === 'Rascunho') {
-      return <Badge variant="outline">Rascunho</Badge>
-    }
-    return <Badge variant="outline">{status}</Badge>
-  }
+  const percentage =
+    execution?.max_score > 0 ? (execution.final_score / execution.max_score) * 100 : 0
+  const isFinalizado = execution?.status === 'Finalizado'
+  const statusColor = isFinalizado
+    ? 'bg-green-100 text-green-800 border-green-300'
+    : 'bg-yellow-100 text-yellow-800 border-yellow-300'
 
-  const finalScore = execution.final_score || 0
-  const maxScore = execution.max_score || 0
-  const percentage = maxScore > 0 ? (finalScore / maxScore) * 100 : 0
-
-  const getScoreBgColor = (perc: number) => {
-    if (perc >= 80)
-      return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
-    if (perc >= 50)
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800'
-    return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
-  }
-
-  const isAdmin = userRole === 'Master' || userRole === 'Administrador'
-
-  let nextDateStr = ''
-  if (isAdmin && execution.status === 'Finalizado' && execution.audits?.frequency !== 'Única') {
-    const baseDate = execution.realization_date || execution.created_at
-    const d = new Date(baseDate.includes('T') ? baseDate : baseDate + 'T00:00:00Z')
-    switch (execution.audits?.frequency) {
-      case 'Diária':
-        d.setUTCDate(d.getUTCDate() + 1)
-        break
-      case 'Semanal':
-        d.setUTCDate(d.getUTCDate() + 7)
-        break
-      case 'Mensal':
-        d.setUTCMonth(d.getUTCMonth() + 1)
-        break
-      case 'Semestral':
-        d.setUTCMonth(d.getUTCMonth() + 6)
-        break
-      case 'Anual':
-        d.setUTCFullYear(d.getUTCFullYear() + 1)
-        break
-    }
-
-    if (!isNaN(d.getTime())) {
-      nextDateStr = format(d, 'dd/MM/yyyy', { locale: ptBR })
-    }
+  function getScoreColor(score: number | null) {
+    if (score === null) return 'bg-gray-100 text-gray-800 border-gray-300'
+    if (score >= 4) return 'bg-green-100 text-green-800 border-green-300'
+    if (score === 3) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+    return 'bg-red-100 text-red-800 border-red-300'
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6 animate-fade-in-up">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto bg-white rounded-lg shadow-sm print:shadow-none print:p-0 print:max-w-none">
+      <div className="flex items-center justify-between print:hidden mb-6">
+        <Button variant="outline" onClick={() => navigate(-1)}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Detalhes da Auditoria</h1>
-          <p className="text-muted-foreground">Visualize os resultados e histórico da execução</p>
+        <Button onClick={() => window.print()}>
+          <Printer className="w-4 h-4 mr-2" />
+          Imprimir
+        </Button>
+      </div>
+
+      <div className="border-b pb-6 mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{audit?.title}</h1>
+            <p className="text-gray-500 mt-1 text-sm sm:text-base">
+              {plant?.name} {plant?.city && `- ${plant.city}`}
+            </p>
+          </div>
+          <div className={cn('px-4 py-2 rounded-md border', statusColor)}>
+            <span className="font-semibold text-sm sm:text-base">{execution?.status}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-6">
+          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Data</p>
+            <p className="font-medium text-gray-900">
+              {execution?.realization_date
+                ? format(new Date(execution.realization_date), 'dd/MM/yyyy')
+                : '-'}
+            </p>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Auditor(a)</p>
+            <p className="font-medium text-gray-900">{assignee?.name || '-'}</p>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Pontuação</p>
+            <p className="font-medium text-gray-900">
+              {execution?.final_score || 0} / {execution?.max_score || 0}
+            </p>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Desempenho</p>
+            <div className="flex items-center">
+              <span className="font-bold text-lg text-primary">{percentage.toFixed(1)}%</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl break-words mr-4">
-                  {execution.audits?.title}
-                </CardTitle>
-                <div className="shrink-0">{getStatusBadge(execution.status)}</div>
-              </div>
-              <CardDescription>Informações gerais sobre a execução</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                  <Building className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Planta:</span>
-                  <span className="text-sm truncate" title={execution.plants?.name}>
-                    {execution.plants?.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Responsável:</span>
-                  <span className="text-sm truncate" title={execution.profiles?.name}>
-                    {execution.profiles?.name || 'Não atribuído'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Frequência:</span>
-                  <span className="text-sm">{execution.audits?.frequency}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Data de Realização:</span>
-                  <span className="text-sm">
-                    {execution.realization_date
-                      ? format(new Date(execution.realization_date + 'T00:00:00Z'), 'dd/MM/yyyy')
-                      : 'Não realizada'}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <ClipboardList className="h-5 w-5" />
-                Respostas do Checklist ({execution.audit_execution_answers?.length || 0})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {execution.audit_execution_answers?.map((answer: any) => (
-                  <div key={answer.id} className="p-4 border rounded-lg bg-card shadow-sm">
-                    <div className="flex justify-between items-start mb-3 gap-2">
-                      <p className="font-medium text-sm md:text-base">
-                        {answer.audit_actions?.title}
-                      </p>
-                      <Badge variant="outline" className="whitespace-nowrap shrink-0">
-                        Peso: {answer.audit_actions?.weight || 1}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-sm text-muted-foreground">Nota recebida:</span>
-                      {answer.score !== null ? (
-                        <Badge className="bg-primary text-primary-foreground text-sm font-bold px-2 py-0.5">
-                          {answer.score}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-sm">
-                          N/A
-                        </Badge>
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Checklist da Auditoria</h2>
+        {answers.length === 0 ? (
+          <p className="text-gray-500 italic">Nenhum item respondido ainda.</p>
+        ) : (
+          answers
+            .sort(
+              (a, b) => (a.audit_actions?.order_index || 0) - (b.audit_actions?.order_index || 0),
+            )
+            .map((ans, idx) => (
+              <Card
+                key={ans.id}
+                className="print-break-inside-avoid shadow-sm print:shadow-none print:border-gray-200"
+              >
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900 flex items-start">
+                        <span className="mr-2 text-gray-400 mt-0.5">{idx + 1}.</span>
+                        {ans.audit_actions?.title}
+                      </h3>
+                      {ans.observations && (
+                        <div className="mt-3 bg-gray-50 p-3 rounded-md text-sm text-gray-700 print:border print:bg-transparent">
+                          <span className="font-semibold block mb-1 text-gray-900">
+                            Observações:
+                          </span>
+                          {ans.observations}
+                        </div>
                       )}
                     </div>
 
-                    {answer.observations && (
-                      <div className="text-sm bg-muted/50 p-3 rounded-md border border-border/50">
-                        <p className="font-medium mb-1 text-xs text-muted-foreground uppercase tracking-wider">
-                          Observações
-                        </p>
-                        <p className="text-foreground break-words">{answer.observations}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {(!execution.audit_execution_answers ||
-                  execution.audit_execution_answers.length === 0) && (
-                  <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg">
-                    Nenhuma resposta registrada para esta execução.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          {/* Pontuação */}
-          <Card className={`border-2 shadow-sm ${getScoreBgColor(percentage)}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-center">Resultado Final</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-2">
-                <div className="text-5xl font-bold tracking-tighter mb-2">
-                  {percentage.toFixed(1)}%
-                </div>
-                <div className="text-sm opacity-80 font-medium text-center">
-                  {finalScore} de {maxScore} pontos possíveis
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Admin Only: Next Date */}
-          {isAdmin && nextDateStr && (
-            <Card className="shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-md flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-primary" />
-                  Próxima Auditoria
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Agendada para:</span>
-                  <span className="font-medium bg-muted px-2 py-1 rounded-md">{nextDateStr}</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Admin Only: History */}
-          {isAdmin && (
-            <Card className="shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-md flex items-center gap-2">
-                  <History className="h-4 w-4 text-primary" />
-                  Histórico de Realizações
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Últimas auditorias nesta planta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {history.length > 0 ? (
-                    history.map((hist) => {
-                      const histPerc =
-                        hist.max_score > 0 ? (hist.final_score / hist.max_score) * 100 : 0
-                      return (
-                        <div
-                          key={hist.id}
-                          className="flex flex-col gap-2 p-3 border rounded-md bg-card/50 hover:bg-card transition-colors group cursor-pointer"
-                          onClick={() => navigate(`/auditoria-checklist/detalhes/${hist.id}`)}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                              {hist.realization_date
-                                ? format(
-                                    new Date(hist.realization_date + 'T00:00:00Z'),
-                                    'dd/MM/yyyy',
-                                  )
-                                : format(new Date(hist.created_at), 'dd/MM/yyyy')}
-                            </span>
-                            {getStatusBadge(hist.status)}
-                          </div>
-                          {hist.status === 'Finalizado' && (
-                            <div className="flex justify-between items-center mt-1">
-                              <span className="text-xs text-muted-foreground font-medium">
-                                Score: {hist.final_score}/{hist.max_score}
-                              </span>
-                              <span
-                                className={`text-xs font-bold px-2 py-0.5 rounded-md border ${getScoreBgColor(histPerc)}`}
-                              >
-                                {histPerc.toFixed(1)}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="text-sm text-center py-6 text-muted-foreground border border-dashed rounded-md">
-                      Nenhum histórico anterior encontrado.
+                    <div
+                      className={cn(
+                        'px-4 py-2 rounded-md border min-w-[80px] text-center shrink-0 self-start sm:self-auto',
+                        getScoreColor(ans.score),
+                      )}
+                    >
+                      <span className="text-[10px] uppercase tracking-wider block mb-1 opacity-80">
+                        Nota
+                      </span>
+                      <span className="font-bold text-lg leading-none">
+                        {ans.score !== null ? ans.score : '-'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+        )}
       </div>
+
+      {(profile?.role === 'Administrador' || profile?.role === 'Master') && history.length > 0 && (
+        <div className="mt-10 pt-8 border-t print-break-inside-avoid">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Histórico de Realizações</h2>
+          <div className="border rounded-md overflow-hidden print:border-gray-300">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 print:bg-gray-100">
+                <tr>
+                  <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700">Auditor</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700">Status</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700">Desempenho</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y print:divide-gray-200">
+                {history.map((hist) => {
+                  const histPerc =
+                    hist.max_score > 0 ? (hist.final_score / hist.max_score) * 100 : 0
+                  return (
+                    <tr key={hist.id} className="bg-white">
+                      <td className="px-4 py-3 text-gray-600">
+                        {hist.realization_date
+                          ? format(new Date(hist.realization_date), 'dd/MM/yyyy')
+                          : format(new Date(hist.created_at), 'dd/MM/yyyy')}
+                      </td>
+                      <td className="px-4 py-3 text-gray-900">{hist.profiles?.name || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'px-2.5 py-1 rounded-full text-xs font-medium border',
+                            hist.status === 'Finalizado'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                          )}
+                        >
+                          {hist.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-gray-900">{histPerc.toFixed(1)}%</span>
+                        <span className="text-gray-500 ml-1.5 text-xs">
+                          ({hist.final_score}/{hist.max_score})
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

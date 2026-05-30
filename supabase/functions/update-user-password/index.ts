@@ -17,7 +17,10 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error('Missing Authorization header')
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser(token)
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: creatorProfile } = await supabaseClient
@@ -43,16 +46,13 @@ Deno.serve(async (req: Request) => {
         .select('client_id')
         .eq('id', userId)
         .single()
-      
+
       if (!targetProfile || targetProfile.client_id !== creatorProfile.client_id) {
         throw new Error('Insufficient permissions to update this user')
       }
     }
 
-    const { data, error } = await supabaseClient.auth.admin.updateUserById(
-      userId,
-      { password }
-    )
+    const { data, error } = await supabaseClient.auth.admin.updateUserById(userId, { password })
 
     if (error) throw error
 
