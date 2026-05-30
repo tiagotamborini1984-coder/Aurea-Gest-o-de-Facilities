@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
-import { Plus, Download, Edit, Trash2, FileCheck, FileX, Percent } from 'lucide-react'
-import { format, differenceInDays } from 'date-fns'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useAppStore } from '@/store/AppContext'
+import { differenceInDays, startOfDay } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -11,105 +13,123 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { useCrud } from '@/hooks/use-crud'
-import { useAppStore } from '@/store/AppContext'
+import { toast } from 'sonner'
+import { FileText, Plus, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react'
 import { DocumentForm } from './components/DocumentForm'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
+import { DocumentActions } from './components/DocumentActions'
+
+const parseDateLocal = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('T')[0].split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '-'
+  const [y, m, d] = dateStr.split('T')[0].split('-')
+  return `${d}/${m}/${y}`
+}
 
 export default function Documentos() {
-  const { data: documents, loading, remove, fetchAll } = useCrud<any>('sector_documents')
-  const { selectedPlant } = useAppStore()
-  const { toast } = useToast()
-
+  const { activeClient } = useAppStore()
+  const [documents, setDocuments] = useState<any[]>([])
+  const [plants, setPlants] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingDoc, setEditingDoc] = useState<any>(null)
-  const [deletingDoc, setDeletingDoc] = useState<any>(null)
 
-  const filteredDocs = useMemo(() => {
-    let docs = documents
-    if (selectedPlant !== 'all') {
-      docs = docs.filter((d: any) => d.plant_id === selectedPlant)
-    }
-    return docs
-  }, [documents, selectedPlant])
-
-  const stats = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    let inCompliance = 0
-    let expired = 0
-
-    filteredDocs.forEach((doc: any) => {
-      if (!doc.expiration_date) return
-      const [year, month, day] = doc.expiration_date.split('-').map(Number)
-      const expDate = new Date(year, month - 1, day)
-
-      if (expDate >= today) {
-        inCompliance++
-      } else {
-        expired++
-      }
-    })
-
-    const total = inCompliance + expired
-    const adherence = total > 0 ? (inCompliance / total) * 100 : 0
-
-    return {
-      inCompliance,
-      expired,
-      adherence: adherence.toFixed(1),
-    }
-  }, [filteredDocs])
-
-  const getStatusInfo = (doc: any) => {
-    if (!doc.expiration_date) return { label: 'Sem data', color: 'bg-gray-500' }
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const [year, month, day] = doc.expiration_date.split('-').map(Number)
-    const expDate = new Date(year, month - 1, day)
-
-    const daysDiff = differenceInDays(expDate, today)
-
-    if (daysDiff < 0) {
-      return { label: 'Vencido', color: 'bg-red-500 hover:bg-red-600' }
-    } else if (daysDiff <= (doc.alert_lead_days || 30)) {
-      return { label: `Vence em ${daysDiff} dias`, color: 'bg-amber-500 hover:bg-amber-600' }
-    } else {
-      return { label: 'Em dia', color: 'bg-green-500 hover:bg-green-600' }
+  const fetchData = async () => {
+    if (!activeClient) return
+    setLoading(true)
+    try {
+      const [docsRes, plantsRes] = await Promise.all([
+        supabase
+          .from('sector_documents')
+          .select('*, plants(name)')
+          .eq('client_id', activeClient.id)
+          .order('expiration_date', { ascending: true }),
+        supabase.from('plants').select('id, name').eq('client_id', activeClient.id),
+      ])
+      if (docsRes.error) throw docsRes.error
+      setDocuments(docsRes.data || [])
+      if (plantsRes.data) setPlants(plantsRes.data)
+    } catch (err: any) {
+      toast.error('Erro ao carregar documentos: ' + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!deletingDoc) return
-    const res = await remove(deletingDoc.id)
-    if (res.success) {
-      toast({ title: 'Documento excluído com sucesso.' })
-    } else {
-      toast({ title: 'Erro ao excluir documento.', variant: 'destructive' })
+  useEffect(() => {
+    fetchData()
+  }, [activeClient])
+
+  const handleEdit = (doc: any) => {
+    setEditingDoc(doc)
+    setIsFormOpen(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Deseja excluir este documento?')) return
+    try {
+      const { error } = await supabase.from('sector_documents').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Documento excluído com sucesso')
+      fetchData()
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + err.message)
     }
-    setDeletingDoc(null)
+  }
+
+  const today = startOfDay(new Date())
+  const validDocs = documents.filter(
+    (d) => differenceInDays(parseDateLocal(d.expiration_date), today) >= 0,
+  )
+  const expiredDocs = documents.filter(
+    (d) => differenceInDays(parseDateLocal(d.expiration_date), today) < 0,
+  )
+  const adherence =
+    documents.length > 0 ? Math.round((validDocs.length / documents.length) * 100) : 0
+
+  const getStatusSla = (doc: any) => {
+    const expDate = parseDateLocal(doc.expiration_date)
+    const daysRemaining = differenceInDays(expDate, today)
+
+    if (daysRemaining < 0) {
+      const absDays = Math.abs(daysRemaining)
+      return {
+        text: `Vencido há ${absDays} dia${absDays > 1 ? 's' : ''}`,
+        color: 'bg-red-100 text-red-800 border-red-300',
+        icon: AlertCircle,
+      }
+    } else if (daysRemaining <= doc.alert_lead_days) {
+      return {
+        text:
+          daysRemaining === 0
+            ? 'Vence hoje'
+            : `${daysRemaining} dia${daysRemaining > 1 ? 's' : ''} para vencer`,
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        icon: AlertTriangle,
+      }
+    }
+    return {
+      text: `${daysRemaining} dia${daysRemaining > 1 ? 's' : ''} para vencer`,
+      color: 'bg-green-100 text-green-800 border-green-300',
+      icon: CheckCircle,
+    }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fade-in-up duration-300">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[#0F4C81]">Gestão de Documentos</h2>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os documentos e licenças da unidade.
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <div className="bg-brand-vividBlue/10 p-2 rounded-lg">
+              <FileText className="h-6 w-6 text-brand-vividBlue" />
+            </div>
+            Gestão de Documentos
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Visualize e gerencie os documentos e suas validades de forma centralizada.
           </p>
         </div>
         <Button
@@ -117,160 +137,111 @@ export default function Documentos() {
             setEditingDoc(null)
             setIsFormOpen(true)
           }}
-          className="bg-[#2B95D6] hover:bg-[#2B95D6]/90"
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Documento
+          <Plus className="h-4 w-4 mr-2" /> Novo Documento
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-t-4 border-t-green-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="border-l-4 border-l-green-500 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-500 font-medium uppercase tracking-wider">
               Documentos em Dia
             </CardTitle>
-            <FileCheck className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.inCompliance}</div>
+            <div className="text-3xl font-bold text-slate-800">{validDocs.length}</div>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-red-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <Card className="border-l-4 border-l-red-500 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-500 font-medium uppercase tracking-wider">
               Documentos Vencidos
             </CardTitle>
-            <FileX className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.expired}</div>
+            <div className="text-3xl font-bold text-slate-800">{expiredDocs.length}</div>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-[#2B95D6] shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Aderência</CardTitle>
-            <Percent className="h-4 w-4 text-[#2B95D6]" />
+        <Card className="border-l-4 border-l-brand-vividBlue shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-500 font-medium uppercase tracking-wider">
+              Aderência de Documentação
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[#2B95D6]">{stats.adherence}%</div>
+            <div className="text-3xl font-bold text-brand-vividBlue">{adherence}%</div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+      <Card className="shadow-sm">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Documento</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Planta</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead>Status / SLA</TableHead>
+              <TableHead className="w-[100px] text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>Documento</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Status / SLA</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableCell colSpan={6} className="text-center py-8">
+                  Carregando...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Carregando documentos...
-                  </TableCell>
-                </TableRow>
-              ) : filteredDocs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Nenhum documento encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredDocs.map((doc: any) => {
-                  const status = getStatusInfo(doc)
-                  return (
-                    <TableRow key={doc.id}>
-                      <TableCell className="font-medium">{doc.name}</TableCell>
-                      <TableCell>{doc.document_type}</TableCell>
-                      <TableCell>
-                        {doc.expiration_date
-                          ? format(
-                              new Date(
-                                doc.expiration_date.split('-')[0],
-                                doc.expiration_date.split('-')[1] - 1,
-                                doc.expiration_date.split('-')[2],
-                              ),
-                              'dd/MM/yyyy',
-                            )
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`text-white ${status.color}`}>{status.label}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {doc.file_url && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => window.open(doc.file_url, '_blank')}
-                              title="Download"
-                            >
-                              <Download className="h-4 w-4 text-[#2B95D6]" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditingDoc(doc)
-                              setIsFormOpen(true)
-                            }}
-                            title="Editar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingDoc(doc)}
-                            title="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
+            ) : documents.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                  Nenhum documento encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              documents.map((doc) => {
+                const status = getStatusSla(doc)
+                const Icon = status.icon
+                return (
+                  <TableRow key={doc.id} className="hover:bg-slate-50 transition-colors">
+                    <TableCell className="font-medium text-slate-800">{doc.name}</TableCell>
+                    <TableCell className="text-slate-600">{doc.document_type}</TableCell>
+                    <TableCell className="text-slate-600">{doc.plants?.name || 'N/A'}</TableCell>
+                    <TableCell className="text-slate-600">
+                      {formatDate(doc.expiration_date)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={`${status.color} flex items-center w-fit gap-1.5 font-medium px-2.5 py-1`}
+                      >
+                        <Icon className="h-3.5 w-3.5" /> {status.text}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DocumentActions
+                        doc={doc}
+                        onEdit={() => handleEdit(doc)}
+                        onDelete={() => handleDelete(doc.id)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
       </Card>
 
       <DocumentForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        docToEdit={editingDoc}
-        onSuccess={fetchAll}
+        doc={editingDoc}
+        plants={plants}
+        onSave={fetchData}
       />
-
-      <AlertDialog open={!!deletingDoc} onOpenChange={() => setDeletingDoc(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Documento</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o documento "{deletingDoc?.name}"? Esta ação não pode
-              ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

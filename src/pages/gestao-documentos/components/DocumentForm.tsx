@@ -1,4 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useAppStore } from '@/store/AppContext'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -6,12 +11,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useCrud } from '@/hooks/use-crud'
-import { useToast } from '@/hooks/use-toast'
-import { useAppStore } from '@/store/AppContext'
 import {
   Select,
   SelectContent,
@@ -19,155 +18,200 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 
-export function DocumentForm({
-  open,
-  onOpenChange,
-  docToEdit,
-  onSuccess,
-}: {
+interface DocumentFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  docToEdit?: any
-  onSuccess: () => void
-}) {
-  const { add, update } = useCrud<any>('sector_documents')
-  const { selectedPlant } = useAppStore()
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
+  doc: any
+  plants: any[]
+  onSave: () => void
+}
 
+export function DocumentForm({ open, onOpenChange, doc, plants, onSave }: DocumentFormProps) {
+  const { activeClient } = useAppStore()
+  const [loading, setLoading] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     document_type: '',
+    plant_id: '',
     expiration_date: '',
     alert_lead_days: 30,
-    file_url: '',
   })
 
   useEffect(() => {
-    if (docToEdit) {
+    if (doc) {
       setFormData({
-        name: docToEdit.name || '',
-        document_type: docToEdit.document_type || '',
-        expiration_date: docToEdit.expiration_date || '',
-        alert_lead_days: docToEdit.alert_lead_days || 30,
-        file_url: docToEdit.file_url || '',
+        name: doc.name,
+        document_type: doc.document_type,
+        plant_id: doc.plant_id,
+        expiration_date: doc.expiration_date?.split('T')[0] || '',
+        alert_lead_days: doc.alert_lead_days,
       })
     } else {
       setFormData({
         name: '',
         document_type: '',
+        plant_id: plants.length > 0 ? plants[0].id : '',
         expiration_date: '',
         alert_lead_days: 30,
-        file_url: '',
       })
     }
-  }, [docToEdit, open])
+    setFile(null)
+  }, [doc, plants, open])
+
+  const handleUpload = async (fileToUpload: File) => {
+    if (!activeClient) throw new Error('Cliente não selecionado')
+    const ext = fileToUpload.name.split('.').pop()
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+    const filePath = `${activeClient.id}/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, fileToUpload)
+
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage.from('documents').getPublicUrl(filePath)
+    return data.publicUrl
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !formData.document_type || !formData.expiration_date) {
-      toast({ title: 'Preencha os campos obrigatórios', variant: 'destructive' })
-      return
-    }
-
-    if (selectedPlant === 'all' && !docToEdit) {
-      toast({ title: 'Selecione uma planta no filtro superior', variant: 'destructive' })
-      return
-    }
-
+    if (!activeClient) return
     setLoading(true)
-    const payload = {
-      ...formData,
-      ...(docToEdit ? {} : { plant_id: selectedPlant }),
-    }
+    try {
+      let file_url = doc?.file_url
 
-    const res = docToEdit ? await update(docToEdit.id, payload) : await add(payload)
+      if (file) {
+        file_url = await handleUpload(file)
+      }
 
-    setLoading(false)
-    if (res.success) {
-      toast({ title: `Documento ${docToEdit ? 'atualizado' : 'criado'} com sucesso!` })
-      onSuccess()
+      const payload = {
+        ...formData,
+        client_id: activeClient.id,
+        file_url,
+      }
+
+      if (doc) {
+        const { error } = await supabase.from('sector_documents').update(payload).eq('id', doc.id)
+        if (error) throw error
+        toast.success('Documento atualizado com sucesso')
+      } else {
+        const { error } = await supabase.from('sector_documents').insert(payload)
+        if (error) throw error
+        toast.success('Documento cadastrado com sucesso')
+      }
+      onSave()
       onOpenChange(false)
-    } else {
-      toast({ title: 'Erro ao salvar documento', variant: 'destructive' })
+    } catch (err: any) {
+      toast.error('Erro ao salvar documento: ' + err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{docToEdit ? 'Editar' : 'Novo'} Documento</DialogTitle>
+          <DialogTitle>{doc ? 'Editar Documento' : 'Novo Documento'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nome do Documento *</Label>
+            <Label>Nome do Documento</Label>
             <Input
-              id="name"
+              required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ex: AVCB"
+              placeholder="Ex: PPRA 2024"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="document_type">Tipo de Documento *</Label>
-            <Select
-              value={formData.document_type}
-              onValueChange={(val) => setFormData({ ...formData, document_type: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Licença">Licença</SelectItem>
-                <SelectItem value="Alvará">Alvará</SelectItem>
-                <SelectItem value="Certificado">Certificado</SelectItem>
-                <SelectItem value="Laudo">Laudo</SelectItem>
-                <SelectItem value="Planta">Planta</SelectItem>
-                <SelectItem value="Outros">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="expiration_date">Data de Vencimento *</Label>
+              <Label>Tipo</Label>
+              <Select
+                value={formData.document_type}
+                onValueChange={(v) => setFormData({ ...formData, document_type: v })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PPRA">PPRA</SelectItem>
+                  <SelectItem value="PCMSO">PCMSO</SelectItem>
+                  <SelectItem value="LTCAT">LTCAT</SelectItem>
+                  <SelectItem value="AVCB">AVCB</SelectItem>
+                  <SelectItem value="Alvará">Alvará</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Planta</Label>
+              <Select
+                value={formData.plant_id}
+                onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Vencimento</Label>
               <Input
-                id="expiration_date"
                 type="date"
+                required
                 value={formData.expiration_date}
                 onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="alert_lead_days">Aviso Prévio (dias)</Label>
+              <Label>Avisar (Dias antes)</Label>
               <Input
-                id="alert_lead_days"
                 type="number"
-                min="1"
+                min="0"
+                required
                 value={formData.alert_lead_days}
                 onChange={(e) =>
-                  setFormData({ ...formData, alert_lead_days: parseInt(e.target.value) || 0 })
+                  setFormData({ ...formData, alert_lead_days: Number(e.target.value) })
                 }
               />
             </div>
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="file_url">URL do Arquivo (Opcional)</Label>
+            <Label>
+              Arquivo{' '}
+              {doc?.file_url && !file && (
+                <span className="text-slate-400 text-xs ml-2">(Já possui arquivo salvo)</span>
+              )}
+            </Label>
             <Input
-              id="file_url"
-              type="url"
-              value={formData.file_url}
-              onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
-              placeholder="https://..."
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              accept=".pdf,.doc,.docx,.jpg,.png"
             />
           </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
