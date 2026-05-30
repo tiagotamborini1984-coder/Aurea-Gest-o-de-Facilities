@@ -158,6 +158,25 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
+  /* Esconder barras de navegação nativas */
+  aside,
+  header,
+  nav,
+  .sidebar,
+  [data-sidebar='sidebar'] {
+    display: none !important;
+  }
+
+  /* Garantir uso total da largura da página */
+  main,
+  #root > div > div {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   .print-break-inside-avoid {
     break-inside: avoid;
   }

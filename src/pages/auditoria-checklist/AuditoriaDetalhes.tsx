@@ -1,281 +1,299 @@
-import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Printer, ArrowLeft } from 'lucide-react'
-import { useAppStore } from '@/store/AppContext'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
+import {
+  Printer,
+  ArrowLeft,
+  Calendar,
+  FileText,
+  Activity,
+  Layers,
+  CheckCircle2,
+} from 'lucide-react'
+import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+
+type Audit = any
+type AuditExecution = any
 
 export default function AuditoriaDetalhes() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { profile } = useAppStore()
-
-  const [execution, setExecution] = useState<any>(null)
-  const [audit, setAudit] = useState<any>(null)
-  const [answers, setAnswers] = useState<any[]>([])
-  const [history, setHistory] = useState<any[]>([])
-  const [plant, setPlant] = useState<any>(null)
-  const [assignee, setAssignee] = useState<any>(null)
+  const [audit, setAudit] = useState<Audit | null>(null)
+  const [executions, setExecutions] = useState<AuditExecution[]>([])
   const [loading, setLoading] = useState(true)
 
+  const isAdminOrMaster = profile?.role === 'Administrador' || profile?.role === 'Master'
+
   useEffect(() => {
-    async function loadData() {
-      if (!id) return
+    if (!id) return
+    const fetchAuditData = async () => {
       setLoading(true)
-
-      const { data: execData } = await supabase
-        .from('audit_executions')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (!execData) {
-        setLoading(false)
-        return
-      }
-
-      setExecution(execData)
 
       const { data: auditData } = await supabase
         .from('audits')
-        .select('*')
-        .eq('id', execData.audit_id)
+        .select(`
+          *,
+          audit_actions (*)
+        `)
+        .eq('id', id)
         .single()
 
-      setAudit(auditData)
+      if (auditData) {
+        setAudit(auditData)
 
-      const { data: plantData } = await supabase
-        .from('plants')
-        .select('*')
-        .eq('id', execData.plant_id)
-        .single()
-      setPlant(plantData)
+        if (isAdminOrMaster) {
+          const { data: execData } = await supabase
+            .from('audit_executions')
+            .select(`
+              id,
+              status,
+              realization_date,
+              created_at,
+              final_score,
+              max_score,
+              assignee_id,
+              profiles ( name )
+            `)
+            .eq('audit_id', id)
+            .order('created_at', { ascending: false })
 
-      const { data: assigneeData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', execData.assignee_id)
-        .single()
-      setAssignee(assigneeData)
-
-      const { data: answersData } = await supabase
-        .from('audit_execution_answers')
-        .select(`*, audit_actions (*)`)
-        .eq('execution_id', id)
-
-      setAnswers(answersData || [])
-
-      if (profile?.role === 'Administrador' || profile?.role === 'Master') {
-        const { data: historyData } = await supabase
-          .from('audit_executions')
-          .select(`*, profiles:assignee_id (name)`)
-          .eq('audit_id', execData.audit_id)
-          .eq('plant_id', execData.plant_id)
-          .order('created_at', { ascending: false })
-
-        setHistory(historyData || [])
+          if (execData) {
+            setExecutions(execData)
+          }
+        }
       }
 
       setLoading(false)
     }
 
-    loadData()
-  }, [id, profile])
+    fetchAuditData()
+  }, [id, isAdminOrMaster])
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4 max-w-5xl mx-auto">
-        <Skeleton className="h-10 w-32" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-40 w-full" />
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-[200px] w-full" />
       </div>
     )
   }
 
-  if (!execution) {
+  if (!audit) {
     return (
-      <div className="p-6 text-center text-muted-foreground">
-        <p>Auditoria não encontrada.</p>
-        <Button variant="link" onClick={() => navigate(-1)} className="mt-4">
-          Voltar
-        </Button>
+      <div className="p-6">
+        <h2 className="text-2xl font-bold text-destructive">Auditoria não encontrada</h2>
+        <Link to="/auditoria-checklist/dashboard">
+          <Button variant="outline" className="mt-4">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+          </Button>
+        </Link>
       </div>
     )
-  }
-
-  const percentage =
-    execution?.max_score > 0 ? (execution.final_score / execution.max_score) * 100 : 0
-  const isFinalizado = execution?.status === 'Finalizado'
-  const statusColor = isFinalizado
-    ? 'bg-green-100 text-green-800 border-green-300'
-    : 'bg-yellow-100 text-yellow-800 border-yellow-300'
-
-  function getScoreColor(score: number | null) {
-    if (score === null) return 'bg-gray-100 text-gray-800 border-gray-300'
-    if (score >= 4) return 'bg-green-100 text-green-800 border-green-300'
-    if (score === 3) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-    return 'bg-red-100 text-red-800 border-red-300'
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto bg-white rounded-lg shadow-sm print:shadow-none print:p-0 print:max-w-none">
-      <div className="flex items-center justify-between print:hidden mb-6">
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <Button onClick={() => window.print()}>
-          <Printer className="w-4 h-4 mr-2" />
+    <div className="p-6 max-w-6xl mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:bg-white print:text-black">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-4">
+          <Link to="/auditoria-checklist/dashboard">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">Detalhes da Auditoria</h1>
+        </div>
+        <Button onClick={() => window.print()} className="gap-2">
+          <Printer className="h-4 w-4" />
           Imprimir
         </Button>
       </div>
 
-      <div className="border-b pb-6 mb-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{audit?.title}</h1>
-            <p className="text-gray-500 mt-1 text-sm sm:text-base">
-              {plant?.name} {plant?.city && `- ${plant.city}`}
-            </p>
-          </div>
-          <div className={cn('px-4 py-2 rounded-md border', statusColor)}>
-            <span className="font-semibold text-sm sm:text-base">{execution?.status}</span>
-          </div>
-        </div>
+      <div className="hidden print:block mb-8 border-b pb-4">
+        <h1 className="text-2xl font-bold">Relatório de Auditoria</h1>
+        <p className="text-sm text-gray-500">
+          Impresso em {format(new Date(), 'dd/MM/yyyy HH:mm')}
+        </p>
+      </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-6">
-          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Data</p>
-            <p className="font-medium text-gray-900">
-              {execution?.realization_date
-                ? format(new Date(execution.realization_date), 'dd/MM/yyyy')
-                : '-'}
-            </p>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Auditor(a)</p>
-            <p className="font-medium text-gray-900">{assignee?.name || '-'}</p>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Pontuação</p>
-            <p className="font-medium text-gray-900">
-              {execution?.final_score || 0} / {execution?.max_score || 0}
-            </p>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-md print:bg-transparent print:p-0 print:border print:border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Desempenho</p>
-            <div className="flex items-center">
-              <span className="font-bold text-lg text-primary">{percentage.toFixed(1)}%</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:block print:space-y-6">
+        <Card className="print:shadow-none print:border print:border-gray-200 print:break-inside-avoid shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary print:text-gray-700" />
+              Informações Gerais
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground print:text-gray-500">
+                Título
+              </p>
+              <p className="text-lg font-semibold">{audit.title}</p>
             </div>
-          </div>
-        </div>
-      </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground print:text-gray-500">
+                  Tipo
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Layers className="h-4 w-4 text-muted-foreground print:hidden" />
+                  <span>{audit.type}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground print:text-gray-500">
+                  Frequência
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Activity className="h-4 w-4 text-muted-foreground print:hidden" />
+                  <span>{audit.frequency}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground print:text-gray-500">
+                  Data de Início
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground print:hidden" />
+                  <span>
+                    {audit.start_date
+                      ? format(new Date(audit.start_date + 'T00:00:00'), 'dd/MM/yyyy')
+                      : '-'}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground print:text-gray-500">
+                  Status
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <CheckCircle2
+                    className={`h-4 w-4 print:hidden ${audit.status === 'Ativo' ? 'text-green-500' : 'text-gray-400'}`}
+                  />
+                  <span>{audit.status}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Checklist da Auditoria</h2>
-        {answers.length === 0 ? (
-          <p className="text-gray-500 italic">Nenhum item respondido ainda.</p>
-        ) : (
-          answers
-            .sort(
-              (a, b) => (a.audit_actions?.order_index || 0) - (b.audit_actions?.order_index || 0),
-            )
-            .map((ans, idx) => (
-              <Card
-                key={ans.id}
-                className="print-break-inside-avoid shadow-sm print:shadow-none print:border-gray-200"
-              >
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900 flex items-start">
-                        <span className="mr-2 text-gray-400 mt-0.5">{idx + 1}.</span>
-                        {ans.audit_actions?.title}
-                      </h3>
-                      {ans.observations && (
-                        <div className="mt-3 bg-gray-50 p-3 rounded-md text-sm text-gray-700 print:border print:bg-transparent">
-                          <span className="font-semibold block mb-1 text-gray-900">
-                            Observações:
-                          </span>
-                          {ans.observations}
-                        </div>
-                      )}
-                    </div>
-
-                    <div
-                      className={cn(
-                        'px-4 py-2 rounded-md border min-w-[80px] text-center shrink-0 self-start sm:self-auto',
-                        getScoreColor(ans.score),
-                      )}
+        <Card className="print:shadow-none print:border print:border-gray-200 print:break-inside-avoid shadow-sm">
+          <CardHeader>
+            <CardTitle>Ações / Itens do Checklist</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {audit.audit_actions && audit.audit_actions.length > 0 ? (
+              <ul className="space-y-2">
+                {audit.audit_actions
+                  .sort((a: any, b: any) => a.order_index - b.order_index)
+                  .map((action: any) => (
+                    <li
+                      key={action.id}
+                      className="p-3 bg-secondary/50 print:bg-white print:border print:border-gray-100 rounded-md border text-sm"
                     >
-                      <span className="text-[10px] uppercase tracking-wider block mb-1 opacity-80">
-                        Nota
-                      </span>
-                      <span className="font-bold text-lg leading-none">
-                        {ans.score !== null ? ans.score : '-'}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-        )}
+                      <span className="font-medium">{action.title}</span>
+                      <div className="flex gap-4 mt-2 text-xs text-muted-foreground print:text-gray-500">
+                        <span>Peso: {action.weight}</span>
+                        {action.evidence_required && <span>Requer Evidência</span>}
+                        {action.comments_required && <span>Requer Comentário</span>}
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground print:text-gray-500">
+                Nenhuma ação configurada.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {(profile?.role === 'Administrador' || profile?.role === 'Master') && history.length > 0 && (
-        <div className="mt-10 pt-8 border-t print-break-inside-avoid">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Histórico de Realizações</h2>
-          <div className="border rounded-md overflow-hidden print:border-gray-300">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 print:bg-gray-100">
-                <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700">Auditor</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700">Status</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700">Desempenho</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y print:divide-gray-200">
-                {history.map((hist) => {
-                  const histPerc =
-                    hist.max_score > 0 ? (hist.final_score / hist.max_score) * 100 : 0
-                  return (
-                    <tr key={hist.id} className="bg-white">
-                      <td className="px-4 py-3 text-gray-600">
-                        {hist.realization_date
-                          ? format(new Date(hist.realization_date), 'dd/MM/yyyy')
-                          : format(new Date(hist.created_at), 'dd/MM/yyyy')}
-                      </td>
-                      <td className="px-4 py-3 text-gray-900">{hist.profiles?.name || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={cn(
-                            'px-2.5 py-1 rounded-full text-xs font-medium border',
-                            hist.status === 'Finalizado'
-                              ? 'bg-green-100 text-green-800 border-green-200'
-                              : 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                          )}
-                        >
-                          {hist.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-semibold text-gray-900">{histPerc.toFixed(1)}%</span>
-                        <span className="text-gray-500 ml-1.5 text-xs">
-                          ({hist.final_score}/{hist.max_score})
-                        </span>
-                      </td>
+      {isAdminOrMaster && (
+        <Card className="print:shadow-none print:border print:border-gray-200 print:break-inside-avoid shadow-sm print:mt-6">
+          <CardHeader>
+            <CardTitle>Histórico de Realizações</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {executions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left print:border-collapse">
+                  <thead className="bg-secondary/50 print:bg-gray-100 text-muted-foreground print:text-black">
+                    <tr>
+                      <th className="px-4 py-3 font-medium rounded-tl-md print:border print:border-gray-300">
+                        Data
+                      </th>
+                      <th className="px-4 py-3 font-medium print:border print:border-gray-300">
+                        Responsável
+                      </th>
+                      <th className="px-4 py-3 font-medium print:border print:border-gray-300">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 font-medium text-right print:border print:border-gray-300">
+                        Pontuação
+                      </th>
+                      <th className="px-4 py-3 font-medium text-right rounded-tr-md print:border print:border-gray-300">
+                        Aproveitamento
+                      </th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody className="divide-y print:divide-gray-300">
+                    {executions.map((exec) => {
+                      const date = exec.realization_date || exec.created_at
+                      const pct =
+                        exec.max_score && exec.max_score > 0
+                          ? (exec.final_score / exec.max_score) * 100
+                          : 0
+
+                      return (
+                        <tr key={exec.id} className="hover:bg-muted/50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap print:border print:border-gray-300">
+                            {date ? format(new Date(date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                          </td>
+                          <td className="px-4 py-3 print:border print:border-gray-300">
+                            {exec.profiles?.name || '-'}
+                          </td>
+                          <td className="px-4 py-3 print:border print:border-gray-300">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium print:bg-transparent print:p-0 print:text-black ${
+                                exec.status === 'Finalizado'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : exec.status === 'Em Andamento'
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                              }`}
+                            >
+                              {exec.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right print:border print:border-gray-300">
+                            {exec.final_score !== null && exec.max_score !== null
+                              ? `${exec.final_score} / ${exec.max_score}`
+                              : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold print:border print:border-gray-300">
+                            {exec.final_score !== null && exec.max_score !== null
+                              ? `${pct.toFixed(1)}%`
+                              : '-'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6 print:text-gray-500 print:text-left print:py-2">
+                Nenhum histórico de realização encontrado para esta auditoria.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   )
