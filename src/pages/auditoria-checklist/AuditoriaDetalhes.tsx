@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Printer, ArrowLeft, CheckCircle, Clock, Calendar, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -11,61 +16,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import {
-  AlertCircle,
-  Printer,
-  ArrowLeft,
-  FileText,
-  CheckSquare,
-  History,
-  User,
-  Building,
-} from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import type { Database } from '@/lib/supabase/types'
 
-type AuditAction = {
-  id: string
-  title: string
-  weight: number
-  evidence_required: boolean
-  comments_required: boolean
-  order_index: number
-}
-
-type AuditAssignment = {
-  plant: { name: string } | null
-  assignee: { name: string } | null
-}
-
-type Audit = {
-  id: string
-  title: string
-  type: string
-  frequency: string
-  start_date: string
-  status: string
-  advance_notice_days: number | null
-  scoring_settings: any
-  client: { name: string } | null
-  audit_actions: AuditAction[]
-  audit_assignments: AuditAssignment[]
-}
-
-type AuditExecution = {
-  id: string
-  status: string
-  realization_date: string | null
-  created_at: string
-  final_score: number | null
-  max_score: number | null
-  assignee: { name: string } | null
-  plant: { name: string } | null
+type Audit = Database['public']['Tables']['audits']['Row']
+type AuditExecution = Database['public']['Tables']['audit_executions']['Row'] & {
+  plant?: { name: string } | null
+  assignee?: { name: string } | null
 }
 
 export default function AuditoriaDetalhes() {
-  const { id } = useParams<{ id: string }>()
+  const { id } = useParams()
   const navigate = useNavigate()
 
   const [audit, setAudit] = useState<Audit | null>(null)
@@ -74,350 +34,229 @@ export default function AuditoriaDetalhes() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchAudit() {
+    async function loadData() {
       if (!id) {
-        setError('ID da auditoria não fornecido.')
+        setError('ID não fornecido')
         setLoading(false)
         return
       }
 
-      // Validação de UUID para evitar erro de sintaxe no Supabase
+      // Sanitize ID using decodeURIComponent to prevent double-encoding issues
+      let cleanId = decodeURIComponent(id).trim()
+      // Remove any extraneous quotes
+      cleanId = cleanId.replace(/^["']|["']$/g, '')
+
+      // Validating UUID format to prevent malformed query errors
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(id)) {
-        setError('ID de auditoria inválido.')
+      if (!uuidRegex.test(cleanId)) {
+        setError('Formato de ID inválido')
         setLoading(false)
         return
       }
 
       try {
-        setLoading(true)
-        setError(null)
-
-        // Usando maybeSingle e limit(1) para prevenir o erro "Cannot coerce the result to a single JSON object"
+        // Use maybeSingle() instead of single() to avoid crash if not found
         const { data: auditData, error: auditError } = await supabase
           .from('audits')
-          .select(`
-            id, title, type, frequency, start_date, status, advance_notice_days, scoring_settings,
-            client:clients(name),
-            audit_actions(id, title, weight, evidence_required, comments_required, order_index),
-            audit_assignments(
-              plant:plants(name),
-              assignee:profiles!audit_assignments_assignee_id_fkey(name)
-            )
-          `)
-          .eq('id', id)
-          .limit(1)
+          .select('*')
+          .eq('id', cleanId)
           .maybeSingle()
 
         if (auditError) throw auditError
-        if (!auditData) throw new Error('Auditoria não encontrada.')
 
-        setAudit({
-          ...auditData,
-          client: Array.isArray(auditData.client) ? auditData.client[0] : auditData.client,
-          audit_actions: ((auditData.audit_actions || []) as any[]).sort(
-            (a, b) => a.order_index - b.order_index,
-          ),
-        } as Audit)
+        if (!auditData) {
+          setError('Auditoria não encontrada')
+          setLoading(false)
+          return
+        }
 
-        // Buscar histórico de execuções (respeitando RLS via token autenticado)
-        const { data: execsData, error: execsError } = await supabase
+        setAudit(auditData)
+
+        // Fetch execution history respecting RLS
+        const { data: execData, error: execError } = await supabase
           .from('audit_executions')
           .select(`
-            id, status, realization_date, created_at, final_score, max_score,
-            assignee:profiles!audit_executions_assignee_id_fkey(name),
-            plant:plants(name)
+            *,
+            plant:plants(name),
+            assignee:profiles(name)
           `)
-          .eq('audit_id', id)
+          .eq('audit_id', cleanId)
           .order('created_at', { ascending: false })
 
-        if (execsError) throw execsError
+        if (execError) throw execError
 
-        const typedExecs = (execsData || []).map((exec: any) => ({
-          ...exec,
-          assignee: Array.isArray(exec.assignee) ? exec.assignee[0] : exec.assignee,
-          plant: Array.isArray(exec.plant) ? exec.plant[0] : exec.plant,
-        }))
-
-        setExecutions(typedExecs as AuditExecution[])
+        setExecutions((execData as any) || [])
       } catch (err: any) {
-        console.error('Error fetching audit details:', err)
-        setError(err.message || 'Ocorreu um erro ao carregar os detalhes da auditoria.')
+        console.error(err)
+        setError(err.message || 'Erro ao carregar os dados da auditoria')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchAudit()
+    loadData()
   }, [id])
 
   if (loading) {
     return (
-      <div className="flex flex-col space-y-6 p-6 w-full max-w-6xl mx-auto">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="p-6 space-y-6 max-w-6xl mx-auto">
+        <Skeleton className="h-10 w-32" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-1/3 mb-2" />
+            <Skeleton className="h-4 w-1/4" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (error || !audit) {
     return (
-      <div className="p-6 w-full max-w-6xl mx-auto">
-        <Card className="border-destructive bg-destructive/5 text-destructive">
-          <CardContent className="flex flex-col items-center justify-center py-10 space-y-4">
-            <AlertCircle className="h-10 w-10 text-destructive" />
-            <h2 className="text-xl font-semibold">Erro ao carregar auditoria</h2>
-            <p className="text-center max-w-md">{error}</p>
-            <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Button>
+      <div className="p-6 max-w-6xl mx-auto">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
+        </Button>
+        <Card className="border-destructive">
+          <CardHeader className="text-destructive flex flex-row items-center space-x-2">
+            <AlertCircle className="w-6 h-6" />
+            <CardTitle>Erro</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{error || 'Auditoria não encontrada'}</p>
           </CardContent>
         </Card>
       </div>
     )
   }
 
+  const handlePrint = () => {
+    window.print()
+  }
+
   return (
-    <div className="flex flex-col space-y-6 p-4 sm:p-6 pb-20 w-full max-w-6xl mx-auto">
-      {/* Cabeçalho - Oculto na impressão */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0 print-hide">
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" size="icon" onClick={() => navigate(-1)} className="shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{audit.title}</h1>
-            <p className="text-muted-foreground text-sm">Detalhes e histórico da auditoria</p>
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      {/* Action Bar */}
+      <div className="flex items-center justify-between print:hidden">
+        <Button variant="ghost" onClick={() => navigate(-1)}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
+        </Button>
+        <Button onClick={handlePrint} variant="outline">
+          <Printer className="w-4 h-4 mr-2" />
+          Imprimir
+        </Button>
+      </div>
+
+      {/* Audit Details */}
+      <Card className="print:shadow-none print:border-none print:m-0 print:p-0">
+        <CardHeader className="print:px-0">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl mb-2">{audit.title}</CardTitle>
+              <CardDescription>Visualização de detalhes e histórico de realizações</CardDescription>
+            </div>
+            <Badge
+              variant={audit.status === 'Ativo' ? 'default' : 'secondary'}
+              className="w-fit print:hidden"
+            >
+              {audit.status}
+            </Badge>
+            <span className="hidden print:block text-sm font-semibold">Status: {audit.status}</span>
           </div>
-        </div>
-        <div className="flex space-x-2">
-          <Button onClick={() => window.print()} className="w-full sm:w-auto">
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
-          </Button>
-        </div>
-      </div>
-
-      <div className="hidden print:block mb-6">
-        <h1 className="text-2xl font-bold border-b pb-2 mb-2">{audit.title}</h1>
-        <p className="text-sm text-gray-500">Relatório de Detalhes da Auditoria</p>
-      </div>
-
-      {/* Detalhes Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 shadow-sm">
-          <CardHeader className="bg-muted/50 pb-4">
-            <CardTitle className="flex items-center text-lg">
-              <FileText className="mr-2 h-5 w-5 text-primary" />
-              Informações Gerais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4 pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Tipo</p>
-              <p className="text-base font-semibold mt-1">{audit.type}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Frequência</p>
-              <p className="text-base font-semibold mt-1">{audit.frequency}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Status</p>
-              <Badge variant={audit.status === 'Ativo' ? 'default' : 'secondary'} className="mt-1">
-                {audit.status}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Data de Início</p>
-              <p className="text-base font-semibold mt-1">
-                {audit.start_date ? format(parseISO(audit.start_date), 'dd/MM/yyyy') : '-'}
-              </p>
-            </div>
-            {audit.advance_notice_days !== null && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Aviso Prévio</p>
-                <p className="text-base font-semibold mt-1">{audit.advance_notice_days} dias</p>
-              </div>
-            )}
-            {audit.client && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Cliente</p>
-                <p className="text-base font-semibold mt-1">{audit.client.name}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="bg-muted/50 pb-4">
-            <CardTitle className="flex items-center text-lg">
-              <Building className="mr-2 h-5 w-5 text-primary" />
-              Atribuições
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {audit.audit_assignments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma atribuição configurada.</p>
-            ) : (
-              <ul className="space-y-5">
-                {audit.audit_assignments.map((assignment, index) => (
-                  <li
-                    key={index}
-                    className="flex flex-col space-y-1.5 border-b last:border-0 pb-3 last:pb-0"
-                  >
-                    <span className="text-sm font-semibold text-foreground">
-                      {assignment.plant?.name || 'Planta não definida'}
-                    </span>
-                    <span className="text-sm text-muted-foreground flex items-center">
-                      <User className="mr-1.5 h-3.5 w-3.5" />
-                      {assignment.assignee?.name || 'Responsável não definido'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Checklist / Ações */}
-      <Card className="shadow-sm print-break-inside-avoid">
-        <CardHeader className="bg-muted/50 pb-4">
-          <CardTitle className="flex items-center text-lg">
-            <CheckSquare className="mr-2 h-5 w-5 text-primary" />
-            Checklist de Auditoria
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Itens que devem ser verificados durante a execução
-          </p>
         </CardHeader>
-        <CardContent className="p-0">
-          {audit.audit_actions.length === 0 ? (
-            <p className="text-sm text-muted-foreground p-6 text-center">
-              Nenhum item configurado para esta auditoria.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead className="w-[60px] text-center">#</TableHead>
-                    <TableHead>Descrição do Item</TableHead>
-                    <TableHead className="text-center w-[100px]">Peso</TableHead>
-                    <TableHead className="text-center w-[120px]">Evidência</TableHead>
-                    <TableHead className="text-center w-[120px]">Observação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {audit.audit_actions.map((action, index) => (
-                    <TableRow key={action.id}>
-                      <TableCell className="font-medium text-center">{index + 1}</TableCell>
-                      <TableCell>{action.title}</TableCell>
-                      <TableCell className="text-center font-medium">{action.weight}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant="outline"
-                          className={
-                            action.evidence_required
-                              ? 'border-primary text-primary'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          {action.evidence_required ? 'Sim' : 'Não'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant="outline"
-                          className={
-                            action.comments_required
-                              ? 'border-primary text-primary'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          {action.comments_required ? 'Sim' : 'Não'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+        <CardContent className="print:px-0">
+          <dl className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-muted/30 p-4 rounded-lg print:bg-transparent print:p-0 print:gap-4">
+            <div className="space-y-1">
+              <dt className="text-sm font-medium text-muted-foreground">Tipo</dt>
+              <dd className="font-medium">{audit.type}</dd>
             </div>
-          )}
+            <div className="space-y-1">
+              <dt className="text-sm font-medium text-muted-foreground">Frequência</dt>
+              <dd className="font-medium">{audit.frequency}</dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-sm font-medium text-muted-foreground">Data de Início</dt>
+              <dd className="font-medium flex items-center">
+                <Calendar className="w-4 h-4 mr-2 text-muted-foreground print:hidden" />
+                {audit.start_date
+                  ? format(new Date(audit.start_date + 'T12:00:00Z'), 'dd/MM/yyyy', {
+                      locale: ptBR,
+                    })
+                  : '-'}
+              </dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-sm font-medium text-muted-foreground">Aviso Antecipado</dt>
+              <dd className="font-medium">{audit.advance_notice_days || 0} dias</dd>
+            </div>
+          </dl>
         </CardContent>
       </Card>
 
-      {/* Histórico de Execuções */}
-      <Card className="shadow-sm print-break-inside-avoid">
-        <CardHeader className="bg-muted/50 pb-4">
-          <CardTitle className="flex items-center text-lg">
-            <History className="mr-2 h-5 w-5 text-primary" />
-            Histórico de Execuções
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">Últimas execuções e seus resultados</p>
+      {/* Execution History */}
+      <Card className="print:shadow-none print:border-none print:m-0 print:p-0">
+        <CardHeader className="print:px-0">
+          <CardTitle>Histórico de Realizações</CardTitle>
+          <CardDescription>Todas as execuções vinculadas a esta auditoria</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="print:px-0">
           {executions.length === 0 ? (
-            <p className="text-sm text-muted-foreground p-6 text-center">
-              Nenhuma execução registrada para esta auditoria ainda.
-            </p>
+            <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed print:border-none">
+              Nenhuma realização encontrada para esta auditoria.
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="rounded-md border print:border-none print:mt-4 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead className="w-[120px]">Data</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
                     <TableHead>Planta</TableHead>
                     <TableHead>Responsável</TableHead>
-                    <TableHead className="text-right w-[120px]">Pontuação</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Pontuação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {executions.map((exec) => (
                     <TableRow key={exec.id}>
-                      <TableCell className="font-medium whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap">
                         {exec.realization_date
-                          ? format(parseISO(exec.realization_date), 'dd/MM/yyyy')
-                          : format(parseISO(exec.created_at), 'dd/MM/yyyy')}
+                          ? format(new Date(exec.realization_date + 'T12:00:00Z'), 'dd/MM/yyyy')
+                          : format(new Date(exec.created_at), 'dd/MM/yyyy')}
                       </TableCell>
+                      <TableCell>{exec.plant?.name || '-'}</TableCell>
+                      <TableCell>{exec.assignee?.name || '-'}</TableCell>
                       <TableCell>
                         <Badge
                           variant={
                             exec.status === 'Finalizado'
                               ? 'default'
-                              : exec.status === 'Pendente'
-                                ? 'destructive'
-                                : 'secondary'
+                              : exec.status === 'Rascunho'
+                                ? 'secondary'
+                                : 'outline'
                           }
+                          className="flex w-fit items-center gap-1 print:hidden"
                         >
+                          {exec.status === 'Finalizado' ? (
+                            <CheckCircle className="w-3 h-3" />
+                          ) : (
+                            <Clock className="w-3 h-3" />
+                          )}
                           {exec.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="truncate max-w-[200px]">
-                        {exec.plant?.name || '-'}
-                      </TableCell>
-                      <TableCell className="truncate max-w-[200px]">
-                        {exec.assignee?.name || '-'}
+                        <span className="hidden print:inline-block text-sm">{exec.status}</span>
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {exec.final_score !== null && exec.max_score !== null ? (
-                          <span
-                            className={
-                              exec.final_score >= exec.max_score * 0.7
-                                ? 'text-green-600'
-                                : 'text-amber-600'
-                            }
-                          >
-                            {exec.final_score}{' '}
-                            <span className="text-muted-foreground text-xs font-normal">
-                              / {exec.max_score}
-                            </span>
+                          <span>
+                            {exec.final_score} / {exec.max_score}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
