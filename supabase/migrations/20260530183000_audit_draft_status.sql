@@ -165,4 +165,4 @@ BEGIN
     'status', v_new_status
   );
 END;
-$function$;
+$function$ LANGUAGE plpgsql SECURITY DEFINER;
