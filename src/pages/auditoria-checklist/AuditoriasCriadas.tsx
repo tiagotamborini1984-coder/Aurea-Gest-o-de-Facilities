@@ -1,364 +1,304 @@
 import { useState, useEffect } from 'react'
-import { useAppStore } from '@/store/AppContext'
-import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Search, Loader2, ClipboardList, Edit, Trash2 } from 'lucide-react'
-import { Link, Navigate } from 'react-router-dom'
-import { useHasAccess } from '@/hooks/use-has-access'
-import { format } from 'date-fns'
-import { useToast } from '@/hooks/use-toast'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useToast } from '@/components/ui/use-toast'
+import { PlayCircle, AlertTriangle } from 'lucide-react'
 
 export default function AuditoriasCriadas() {
-  const { profile } = useAppStore()
-  const hasAccess = useHasAccess('Auditoria e Checklist')
+  const { user } = useAuth()
   const { toast } = useToast()
-  const { plants } = useMasterData()
-
-  const [audits, setAudits] = useState<any[]>([])
-  const [users, setUsers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-
-  const loadData = async () => {
-    if (!profile?.client_id) return
-    setLoading(true)
-
-    const { data: pData } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .eq('client_id', profile.client_id)
-    setUsers(pData || [])
-
-    let query = supabase
-      .from('audits')
-      .select('*, audit_assignments(*)')
-      .eq('client_id', profile.client_id)
-      .order('created_at', { ascending: false })
-
-    const { data } = await query
-
-    let filteredAudits = data || []
-    if (profile.role !== 'Administrador' && profile.role !== 'Master') {
-      const authPlants = profile.authorized_plants || []
-      filteredAudits = filteredAudits.filter((audit) => {
-        const assignments = audit.audit_assignments || []
-        return assignments.some((a: any) => authPlants.includes(a.plant_id))
-      })
-    }
-
-    setAudits(filteredAudits)
-    setLoading(false)
-
-    // Simulate cron job to generate pending tasks if needed
-    if (filteredAudits.length > 0) {
-      checkAndGenerateTasks(filteredAudits, pData || [])
-    }
-  }
+  const [executions, setExecutions] = useState<any[]>([])
+  const [profiles, setProfiles] = useState<any[]>([])
+  const [selectedExec, setSelectedExec] = useState<any>(null)
+  const [actions, setActions] = useState<any[]>([])
+  const [answers, setAnswers] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    loadData()
-  }, [profile])
+    if (user) {
+      loadExecutions()
+      loadProfiles()
+    }
+  }, [user])
 
-  const checkAndGenerateTasks = async (auditsList: any[], usersList: any[]) => {
-    if (!profile?.client_id) return
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+  const loadProfiles = async () => {
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id)
+      .single()
+    if (p?.client_id) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('client_id', p.client_id)
+      setProfiles(data || [])
+    }
+  }
 
-    for (const audit of auditsList) {
-      if (!audit.start_date) continue
-      const parts = audit.start_date.split('-')
-      if (parts.length !== 3) continue
+  const loadExecutions = async () => {
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id)
+      .single()
+    if (!p?.client_id) return
 
-      const start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-      const advanceDays = audit.advance_notice_days || 0
-      const triggerDate = new Date(start)
-      triggerDate.setDate(triggerDate.getDate() - advanceDays)
+    const { data } = await supabase
+      .from('audit_executions')
+      .select(`
+        id, status, created_at, realization_date,
+        audits ( id, title, type, scoring_settings ),
+        plants ( name )
+      `)
+      .eq('status', 'Pendente')
+      .order('created_at', { ascending: false })
 
-      if (today >= triggerDate) {
-        const { data: existing } = await supabase
-          .from('audit_executions')
-          .select('id, assignee_id, plant_id')
-          .eq('audit_id', audit.id)
-          .eq('status', 'Pendente')
+    setExecutions(data || [])
+  }
 
-        const existingSet = new Set(existing?.map((e) => `${e.assignee_id}-${e.plant_id}`) || [])
+  const openExecution = async (exec: any) => {
+    setSelectedExec(exec)
+    setAnswers({})
+    const { data } = await supabase
+      .from('audit_actions')
+      .select('*')
+      .eq('audit_id', exec.audits.id)
+      .order('order_index')
+    setActions(data || [])
+  }
 
-        let typeId: string | null = null
-        let statusId: string | null = null
+  const updateAnswer = (actionId: string, field: string, value: any) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [actionId]: { ...prev[actionId], [field]: value },
+    }))
+  }
 
-        const assignments = audit.audit_assignments || []
-        for (const assign of assignments) {
-          if (existingSet.has(`${assign.assignee_id}-${assign.plant_id}`)) continue
+  const isTrigger = (score: number) => {
+    if (!selectedExec?.audits?.scoring_settings) return false
+    const setting = selectedExec.audits.scoring_settings.find((s: any) => s.score === score)
+    return setting?.trigger_task === true
+  }
 
-          if (!typeId) {
-            const { data: typeRes } = await supabase
-              .from('task_types')
-              .select('id')
-              .eq('client_id', profile.client_id)
-              .ilike('name', '%Auditoria%')
-              .limit(1)
-            typeId = typeRes?.[0]?.id
-            if (!typeId) {
-              const { data: newType } = await supabase
-                .from('task_types')
-                .insert({ client_id: profile.client_id, name: 'Auditoria', sla_hours: 24 } as any)
-                .select('id')
-                .single()
-              typeId = newType?.id
-            }
-          }
+  const submitAudit = async () => {
+    if (actions.length === 0) return
 
-          if (!statusId) {
-            const { data: statusRes } = await supabase
-              .from('task_statuses')
-              .select('id')
-              .eq('client_id', profile.client_id)
-              .eq('is_terminal', false)
-              .order('created_at', { ascending: true })
-              .limit(1)
-            statusId = statusRes?.[0]?.id
-            if (!statusId) {
-              const { data: newStatus } = await supabase
-                .from('task_statuses')
-                .insert({
-                  client_id: profile.client_id,
-                  name: 'Pendente',
-                  color: '#eab308',
-                  is_terminal: false,
-                } as any)
-                .select('id')
-                .single()
-              statusId = newStatus?.id
-            }
-          }
-
-          if (typeId && statusId) {
-            const year = new Date().getFullYear()
-            const { data: latest } = await supabase
-              .from('tasks')
-              .select('task_number')
-              .eq('client_id', profile.client_id)
-              .like('task_number', `TSK-${year}-%`)
-              .order('created_at', { ascending: false })
-              .limit(1)
-
-            let seq = 1
-            if (latest && latest.length > 0) {
-              const p = latest[0].task_number.split('-')
-              if (p.length === 3) seq = parseInt(p[2], 10) + 1
-            }
-            const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-
-            const { data: newTask } = await supabase
-              .from('tasks')
-              .insert({
-                client_id: profile.client_id,
-                plant_id: assign.plant_id,
-                type_id: typeId,
-                status_id: statusId,
-                requester_id: profile.id,
-                assignee_id: assign.assignee_id,
-                task_number: taskNumber,
-                title: `Auditoria: ${audit.title}`,
-                description: `Por favor, realize a auditoria "${audit.title}" agendada para ${audit.start_date.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`,
-                due_date: new Date(`${audit.start_date}T23:59:59.999Z`).toISOString(),
-                status_updated_at: new Date().toISOString(),
-              } as any)
-              .select()
-              .single()
-
-            if (newTask) {
-              await supabase.from('audit_executions').insert({
-                audit_id: audit.id,
-                task_id: newTask.id,
-                assignee_id: assign.assignee_id,
-                plant_id: assign.plant_id,
-                status: 'Pendente',
-              })
-            }
-          }
-        }
+    for (const a of actions) {
+      const ans = answers[a.id]
+      if (!ans?.score) {
+        return toast({
+          title: 'Atenção',
+          description: `Por favor, avalie o item: ${a.title}`,
+          variant: 'destructive',
+        })
+      }
+      if (isTrigger(ans.score) && (!ans.corrective_assignee_id || !ans.corrective_due_date)) {
+        return toast({
+          title: 'Atenção',
+          description: `Preencha o responsável e prazo para a ação corretiva do item: ${a.title}`,
+          variant: 'destructive',
+        })
       }
     }
-  }
 
-  const handleDelete = async () => {
-    if (!deleteId) return
-    try {
-      await supabase.from('audits').delete().eq('id', deleteId)
-      toast({ title: 'Auditoria excluída com sucesso!' })
-      setDeleteId(null)
-      loadData()
-    } catch (e: any) {
-      toast({ title: 'Erro ao excluir', description: e.message, variant: 'destructive' })
+    setLoading(true)
+    const p_answers = actions.map((a) => ({
+      action_id: a.id,
+      score: answers[a.id].score,
+      observations: answers[a.id].observations || null,
+      evidence_url: answers[a.id].evidence_url || null,
+      corrective_assignee_id: answers[a.id].corrective_assignee_id || null,
+      corrective_due_date: answers[a.id].corrective_due_date || null,
+    }))
+
+    const { error } = await supabase.rpc('submit_audit_execution', {
+      p_execution_id: selectedExec.id,
+      p_answers,
+      p_participants: user?.email || 'Auditor',
+    })
+
+    setLoading(false)
+
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    } else {
+      toast({
+        title: 'Sucesso',
+        description: 'Auditoria finalizada com sucesso. Ações corretivas geradas.',
+      })
+      setSelectedExec(null)
+      loadExecutions()
     }
   }
 
-  const filteredAudits = audits.filter((a) =>
-    a.title.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
-  if (!profile) return null
-  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
-
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
-            <ClipboardList className="h-6 w-6 text-brand-deepBlue" />
+    <div className="p-6 max-w-6xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      <h1 className="text-3xl font-bold tracking-tight">Auditorias Pendentes</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {executions.map((exec) => (
+          <Card
+            key={exec.id}
+            className="overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+          >
+            <div className="h-2 bg-primary"></div>
+            <CardHeader>
+              <div className="flex justify-between items-start mb-2">
+                <Badge variant="outline">{exec.audits?.type}</Badge>
+                <Badge variant="secondary">{exec.status}</Badge>
+              </div>
+              <CardTitle className="text-xl leading-tight">{exec.audits?.title}</CardTitle>
+              <p className="text-sm text-muted-foreground pt-1">
+                Planta: <span className="font-medium text-foreground">{exec.plants?.name}</span>
+              </p>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-end">
+              <Button className="w-full mt-4 group" onClick={() => openExecution(exec)}>
+                <PlayCircle className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />{' '}
+                Executar Auditoria
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+        {executions.length === 0 && (
+          <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
+            Nenhuma auditoria pendente no momento.
           </div>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Auditorias Criadas
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Visualize e edite as regras, perguntas e frequência das suas auditorias.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Buscar título..."
-              className="pl-9 bg-white border-slate-200"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button asChild variant="tech">
-            <Link to="/auditoria-checklist/configuracao">
-              <Plus className="w-4 h-4 mr-2" /> Nova Auditoria
-            </Link>
-          </Button>
-        </div>
+        )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50/80 border-b border-slate-200">
-            <TableRow>
-              <TableHead className="font-semibold text-slate-800">Título da Auditoria</TableHead>
-              <TableHead className="font-semibold text-slate-800">Tipo / Frequência</TableHead>
-              <TableHead className="font-semibold text-slate-800">Data de Início</TableHead>
-              <TableHead className="font-semibold text-slate-800">Antecedência</TableHead>
-              <TableHead className="font-semibold text-slate-800">Responsáveis</TableHead>
-              <TableHead className="font-semibold text-slate-800 text-right">Ação</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
-                </TableCell>
-              </TableRow>
-            ) : filteredAudits.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                  Nenhuma auditoria criada encontrada.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredAudits.map((audit) => {
-                const assignmentsCount = audit.audit_assignments?.length || 0
-                return (
-                  <TableRow key={audit.id} className="hover:bg-slate-50 border-slate-100">
-                    <TableCell className="font-medium text-slate-800">{audit.title}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-slate-700">{audit.type}</span>
-                        <Badge variant="outline" className="w-fit text-[10px]">
-                          {audit.frequency}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      {audit.start_date
-                        ? format(new Date(`${audit.start_date}T12:00:00Z`), 'dd/MM/yyyy')
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      {audit.advance_notice_days || 0} dias antes
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-slate-100 text-slate-700 border-slate-200 shadow-none">
-                        {assignmentsCount} local/responsável
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
-                        >
-                          <Link to={`/auditoria-checklist/configuracao/${audit.id}`}>
-                            <Edit className="w-4 h-4 mr-2" /> Editar
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(audit.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <Dialog open={!!selectedExec} onOpenChange={(val) => !val && setSelectedExec(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Execução: {selectedExec?.audits?.title}</DialogTitle>
+            <DialogDescription>Planta: {selectedExec?.plants?.name}</DialogDescription>
+          </DialogHeader>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Auditoria</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir esta auditoria? Todo o histórico de execução será
-              mantido, mas novas tarefas não serão geradas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <div className="space-y-6 py-4">
+            {actions.map((action, idx) => {
+              const currentAnswer = answers[action.id] || {}
+              const trigger = currentAnswer.score && isTrigger(currentAnswer.score)
+
+              return (
+                <div key={action.id} className="border p-5 rounded-lg space-y-4 bg-card shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <h4 className="font-semibold text-lg flex-1">
+                      {idx + 1}. {action.title}
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>
+                        Avaliação <span className="text-destructive">*</span>
+                      </Label>
+                      <Select
+                        value={currentAnswer.score?.toString()}
+                        onValueChange={(val) => updateAnswer(action.id, 'score', parseInt(val))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma nota" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedExec?.audits?.scoring_settings?.map((s: any) => (
+                            <SelectItem key={s.score} value={s.score.toString()}>
+                              {s.score} - {s.description}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Observações</Label>
+                      <Input
+                        placeholder="Detalhes adicionais e observações..."
+                        value={currentAnswer.observations || ''}
+                        onChange={(e) => updateAnswer(action.id, 'observations', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {trigger && (
+                    <div className="bg-orange-50/80 dark:bg-orange-950/30 p-4 rounded-md border border-orange-200 dark:border-orange-900 mt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center gap-2 text-orange-800 dark:text-orange-400 font-medium mb-2">
+                        <AlertTriangle className="h-5 w-5" />
+                        <span>Ação Corretiva Necessária</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-orange-900 dark:text-orange-300">
+                            Responsável <span className="text-destructive">*</span>
+                          </Label>
+                          <Select
+                            value={currentAnswer.corrective_assignee_id || ''}
+                            onValueChange={(val) =>
+                              updateAnswer(action.id, 'corrective_assignee_id', val)
+                            }
+                          >
+                            <SelectTrigger className="border-orange-300 dark:border-orange-800 bg-white dark:bg-background">
+                              <SelectValue placeholder="Selecione o responsável" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {profiles.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-orange-900 dark:text-orange-300">
+                            Prazo de Resolução <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            type="date"
+                            className="border-orange-300 dark:border-orange-800 bg-white dark:bg-background"
+                            value={currentAnswer.corrective_due_date || ''}
+                            onChange={(e) =>
+                              updateAnswer(action.id, 'corrective_due_date', e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => setSelectedExec(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={submitAudit} disabled={loading} className="px-8">
+              {loading ? 'Salvando...' : 'Finalizar Auditoria'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

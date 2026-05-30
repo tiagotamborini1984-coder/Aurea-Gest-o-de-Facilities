@@ -1,12 +1,21 @@
 import { useState, useEffect } from 'react'
-import { useAppStore } from '@/store/AppContext'
-import { useMasterData } from '@/hooks/use-master-data'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Card, CardContent } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { useToast } from '@/components/ui/use-toast'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -14,676 +23,356 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Save, ClipboardCheck, ArrowLeft } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
-import { Navigate, useNavigate, useParams, Link } from 'react-router-dom'
-import { useHasAccess } from '@/hooks/use-has-access'
-import { format } from 'date-fns'
-
-type Assignment = { plant_id: string; assignee_id: string }
-type ScoringSetting = { score: number; description: string }
-type Action = { title: string; evidence_required: boolean; weight: number }
+import { Plus, Trash2, Edit2, ChevronLeft, Save } from 'lucide-react'
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
-  const { profile } = useAppStore()
-  const { plants } = useMasterData()
-  const hasAccess = useHasAccess('Auditoria e Checklist')
-  const { toast } = useToast()
-  const navigate = useNavigate()
+  if (!id) return <AuditoriaList />
+  return <AuditoriaForm id={id === 'nova' ? undefined : id} />
+}
 
-  const [title, setTitle] = useState('')
-  const [type, setType] = useState('Qualidade')
-  const [frequency, setFrequency] = useState('Única')
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [advanceNotice, setAdvanceNotice] = useState('0')
-
-  const [assignments, setAssignments] = useState<Assignment[]>([{ plant_id: '', assignee_id: '' }])
-  const [actions, setActions] = useState<Action[]>([
-    { title: '', evidence_required: false, weight: 1 },
-  ])
-  const [scoringSettings, setScoringSettings] = useState<ScoringSetting[]>([
-    { score: 1, description: 'Muito Ruim' },
-    { score: 2, description: 'Ruim' },
-    { score: 3, description: 'Regular' },
-    { score: 4, description: 'Bom' },
-    { score: 5, description: 'Excelente' },
-  ])
-
-  const [users, setUsers] = useState<any[]>([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoadingAudit, setIsLoadingAudit] = useState(false)
+function AuditoriaList() {
+  const { user } = useAuth()
+  const [audits, setAudits] = useState<any[]>([])
 
   useEffect(() => {
-    if (profile?.client_id) {
-      supabase
-        .from('profiles')
-        .select('id, name')
-        .eq('client_id', profile.client_id)
-        .then((res) => {
-          if (res.data) setUsers(res.data)
-        })
-    }
-  }, [profile])
+    loadAudits()
+  }, [user])
 
-  useEffect(() => {
-    if (id && profile) {
-      setIsLoadingAudit(true)
-      const loadAudit = async () => {
-        const { data: audit } = await supabase.from('audits').select('*').eq('id', id).single()
-        if (audit) {
-          setTitle(audit.title)
-          setType(audit.type)
-          setFrequency(audit.frequency)
-          setStartDate(audit.start_date)
-          setAdvanceNotice((audit as any).advance_notice_days?.toString() || '0')
-          if ((audit as any).scoring_settings) {
-            setScoringSettings((audit as any).scoring_settings)
-          }
-
-          const { data: acts } = await supabase
-            .from('audit_actions')
-            .select('*')
-            .eq('audit_id', id)
-            .order('order_index')
-          if (acts && acts.length > 0) {
-            setActions(acts.map((a: any) => ({ ...a, weight: a.weight || 1 })))
-          }
-
-          const { data: assigns } = await supabase
-            .from('audit_assignments' as any)
-            .select('*')
-            .eq('audit_id', id)
-          if (assigns && assigns.length > 0) {
-            setAssignments(
-              assigns.map((a: any) => ({ plant_id: a.plant_id, assignee_id: a.assignee_id })),
-            )
-          }
-        }
-        setIsLoadingAudit(false)
-      }
-      loadAudit()
-    }
-  }, [id, profile])
-
-  if (!profile) return null
-  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
-
-  const addAssignment = () => setAssignments([...assignments, { plant_id: '', assignee_id: '' }])
-  const removeAssignment = (index: number) =>
-    setAssignments(assignments.filter((_, i) => i !== index))
-
-  const addAction = () =>
-    setActions([...actions, { title: '', evidence_required: false, weight: 1 }])
-  const removeAction = (index: number) => setActions(actions.filter((_, i) => i !== index))
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (
-      !title ||
-      assignments.some((a) => !a.plant_id || !a.assignee_id) ||
-      actions.some((a) => !a.title)
-    ) {
-      toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' })
-      return
-    }
-
-    const uniqueScores = new Set(scoringSettings.map((s) => s.score))
-    if (uniqueScores.size !== scoringSettings.length) {
-      toast({
-        title: 'Valores de nota duplicados',
-        description: 'Cada nota na escala deve ser única.',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      let auditId = id
-
-      if (auditId) {
-        // Update Audit
-        await supabase
-          .from('audits')
-          .update({
-            title,
-            type,
-            frequency,
-            start_date: startDate,
-            advance_notice_days: parseInt(advanceNotice) || 0,
-            scoring_settings: scoringSettings,
-          } as any)
-          .eq('id', auditId)
-      } else {
-        // Create Audit Template
-        const { data: newAudit, error: auditErr } = await supabase
-          .from('audits')
-          .insert({
-            client_id: profile.client_id,
-            title,
-            type,
-            frequency,
-            start_date: startDate,
-            advance_notice_days: parseInt(advanceNotice) || 0,
-            scoring_settings: scoringSettings,
-          } as any)
-          .select()
-          .single()
-
-        if (auditErr) throw auditErr
-        auditId = newAudit.id
-      }
-
-      // Recreate Actions
-      await supabase.from('audit_actions').delete().eq('audit_id', auditId!)
-      const actionsToInsert = actions.map((a, idx) => ({
-        audit_id: auditId!,
-        title: a.title,
-        evidence_required: a.evidence_required,
-        weight: a.weight || 1,
-        order_index: idx,
-      }))
-      await supabase.from('audit_actions').insert(actionsToInsert)
-
-      // Recreate Assignments
-      await supabase
-        .from('audit_assignments' as any)
-        .delete()
-        .eq('audit_id', auditId!)
-      const assignmentsToInsert = assignments.map((a) => ({
-        audit_id: auditId!,
-        plant_id: a.plant_id,
-        assignee_id: a.assignee_id,
-      }))
-      await supabase.from('audit_assignments' as any).insert(assignmentsToInsert)
-
-      // Generate initial tasks if date is within advance notice (for both new and updated)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const parts = startDate.split('-')
-      if (parts.length === 3) {
-        const start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-        const advance = parseInt(advanceNotice) || 0
-        const triggerDate = new Date(start)
-        triggerDate.setDate(triggerDate.getDate() - advance)
-
-        if (today >= triggerDate) {
-          let { data: typeRes } = await supabase
-            .from('task_types')
-            .select('id')
-            .eq('client_id', profile.client_id)
-            .ilike('name', '%Auditoria%')
-            .limit(1)
-          let typeId = typeRes?.[0]?.id
-
-          if (!typeId) {
-            const { data: newType } = await supabase
-              .from('task_types')
-              .insert({ client_id: profile.client_id, name: 'Auditoria', sla_hours: 24 } as any)
-              .select('id')
-              .single()
-            typeId = newType?.id
-          }
-
-          let { data: statusRes } = await supabase
-            .from('task_statuses')
-            .select('id')
-            .eq('client_id', profile.client_id)
-            .eq('is_terminal', false)
-            .order('created_at', { ascending: true })
-            .limit(1)
-          let statusId = statusRes?.[0]?.id
-
-          if (!statusId) {
-            const { data: newStatus } = await supabase
-              .from('task_statuses')
-              .insert({
-                client_id: profile.client_id,
-                name: 'Pendente',
-                color: '#eab308',
-                is_terminal: false,
-              } as any)
-              .select('id')
-              .single()
-            statusId = newStatus?.id
-          }
-
-          if (typeId && statusId) {
-            for (const assign of assignments) {
-              const { data: existingExec } = await supabase
-                .from('audit_executions')
-                .select('id')
-                .eq('audit_id', auditId!)
-                .eq('assignee_id', assign.assignee_id)
-                .eq('plant_id', assign.plant_id)
-                .eq('status', 'Pendente')
-
-              if (!existingExec || existingExec.length === 0) {
-                const year = new Date().getFullYear()
-                const { data: latest } = await supabase
-                  .from('tasks')
-                  .select('task_number')
-                  .eq('client_id', profile.client_id)
-                  .like('task_number', `TSK-${year}-%`)
-                  .order('created_at', { ascending: false })
-                  .limit(1)
-
-                let seq = 1
-                if (latest && latest.length > 0) {
-                  const p = latest[0].task_number.split('-')
-                  if (p.length === 3) seq = parseInt(p[2], 10) + 1
-                }
-                const taskNumber = `TSK-${year}-${seq.toString().padStart(4, '0')}`
-
-                const { data: newTask } = await supabase
-                  .from('tasks')
-                  .insert({
-                    client_id: profile.client_id,
-                    plant_id: assign.plant_id,
-                    type_id: typeId,
-                    status_id: statusId,
-                    requester_id: profile.id,
-                    assignee_id: assign.assignee_id,
-                    task_number: taskNumber,
-                    title: `Auditoria: ${title}`,
-                    description: `Por favor, realize a auditoria "${title}" agendada para ${startDate.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`,
-                    due_date: new Date(`${startDate}T23:59:59.999Z`).toISOString(),
-                    status_updated_at: new Date().toISOString(),
-                  } as any)
-                  .select()
-                  .single()
-
-                if (newTask) {
-                  await supabase.from('audit_executions').insert({
-                    audit_id: auditId!,
-                    task_id: newTask.id,
-                    assignee_id: assign.assignee_id,
-                    plant_id: assign.plant_id,
-                    status: 'Pendente',
-                  })
-                }
-              }
-            }
-          }
-        }
-      }
-
-      toast({
-        title: id ? 'Auditoria atualizada!' : 'Auditoria criada com sucesso!',
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-      navigate('/auditoria-checklist/criadas')
-    } catch (err: any) {
-      toast({ title: 'Erro ao salvar auditoria', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  if (isLoadingAudit) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-deepBlue" />
-      </div>
-    )
+  const loadAudits = async () => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id)
+      .single()
+    if (!profile?.client_id) return
+    const { data } = await supabase
+      .from('audits')
+      .select('*')
+      .eq('client_id', profile.client_id)
+      .order('created_at', { ascending: false })
+    setAudits(data || [])
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" asChild className="h-10 w-10 shrink-0">
-            <Link to="/auditoria-checklist/criadas">
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
-            </Link>
-          </Button>
-          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm shrink-0">
-            <ClipboardCheck className="h-6 w-6 text-brand-deepBlue" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {id ? 'Editar Auditoria' : 'Nova Auditoria'}
-            </h2>
-            <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-              Crie templates, defina ações, regras e frequência.
-            </p>
-          </div>
-        </div>
+    <div className="p-6 max-w-6xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Configuração de Auditorias</h1>
+        <Button asChild>
+          <Link to="/auditoria-checklist/configuracao/nova">
+            <Plus className="mr-2 h-4 w-4" /> Nova Auditoria
+          </Link>
+        </Button>
+      </div>
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Título</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Frequência</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {audits.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell className="font-medium">{a.title}</TableCell>
+                <TableCell>{a.type}</TableCell>
+                <TableCell>{a.frequency}</TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link to={`/auditoria-checklist/configuracao/${a.id}`}>
+                      <Edit2 className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {audits.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  Nenhuma auditoria configurada.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  )
+}
+
+function AuditoriaForm({ id }: { id?: string }) {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { toast } = useToast()
+
+  const [audit, setAudit] = useState({
+    title: '',
+    type: 'Geral',
+    frequency: 'Única',
+    start_date: '',
+  })
+  const [settings, setSettings] = useState([
+    { score: 1, description: 'Muito Ruim', trigger_task: true },
+    { score: 2, description: 'Ruim', trigger_task: true },
+    { score: 3, description: 'Regular', trigger_task: false },
+    { score: 4, description: 'Bom', trigger_task: false },
+    { score: 5, description: 'Excelente', trigger_task: false },
+  ])
+  const [actions, setActions] = useState([{ title: '', weight: 1, evidence_required: false }])
+
+  useEffect(() => {
+    if (id) loadAudit()
+  }, [id])
+
+  const loadAudit = async () => {
+    const { data: aud } = await supabase.from('audits').select('*').eq('id', id).single()
+    if (aud) {
+      setAudit({
+        title: aud.title,
+        type: aud.type,
+        frequency: aud.frequency,
+        start_date: aud.start_date,
+      })
+      if (aud.scoring_settings) setSettings(aud.scoring_settings as any)
+
+      const { data: acts } = await supabase
+        .from('audit_actions')
+        .select('*')
+        .eq('audit_id', aud.id)
+        .order('order_index')
+      if (acts && acts.length > 0) setActions(acts)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!audit.title || !audit.start_date)
+      return toast({
+        title: 'Erro',
+        description: 'Preencha os campos obrigatórios',
+        variant: 'destructive',
+      })
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id)
+      .single()
+    if (!profile?.client_id) return
+
+    let auditId = id
+
+    if (id) {
+      await supabase
+        .from('audits')
+        .update({ ...audit, scoring_settings: settings })
+        .eq('id', id)
+    } else {
+      const { data, error } = await supabase
+        .from('audits')
+        .insert({
+          client_id: profile.client_id,
+          ...audit,
+          scoring_settings: settings,
+        })
+        .select()
+        .single()
+      if (error) return toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      auditId = data.id
+    }
+
+    if (auditId) {
+      await supabase.from('audit_actions').delete().eq('audit_id', auditId)
+      const actsToInsert = actions.map((a, idx) => ({
+        audit_id: auditId,
+        title: a.title,
+        weight: a.weight,
+        evidence_required: a.evidence_required,
+        order_index: idx,
+      }))
+      await supabase.from('audit_actions').insert(actsToInsert)
+      toast({ title: 'Sucesso', description: 'Auditoria salva com sucesso' })
+      navigate('/auditoria-checklist/configuracao')
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      <div className="flex items-center gap-4">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => navigate('/auditoria-checklist/configuracao')}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {id ? 'Editar Auditoria' : 'Nova Auditoria'}
+        </h1>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
-        <Card className="shadow-sm border-gray-200">
-          <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2 md:col-span-2">
-                <Label className="text-slate-700 font-bold">Nome da Auditoria *</Label>
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados Gerais</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Título</Label>
+            <Input
+              value={audit.title}
+              onChange={(e) => setAudit({ ...audit, title: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Data de Início</Label>
+            <Input
+              type="date"
+              value={audit.start_date}
+              onChange={(e) => setAudit({ ...audit, start_date: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Tipo</Label>
+            <Select value={audit.type} onValueChange={(v) => setAudit({ ...audit, type: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Geral">Geral</SelectItem>
+                <SelectItem value="Qualidade">Qualidade</SelectItem>
+                <SelectItem value="Segurança">Segurança</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Frequência</Label>
+            <Select
+              value={audit.frequency}
+              onValueChange={(v) => setAudit({ ...audit, frequency: v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Única">Única</SelectItem>
+                <SelectItem value="Semanal">Semanal</SelectItem>
+                <SelectItem value="Mensal">Mensal</SelectItem>
+                <SelectItem value="Anual">Anual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Escala de Avaliação e Ações Corretivas</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Configure as notas e ative a geração automática de tarefas para correções de
+            não-conformidades.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {settings.map((s, idx) => (
+            <div
+              key={idx}
+              className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 border rounded-lg bg-card transition-colors hover:border-primary/50"
+            >
+              <div className="w-20 space-y-1">
+                <Label>Nota</Label>
+                <Input value={s.score} disabled className="font-semibold text-center bg-muted/50" />
+              </div>
+              <div className="flex-1 space-y-1 w-full">
+                <Label>Descrição</Label>
                 <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ex: Auditoria 5S - Limpeza Geral"
-                  className="text-lg bg-slate-50"
-                  required
+                  value={s.description}
+                  onChange={(e) => {
+                    const ns = [...settings]
+                    ns[idx].description = e.target.value
+                    setSettings(ns)
+                  }}
                 />
               </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700">Tipo de Auditoria</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Qualidade">Qualidade</SelectItem>
-                    <SelectItem value="Segurança">Segurança</SelectItem>
-                    <SelectItem value="Operacional">Operacional</SelectItem>
-                    <SelectItem value="Geral">Geral</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700">Frequência</Label>
-                <Select value={frequency} onValueChange={setFrequency}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Única">Única</SelectItem>
-                    <SelectItem value="Diária">Diária</SelectItem>
-                    <SelectItem value="Semanal">Semanal</SelectItem>
-                    <SelectItem value="Mensal">Mensal</SelectItem>
-                    <SelectItem value="Semestral">Semestral</SelectItem>
-                    <SelectItem value="Anual">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700">Data de Início *</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  required
-                  className="bg-white"
+              <div className="flex items-center gap-2 sm:mt-6">
+                <Switch
+                  checked={s.trigger_task}
+                  onCheckedChange={(v) => {
+                    const ns = [...settings]
+                    ns[idx].trigger_task = v
+                    setSettings(ns)
+                  }}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-700">
-                  Antecedência (dias antes para abrir tarefa)
+                <Label className="whitespace-nowrap font-medium text-orange-600 dark:text-orange-400">
+                  Gera Ação Corretiva
                 </Label>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Itens de Auditoria</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setActions([...actions, { title: '', weight: 1, evidence_required: false }])
+            }
+          >
+            <Plus className="mr-2 h-4 w-4" /> Adicionar Item
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {actions.map((a, idx) => (
+            <div
+              key={idx}
+              className="flex items-end gap-4 p-4 border rounded-lg hover:border-primary/50 transition-colors"
+            >
+              <div className="flex-1 space-y-1">
+                <Label>Item a avaliar</Label>
+                <Input
+                  value={a.title}
+                  onChange={(e) => {
+                    const na = [...actions]
+                    na[idx].title = e.target.value
+                    setActions(na)
+                  }}
+                  placeholder="Ex: Limpeza e organização do ambiente"
+                />
+              </div>
+              <div className="w-24 space-y-1">
+                <Label>Peso</Label>
                 <Input
                   type="number"
-                  min="0"
-                  value={advanceNotice}
-                  onChange={(e) => setAdvanceNotice(e.target.value)}
-                  className="bg-white"
-                  placeholder="Ex: 5"
+                  value={a.weight}
+                  onChange={(e) => {
+                    const na = [...actions]
+                    na[idx].weight = Number(e.target.value)
+                    setActions(na)
+                  }}
                 />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-gray-200">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-bold text-slate-800">
-                Distribuição (Plantas e Responsáveis)
-              </h3>
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addAssignment}
-                className="text-brand-deepBlue border-brand-deepBlue/20 hover:bg-brand-deepBlue/5"
+                variant="ghost"
+                size="icon"
+                onClick={() => setActions(actions.filter((_, i) => i !== idx))}
               >
-                <Plus className="w-4 h-4 mr-1" /> Adicionar Local
+                <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             </div>
+          ))}
+        </CardContent>
+      </Card>
 
-            {assignments.map((assign, idx) => (
-              <div
-                key={idx}
-                className="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-200"
-              >
-                <div className="w-full space-y-2">
-                  <Label className="text-slate-700">Planta</Label>
-                  <Select
-                    value={assign.plant_id}
-                    onValueChange={(v) => {
-                      const newArr = [...assignments]
-                      newArr[idx].plant_id = v
-                      setAssignments(newArr)
-                    }}
-                    required
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plants.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-full space-y-2">
-                  <Label className="text-slate-700">Responsável</Label>
-                  <Select
-                    value={assign.assignee_id}
-                    onValueChange={(v) => {
-                      const newArr = [...assignments]
-                      newArr[idx].assignee_id = v
-                      setAssignments(newArr)
-                    }}
-                    required
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {assignments.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
-                    onClick={() => removeAssignment(idx)}
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-gray-200">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">
-                  Critérios de Avaliação (Escala)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Defina as notas possíveis e a descrição de cada critério.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setScoringSettings([...scoringSettings, { score: 0, description: '' }])
-                }
-                className="text-brand-deepBlue border-brand-deepBlue/20 hover:bg-brand-deepBlue/5"
-              >
-                <Plus className="w-4 h-4 mr-1" /> Adicionar Nota
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {scoringSettings.map((setting, idx) => (
-                <div key={idx} className="flex gap-4 items-center">
-                  <div className="w-24">
-                    <Label className="text-xs">Nota</Label>
-                    <Input
-                      type="number"
-                      value={setting.score}
-                      onChange={(e) => {
-                        const newSettings = [...scoringSettings]
-                        newSettings[idx].score = parseFloat(e.target.value) || 0
-                        setScoringSettings(newSettings)
-                      }}
-                      required
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label className="text-xs">Descrição do Critério</Label>
-                    <Input
-                      value={setting.description}
-                      onChange={(e) => {
-                        const newSettings = [...scoringSettings]
-                        newSettings[idx].description = e.target.value
-                        setScoringSettings(newSettings)
-                      }}
-                      placeholder="Ex: Totalmente conforme"
-                      required
-                    />
-                  </div>
-                  {scoringSettings.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="mt-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => {
-                        const newSettings = [...scoringSettings]
-                        newSettings.splice(idx, 1)
-                        setScoringSettings(newSettings)
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-gray-200">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">Checklist (Ações)</h3>
-                <p className="text-xs text-slate-500">
-                  Descreva cada ação e defina o peso correspondente na nota final.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addAction}
-                className="text-brand-deepBlue border-brand-deepBlue/20 hover:bg-brand-deepBlue/5"
-              >
-                <Plus className="w-4 h-4 mr-1" /> Adicionar Ação
-              </Button>
-            </div>
-
-            {actions.map((action, idx) => (
-              <div
-                key={idx}
-                className="flex flex-col sm:flex-row gap-4 items-center sm:items-start bg-white p-4 rounded-xl border border-slate-200 shadow-sm"
-              >
-                <div className="flex items-center justify-center bg-slate-100 w-8 h-8 rounded-full font-bold text-slate-500 shrink-0 mt-1">
-                  {idx + 1}
-                </div>
-                <div className="flex-1 w-full space-y-1">
-                  <Label className="text-xs text-slate-500">Ação / Pergunta</Label>
-                  <Input
-                    value={action.title}
-                    onChange={(e) => {
-                      const newArr = [...actions]
-                      newArr[idx].title = e.target.value
-                      setActions(newArr)
-                    }}
-                    placeholder="Descreva a ação a ser avaliada..."
-                    required
-                    className="border-slate-200"
-                  />
-                </div>
-                <div className="w-24 shrink-0 space-y-1">
-                  <Label className="text-xs text-slate-500">Peso</Label>
-                  <Input
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    value={action.weight}
-                    onChange={(e) => {
-                      const newArr = [...actions]
-                      newArr[idx].weight = parseFloat(e.target.value) || 1
-                      setActions(newArr)
-                    }}
-                    required
-                    className="border-slate-200 text-center"
-                  />
-                </div>
-                <div className="flex items-center gap-2 shrink-0 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 mt-0 sm:mt-6">
-                  <Switch
-                    checked={action.evidence_required}
-                    onCheckedChange={(v) => {
-                      const newArr = [...actions]
-                      newArr[idx].evidence_required = v
-                      setActions(newArr)
-                    }}
-                  />
-                  <Label className="text-xs font-semibold cursor-pointer">
-                    Evidência Obrigatória
-                  </Label>
-                </div>
-                {actions.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 mt-0 sm:mt-5"
-                    onClick={() => removeAction(idx)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end gap-4 pb-12">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(-1)}
-            className="border-gray-300"
-          >
-            Cancelar
-          </Button>
-          <Button type="submit" variant="tech" disabled={isSubmitting} className="px-8 shadow-md">
-            {isSubmitting ? (
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-            ) : (
-              <Save className="w-5 h-5 mr-2" />
-            )}
-            {id ? 'Salvar Alterações' : 'Criar Auditoria e Agendar'}
-          </Button>
-        </div>
-      </form>
+      <div className="flex justify-end pt-4">
+        <Button onClick={handleSave} className="w-full sm:w-auto px-8">
+          <Save className="mr-2 h-4 w-4" /> Salvar Configuração
+        </Button>
+      </div>
     </div>
   )
 }
