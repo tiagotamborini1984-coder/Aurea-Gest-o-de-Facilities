@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -9,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Play, CheckCircle } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -19,59 +23,89 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/components/ui/use-toast'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
+import { SignatureCapture } from '@/components/audit/SignatureCapture'
 
 export default function AuditoriaRealizadas() {
+  const { user } = useAuth()
+  const { toast } = useToast()
   const [executions, setExecutions] = useState<any[]>([])
-  const [selectedExecution, setSelectedExecution] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const [activeExec, setActiveExec] = useState<any>(null)
+  const [executing, setExecuting] = useState(false)
   const [actions, setActions] = useState<any[]>([])
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [participants, setParticipants] = useState('')
-  const { toast } = useToast()
+  const [signatures, setSignatures] = useState<any[]>([])
 
-  useEffect(() => {
-    loadExecutions()
-  }, [])
-
-  const loadExecutions = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+  const fetchExecutions = async () => {
     if (!user) return
-    const { data } = await supabase
-      .from('audit_executions')
-      .select(`
-      *,
-      audits (title, type),
-      plants (name),
-      profiles (name)
-    `)
-      .order('created_at', { ascending: false })
-
-    setExecutions(data || [])
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user.id)
+      .single()
+    if (profile?.client_id) {
+      const { data } = await supabase
+        .from('audit_executions')
+        .select(`
+          id, status, realization_date, final_score, max_score, participants, signatures,
+          audits!inner(id, title, client_id, scoring_settings),
+          plants!inner(name)
+        `)
+        .eq('audits.client_id', profile.client_id)
+        .order('created_at', { ascending: false })
+      if (data) setExecutions(data)
+    }
+    setLoading(false)
   }
 
+  useEffect(() => {
+    fetchExecutions()
+  }, [user])
+
   const openExecution = async (exec: any) => {
+    if (exec.status === 'Finalizado') {
+      toast({ title: 'Aviso', description: 'Esta auditoria já foi finalizada.' })
+      return
+    }
+    setActiveExec(exec)
+    setParticipants(exec.participants || '')
+    setSignatures(exec.signatures || [])
+
     const { data } = await supabase
       .from('audit_actions')
       .select('*')
-      .eq('audit_id', exec.audit_id)
+      .eq('audit_id', exec.audits.id)
       .order('order_index')
     setActions(data || [])
-    setSelectedExecution(exec)
-    setAnswers({})
-    setParticipants('')
+
+    const { data: existAns } = await supabase
+      .from('audit_execution_answers')
+      .select('*')
+      .eq('execution_id', exec.id)
+    const ansMap: Record<string, any> = {}
+    existAns?.forEach((a) => {
+      ansMap[a.action_id] = {
+        score: a.score,
+        observations: a.observations,
+        evidence_url: a.evidence_url,
+        corrective_assignee_id: a.corrective_assignee_id,
+        corrective_due_date: a.corrective_due_date,
+      }
+    })
+    setAnswers(ansMap)
   }
 
-  const updateAnswer = (actionId: string, field: string, value: any) => {
+  const closeExecution = () => {
+    setActiveExec(null)
+    setActions([])
+    setAnswers({})
+    setParticipants('')
+    setSignatures([])
+  }
+
+  const handleAnswerChange = (actionId: string, field: string, value: any) => {
     setAnswers((prev) => ({
       ...prev,
       [actionId]: {
@@ -81,183 +115,237 @@ export default function AuditoriaRealizadas() {
     }))
   }
 
-  const handleSave = async () => {
-    for (const action of actions) {
-      const ans = answers[action.id] || {}
-      if (action.evidence_required && !ans.evidence_url) {
+  const handleSubmit = async (isDraft: boolean) => {
+    if (!activeExec) return
+
+    const participantNames = participants
+      .split(',')
+      .map((n) => n.trim())
+      .filter(Boolean)
+
+    if (!isDraft) {
+      if (participantNames.length > 0 && signatures.length < participantNames.length) {
         toast({
           title: 'Atenção',
-          description: `O item "${action.title}" exige uma evidência (URL da foto/documento).`,
+          description: 'Todos os participantes listados devem assinar antes de finalizar.',
           variant: 'destructive',
         })
         return
       }
-      if ((action as any).comments_required && !ans.observations) {
+
+      const allAnswered = actions.every((a) => answers[a.id]?.score !== undefined)
+      if (!allAnswered) {
         toast({
           title: 'Atenção',
-          description: `O item "${action.title}" exige um comentário.`,
+          description: 'Responda todas as perguntas antes de finalizar.',
           variant: 'destructive',
         })
         return
       }
     }
 
-    const payload = actions.map((action) => ({
-      action_id: action.id,
-      score: answers[action.id]?.score || 0,
-      observations: answers[action.id]?.observations || '',
-      evidence_url: answers[action.id]?.evidence_url || '',
-    }))
+    setExecuting(true)
+    try {
+      const payload = Object.keys(answers).map((actionId) => ({
+        action_id: actionId,
+        score: answers[actionId].score,
+        observations: answers[actionId].observations,
+        evidence_url: answers[actionId].evidence_url,
+        corrective_assignee_id: answers[actionId].corrective_assignee_id,
+        corrective_due_date: answers[actionId].corrective_due_date,
+      }))
 
-    const { error } = await supabase.rpc('submit_audit_execution', {
-      p_execution_id: selectedExecution.id,
-      p_answers: payload as any,
-      p_participants: participants,
-    })
+      const { error } = await supabase.rpc('submit_audit_execution', {
+        p_execution_id: activeExec.id,
+        p_answers: payload.length > 0 ? payload : [],
+        p_participants: participants,
+        p_is_draft: isDraft,
+        p_signatures: signatures,
+      })
 
-    if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-    } else {
-      toast({ title: 'Sucesso', description: 'Auditoria salva e finalizada.' })
-      setSelectedExecution(null)
-      loadExecutions()
+      if (error) throw error
+
+      toast({
+        title: 'Sucesso',
+        description: isDraft ? 'Rascunho salvo.' : 'Auditoria finalizada com sucesso!',
+      })
+      closeExecution()
+      fetchExecutions()
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setExecuting(false)
     }
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6 animate-fade-in-up">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Execuções de Auditoria</h1>
+        <h1 className="text-2xl font-bold">Execuções de Auditorias</h1>
       </div>
 
-      <div className="border rounded-md bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Auditoria</TableHead>
-              <TableHead>Planta</TableHead>
-              <TableHead>Responsável</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Data Realização</TableHead>
-              <TableHead className="w-[120px]">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {executions.map((exec) => (
-              <TableRow key={exec.id}>
-                <TableCell className="font-medium">{exec.audits?.title}</TableCell>
-                <TableCell>{exec.plants?.name}</TableCell>
-                <TableCell>{exec.profiles?.name}</TableCell>
-                <TableCell>
-                  <Badge variant={exec.status === 'Finalizado' ? 'secondary' : 'default'}>
-                    {exec.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {exec.realization_date
-                    ? new Date(exec.realization_date).toLocaleDateString()
-                    : '-'}
-                </TableCell>
-                <TableCell>
-                  {exec.status === 'Pendente' && (
-                    <Button size="sm" onClick={() => openExecution(exec)}>
-                      Executar
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {executions.length === 0 && (
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Nenhuma execução encontrada.
-                </TableCell>
+                <TableHead>Auditoria</TableHead>
+                <TableHead>Planta</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Pontuação</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">
+                    Carregando...
+                  </TableCell>
+                </TableRow>
+              ) : executions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">
+                    Nenhuma execução encontrada.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                executions.map((exec) => (
+                  <TableRow key={exec.id}>
+                    <TableCell className="font-medium">{exec.audits.title}</TableCell>
+                    <TableCell>{exec.plants.name}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          exec.status === 'Pendente'
+                            ? 'bg-blue-100 text-blue-800'
+                            : exec.status === 'Rascunho'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                        }`}
+                      >
+                        {exec.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {exec.realization_date
+                        ? new Date(exec.realization_date).toLocaleDateString()
+                        : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {exec.final_score !== null ? `${exec.final_score} / ${exec.max_score}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {exec.status !== 'Finalizado' ? (
+                        <Button variant="outline" size="sm" onClick={() => openExecution(exec)}>
+                          <Play className="w-4 h-4 mr-1" />{' '}
+                          {exec.status === 'Rascunho' ? 'Continuar' : 'Executar'}
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" disabled>
+                          <CheckCircle className="w-4 h-4 mr-1 text-green-500" /> Finalizado
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      <Dialog open={!!selectedExecution} onOpenChange={(o) => !o && setSelectedExecution(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!activeExec} onOpenChange={(open) => !open && closeExecution()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Executar Auditoria: {selectedExecution?.audits?.title}</DialogTitle>
+            <DialogTitle>Execução: {activeExec?.audits?.title}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            <div className="space-y-2">
-              <Label>Participantes (Opcional)</Label>
-              <Input
-                placeholder="Nomes dos participantes separados por vírgula"
-                value={participants}
-                onChange={(e) => setParticipants(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium">Itens do Checklist</h3>
-              {actions.map((action, idx) => (
-                <div key={action.id} className="p-4 border rounded-md space-y-4">
-                  <div className="flex justify-between items-start">
-                    <span className="font-medium">
-                      {idx + 1}. {action.title}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Label>Nota</Label>
-                      <Select
-                        value={answers[action.id]?.score?.toString() || ''}
-                        onValueChange={(v) => updateAnswer(action.id, 'score', parseInt(v))}
-                      >
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="-" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <SelectItem key={n} value={n.toString()}>
-                              {n}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+            {actions.map((act, i) => (
+              <Card key={act.id}>
+                <CardHeader className="py-3 bg-muted/30">
+                  <CardTitle className="text-base font-medium">
+                    {i + 1}. {act.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="py-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nota</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <Button
+                          key={score}
+                          type="button"
+                          variant={answers[act.id]?.score === score ? 'default' : 'outline'}
+                          onClick={() => handleAnswerChange(act.id, 'score', score)}
+                          className="w-12 h-12"
+                        >
+                          {score}
+                        </Button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {act.comments_required && (
                     <div className="space-y-2">
-                      <Label>
-                        Evidência (URL)
-                        {action.evidence_required && <span className="text-red-500 ml-1">*</span>}
-                      </Label>
-                      <Input
-                        placeholder="https://..."
-                        value={answers[action.id]?.evidence_url || ''}
-                        onChange={(e) => updateAnswer(action.id, 'evidence_url', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>
-                        Comentários
-                        {(action as any).comments_required && (
-                          <span className="text-red-500 ml-1">*</span>
-                        )}
-                      </Label>
+                      <Label>Observações (Obrigatório)</Label>
                       <Textarea
-                        placeholder="Observações..."
-                        value={answers[action.id]?.observations || ''}
-                        onChange={(e) => updateAnswer(action.id, 'observations', e.target.value)}
+                        value={answers[act.id]?.observations || ''}
+                        onChange={(e) => handleAnswerChange(act.id, 'observations', e.target.value)}
+                        placeholder="Descreva suas observações..."
                       />
                     </div>
-                  </div>
+                  )}
+
+                  {act.evidence_required && (
+                    <div className="space-y-2">
+                      <Label>Evidência (URL/Obrigatório)</Label>
+                      <Input
+                        value={answers[act.id]?.evidence_url || ''}
+                        onChange={(e) => handleAnswerChange(act.id, 'evidence_url', e.target.value)}
+                        placeholder="https://..."
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Conclusão & Assinaturas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Participantes (separados por vírgula)</Label>
+                  <Input
+                    value={participants}
+                    onChange={(e) => setParticipants(e.target.value)}
+                    placeholder="João Silva, Maria Souza"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Adicione os nomes dos participantes para habilitar a captura de assinaturas.
+                  </p>
                 </div>
-              ))}
-            </div>
+
+                <SignatureCapture
+                  participantsText={participants}
+                  signatures={signatures}
+                  onChange={setSignatures}
+                />
+              </CardContent>
+            </Card>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedExecution(null)}>
-              Cancelar
+          <DialogFooter className="gap-2 sm:gap-0 sticky bottom-0 bg-background pt-2 pb-2">
+            <Button variant="outline" onClick={() => handleSubmit(true)} disabled={executing}>
+              Salvar Rascunho
             </Button>
-            <Button onClick={handleSave}>Finalizar Auditoria</Button>
+            <Button onClick={() => handleSubmit(false)} disabled={executing}>
+              Finalizar Auditoria
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

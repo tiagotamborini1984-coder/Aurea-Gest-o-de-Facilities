@@ -1,213 +1,394 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useForm, FormProvider } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { toast } from 'sonner'
+import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
-import { auditConfigSchema, type AuditConfigForm } from './schema'
-import { BasicSettings } from './components/BasicSettings'
-import { ScoringSettings } from './components/ScoringSettings'
-import { ChecklistSettings } from './components/ChecklistSettings'
-import { AssignmentSettings } from './components/AssignmentSettings'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Save, Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { toast } = useToast()
+
   const [loading, setLoading] = useState(false)
+  const [fetching, setFetching] = useState(!!id)
+  const [clientId, setClientId] = useState<string | null>(null)
+
+  const [title, setTitle] = useState('')
+  const [type, setType] = useState('Geral')
+  const [frequency, setFrequency] = useState('Única')
+  const [startDate, setStartDate] = useState('')
+  const [advanceNoticeDays, setAdvanceNoticeDays] = useState(0)
+
+  const [actions, setActions] = useState<any[]>([])
+  const [assignments, setAssignments] = useState<any[]>([])
+
   const [plants, setPlants] = useState<any[]>([])
   const [profiles, setProfiles] = useState<any[]>([])
 
-  const methods = useForm<AuditConfigForm>({
-    resolver: zodResolver(auditConfigSchema),
-    defaultValues: {
-      title: '',
-      type: 'Geral',
-      frequency: 'Única',
-      start_date: new Date().toISOString().split('T')[0],
-      advance_notice_days: 0,
-      scoring_settings: [
-        { score: 1, description: 'Muito Ruim', trigger_task: true },
-        { score: 2, description: 'Ruim', trigger_task: true },
-        { score: 3, description: 'Regular', trigger_task: false },
-        { score: 4, description: 'Bom', trigger_task: false },
-        { score: 5, description: 'Excelente', trigger_task: false },
-      ],
-      actions: [{ title: '', weight: 1, evidence_required: false, comments_required: false }],
-      assignments: [],
-    },
-  })
-
   useEffect(() => {
-    if (!user) return
-    const loadData = async () => {
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('client_id')
-          .eq('id', user.id)
-          .single()
-        if (!profile?.client_id) return
-
-        const [plantsRes, profilesRes] = await Promise.all([
-          supabase
-            .from('plants')
-            .select('id, name')
-            .eq('client_id', profile.client_id)
-            .order('name'),
-          supabase
-            .from('profiles')
-            .select('id, name')
-            .eq('client_id', profile.client_id)
-            .order('name'),
-        ])
-
-        setPlants(plantsRes.data || [])
-        setProfiles(profilesRes.data || [])
-
-        if (id) {
-          const { data: audit } = await supabase
-            .from('audits')
-            .select('*, audit_actions(*), audit_assignments(*)')
-            .eq('id', id)
-            .single()
-
-          if (audit) {
-            methods.reset({
-              title: audit.title,
-              type: audit.type,
-              frequency: audit.frequency,
-              start_date: audit.start_date,
-              advance_notice_days: audit.advance_notice_days || 0,
-              scoring_settings: (audit.scoring_settings as any[]) || [],
-              actions:
-                audit.audit_actions
-                  ?.sort((a, b) => a.order_index - b.order_index)
-                  .map((a) => ({
-                    id: a.id,
-                    title: a.title,
-                    weight: Number(a.weight),
-                    evidence_required: a.evidence_required,
-                    comments_required: a.comments_required,
-                  })) || [],
-              assignments:
-                audit.audit_assignments?.map((a) => ({
-                  plant_id: a.plant_id,
-                  assignee_id: a.assignee_id,
-                })) || [],
-            })
-          }
-        }
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    loadData()
-  }, [id, user, methods])
-
-  const onSubmit = async (data: AuditConfigForm) => {
-    setLoading(true)
-    try {
+    const loadContext = async () => {
+      if (!user) return
       const { data: profile } = await supabase
         .from('profiles')
         .select('client_id')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .single()
-      if (!profile?.client_id) throw new Error('Client ID não encontrado')
+      if (profile?.client_id) {
+        setClientId(profile.client_id)
 
-      let auditId = id
-
-      const auditData = {
-        client_id: profile.client_id,
-        title: data.title,
-        type: data.type,
-        frequency: data.frequency,
-        start_date: data.start_date,
-        advance_notice_days: data.advance_notice_days,
-        scoring_settings: data.scoring_settings,
+        const [{ data: pData }, { data: prData }] = await Promise.all([
+          supabase.from('plants').select('id, name').eq('client_id', profile.client_id),
+          supabase.from('profiles').select('id, name').eq('client_id', profile.client_id),
+        ])
+        setPlants(pData || [])
+        setProfiles(prData || [])
       }
+    }
+    loadContext()
+  }, [user])
 
-      if (auditId) {
-        const { error } = await supabase.from('audits').update(auditData).eq('id', auditId)
-        if (error) throw error
-      } else {
-        const { data: newAudit, error } = await supabase
-          .from('audits')
-          .insert(auditData)
-          .select()
-          .single()
-        if (error) throw error
-        auditId = newAudit.id
+  useEffect(() => {
+    if (id && clientId) {
+      const fetchAudit = async () => {
+        const { data } = await supabase.from('audits').select('*').eq('id', id).single()
+        if (data) {
+          setTitle(data.title)
+          setType(data.type)
+          setFrequency(data.frequency)
+          setStartDate(data.start_date)
+          setAdvanceNoticeDays(data.advance_notice_days || 0)
+
+          const { data: acts } = await supabase
+            .from('audit_actions')
+            .select('*')
+            .eq('audit_id', id)
+            .order('order_index')
+          setActions(acts || [])
+
+          const { data: assigns } = await supabase
+            .from('audit_assignments')
+            .select('*')
+            .eq('audit_id', id)
+          setAssignments(assigns || [])
+        }
+        setFetching(false)
+      }
+      fetchAudit()
+    }
+  }, [id, clientId])
+
+  const handleSave = async (status: 'Ativo' | 'Rascunho') => {
+    if (!clientId) return
+    if (!title || !startDate) {
+      toast({
+        title: 'Erro',
+        description: 'Preencha os campos obrigatórios (Título, Data Inicial).',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setLoading(true)
+    try {
+      let auditId = id
+      const auditData = {
+        client_id: clientId,
+        title,
+        type,
+        frequency,
+        start_date: startDate,
+        advance_notice_days: advanceNoticeDays,
+        status,
       }
 
       if (id) {
+        await supabase.from('audits').update(auditData).eq('id', id)
+      } else {
+        const { data, error } = await supabase.from('audits').insert([auditData]).select().single()
+        if (error) throw error
+        auditId = data.id
+      }
+
+      if (auditId) {
         await supabase.from('audit_actions').delete().eq('audit_id', auditId)
+        if (actions.length > 0) {
+          await supabase.from('audit_actions').insert(
+            actions.map((a, idx) => ({
+              audit_id: auditId,
+              title: a.title,
+              evidence_required: a.evidence_required || false,
+              weight: a.weight || 1,
+              comments_required: a.comments_required || false,
+              order_index: idx,
+            })),
+          )
+        }
+
         await supabase.from('audit_assignments').delete().eq('audit_id', auditId)
+        if (assignments.length > 0) {
+          await supabase.from('audit_assignments').insert(
+            assignments.map((a) => ({
+              audit_id: auditId,
+              plant_id: a.plant_id,
+              assignee_id: a.assignee_id,
+            })),
+          )
+        }
       }
 
-      if (data.actions.length) {
-        const actionsData = data.actions.map((a, i) => ({
-          audit_id: auditId,
-          title: a.title,
-          weight: a.weight,
-          evidence_required: a.evidence_required,
-          comments_required: a.comments_required,
-          order_index: i,
-        }))
-        const { error } = await supabase.from('audit_actions').insert(actionsData)
-        if (error) throw error
-      }
-
-      if (data.assignments.length) {
-        const assignmentsData = data.assignments.map((a) => ({
-          audit_id: auditId,
-          plant_id: a.plant_id,
-          assignee_id: a.assignee_id,
-        }))
-        const { error } = await supabase.from('audit_assignments').insert(assignmentsData)
-        if (error) throw error
-      }
-
-      toast.success('Configuração salva com sucesso!')
+      toast({ title: 'Sucesso', description: `Auditoria salva como ${status}.` })
       navigate('/auditoria-checklist/criadas')
     } catch (error: any) {
-      toast.error(error.message)
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
+  if (fetching) return <div className="p-8">Carregando...</div>
+
   return (
-    <div className="container mx-auto py-8 max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {id ? 'Editar Configuração' : 'Nova Auditoria'}
-          </h1>
-          <p className="text-muted-foreground">
-            Defina os parâmetros, notas e itens do checklist da auditoria.
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            Cancelar
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/auditoria-checklist/criadas')}
+          >
+            <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Button onClick={methods.handleSubmit(onSubmit)} disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar Configuração'}
+          <h1 className="text-2xl font-bold">
+            {id ? 'Editar Modelo de Auditoria' : 'Novo Modelo de Auditoria'}
+          </h1>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => handleSave('Rascunho')} disabled={loading}>
+            Salvar como Rascunho
+          </Button>
+          <Button onClick={() => handleSave('Ativo')} disabled={loading}>
+            <Save className="w-4 h-4 mr-2" /> {id ? 'Atualizar' : 'Publicar'}
           </Button>
         </div>
       </div>
 
-      <FormProvider {...methods}>
-        <form onSubmit={methods.handleSubmit(onSubmit)} className="space-y-6">
-          <BasicSettings />
-          <ScoringSettings />
-          <ChecklistSettings />
-          <AssignmentSettings plants={plants} profiles={profiles} />
-        </form>
-      </FormProvider>
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados Gerais</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Título</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex: Auditoria 5S"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Tipo</Label>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Geral">Geral</SelectItem>
+                <SelectItem value="Qualidade">Qualidade</SelectItem>
+                <SelectItem value="Segurança">Segurança</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Frequência</Label>
+            <Select value={frequency} onValueChange={setFrequency}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Única">Única</SelectItem>
+                <SelectItem value="Diária">Diária</SelectItem>
+                <SelectItem value="Semanal">Semanal</SelectItem>
+                <SelectItem value="Mensal">Mensal</SelectItem>
+                <SelectItem value="Anual">Anual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Data de Início</Label>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Dias de Antecedência (Aviso)</Label>
+            <Input
+              type="number"
+              value={advanceNoticeDays}
+              onChange={(e) => setAdvanceNoticeDays(parseInt(e.target.value) || 0)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Perguntas / Ações</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setActions([...actions, { title: '', weight: 1 }])}
+          >
+            <Plus className="w-4 h-4 mr-2" /> Adicionar Pergunta
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {actions.map((act, i) => (
+            <div key={i} className="flex items-start gap-4 p-4 border rounded-md">
+              <div className="flex-1 space-y-4">
+                <Input
+                  value={act.title}
+                  onChange={(e) => {
+                    const n = [...actions]
+                    n[i].title = e.target.value
+                    setActions(n)
+                  }}
+                  placeholder="Descrição da pergunta"
+                />
+                <div className="flex gap-4 items-center">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm">Peso:</Label>
+                    <Input
+                      type="number"
+                      className="w-20 h-8"
+                      value={act.weight}
+                      onChange={(e) => {
+                        const n = [...actions]
+                        n[i].weight = parseInt(e.target.value) || 1
+                        setActions(n)
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`ev-${i}`}
+                      checked={act.evidence_required}
+                      onCheckedChange={(c) => {
+                        const n = [...actions]
+                        n[i].evidence_required = !!c
+                        setActions(n)
+                      }}
+                    />
+                    <Label htmlFor={`ev-${i}`}>Exige Evidência?</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`com-${i}`}
+                      checked={act.comments_required}
+                      onCheckedChange={(c) => {
+                        const n = [...actions]
+                        n[i].comments_required = !!c
+                        setActions(n)
+                      }}
+                    />
+                    <Label htmlFor={`com-${i}`}>Exige Comentário?</Label>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                onClick={() => setActions(actions.filter((_, idx) => idx !== i))}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          {actions.length === 0 && (
+            <p className="text-muted-foreground text-sm">Nenhuma pergunta adicionada.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Atribuições</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setAssignments([...assignments, { plant_id: '', assignee_id: '' }])}
+          >
+            <Plus className="w-4 h-4 mr-2" /> Adicionar Atribuição
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {assignments.map((ass, i) => (
+            <div key={i} className="flex gap-4 items-center">
+              <Select
+                value={ass.plant_id}
+                onValueChange={(v) => {
+                  const n = [...assignments]
+                  n[i].plant_id = v
+                  setAssignments(n)
+                }}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={ass.assignee_id}
+                onValueChange={(v) => {
+                  const n = [...assignments]
+                  n[i].assignee_id = v
+                  setAssignments(n)
+                }}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                onClick={() => setAssignments(assignments.filter((_, idx) => idx !== i))}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          {assignments.length === 0 && (
+            <p className="text-muted-foreground text-sm">Nenhuma atribuição configurada.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
