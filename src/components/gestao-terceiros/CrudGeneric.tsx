@@ -91,9 +91,15 @@ export function CrudGeneric({
   const load = useCallback(async () => {
     setLoading(true)
     const res = await fetchQuery()
-    setData(res || [])
+    let fetchedData = res || []
+
+    if (tableName === 'profiles') {
+      fetchedData = [...fetchedData].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    }
+
+    setData(fetchedData)
     setLoading(false)
-  }, [fetchQuery])
+  }, [fetchQuery, tableName])
 
   useEffect(() => {
     load()

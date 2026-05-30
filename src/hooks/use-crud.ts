@@ -14,7 +14,13 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     if (profile.role !== 'Master' && !profile.client_id) return
 
     setLoading(true)
-    let q = supabase.from(tableName).select(defaultSelect).order('created_at', { ascending: false })
+    let q = supabase.from(tableName).select(defaultSelect)
+
+    if (tableName === 'profiles') {
+      q = q.order('name', { ascending: true })
+    } else {
+      q = q.order('created_at', { ascending: false })
+    }
 
     if (tableName === 'employees' || tableName === 'equipment') {
       q = q.eq('status', 'Ativo')
