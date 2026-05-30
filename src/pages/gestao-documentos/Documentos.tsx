@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { format, parseISO } from 'date-fns'
+import { z } from 'zod'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Search, Edit2, Trash2, FileText, Plus } from 'lucide-react'
+import { toast } from 'sonner'
+
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { startOfDay, differenceInDays } from 'date-fns'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -14,6 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import {
   Select,
   SelectContent,
@@ -21,455 +34,358 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
-import {
-  FileText,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Plus,
-  Trash2,
-  Edit,
-  Download,
-} from 'lucide-react'
-import { useToast } from '@/components/ui/use-toast'
-import { cn } from '@/lib/utils'
-import type { Database } from '@/lib/supabase/types'
 
-type SectorDocument = Database['public']['Tables']['sector_documents']['Row']
-type Plant = Database['public']['Tables']['plants']['Row']
+const PERIODICIDADE_OPCOES = [
+  'Diário',
+  'Semanal',
+  'Quinzenal',
+  'Mensal',
+  'Trimestral',
+  'Semestral',
+  'Anual',
+]
 
-function getSLA(doc: SectorDocument) {
-  if (!doc.expiration_date)
-    return {
-      status: 'N/A',
-      text: 'Sem vencimento',
-      color: 'bg-slate-100 text-slate-600 border-slate-200',
-    }
-
-  const today = startOfDay(new Date())
-  const [year, month, day] = doc.expiration_date.split('-').map(Number)
-  const expDate = new Date(year, month - 1, day)
-
-  const remainingDays = differenceInDays(expDate, today)
-
-  if (remainingDays < 0) {
-    const absDays = Math.abs(remainingDays)
-    return {
-      status: 'Vencidos',
-      text: `Vencido há ${absDays} ${absDays === 1 ? 'dia' : 'dias'}`,
-      color: 'bg-red-100 text-red-800 border-red-300',
-    }
-  } else if (remainingDays <= doc.alert_lead_days) {
-    return {
-      status: 'Atenção',
-      text:
-        remainingDays === 0
-          ? 'Vence hoje'
-          : `Vence em ${remainingDays} ${remainingDays === 1 ? 'dia' : 'dias'}`,
-      color: 'bg-amber-100 text-amber-800 border-amber-300',
-    }
-  } else {
-    return {
-      status: 'Em dia',
-      text: `Vence em ${remainingDays} ${remainingDays === 1 ? 'dia' : 'dias'}`,
-      color: 'bg-green-100 text-green-800 border-green-300',
-    }
-  }
-}
+const formSchema = z.object({
+  name: z.string().min(1, 'Obrigatório'),
+  document_type: z.string().min(1, 'Obrigatório'),
+  plant_id: z.string().min(1, 'Obrigatório'),
+  frequency: z.string().min(1, 'Obrigatório'),
+  expiration_date: z.string().min(1, 'Obrigatório'),
+  alert_lead_days: z.coerce.number().min(1, 'Obrigatório'),
+})
 
 export default function Documentos() {
-  const [documents, setDocuments] = useState<SectorDocument[]>([])
-  const [plants, setPlants] = useState<Plant[]>([])
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const { activeClient } = useAppStore()
-  const { toast } = useToast()
+  const { activeClient, profile } = useAppStore()
+  const [documents, setDocuments] = useState<any[]>([])
+  const [plants, setPlants] = useState<any[]>([])
+  const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
-  const [formData, setFormData] = useState({
-    id: '',
-    name: '',
-    document_type: '',
-    expiration_date: '',
-    alert_lead_days: 30,
-    plant_id: '',
-    file_url: '',
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      document_type: '',
+      plant_id: '',
+      frequency: '',
+      expiration_date: '',
+      alert_lead_days: 30,
+    },
   })
 
   useEffect(() => {
-    if (activeClient) {
-      fetchPlants()
+    if (activeClient?.id) {
       fetchDocuments()
+      fetchPlants()
     }
-  }, [activeClient])
+  }, [activeClient?.id])
+
+  const fetchDocuments = async () => {
+    const { data, error } = await supabase
+      .from('sector_documents')
+      .select('*, plants(name)')
+      .eq('client_id', activeClient!.id)
+      .order('created_at', { ascending: false })
+    if (!error && data) setDocuments(data)
+  }
 
   const fetchPlants = async () => {
-    const { data } = await supabase.from('plants').select('*').eq('client_id', activeClient?.id)
-    if (data) {
-      setPlants(data)
-      if (data.length > 0 && !formData.plant_id) {
-        setFormData((prev) => ({ ...prev, plant_id: data[0].id }))
+    const { data, error } = await supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient!.id)
+
+    if (!error && data) {
+      if (profile?.role === 'Operacional' || profile?.role === 'Gestor') {
+        const authPlants = profile?.authorized_plants || []
+        setPlants(data.filter((p) => authPlants.includes(p.id)))
+      } else {
+        setPlants(data)
       }
     }
   }
 
-  const fetchDocuments = async () => {
-    const { data } = await supabase
-      .from('sector_documents')
-      .select('*')
-      .eq('client_id', activeClient?.id)
-      .order('expiration_date', { ascending: true })
-    if (data) setDocuments(data)
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      if (editingId) {
+        const { error } = await supabase.from('sector_documents').update(values).eq('id', editingId)
+        if (error) throw error
+        toast.success('Documento atualizado com sucesso!')
+      } else {
+        const { error } = await supabase
+          .from('sector_documents')
+          .insert({ ...values, client_id: activeClient!.id })
+        if (error) throw error
+        toast.success('Documento criado com sucesso!')
+      }
+      setIsOpen(false)
+      fetchDocuments()
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao salvar documento')
+    }
   }
 
-  const filteredDocuments = documents.filter(
-    (doc) => selectedPlant === 'all' || doc.plant_id === selectedPlant,
-  )
-
-  const stats = filteredDocuments.reduce(
-    (acc, doc) => {
-      const sla = getSLA(doc)
-      acc.total++
-      if (sla.status === 'Em dia') acc.emDia++
-      else if (sla.status === 'Atenção') acc.atencao++
-      else if (sla.status === 'Vencidos') acc.vencidos++
-      return acc
-    },
-    { total: 0, emDia: 0, atencao: 0, vencidos: 0 },
-  )
-
-  const resetForm = () => {
-    setFormData({
-      id: '',
+  const handleAdd = () => {
+    setEditingId(null)
+    form.reset({
       name: '',
       document_type: '',
+      plant_id: '',
+      frequency: '',
       expiration_date: '',
       alert_lead_days: 30,
-      plant_id: plants.length > 0 ? plants[0].id : '',
-      file_url: '',
     })
+    setIsOpen(true)
   }
 
-  const handleEdit = (doc: SectorDocument) => {
-    setFormData({
-      id: doc.id,
+  const handleEdit = (doc: any) => {
+    setEditingId(doc.id)
+    form.reset({
       name: doc.name,
       document_type: doc.document_type,
-      expiration_date: doc.expiration_date,
-      alert_lead_days: doc.alert_lead_days,
       plant_id: doc.plant_id,
-      file_url: doc.file_url || '',
+      frequency: doc.frequency || '',
+      expiration_date: doc.expiration_date ? doc.expiration_date.split('T')[0] : '',
+      alert_lead_days: doc.alert_lead_days,
     })
     setIsOpen(true)
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este documento?')) return
-
+    if (!confirm('Tem certeza que deseja excluir este documento?')) return
     const { error } = await supabase.from('sector_documents').delete().eq('id', id)
     if (error) {
-      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' })
+      toast.error('Erro ao excluir documento')
     } else {
-      toast({ title: 'Sucesso', description: 'Documento excluído com sucesso.' })
+      toast.success('Documento excluído com sucesso')
       fetchDocuments()
     }
   }
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const filteredDocs = useMemo(() => {
+    return documents.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()))
+  }, [documents, search])
 
-    if (!activeClient) return
-
-    const payload = {
-      client_id: activeClient.id,
-      name: formData.name,
-      document_type: formData.document_type,
-      expiration_date: formData.expiration_date,
-      alert_lead_days: formData.alert_lead_days,
-      plant_id: formData.plant_id,
-      file_url: formData.file_url || null,
-    }
-
-    if (formData.id) {
-      const { error } = await supabase
-        .from('sector_documents')
-        .update(payload)
-        .eq('id', formData.id)
-      if (error)
-        toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' })
-      else {
-        toast({ title: 'Sucesso', description: 'Documento atualizado.' })
-        setIsOpen(false)
-        fetchDocuments()
-      }
-    } else {
-      const { error } = await supabase.from('sector_documents').insert(payload)
-      if (error)
-        toast({ title: 'Erro ao criar', description: error.message, variant: 'destructive' })
-      else {
-        toast({ title: 'Sucesso', description: 'Documento criado.' })
-        setIsOpen(false)
-        fetchDocuments()
-      }
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-'
+    try {
+      return format(parseISO(dateStr), 'dd/MM/yyyy')
+    } catch {
+      return dateStr
     }
   }
 
-  const getPlantName = (id: string) => plants.find((p) => p.id === id)?.name || '-'
-
   return (
-    <div className="p-6 space-y-6 bg-slate-50 min-h-full">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestão de Documentos</h1>
-          <p className="text-slate-500 mt-1">Acompanhamento e SLA de vencimento de documentos.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-            <SelectTrigger className="w-[200px] bg-white">
-              <SelectValue placeholder="Todas as Plantas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Plantas</SelectItem>
-              {plants.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Dialog
-            open={isOpen}
-            onOpenChange={(v) => {
-              setIsOpen(v)
-              if (!v) resetForm()
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white shadow-sm">
-                <Plus className="h-4 w-4 mr-2" /> Novo Documento
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>{formData.id ? 'Editar Documento' : 'Novo Documento'}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={onSubmit} className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label>Nome do Documento</Label>
-                  <Input
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Alvará de Funcionamento"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo de Documento</Label>
-                  <Input
-                    required
-                    value={formData.document_type}
-                    onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-                    placeholder="Ex: Alvará, AVCB, Licença"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Data de Vencimento</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={formData.expiration_date}
-                      onChange={(e) =>
-                        setFormData({ ...formData, expiration_date: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Alerta (dias antes)</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      required
-                      value={formData.alert_lead_days}
-                      onChange={(e) =>
-                        setFormData({ ...formData, alert_lead_days: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Planta</Label>
-                  <Select
-                    required
-                    value={formData.plant_id}
-                    onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a planta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plants.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>URL do Arquivo (Opcional)</Label>
-                  <Input
-                    type="url"
-                    value={formData.file_url}
-                    onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" className="bg-brand-vividBlue hover:bg-brand-deepBlue">
-                    Salvar
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+          <FileText className="h-8 w-8 text-brand-vividBlue" />
+          Gestão de Documentos
+        </h1>
+        <Button
+          onClick={handleAdd}
+          className="bg-brand-vividBlue hover:bg-brand-deepBlue w-full sm:w-auto shadow-md"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Documento
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
-              Total de Documentos
-            </CardTitle>
-            <FileText className="h-4 w-4 text-slate-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-800">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Em Dia</CardTitle>
-            <CheckCircle className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{stats.emDia}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Atenção</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats.atencao}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Vencidos</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-600">{stats.vencidos}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="shadow-sm border-slate-200/60">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50/50">
-              <TableHead>Nome do Documento</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Planta</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>SLA / Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredDocuments.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                  Nenhum documento encontrado.
-                </TableCell>
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b bg-gray-50/50">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Buscar documentos..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-white"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50/50">
+                <TableHead className="font-semibold text-gray-700">Nome</TableHead>
+                <TableHead className="font-semibold text-gray-700">Tipo</TableHead>
+                <TableHead className="font-semibold text-gray-700">Planta</TableHead>
+                <TableHead className="font-semibold text-gray-700">Periodicidade</TableHead>
+                <TableHead className="font-semibold text-gray-700">Vencimento</TableHead>
+                <TableHead className="font-semibold text-gray-700 w-24">Ações</TableHead>
               </TableRow>
-            ) : (
-              filteredDocuments.map((doc) => {
-                const sla = getSLA(doc)
-                return (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium text-slate-800">{doc.name}</TableCell>
-                    <TableCell className="text-slate-600">{doc.document_type}</TableCell>
-                    <TableCell className="text-slate-600">{getPlantName(doc.plant_id)}</TableCell>
-                    <TableCell className="text-slate-600">
-                      {doc.expiration_date.split('-').reverse().join('/')}
+            </TableHeader>
+            <TableBody>
+              {filteredDocs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    Nenhum documento encontrado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredDocs.map((doc) => (
+                  <TableRow key={doc.id} className="hover:bg-gray-50 transition-colors">
+                    <TableCell className="font-medium text-gray-900">{doc.name}</TableCell>
+                    <TableCell className="text-gray-600">{doc.document_type}</TableCell>
+                    <TableCell className="text-gray-600">{doc.plants?.name}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {doc.frequency || '-'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-gray-600">
+                      {formatDate(doc.expiration_date)}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'whitespace-nowrap font-medium px-2 py-0.5 shadow-sm',
-                          sla.color,
-                        )}
-                      >
-                        {sla.text}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {doc.file_url && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-500 hover:text-brand-vividBlue"
-                            asChild
-                          >
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                              <Download className="h-4 w-4" />
-                            </a>
-                          </Button>
-                        )}
+                      <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-brand-vividBlue"
                           onClick={() => handleEdit(doc)}
+                          className="h-8 w-8 text-brand-vividBlue hover:text-brand-deepBlue hover:bg-blue-50"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:text-rose-500"
                           onClick={() => handleDelete(doc.id)}
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Editar Documento' : 'Novo Documento'}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Nome do Documento</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: PPRA 2026" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="document_type"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 sm:col-span-1">
+                      <FormLabel>Tipo</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: Segurança" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="plant_id"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 sm:col-span-1">
+                      <FormLabel>Planta</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {plants.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="frequency"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Periodicidade</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PERIODICIDADE_OPCOES.map((op) => (
+                            <SelectItem key={op} value={op}>
+                              {op}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="expiration_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 sm:col-span-1">
+                      <FormLabel>Data de Vencimento</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="alert_lead_days"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2 sm:col-span-1">
+                      <FormLabel>Dias para Alerta</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" className="bg-brand-vividBlue hover:bg-brand-deepBlue">
+                  Salvar Documento
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
