@@ -64,6 +64,7 @@ import RelatoriosTarefas from './pages/gestao-tarefas/RelatoriosTarefas'
 import AuditoriaConfig from './pages/auditoria-checklist/Configuracao'
 import AuditoriasCriadas from './pages/auditoria-checklist/AuditoriasCriadas'
 import AuditoriaRealizadas from './pages/auditoria-checklist/Realizadas'
+import AuditoriaDetalhes from './pages/auditoria-checklist/AuditoriaDetalhes'
 import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
 
 // Gestão de Budget
@@ -142,6 +143,10 @@ const App = () => (
                       <Route
                         path="/auditoria-checklist/realizadas"
                         element={<AuditoriaRealizadas />}
+                      />
+                      <Route
+                        path="/auditoria-checklist/detalhes/:id"
+                        element={<AuditoriaDetalhes />}
                       />
                       <Route
                         path="/auditoria-checklist/dashboard"
