@@ -21,7 +21,8 @@ import { useHasAccess } from '@/hooks/use-has-access'
 import { format } from 'date-fns'
 
 type Assignment = { plant_id: string; assignee_id: string }
-type Action = { title: string; evidence_required: boolean }
+type ScoringSetting = { score: number; description: string }
+type Action = { title: string; evidence_required: boolean; weight: number }
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
@@ -38,7 +39,16 @@ export default function AuditoriaConfig() {
   const [advanceNotice, setAdvanceNotice] = useState('0')
 
   const [assignments, setAssignments] = useState<Assignment[]>([{ plant_id: '', assignee_id: '' }])
-  const [actions, setActions] = useState<Action[]>([{ title: '', evidence_required: false }])
+  const [actions, setActions] = useState<Action[]>([
+    { title: '', evidence_required: false, weight: 1 },
+  ])
+  const [scoringSettings, setScoringSettings] = useState<ScoringSetting[]>([
+    { score: 1, description: 'Muito Ruim' },
+    { score: 2, description: 'Ruim' },
+    { score: 3, description: 'Regular' },
+    { score: 4, description: 'Bom' },
+    { score: 5, description: 'Excelente' },
+  ])
 
   const [users, setUsers] = useState<any[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -67,13 +77,18 @@ export default function AuditoriaConfig() {
           setFrequency(audit.frequency)
           setStartDate(audit.start_date)
           setAdvanceNotice((audit as any).advance_notice_days?.toString() || '0')
+          if ((audit as any).scoring_settings) {
+            setScoringSettings((audit as any).scoring_settings)
+          }
 
           const { data: acts } = await supabase
             .from('audit_actions')
             .select('*')
             .eq('audit_id', id)
             .order('order_index')
-          if (acts && acts.length > 0) setActions(acts)
+          if (acts && acts.length > 0) {
+            setActions(acts.map((a: any) => ({ ...a, weight: a.weight || 1 })))
+          }
 
           const { data: assigns } = await supabase
             .from('audit_assignments' as any)
@@ -98,7 +113,8 @@ export default function AuditoriaConfig() {
   const removeAssignment = (index: number) =>
     setAssignments(assignments.filter((_, i) => i !== index))
 
-  const addAction = () => setActions([...actions, { title: '', evidence_required: false }])
+  const addAction = () =>
+    setActions([...actions, { title: '', evidence_required: false, weight: 1 }])
   const removeAction = (index: number) => setActions(actions.filter((_, i) => i !== index))
 
   const handleSave = async (e: React.FormEvent) => {
@@ -109,6 +125,16 @@ export default function AuditoriaConfig() {
       actions.some((a) => !a.title)
     ) {
       toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' })
+      return
+    }
+
+    const uniqueScores = new Set(scoringSettings.map((s) => s.score))
+    if (uniqueScores.size !== scoringSettings.length) {
+      toast({
+        title: 'Valores de nota duplicados',
+        description: 'Cada nota na escala deve ser única.',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -127,6 +153,7 @@ export default function AuditoriaConfig() {
             frequency,
             start_date: startDate,
             advance_notice_days: parseInt(advanceNotice) || 0,
+            scoring_settings: scoringSettings,
           } as any)
           .eq('id', auditId)
       } else {
@@ -140,6 +167,7 @@ export default function AuditoriaConfig() {
             frequency,
             start_date: startDate,
             advance_notice_days: parseInt(advanceNotice) || 0,
+            scoring_settings: scoringSettings,
           } as any)
           .select()
           .single()
@@ -154,6 +182,7 @@ export default function AuditoriaConfig() {
         audit_id: auditId!,
         title: a.title,
         evidence_required: a.evidence_required,
+        weight: a.weight || 1,
         order_index: idx,
       }))
       await supabase.from('audit_actions').insert(actionsToInsert)
@@ -482,9 +511,81 @@ export default function AuditoriaConfig() {
           <CardContent className="p-6 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
+                <h3 className="text-lg font-bold text-slate-800">
+                  Critérios de Avaliação (Escala)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Defina as notas possíveis e a descrição de cada critério.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setScoringSettings([...scoringSettings, { score: 0, description: '' }])
+                }
+                className="text-brand-deepBlue border-brand-deepBlue/20 hover:bg-brand-deepBlue/5"
+              >
+                <Plus className="w-4 h-4 mr-1" /> Adicionar Nota
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {scoringSettings.map((setting, idx) => (
+                <div key={idx} className="flex gap-4 items-center">
+                  <div className="w-24">
+                    <Label className="text-xs">Nota</Label>
+                    <Input
+                      type="number"
+                      value={setting.score}
+                      onChange={(e) => {
+                        const newSettings = [...scoringSettings]
+                        newSettings[idx].score = parseFloat(e.target.value) || 0
+                        setScoringSettings(newSettings)
+                      }}
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Descrição do Critério</Label>
+                    <Input
+                      value={setting.description}
+                      onChange={(e) => {
+                        const newSettings = [...scoringSettings]
+                        newSettings[idx].description = e.target.value
+                        setScoringSettings(newSettings)
+                      }}
+                      placeholder="Ex: Totalmente conforme"
+                      required
+                    />
+                  </div>
+                  {scoringSettings.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="mt-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => {
+                        const newSettings = [...scoringSettings]
+                        newSettings.splice(idx, 1)
+                        setScoringSettings(newSettings)
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-gray-200">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div>
                 <h3 className="text-lg font-bold text-slate-800">Checklist (Ações)</h3>
                 <p className="text-xs text-slate-500">
-                  Cada ação será avaliada de 1 a 5 no momento da auditoria.
+                  Descreva cada ação e defina o peso correspondente na nota final.
                 </p>
               </div>
               <Button
@@ -501,12 +602,13 @@ export default function AuditoriaConfig() {
             {actions.map((action, idx) => (
               <div
                 key={idx}
-                className="flex flex-col sm:flex-row gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm"
+                className="flex flex-col sm:flex-row gap-4 items-center sm:items-start bg-white p-4 rounded-xl border border-slate-200 shadow-sm"
               >
-                <div className="flex items-center justify-center bg-slate-100 w-8 h-8 rounded-full font-bold text-slate-500 shrink-0">
+                <div className="flex items-center justify-center bg-slate-100 w-8 h-8 rounded-full font-bold text-slate-500 shrink-0 mt-1">
                   {idx + 1}
                 </div>
-                <div className="flex-1 w-full">
+                <div className="flex-1 w-full space-y-1">
+                  <Label className="text-xs text-slate-500">Ação / Pergunta</Label>
                   <Input
                     value={action.title}
                     onChange={(e) => {
@@ -519,7 +621,23 @@ export default function AuditoriaConfig() {
                     className="border-slate-200"
                   />
                 </div>
-                <div className="flex items-center gap-2 shrink-0 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                <div className="w-24 shrink-0 space-y-1">
+                  <Label className="text-xs text-slate-500">Peso</Label>
+                  <Input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={action.weight}
+                    onChange={(e) => {
+                      const newArr = [...actions]
+                      newArr[idx].weight = parseFloat(e.target.value) || 1
+                      setActions(newArr)
+                    }}
+                    required
+                    className="border-slate-200 text-center"
+                  />
+                </div>
+                <div className="flex items-center gap-2 shrink-0 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 mt-0 sm:mt-6">
                   <Switch
                     checked={action.evidence_required}
                     onCheckedChange={(v) => {
@@ -536,7 +654,7 @@ export default function AuditoriaConfig() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
+                    className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 mt-0 sm:mt-5"
                     onClick={() => removeAction(idx)}
                   >
                     <Trash2 className="w-4 h-4" />
