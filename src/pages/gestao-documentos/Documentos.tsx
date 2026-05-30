@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { format, differenceInDays, startOfDay, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { FileText, Plus, Search, Trash2, Edit2, AlertCircle } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -11,6 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +24,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -25,11 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/components/ui/use-toast'
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
-import { format, differenceInDays, isBefore, startOfDay } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 export default function Documentos() {
   const { user } = useAuth()
@@ -37,197 +40,235 @@ export default function Documentos() {
 
   const [documents, setDocuments] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
+  const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [plantFilter, setPlantFilter] = useState('all')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingDoc, setEditingDoc] = useState<any>(null)
   const [formData, setFormData] = useState({
+    id: '',
     name: '',
-    plant_id: '',
     document_type: '',
-    frequency: 'Anual',
+    frequency: '',
     expiration_date: '',
     alert_lead_days: 30,
+    plant_id: '',
   })
 
-  const fetchData = async () => {
-    if (!user) return
-    setLoading(true)
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id, authorized_plants, role')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.client_id) return
-
-      let plantQuery = supabase.from('plants').select('id, name').eq('client_id', profile.client_id)
-      if (
-        profile.role !== 'Master' &&
-        profile.role !== 'Administrador' &&
-        profile.authorized_plants?.length
-      ) {
-        plantQuery = plantQuery.in('id', profile.authorized_plants)
-      }
-      const { data: plantsData } = await plantQuery
-      setPlants(plantsData || [])
-
-      let docQuery = supabase
-        .from('sector_documents')
-        .select('*, plants(name)')
-        .eq('client_id', profile.client_id)
-        .order('expiration_date', { ascending: true })
-      if (
-        profile.role !== 'Master' &&
-        profile.role !== 'Administrador' &&
-        profile.authorized_plants?.length
-      ) {
-        docQuery = docQuery.in('plant_id', profile.authorized_plants)
-      }
-      const { data: docsData } = await docQuery
-      setDocuments(docsData || [])
-    } catch (error: any) {
-      toast({ title: 'Erro', description: 'Erro ao carregar documentos.', variant: 'destructive' })
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    if (user) {
+      fetchPlants()
     }
-  }
+  }, [user])
 
   useEffect(() => {
-    fetchData()
-  }, [user])
+    if (user) {
+      fetchDocuments()
+    }
+  }, [user, selectedPlant])
+
+  const fetchPlants = async () => {
+    const { data } = await supabase.from('plants').select('id, name')
+    setPlants(data || [])
+  }
+
+  const fetchDocuments = async () => {
+    setLoading(true)
+    let query = supabase
+      .from('sector_documents')
+      .select(`*, plants(name)`)
+      .order('expiration_date', { ascending: true })
+
+    if (selectedPlant && selectedPlant !== 'all') {
+      query = query.eq('plant_id', selectedPlant)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os documentos.',
+        variant: 'destructive',
+      })
+    } else {
+      setDocuments(data || [])
+    }
+    setLoading(false)
+  }
+
+  const getStatusAndSLA = (doc: any) => {
+    if (!doc.expiration_date) {
+      return {
+        slaText: '-',
+        slaDays: 0,
+        status: 'Sem Data',
+        color: 'bg-slate-100 text-slate-800 border-slate-200',
+      }
+    }
+
+    const today = startOfDay(new Date())
+    const expDate = startOfDay(parseISO(doc.expiration_date))
+    const slaDays = differenceInDays(expDate, today)
+
+    let slaText = `${slaDays} dias`
+    let status = 'Válido'
+    let color = 'bg-emerald-100 text-emerald-800 border-emerald-200'
+
+    if (slaDays < 0) {
+      status = 'Vencido'
+      color = 'bg-red-100 text-red-800 border-red-200 shadow-sm'
+    } else if (slaDays === 0) {
+      slaText = 'Vence hoje'
+      status = 'Vencendo'
+      color = 'bg-amber-100 text-amber-800 border-amber-200'
+    } else if (slaDays <= (doc.alert_lead_days || 30)) {
+      status = 'Vencendo'
+      color = 'bg-amber-100 text-amber-800 border-amber-200'
+    }
+
+    return { slaText, slaDays, status, color }
+  }
 
   const handleOpenModal = (doc?: any) => {
     if (doc) {
-      setEditingDoc(doc)
       setFormData({
+        id: doc.id,
         name: doc.name,
-        plant_id: doc.plant_id,
         document_type: doc.document_type,
-        frequency: doc.frequency || 'Anual',
+        frequency: doc.frequency || '',
         expiration_date: doc.expiration_date,
         alert_lead_days: doc.alert_lead_days,
+        plant_id: doc.plant_id,
       })
     } else {
-      setEditingDoc(null)
       setFormData({
+        id: '',
         name: '',
-        plant_id: plants.length === 1 ? plants[0].id : '',
         document_type: '',
-        frequency: 'Anual',
+        frequency: '',
         expiration_date: '',
         alert_lead_days: 30,
+        plant_id: selectedPlant !== 'all' ? selectedPlant : '',
       })
     }
     setIsModalOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id')
-        .eq('id', user?.id)
-        .single()
+  const handleSave = async () => {
+    if (
+      !formData.name ||
+      !formData.document_type ||
+      !formData.expiration_date ||
+      !formData.plant_id
+    ) {
+      toast({
+        title: 'Aviso',
+        description: 'Preencha os campos obrigatórios (*).',
+        variant: 'destructive',
+      })
+      return
+    }
 
-      const payload = {
-        name: formData.name,
-        plant_id: formData.plant_id,
-        document_type: formData.document_type,
-        frequency: formData.frequency,
-        expiration_date: formData.expiration_date,
-        alert_lead_days: formData.alert_lead_days,
-      }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id)
+      .single()
 
-      if (editingDoc) {
-        const { error } = await supabase
-          .from('sector_documents')
-          .update(payload)
-          .eq('id', editingDoc.id)
-        if (error) throw error
-        toast({ title: 'Sucesso', description: 'Documento atualizado com sucesso.' })
+    if (!profile?.client_id) {
+      toast({ title: 'Erro', description: 'Cliente não encontrado.', variant: 'destructive' })
+      return
+    }
+
+    const payload = {
+      client_id: profile.client_id,
+      plant_id: formData.plant_id,
+      name: formData.name,
+      document_type: formData.document_type,
+      frequency: formData.frequency,
+      expiration_date: formData.expiration_date,
+      alert_lead_days: formData.alert_lead_days,
+    }
+
+    if (formData.id) {
+      const { error } = await supabase
+        .from('sector_documents')
+        .update(payload)
+        .eq('id', formData.id)
+      if (error) {
+        toast({ title: 'Erro', description: error.message, variant: 'destructive' })
       } else {
-        const { error } = await supabase.from('sector_documents').insert({
-          ...payload,
-          client_id: profile?.client_id,
-        })
-        if (error) throw error
-        toast({ title: 'Sucesso', description: 'Documento cadastrado com sucesso.' })
+        toast({ title: 'Sucesso', description: 'Documento atualizado com sucesso.' })
+        setIsModalOpen(false)
+        fetchDocuments()
       }
-      setIsModalOpen(false)
-      fetchData()
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    } else {
+      const { error } = await supabase.from('sector_documents').insert([payload])
+      if (error) {
+        toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      } else {
+        toast({ title: 'Sucesso', description: 'Documento registrado com sucesso.' })
+        setIsModalOpen(false)
+        fetchDocuments()
+      }
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este documento?')) return
-    try {
-      const { error } = await supabase.from('sector_documents').delete().eq('id', id)
-      if (error) throw error
-      toast({ title: 'Sucesso', description: 'Documento excluído com sucesso.' })
-      fetchData()
-    } catch (error: any) {
+    if (
+      !window.confirm(
+        'Tem certeza que deseja excluir este documento? Essa ação não pode ser desfeita.',
+      )
+    )
+      return
+    const { error } = await supabase.from('sector_documents').delete().eq('id', id)
+    if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    } else {
+      toast({ title: 'Sucesso', description: 'Documento excluído com sucesso.' })
+      fetchDocuments()
     }
   }
 
-  const filteredDocs = documents.filter((doc) => {
-    const matchSearch =
-      doc.name.toLowerCase().includes(search.toLowerCase()) ||
-      doc.document_type.toLowerCase().includes(search.toLowerCase())
-    const matchPlant = plantFilter === 'all' || doc.plant_id === plantFilter
-    return matchSearch && matchPlant
-  })
-
-  const getStatus = (expirationDate: string, alertDays: number) => {
-    if (!expirationDate) return { label: 'Indefinido', color: 'bg-slate-100 text-slate-800' }
-    const today = startOfDay(new Date())
-    const expDate = startOfDay(new Date(expirationDate + 'T00:00:00'))
-
-    if (isBefore(expDate, today)) {
-      return { label: 'Vencido', color: 'bg-red-100 text-red-800 border-red-300' }
-    }
-
-    const daysUntilExp = differenceInDays(expDate, today)
-    if (daysUntilExp <= alertDays) {
-      return { label: 'Alerta', color: 'bg-amber-100 text-amber-800 border-amber-300' }
-    }
-
-    return { label: 'Regular', color: 'bg-green-100 text-green-800 border-green-300' }
-  }
+  const filteredDocuments = documents.filter(
+    (doc) =>
+      doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.document_type.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestão de Documentos</h1>
-          <p className="text-muted-foreground">
-            Gerencie os documentos, certidões e licenças da operação
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <FileText className="h-6 w-6 text-primary" />
+            Gestão de Documentos
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Acompanhe os vencimentos, SLAs e status de compliance.
           </p>
         </div>
-        <Button onClick={() => handleOpenModal()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Documento
+        <Button
+          onClick={() => handleOpenModal()}
+          className="w-full md:w-auto flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" /> Novo Documento
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Buscar documentos..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome ou tipo do documento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-white"
           />
         </div>
-        <Select value={plantFilter} onValueChange={setPlantFilter}>
-          <SelectTrigger className="w-full sm:w-56">
+        <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+          <SelectTrigger className="w-full sm:w-[280px] bg-white">
             <SelectValue placeholder="Todas as Plantas" />
           </SelectTrigger>
           <SelectContent>
@@ -241,164 +282,224 @@ export default function Documentos() {
         </Select>
       </div>
 
-      <div className="border rounded-lg bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Documento</TableHead>
-              <TableHead>Planta</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Periodicidade</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>SLA (Alerta)</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[100px] text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  Carregando...
-                </TableCell>
+      <div className="bg-white rounded-xl border shadow-sm">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50 border-b">
+                <TableHead className="font-semibold text-slate-700 min-w-[200px]">
+                  Nome do Documento
+                </TableHead>
+                <TableHead className="font-semibold text-slate-700 min-w-[150px]">Tipo</TableHead>
+                <TableHead className="font-semibold text-slate-700 min-w-[140px]">
+                  Data de Vencimento
+                </TableHead>
+                <TableHead className="font-semibold text-slate-700 min-w-[120px]">
+                  Periodicidade
+                </TableHead>
+                <TableHead className="font-semibold text-slate-700 min-w-[100px]">SLA</TableHead>
+                <TableHead className="font-semibold text-slate-700 min-w-[100px]">Status</TableHead>
+                <TableHead className="text-right font-semibold text-slate-700">Ações</TableHead>
               </TableRow>
-            ) : filteredDocs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  Nenhum documento encontrado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredDocs.map((doc) => {
-                const status = getStatus(doc.expiration_date, doc.alert_lead_days)
-                return (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.name}</TableCell>
-                    <TableCell>{doc.plants?.name}</TableCell>
-                    <TableCell>{doc.document_type}</TableCell>
-                    <TableCell>{doc.frequency || '-'}</TableCell>
-                    <TableCell>
-                      {doc.expiration_date
-                        ? format(new Date(doc.expiration_date + 'T00:00:00'), 'dd/MM/yyyy')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>{doc.alert_lead_days} dias</TableCell>
-                    <TableCell>
-                      <Badge className={status.color} variant="outline">
-                        {status.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenModal(doc)}>
-                          <Pencil className="w-4 h-4 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(doc.id)}>
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center">
+                    <div className="flex flex-col items-center justify-center text-slate-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                      Carregando documentos...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredDocuments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-10 text-slate-500">
+                    <AlertCircle className="h-8 w-8 mx-auto text-slate-400 mb-3" />
+                    Nenhum documento encontrado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredDocuments.map((doc) => {
+                  const { slaText, slaDays, status, color } = getStatusAndSLA(doc)
+                  return (
+                    <TableRow key={doc.id} className="group hover:bg-slate-50/50">
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-900">{doc.name}</span>
+                          {selectedPlant === 'all' && doc.plants && (
+                            <span className="text-xs text-slate-500 mt-0.5">{doc.plants.name}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-slate-600">{doc.document_type}</TableCell>
+                      <TableCell className="text-slate-700 font-medium">
+                        {doc.expiration_date
+                          ? format(parseISO(doc.expiration_date), 'dd/MM/yyyy', { locale: ptBR })
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-slate-600 capitalize">
+                        {doc.frequency || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={cn(
+                            'font-semibold whitespace-nowrap',
+                            slaDays < 0 ? 'text-red-600' : 'text-slate-700',
+                          )}
+                        >
+                          {slaText}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn('whitespace-nowrap font-medium', color)}
+                        >
+                          {status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-primary"
+                            onClick={() => handleOpenModal(doc)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-red-600"
+                            onClick={() => handleDelete(doc.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle>{editingDoc ? 'Editar Documento' : 'Novo Documento'}</DialogTitle>
+            <DialogTitle className="text-xl">
+              {formData.id ? 'Editar Documento' : 'Novo Documento'}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-            <div className="grid gap-4">
+          <div className="grid gap-5 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                Nome do Documento <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="name"
+                placeholder="Ex: Auto de Vistoria (AVCB)"
+                value={formData.name}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Nome do Documento</Label>
+                <Label htmlFor="document_type">
+                  Tipo <span className="text-red-500">*</span>
+                </Label>
                 <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Planta</Label>
-                <Select
-                  value={formData.plant_id}
-                  onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a planta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plants.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo de Documento</Label>
-                <Input
+                  id="document_type"
+                  placeholder="Ex: Licença, Alvará..."
                   value={formData.document_type}
-                  onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-                  required
-                  placeholder="Ex: Alvará, Certidão, etc."
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, document_type: e.target.value }))
+                  }
                 />
               </div>
               <div className="space-y-2">
-                <Label>Periodicidade</Label>
+                <Label htmlFor="frequency">Periodicidade</Label>
                 <Select
                   value={formData.frequency}
-                  onValueChange={(v) => setFormData({ ...formData, frequency: v })}
-                  required
+                  onValueChange={(val) => setFormData((prev) => ({ ...prev, frequency: val }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Única">Única</SelectItem>
-                    <SelectItem value="Mensal">Mensal</SelectItem>
-                    <SelectItem value="Trimestral">Trimestral</SelectItem>
-                    <SelectItem value="Semestral">Semestral</SelectItem>
                     <SelectItem value="Anual">Anual</SelectItem>
+                    <SelectItem value="Semestral">Semestral</SelectItem>
+                    <SelectItem value="Trimestral">Trimestral</SelectItem>
+                    <SelectItem value="Mensal">Mensal</SelectItem>
+                    <SelectItem value="Única">Única</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Data de Vencimento</Label>
-                  <Input
-                    type="date"
-                    value={formData.expiration_date}
-                    onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>SLA (Dias de Alerta)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.alert_lead_days}
-                    onChange={(e) =>
-                      setFormData({ ...formData, alert_lead_days: parseInt(e.target.value) || 0 })
-                    }
-                    required
-                  />
-                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="expiration_date">
+                  Data de Vencimento <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="expiration_date"
+                  type="date"
+                  value={formData.expiration_date}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, expiration_date: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="alert_lead_days">Avisar antecedência (dias)</Label>
+                <Input
+                  id="alert_lead_days"
+                  type="number"
+                  min="0"
+                  value={formData.alert_lead_days}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      alert_lead_days: parseInt(e.target.value) || 0,
+                    }))
+                  }
+                />
               </div>
             </div>
-            <DialogFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Salvar</Button>
-            </DialogFooter>
-          </form>
+
+            <div className="space-y-2">
+              <Label htmlFor="plant_id">
+                Planta Relacionada <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.plant_id}
+                onValueChange={(val) => setFormData((prev) => ({ ...prev, plant_id: val }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave}>Salvar Documento</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
