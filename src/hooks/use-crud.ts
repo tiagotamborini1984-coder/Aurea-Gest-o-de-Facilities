@@ -87,6 +87,21 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     return { success: false, error }
   }
 
+  const update = async (id: string, record: Partial<T>) => {
+    const { data: result, error } = await supabase
+      .from(tableName)
+      .update(record)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (!error && result) {
+      setData((prev) => prev.map((item: any) => (item.id === id ? (result as T) : item)))
+      return { success: true, data: result as T }
+    }
+    return { success: false, error }
+  }
+
   const remove = async (id: string) => {
     const { error } = await supabase.from(tableName).delete().eq('id', id)
 
@@ -118,5 +133,5 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     return { success: false, error }
   }
 
-  return { data, loading, add, remove, fetchAll }
+  return { data, loading, add, update, remove, fetchAll }
 }

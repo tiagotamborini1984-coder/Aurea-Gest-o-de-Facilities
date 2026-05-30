@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useCrud } from '@/hooks/use-crud'
-import { useAppStore } from '@/store/AppContext'
+import { Plus, Search, FileText, Download, Edit2, Trash2, MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Search, Plus, Download, Trash2, FileText, FileDown } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +19,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -28,413 +26,511 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { supabase } from '@/lib/supabase/client'
-import { useToast } from '@/components/ui/use-toast'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Label } from '@/components/ui/label'
+import { useCrud } from '@/hooks/use-crud'
+import { useToast } from '@/components/ui/use-toast'
+import { differenceInDays, parseISO, format } from 'date-fns'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { cn } from '@/lib/utils'
 
 export default function Documentos() {
-  const { data: documents, loading, add, remove } = useCrud<any>('sector_documents')
+  const { data: documents, loading, add, update, remove } = useCrud<any>('sector_documents')
   const { data: plants } = useCrud<any>('plants')
   const { toast } = useToast()
 
-  const [search, setSearch] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [formData, setFormData] = useState<any>({
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedPlant, setSelectedPlant] = useState('all')
+
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+
+  const [selectedDoc, setSelectedDoc] = useState<any>(null)
+
+  const [formData, setFormData] = useState({
     name: '',
-    document_type: 'Alvará',
+    document_type: '',
     plant_id: '',
     expiration_date: '',
     alert_lead_days: 30,
     frequency: 'Anual',
-    file_url: '',
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const filteredDocs = documents.filter((doc) => {
+    const matchesSearch =
+      doc.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.document_type?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesPlant = selectedPlant === 'all' || doc.plant_id === selectedPlant
+    return matchesSearch && matchesPlant
   })
 
-  const [uploading, setUploading] = useState(false)
+  function getSlaStatus(expirationDate: string, alertLeadDays: number) {
+    if (!expirationDate) return { label: '-', color: 'bg-gray-100 text-gray-800 border-gray-200' }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const expDate = parseISO(expirationDate)
+    expDate.setHours(0, 0, 0, 0)
 
-    setUploading(true)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-    const filePath = `documents/${fileName}`
+    const diffDays = differenceInDays(expDate, today)
 
-    const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file)
+    if (diffDays <= 0) {
+      return {
+        label: `${diffDays} dias`,
+        color: 'bg-red-100 text-red-800 border-red-300 font-medium',
+      }
+    } else if (diffDays <= alertLeadDays) {
+      return {
+        label: `${diffDays} dias`,
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-300 font-medium',
+      }
+    } else {
+      return {
+        label: `${diffDays} dias`,
+        color: 'bg-green-100 text-green-800 border-green-300 font-medium',
+      }
+    }
+  }
 
-    if (uploadError) {
+  const handleDownload = (doc: any) => {
+    let url = doc.file_url
+    if (!url && doc.file_urls && Array.isArray(doc.file_urls) && doc.file_urls.length > 0) {
+      url = doc.file_urls[0]
+    }
+    if (url) {
+      window.open(url, '_blank')
+    } else {
       toast({
-        title: 'Erro',
-        description: 'Erro ao fazer upload do arquivo',
+        title: 'Arquivo indisponível',
+        description: 'Não há arquivo associado a este documento.',
         variant: 'destructive',
       })
-      setUploading(false)
-      return
     }
-
-    const { data: publicUrl } = supabase.storage.from('attachments').getPublicUrl(filePath)
-
-    setFormData((prev: any) => ({ ...prev, file_url: publicUrl.publicUrl }))
-    setUploading(false)
   }
 
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.plant_id || !formData.expiration_date) {
-      toast({ title: 'Atenção', description: 'Preencha os campos obrigatórios' })
+  const openAdd = () => {
+    setFormData({
+      name: '',
+      document_type: '',
+      plant_id: '',
+      expiration_date: '',
+      alert_lead_days: 30,
+      frequency: 'Anual',
+    })
+    setIsAddOpen(true)
+  }
+
+  const openEdit = (doc: any) => {
+    setSelectedDoc(doc)
+    setFormData({
+      name: doc.name || '',
+      document_type: doc.document_type || '',
+      plant_id: doc.plant_id || '',
+      expiration_date: doc.expiration_date ? doc.expiration_date.split('T')[0] : '',
+      alert_lead_days: doc.alert_lead_days || 30,
+      frequency: doc.frequency || 'Anual',
+    })
+    setIsEditOpen(true)
+  }
+
+  const openDelete = (doc: any) => {
+    setSelectedDoc(doc)
+    setIsDeleteOpen(true)
+  }
+
+  const handleAddSubmit = async () => {
+    if (
+      !formData.name ||
+      !formData.document_type ||
+      !formData.plant_id ||
+      !formData.expiration_date
+    ) {
+      toast({ title: 'Preencha os campos obrigatórios', variant: 'destructive' })
       return
     }
+    setIsSubmitting(true)
+    const { success, error } = await add(formData)
+    setIsSubmitting(false)
 
-    const { success } = await add(formData)
     if (success) {
-      toast({ title: 'Sucesso', description: 'Documento salvo com sucesso' })
-      setIsModalOpen(false)
-      setFormData({
-        name: '',
-        document_type: 'Alvará',
-        plant_id: '',
-        expiration_date: '',
-        alert_lead_days: 30,
-        frequency: 'Anual',
-        file_url: '',
-      })
+      toast({ title: 'Documento adicionado com sucesso' })
+      setIsAddOpen(false)
     } else {
-      toast({ title: 'Erro', description: 'Erro ao salvar documento', variant: 'destructive' })
+      toast({ title: 'Erro ao adicionar', description: error?.message, variant: 'destructive' })
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Deseja realmente excluir este documento?')) {
-      await remove(id)
-      toast({ title: 'Sucesso', description: 'Documento excluído' })
+  const handleEditSubmit = async () => {
+    if (!formData.name || !formData.document_type || !formData.expiration_date) {
+      toast({ title: 'Preencha os campos obrigatórios', variant: 'destructive' })
+      return
+    }
+    setIsSubmitting(true)
+    const payload = {
+      name: formData.name,
+      document_type: formData.document_type,
+      expiration_date: formData.expiration_date,
+      alert_lead_days: Number(formData.alert_lead_days),
+      frequency: formData.frequency,
+    }
+    const { success, error } = await update(selectedDoc.id, payload)
+    setIsSubmitting(false)
+
+    if (success) {
+      toast({ title: 'Documento atualizado com sucesso' })
+      setIsEditOpen(false)
+    } else {
+      toast({ title: 'Erro ao atualizar', description: error?.message, variant: 'destructive' })
     }
   }
 
-  const filteredDocs = documents.filter(
-    (d) =>
-      d.name?.toLowerCase().includes(search.toLowerCase()) ||
-      d.document_type?.toLowerCase().includes(search.toLowerCase()),
-  )
+  const handleDeleteConfirm = async () => {
+    setIsSubmitting(true)
+    const { success, error } = await remove(selectedDoc.id)
+    setIsSubmitting(false)
+
+    if (success) {
+      toast({ title: 'Documento excluído com sucesso' })
+      setIsDeleteOpen(false)
+    } else {
+      toast({ title: 'Erro ao excluir', description: error?.message, variant: 'destructive' })
+    }
+  }
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto animate-fade-in">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Gestão de Documentos</h1>
-          <p className="text-slate-500 mt-1">
-            Gerencie alvarás, licenças e certificados da operação
+          <h1 className="text-3xl font-bold tracking-tight">Gestão de Documentos</h1>
+          <p className="text-muted-foreground mt-1">
+            Gerencie os documentos do setor e acompanhe os prazos de validade.
           </p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Buscar documentos..."
-              className="pl-9 bg-white"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <Button onClick={openAdd} className="w-full sm:w-auto">
+          <Plus className="w-4 h-4 mr-2" />
+          Novo Documento
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row justify-between gap-4">
+            <CardTitle>Documentos Cadastrados</CardTitle>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar documento..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Filtrar por Planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Plantas</SelectItem>
+                  {plants.map((plant: any) => (
+                    <SelectItem key={plant.id} value={plant.id}>
+                      {plant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 text-white shrink-0 shadow-sm transition-all"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50/80 border-b">
-              <TableRow>
-                <TableHead className="font-semibold text-slate-700">Documento</TableHead>
-                <TableHead className="font-semibold text-slate-700">Planta</TableHead>
-                <TableHead className="font-semibold text-slate-700">Periodicidade</TableHead>
-                <TableHead className="font-semibold text-slate-700">Vencimento</TableHead>
-                <TableHead className="font-semibold text-slate-700">SLA</TableHead>
-                <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                <TableHead className="font-semibold text-slate-700 text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-slate-500">
-                    Carregando documentos...
-                  </TableCell>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Planta</TableHead>
+                  <TableHead>Periodicidade</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Status/SLA</TableHead>
+                  <TableHead className="w-[80px]">Ações</TableHead>
                 </TableRow>
-              ) : filteredDocs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-slate-500">
-                    <FileText className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                    <p>Nenhum documento encontrado.</p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredDocs.map((doc) => {
-                  let diffDays = 0
-                  let expDateObj = new Date()
-
-                  if (doc.expiration_date) {
-                    const [year, month, day] = doc.expiration_date.split('-')
-                    expDateObj = new Date(Number(year), Number(month) - 1, Number(day))
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    const diffTime = expDateObj.getTime() - today.getTime()
-                    diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
-                  }
-
-                  let status = 'Válido'
-                  let badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                  let slaColor = 'text-emerald-600 font-medium'
-                  let slaText = `${diffDays} dias`
-
-                  if (diffDays < 0) {
-                    status = 'Vencido'
-                    badgeColor = 'bg-rose-100 text-rose-800 border-rose-200'
-                    slaColor = 'text-rose-600 font-bold'
-                  } else if (diffDays <= (doc.alert_lead_days || 30)) {
-                    status = 'A Vencer'
-                    badgeColor = 'bg-amber-100 text-amber-800 border-amber-200'
-                    slaColor = 'text-amber-600 font-semibold'
-                  }
-
-                  const plant = plants.find((p) => p.id === doc.plant_id)
-
-                  const fileUrls: string[] = []
-                  if (doc.file_url) fileUrls.push(doc.file_url)
-                  if (doc.file_urls && Array.isArray(doc.file_urls)) {
-                    doc.file_urls.forEach((url: string) => {
-                      if (!fileUrls.includes(url)) fileUrls.push(url)
-                    })
-                  }
-
-                  return (
-                    <TableRow key={doc.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center border border-indigo-100/50 shrink-0">
-                            <FileText className="h-5 w-5 text-indigo-500" />
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Carregando...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredDocs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Nenhum documento encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredDocs.map((doc: any) => {
+                    const plant = plants.find((p: any) => p.id === doc.plant_id)
+                    const sla = getSlaStatus(doc.expiration_date, doc.alert_lead_days)
+                    return (
+                      <TableRow key={doc.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-blue-500" />
+                            {doc.name}
                           </div>
-                          <div>
-                            <p className="font-medium text-slate-900">{doc.name}</p>
-                            <p className="text-xs text-slate-500">{doc.document_type}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-slate-600">{plant?.name || 'Geral'}</TableCell>
-                      <TableCell className="text-slate-600">{doc.frequency || '-'}</TableCell>
-                      <TableCell className="text-slate-600 font-medium">
-                        {doc.expiration_date ? expDateObj.toLocaleDateString('pt-BR') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <span className={slaColor}>{slaText}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={badgeColor}>
-                          {status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {fileUrls.length === 1 ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-slate-500 hover:text-brand-vividBlue hover:bg-blue-50"
-                              onClick={() => window.open(fileUrls[0], '_blank')}
-                              title="Baixar arquivo"
-                            >
-                              <FileDown className="h-4 w-4" />
-                            </Button>
-                          ) : fileUrls.length > 1 ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-slate-500 hover:text-brand-vividBlue hover:bg-blue-50"
-                                  title="Baixar arquivos"
-                                >
-                                  <FileDown className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {fileUrls.map((url, i) => (
-                                  <DropdownMenuItem
-                                    key={i}
-                                    onClick={() => window.open(url, '_blank')}
-                                  >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Arquivo {i + 1}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
+                        </TableCell>
+                        <TableCell>{doc.document_type}</TableCell>
+                        <TableCell>{plant?.name || '-'}</TableCell>
+                        <TableCell>{doc.frequency || 'Anual'}</TableCell>
+                        <TableCell>
+                          {doc.expiration_date
+                            ? format(parseISO(doc.expiration_date), 'dd/MM/yyyy')
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn('whitespace-nowrap', sla.color)}>
+                            {sla.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDownload(doc)}>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEdit(doc)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => openDelete(doc)}
+                                className="text-red-600 focus:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-slate-500 hover:text-rose-600 hover:bg-rose-50"
-                            onClick={() => handleDelete(doc.id)}
-                            title="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Add Modal */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo Documento</DialogTitle>
           </DialogHeader>
-
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Nome do Documento *</Label>
+              <Label>Nome do Documento</Label>
               <Input
-                id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: Alvará de Funcionamento"
+                placeholder="Ex: PPRA 2024"
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Tipo</Label>
-                <Select
-                  value={formData.document_type}
-                  onValueChange={(val) => setFormData({ ...formData, document_type: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Alvará">Alvará</SelectItem>
-                    <SelectItem value="Licença">Licença</SelectItem>
-                    <SelectItem value="Certificado">Certificado</SelectItem>
-                    <SelectItem value="PPCI">PPCI</SelectItem>
-                    <SelectItem value="Outros">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Planta *</Label>
-                <Select
-                  value={formData.plant_id}
-                  onValueChange={(val) => setFormData({ ...formData, plant_id: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plants.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid gap-2">
+              <Label>Tipo de Documento</Label>
+              <Input
+                value={formData.document_type}
+                onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
+                placeholder="Ex: PPRA, PCMSO, LTCAT"
+              />
             </div>
-
+            <div className="grid gap-2">
+              <Label>Planta</Label>
+              <Select
+                value={formData.plant_id}
+                onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((plant: any) => (
+                    <SelectItem key={plant.id} value={plant.id}>
+                      {plant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Periodicidade</Label>
-                <Select
-                  value={formData.frequency}
-                  onValueChange={(val) => setFormData({ ...formData, frequency: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Mensal">Mensal</SelectItem>
-                    <SelectItem value="Trimestral">Trimestral</SelectItem>
-                    <SelectItem value="Semestral">Semestral</SelectItem>
-                    <SelectItem value="Anual">Anual</SelectItem>
-                    <SelectItem value="Bianual">Bianual</SelectItem>
-                    <SelectItem value="Única">Única</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Data de Vencimento *</Label>
+                <Label>Data de Vencimento</Label>
                 <Input
                   type="date"
                   value={formData.expiration_date}
                   onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
                 />
               </div>
+              <div className="grid gap-2">
+                <Label>Aviso de Vencimento (Dias)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.alert_lead_days}
+                  onChange={(e) =>
+                    setFormData({ ...formData, alert_lead_days: Number(e.target.value) })
+                  }
+                />
+              </div>
             </div>
-
             <div className="grid gap-2">
-              <Label>Aviso Prévio (Dias)</Label>
-              <Input
-                type="number"
-                value={formData.alert_lead_days}
-                onChange={(e) =>
-                  setFormData({ ...formData, alert_lead_days: Number(e.target.value) })
-                }
-              />
-              <p className="text-xs text-slate-500">
-                Quantos dias antes do vencimento o status mudará para "A Vencer"
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Arquivo (PDF, Imagem)</Label>
-              <Input
-                type="file"
-                accept=".pdf,image/*"
-                onChange={handleFileUpload}
-                disabled={uploading}
-              />
-              {uploading && (
-                <p className="text-xs text-blue-600 animate-pulse">Enviando arquivo...</p>
-              )}
-              {formData.file_url && !uploading && (
-                <p className="text-xs text-green-600 flex items-center gap-1 font-medium">
-                  <FileText className="h-3 w-3" /> Arquivo anexado com sucesso
-                </p>
-              )}
+              <Label>Periodicidade</Label>
+              <Select
+                value={formData.frequency}
+                onValueChange={(v) => setFormData({ ...formData, frequency: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a periodicidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mensal">Mensal</SelectItem>
+                  <SelectItem value="Trimestral">Trimestral</SelectItem>
+                  <SelectItem value="Semestral">Semestral</SelectItem>
+                  <SelectItem value="Anual">Anual</SelectItem>
+                  <SelectItem value="Bianual">Bianual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+            <Button variant="outline" onClick={() => setIsAddOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={handleSubmit}
-              className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 text-white"
-              disabled={uploading}
-            >
-              Salvar Documento
+            <Button onClick={handleAddSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Salvar'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Documento</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Nome do Documento</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Tipo de Documento</Label>
+              <Input
+                value={formData.document_type}
+                onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Data de Vencimento</Label>
+                <Input
+                  type="date"
+                  value={formData.expiration_date}
+                  onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Aviso de Vencimento (Dias)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.alert_lead_days}
+                  onChange={(e) =>
+                    setFormData({ ...formData, alert_lead_days: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Periodicidade</Label>
+              <Select
+                value={formData.frequency}
+                onValueChange={(v) => setFormData({ ...formData, frequency: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a periodicidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mensal">Mensal</SelectItem>
+                  <SelectItem value="Trimestral">Trimestral</SelectItem>
+                  <SelectItem value="Semestral">Semestral</SelectItem>
+                  <SelectItem value="Anual">Anual</SelectItem>
+                  <SelectItem value="Bianual">Bianual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Documento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o documento <strong>{selectedDoc?.name}</strong>? Esta
+              ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isSubmitting ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
