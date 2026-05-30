@@ -1,4 +1,16 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useAppStore } from '@/store/AppContext'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -7,262 +19,246 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Loader2, Trash2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase/client'
-import { useAppStore } from '@/store/AppContext'
-import { CreateUserDialog } from './components/CreateUserDialog'
-import { EditUserDialog } from './components/EditUserDialog'
-import { useHasAccess } from '@/hooks/use-has-access'
-import { Navigate } from 'react-router-dom'
-import { useToast } from '@/hooks/use-toast'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { logAudit } from '@/services/audit'
-import { useAuth } from '@/hooks/use-auth'
+import { useToast } from '@/components/ui/use-toast'
+import { Loader2, Plus, Edit, Trash2 } from 'lucide-react'
+
+const MENUS = [
+  'Dashboard Gestor',
+  'Lançamentos',
+  'Treinamentos',
+  'Relatórios',
+  'BI Dashboard',
+  'Email Reports',
+  'Limpeza e Jardinagem',
+  'Gestão de Tarefas',
+  'Organograma e Fluxos',
+  'Auditoria e Checklist',
+  'Gestão de Acidentes',
+  'Gestão da Manutenção',
+  'Gestão de Budget',
+  'Gestão de Lockers',
+  'Gestão de Documentos',
+  'Gestão de Imóveis',
+  'Gestão de Encomendas',
+  'Book de Metas',
+  'Cadastros',
+  'Usuários',
+  'Dashboard Estratégico',
+  'Log de Auditoria',
+]
 
 export default function Usuarios() {
-  const [usersList, setUsersList] = useState<any[]>([])
+  const { activeClient, profile } = useAppStore()
+  const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [userToDelete, setUserToDelete] = useState<any>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  const { profile } = useAppStore()
-  const { user: authUser } = useAuth()
-  const hasAccess = useHasAccess('Usuários')
+  const [isOpen, setIsOpen] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'Operacional',
+    accessible_menus: [] as string[],
+  })
   const { toast } = useToast()
 
   const fetchUsers = async () => {
-    let query = supabase
-      .from('profiles')
-      .select('*, clients(name)')
-      .order('name', { ascending: true })
-
-    if (profile?.role === 'Master') {
-      if (selectedMasterClient !== 'all') {
-        query = query.eq('client_id', selectedMasterClient)
-      }
-    } else {
-      if (!profile?.client_id) return
-      query = query.eq('client_id', profile.client_id)
-    }
-
-    const { data } = await query
-    setUsersList(data || [])
+    if (!profile) return
+    setLoading(true)
+    let q = supabase.from('profiles').select('*').order('name')
+    if (profile.role !== 'Master' && activeClient) q = q.eq('client_id', activeClient.id)
+    const { data } = await q
+    if (data) setUsers(data)
     setLoading(false)
   }
 
   useEffect(() => {
     fetchUsers()
-  }, [profile])
+  }, [activeClient, profile])
 
-  if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
-
-  const handleEditClick = (user: any) => {
-    setSelectedUser(user)
-    setEditOpen(true)
-  }
-
-  const canDeleteUser = (targetUser: any) => {
-    if (!profile) return false
-    if (targetUser.id === profile.id) return false // cannot delete self
-    if (profile.role === 'Master') {
-      return targetUser.role !== 'Master'
-    }
-    if (profile.role === 'Administrador') {
-      return (
-        targetUser.client_id === profile.client_id &&
-        !['Master', 'Administrador'].includes(targetUser.role)
-      )
-    }
-    return false
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!userToDelete) return
-    setIsDeleting(true)
+  const save = async () => {
     try {
-      const { error } = await supabase.functions.invoke('delete-user', {
-        body: { userId: userToDelete.id },
-      })
-      if (error) throw new Error(error.message)
-
-      toast({
-        title: 'Usuário excluído',
-        description: 'O usuário foi removido com sucesso.',
-        className: 'bg-green-50 text-green-900 border-green-200',
-      })
-
-      if (authUser && profile) {
-        logAudit(
-          profile.client_id || userToDelete.client_id,
-          authUser.id,
-          'Exclusão de Usuário',
-          `Usuário excluído: ${userToDelete.email} | Nível: ${userToDelete.role}`,
-        )
+      if (editing) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            name: formData.name,
+            role: formData.role,
+            accessible_menus: formData.accessible_menus,
+          })
+          .eq('id', editing.id)
+        if (error) throw error
+        toast({ title: 'Usuário atualizado' })
+      } else {
+        const { error } = await supabase.functions.invoke('create-user', {
+          body: { ...formData, client_id: activeClient?.id },
+        })
+        if (error) throw error
+        toast({ title: 'Usuário criado' })
       }
-
+      setIsOpen(false)
       fetchUsers()
-    } catch (err: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao excluir',
-        description: err.message || 'Ocorreu um erro ao excluir o usuário.',
-      })
-    } finally {
-      setIsDeleting(false)
-      setUserToDelete(null)
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' })
     }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este usuário?')) return
+    try {
+      const { error } = await supabase.functions.invoke('delete-user', { body: { userId: id } })
+      if (error) throw error
+      toast({ title: 'Usuário excluído' })
+      fetchUsers()
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const openForm = (u?: any) => {
+    setEditing(u || null)
+    setFormData(
+      u
+        ? {
+            name: u.name,
+            email: u.email,
+            password: '',
+            role: u.role,
+            accessible_menus: u.accessible_menus || [],
+          }
+        : { name: '', email: '', password: '', role: 'Operacional', accessible_menus: [] },
+    )
+    setIsOpen(true)
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-fade-in">
-      <div className="flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Gestão de Usuários</h2>
-          <p className="text-muted-foreground mt-1">
-            Controle de acessos e permissões granulares por cliente.
-          </p>
-        </div>
-        <Button
-          className="bg-brand-vividBlue hover:bg-brand-vividBlue/90 text-white"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" /> Novo Usuário
-        </Button>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">Gestão de Usuários</h1>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => openForm()}>
+              <Plus className="w-4 h-4 mr-2" /> Novo Usuário
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editing ? 'Editar' : 'Novo'} Usuário</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nome</label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  disabled={!!editing}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              {!editing && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Senha</label>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  />
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Perfil</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="Operacional">Operacional</option>
+                  <option value="Gestor">Gestor</option>
+                  <option value="Administrador">Administrador</option>
+                  {profile?.role === 'Master' && <option value="Master">Master</option>}
+                </select>
+              </div>
+              <div className="col-span-2 space-y-2 mt-2">
+                <label className="text-sm font-medium border-b pb-1 block">Menus Acessíveis</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                  {MENUS.map((mod) => (
+                    <div key={mod} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`m-${mod}`}
+                        checked={formData.accessible_menus.includes(mod)}
+                        onCheckedChange={(c) => {
+                          setFormData({
+                            ...formData,
+                            accessible_menus: c
+                              ? [...formData.accessible_menus, mod]
+                              : formData.accessible_menus.filter((m) => m !== mod),
+                          })
+                        }}
+                      />
+                      <label
+                        htmlFor={`m-${mod}`}
+                        className="text-sm cursor-pointer truncate"
+                        title={mod}
+                      >
+                        {mod}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <Button onClick={save} className="w-full mt-4">
+              Salvar
+            </Button>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50/80 border-b border-gray-200">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="font-semibold text-slate-800">Nome</TableHead>
-              <TableHead className="font-semibold text-slate-800">E-mail</TableHead>
-              {profile?.role === 'Master' && (
-                <TableHead className="font-semibold text-slate-800">Empresa</TableHead>
-              )}
-              <TableHead className="font-semibold text-slate-800">Nível de Acesso</TableHead>
-              <TableHead className="font-semibold text-slate-800 text-right pr-6">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      {loading ? (
+        <div className="flex justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border shadow-sm">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={profile?.role === 'Master' ? 5 : 4}
-                  className="text-center py-8"
-                >
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-vividBlue" />
-                </TableCell>
+                <TableHead>Nome</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Perfil</TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
-            ) : usersList.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={profile?.role === 'Master' ? 5 : 4}
-                  className="text-center py-8 text-slate-600"
-                >
-                  Nenhum usuário encontrado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              usersList.map((u) => (
-                <TableRow key={u.id} className="hover:bg-slate-50 border-gray-100">
-                  <TableCell className="font-medium text-brand-graphite">{u.name}</TableCell>
-                  <TableCell className="text-slate-600">{u.email}</TableCell>
-                  {profile?.role === 'Master' && (
-                    <TableCell className="text-slate-600">{u.clients?.name || '-'}</TableCell>
-                  )}
+            </TableHeader>
+            <TableBody>
+              {users.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium">{u.name}</TableCell>
+                  <TableCell>{u.email}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        u.role === 'Administrador' || u.role === 'Master'
-                          ? 'bg-brand-vividBlue text-white border-brand-vividBlue'
-                          : u.role === 'Gestor'
-                            ? 'bg-amber-500 text-white border-amber-500'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                      }
-                    >
-                      {u.role === 'Master' ? 'Administrador' : u.role}
-                    </Badge>
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      {u.role}
+                    </span>
                   </TableCell>
-                  <TableCell className="text-right pr-6">
-                    <div className="flex justify-end items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-brand-vividBlue hover:bg-brand-vividBlue/10 hover:text-brand-vividBlue"
-                        onClick={() => handleEditClick(u)}
-                      >
-                        Editar
-                      </Button>
-                      {canDeleteUser(u) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => setUserToDelete(u)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                  <TableCell className="space-x-2">
+                    <Button variant="ghost" size="icon" onClick={() => openForm(u)}>
+                      <Edit className="w-4 h-4 text-blue-600" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)}>
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={fetchUsers} />
-      <EditUserDialog
-        userToEdit={selectedUser}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSuccess={fetchUsers}
-      />
-
-      <AlertDialog
-        open={!!userToDelete}
-        onOpenChange={(open) => !open && !isDeleting && setUserToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o usuário <strong>{userToDelete?.name}</strong> (
-              {userToDelete?.email})? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                handleDeleteConfirm()
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={isDeleting}
-            >
-              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirmar Exclusão
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   )
 }
