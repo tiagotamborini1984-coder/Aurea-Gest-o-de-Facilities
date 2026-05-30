@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
-import { useToast } from '@/components/ui/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -14,364 +12,307 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Printer, ArrowLeft, Calendar, FileText, Settings, Target, Hash } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ArrowLeft, Calendar, FileText, Activity, AlertCircle, FileCheck2 } from 'lucide-react'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-const formatDate = (dateStr: string | null | undefined) => {
-  if (!dateStr) return '-'
-  if (dateStr.length === 10) {
-    const [y, m, d] = dateStr.split('-')
-    return `${d}/${m}/${y}`
-  }
-  try {
-    return format(parseISO(dateStr), 'dd/MM/yyyy')
-  } catch {
-    return '-'
-  }
+// Types
+type Audit = {
+  id: string
+  title: string
+  type: string
+  frequency: string
+  status: string
+  start_date: string
+}
+
+type Execution = {
+  id: string
+  realization_date: string | null
+  created_at: string
+  status: string
+  final_score: number | null
+  max_score: number | null
+  plants: { name: string } | null
+  profiles: { name: string } | null
 }
 
 export default function AuditoriaDetalhes() {
   const { id } = useParams<{ id: string }>()
-  const { toast } = useToast()
+  const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
 
+  const [audit, setAudit] = useState<Audit | null>(null)
+  const [executions, setExecutions] = useState<Execution[]>([])
   const [loading, setLoading] = useState(true)
-  const [audit, setAudit] = useState<any>(null)
-  const [actions, setActions] = useState<any[]>([])
-  const [executions, setExecutions] = useState<any[]>([])
-  const [userRole, setUserRole] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
-    const loadData = async () => {
+    if (authLoading) return
+    if (!user) {
+      navigate('/')
+      return
+    }
+
+    const fetchData = async () => {
       if (!id) return
+
       try {
         setLoading(true)
+        setError(null)
 
-        const { data: userData } = await supabase.auth.getUser()
-        if (!userData.user) return
-
+        // Fetch user role
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', userData.user.id)
+          .eq('id', user.id)
           .single()
 
-        const role = profile?.role || ''
+        const role = profile?.role || null
         setUserRole(role)
 
+        // Fetch Audit
         const { data: auditData, error: auditError } = await supabase
           .from('audits')
-          .select('*')
+          .select('id, title, type, frequency, status, start_date')
           .eq('id', id)
           .single()
 
         if (auditError || !auditData) {
-          setAudit(null)
+          setError('Auditoria não encontrada.')
           return
         }
 
         setAudit(auditData)
 
-        const { data: actionsData } = await supabase
-          .from('audit_actions')
-          .select('*')
-          .eq('audit_id', id)
-          .order('order_index', { ascending: true })
-
-        setActions(actionsData || [])
-
-        if (['Master', 'Administrador'].includes(role)) {
-          const { data: execsData, error: execsError } = await supabase
+        // Fetch Executions only if Admin or Master
+        if (role === 'Administrador' || role === 'Master') {
+          const { data: execData, error: execError } = await supabase
             .from('audit_executions')
             .select(`
-              *,
-              profiles (name),
-              plants (name)
+              id,
+              realization_date,
+              created_at,
+              status,
+              final_score,
+              max_score,
+              plants(name),
+              profiles(name)
             `)
             .eq('audit_id', id)
             .order('created_at', { ascending: false })
 
-          if (!execsError && execsData) {
-            setExecutions(execsData)
+          if (!execError && execData) {
+            setExecutions(execData as any)
           }
         }
-      } catch (err: any) {
-        toast({
-          title: 'Erro ao carregar auditoria',
-          description: err.message,
-          variant: 'destructive',
-        })
+      } catch (err) {
+        console.error(err)
+        setError('Ocorreu um erro ao carregar os dados.')
       } finally {
         setLoading(false)
       }
     }
 
-    loadData()
-  }, [id, toast])
+    fetchData()
+  }, [id, user, authLoading, navigate])
 
-  const handlePrint = () => {
-    window.print()
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Finalizado':
+        return <Badge className="bg-green-500">Finalizado</Badge>
+      case 'Pendente':
+        return (
+          <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+            Pendente
+          </Badge>
+        )
+      case 'Rascunho':
+        return <Badge variant="secondary">Rascunho</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
   }
 
-  if (loading) {
+  const getAuditStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Ativo':
+        return <Badge className="bg-green-500">Ativo</Badge>
+      case 'Inativo':
+        return <Badge variant="destructive">Inativo</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  if (authLoading || loading) {
     return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-10 w-1/3" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
+      <div className="p-6 space-y-6 max-w-6xl mx-auto">
+        <div className="flex items-center gap-4 mb-6">
+          <Skeleton className="h-10 w-10" />
+          <div>
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
         </div>
-        <Skeleton className="h-64" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-xl" />
+        </div>
+        <Skeleton className="h-64 w-full rounded-xl mt-8" />
       </div>
     )
   }
 
-  if (!audit) {
+  if (error || !audit) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
-        <div className="bg-muted p-4 rounded-full">
-          <FileText className="h-10 w-10 text-muted-foreground" />
-        </div>
-        <h2 className="text-2xl font-bold">Auditoria não encontrada</h2>
-        <p className="text-muted-foreground">
-          A auditoria solicitada não existe ou você não tem permissão para acessá-la.
+      <div className="p-6 max-w-4xl mx-auto text-center mt-20">
+        <AlertCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-2xl font-semibold mb-2">Auditoria não encontrada</h2>
+        <p className="text-muted-foreground mb-6">
+          {error || 'Não foi possível carregar os detalhes desta auditoria.'}
         </p>
-        <Link to="/auditoria-checklist/dashboard">
-          <Button variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar ao Dashboard
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  const scoringSettings = Array.isArray(audit.scoring_settings) ? audit.scoring_settings : []
-
-  return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full bg-background">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
-        <div className="flex items-center gap-2">
-          <Link to="/auditoria-checklist/criadas">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+        <Button asChild>
+          <Link to="/auditoria-checklist/configuracao">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar para Configurações
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Detalhes da Auditoria</h1>
-        </div>
-        <Button onClick={handlePrint} className="print:hidden">
-          <Printer className="mr-2 h-4 w-4" /> Imprimir
         </Button>
       </div>
+    )
+  }
 
-      <div className="hidden print:block mb-8">
-        <h1 className="text-3xl font-bold">{audit.title}</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Documento gerado em {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-        </p>
+  const isAdmin = userRole === 'Administrador' || userRole === 'Master'
+
+  return (
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" asChild>
+          <Link to="/auditoria-checklist/configuracao">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{audit.title}</h1>
+          <p className="text-muted-foreground">Visualizando detalhes e histórico da auditoria</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="print:shadow-none print:border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" /> Informações Gerais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Título</p>
-                <p className="font-medium">{audit.title}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <Badge
-                  variant={audit.status === 'Ativo' ? 'default' : 'secondary'}
-                  className="mt-1"
-                >
-                  {audit.status}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Tipo</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                  <span>{audit.type}</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Frequência</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>{audit.frequency}</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Data de Início</p>
-                <p className="font-medium mt-1">{formatDate(audit.start_date)}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Aviso Prévio</p>
-                <p className="font-medium mt-1">{audit.advance_notice_days || 0} dias</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="print:shadow-none print:border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" /> Sistema de Pontuação
-            </CardTitle>
-            <CardDescription>Critérios de avaliação para esta auditoria</CardDescription>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Status</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {scoringSettings.length > 0 ? (
-              <div className="space-y-3">
-                {scoringSettings.map((setting: any, idx: number) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/50 border"
-                  >
-                    <span className="font-medium">{setting.description}</span>
-                    <Badge variant="outline" className="font-mono">
-                      {setting.score} {setting.score === 1 ? 'ponto' : 'pontos'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Sem configuração de pontuação definida.
+            <div className="text-2xl font-bold">{getAuditStatusBadge(audit.status)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Frequência</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{audit.frequency}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Início: {format(new Date(audit.start_date), 'dd/MM/yyyy', { locale: ptBR })}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Tipo</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{audit.type}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Execuções Realizadas</CardTitle>
+            <FileCheck2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {executions.filter((e) => e.status === 'Finalizado').length}
+            </div>
+            {isAdmin && (
+              <p className="text-xs text-muted-foreground mt-1">
+                De {executions.length} programadas
               </p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <Card className="print:shadow-none print:border-border print:break-inside-avoid">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Hash className="h-5 w-5" /> Itens do Checklist ({actions.length})
-          </CardTitle>
-          <CardDescription>Ações que devem ser verificadas durante a execução</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16 text-center">#</TableHead>
-                  <TableHead>Descrição do Item</TableHead>
-                  <TableHead className="text-center">Peso</TableHead>
-                  <TableHead className="text-center">Requisitos</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {actions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                      Nenhuma ação cadastrada neste checklist.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  actions.map((action, index) => (
-                    <TableRow key={action.id}>
-                      <TableCell className="text-center font-medium">{index + 1}</TableCell>
-                      <TableCell>{action.title}</TableCell>
-                      <TableCell className="text-center">{action.weight}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
-                          {action.evidence_required && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              Foto/Evidência
-                            </Badge>
-                          )}
-                          {action.comments_required && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              Observação
-                            </Badge>
-                          )}
-                          {!action.evidence_required && !action.comments_required && <span>-</span>}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {['Master', 'Administrador'].includes(userRole) && (
-        <Card className="print:shadow-none print:border-border print:break-before-page">
+      {isAdmin && (
+        <Card>
           <CardHeader>
             <CardTitle>Histórico de Realizações</CardTitle>
             <CardDescription>
-              Últimas execuções desta auditoria registradas no sistema
+              Acompanhe todas as execuções programadas e realizadas para esta auditoria.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Planta</TableHead>
-                    <TableHead>Responsável</TableHead>
-                    <TableHead className="text-right">Pontuação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {executions.length === 0 ? (
+            {executions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileCheck2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p>Nenhuma execução encontrada para esta auditoria.</p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                        Nenhuma execução registrada para esta auditoria.
-                      </TableCell>
+                      <TableHead>Data Programada / Realização</TableHead>
+                      <TableHead>Planta</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Nota Final</TableHead>
                     </TableRow>
-                  ) : (
-                    executions.map((exec) => (
-                      <TableRow key={exec.id}>
-                        <TableCell className="font-medium">
-                          {exec.realization_date
-                            ? formatDate(exec.realization_date)
-                            : formatDate(exec.created_at)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              exec.status === 'Finalizado'
-                                ? 'default'
-                                : exec.status === 'Pendente'
-                                  ? 'destructive'
-                                  : 'secondary'
-                            }
-                          >
-                            {exec.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{exec.plants?.name || '-'}</TableCell>
-                        <TableCell>{exec.profiles?.name || '-'}</TableCell>
-                        <TableCell className="text-right">
-                          {exec.final_score !== null && exec.max_score !== null ? (
-                            <span className="font-mono font-medium">
-                              {exec.final_score} / {exec.max_score}
-                              <span className="text-xs text-muted-foreground ml-1">
-                                ({Math.round((exec.final_score / exec.max_score) * 100)}%)
+                  </TableHeader>
+                  <TableBody>
+                    {executions.map((exec) => {
+                      const displayDate = exec.realization_date || exec.created_at
+                      return (
+                        <TableRow key={exec.id}>
+                          <TableCell className="font-medium">
+                            {format(new Date(displayDate), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                            {!exec.realization_date && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                (Programada)
                               </span>
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                            )}
+                          </TableCell>
+                          <TableCell>{exec.plants?.name || '-'}</TableCell>
+                          <TableCell>{exec.profiles?.name || '-'}</TableCell>
+                          <TableCell>{getStatusBadge(exec.status)}</TableCell>
+                          <TableCell className="text-right">
+                            {exec.final_score !== null && exec.max_score ? (
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold">{exec.final_score}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  de {exec.max_score}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
