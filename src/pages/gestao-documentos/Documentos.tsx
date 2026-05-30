@@ -1,13 +1,6 @@
-import { useEffect, useState, useMemo } from 'react'
-import { format, parseISO } from 'date-fns'
-import { z } from 'zod'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Search, Edit2, Trash2, FileText, Plus } from 'lucide-react'
-import { toast } from 'sonner'
-
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { useAppStore } from '@/store/AppContext'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,15 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -34,356 +25,380 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-
-const PERIODICIDADE_OPCOES = [
-  'Diário',
-  'Semanal',
-  'Quinzenal',
-  'Mensal',
-  'Trimestral',
-  'Semestral',
-  'Anual',
-]
-
-const formSchema = z.object({
-  name: z.string().min(1, 'Obrigatório'),
-  document_type: z.string().min(1, 'Obrigatório'),
-  plant_id: z.string().min(1, 'Obrigatório'),
-  frequency: z.string().min(1, 'Obrigatório'),
-  expiration_date: z.string().min(1, 'Obrigatório'),
-  alert_lead_days: z.coerce.number().min(1, 'Obrigatório'),
-})
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/components/ui/use-toast'
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import { format, differenceInDays, isBefore, startOfDay } from 'date-fns'
 
 export default function Documentos() {
-  const { activeClient, profile } = useAppStore()
+  const { user } = useAuth()
+  const { toast } = useToast()
+
   const [documents, setDocuments] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [plantFilter, setPlantFilter] = useState('all')
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: '',
-      document_type: '',
-      plant_id: '',
-      frequency: '',
-      expiration_date: '',
-      alert_lead_days: 30,
-    },
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingDoc, setEditingDoc] = useState<any>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    plant_id: '',
+    document_type: '',
+    frequency: 'Anual',
+    expiration_date: '',
+    alert_lead_days: 30,
   })
 
-  useEffect(() => {
-    if (activeClient?.id) {
-      fetchDocuments()
-      fetchPlants()
-    }
-  }, [activeClient?.id])
-
-  const fetchDocuments = async () => {
-    const { data, error } = await supabase
-      .from('sector_documents')
-      .select('*, plants(name)')
-      .eq('client_id', activeClient!.id)
-      .order('created_at', { ascending: false })
-    if (!error && data) setDocuments(data)
-  }
-
-  const fetchPlants = async () => {
-    const { data, error } = await supabase
-      .from('plants')
-      .select('id, name')
-      .eq('client_id', activeClient!.id)
-
-    if (!error && data) {
-      if (profile?.role === 'Operacional' || profile?.role === 'Gestor') {
-        const authPlants = profile?.authorized_plants || []
-        setPlants(data.filter((p) => authPlants.includes(p.id)))
-      } else {
-        setPlants(data)
-      }
-    }
-  }
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const fetchData = async () => {
+    if (!user) return
+    setLoading(true)
     try {
-      if (editingId) {
-        const { error } = await supabase.from('sector_documents').update(values).eq('id', editingId)
-        if (error) throw error
-        toast.success('Documento atualizado com sucesso!')
-      } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('client_id, authorized_plants, role')
+        .eq('id', user.id)
+        .single()
+      if (!profile?.client_id) return
+
+      let plantQuery = supabase.from('plants').select('id, name').eq('client_id', profile.client_id)
+      if (
+        profile.role !== 'Master' &&
+        profile.role !== 'Administrador' &&
+        profile.authorized_plants?.length
+      ) {
+        plantQuery = plantQuery.in('id', profile.authorized_plants)
+      }
+      const { data: plantsData } = await plantQuery
+      setPlants(plantsData || [])
+
+      let docQuery = supabase
+        .from('sector_documents')
+        .select('*, plants(name)')
+        .eq('client_id', profile.client_id)
+        .order('expiration_date', { ascending: true })
+      if (
+        profile.role !== 'Master' &&
+        profile.role !== 'Administrador' &&
+        profile.authorized_plants?.length
+      ) {
+        docQuery = docQuery.in('plant_id', profile.authorized_plants)
+      }
+      const { data: docsData } = await docQuery
+      setDocuments(docsData || [])
+    } catch (error: any) {
+      toast({ title: 'Erro', description: 'Erro ao carregar documentos.', variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [user])
+
+  const handleOpenModal = (doc?: any) => {
+    if (doc) {
+      setEditingDoc(doc)
+      setFormData({
+        name: doc.name,
+        plant_id: doc.plant_id,
+        document_type: doc.document_type,
+        frequency: doc.frequency || 'Anual',
+        expiration_date: doc.expiration_date,
+        alert_lead_days: doc.alert_lead_days,
+      })
+    } else {
+      setEditingDoc(null)
+      setFormData({
+        name: '',
+        plant_id: plants.length === 1 ? plants[0].id : '',
+        document_type: '',
+        frequency: 'Anual',
+        expiration_date: '',
+        alert_lead_days: 30,
+      })
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('client_id')
+        .eq('id', user?.id)
+        .single()
+
+      const payload = {
+        name: formData.name,
+        plant_id: formData.plant_id,
+        document_type: formData.document_type,
+        frequency: formData.frequency,
+        expiration_date: formData.expiration_date,
+        alert_lead_days: formData.alert_lead_days,
+      }
+
+      if (editingDoc) {
         const { error } = await supabase
           .from('sector_documents')
-          .insert({ ...values, client_id: activeClient!.id })
+          .update(payload)
+          .eq('id', editingDoc.id)
         if (error) throw error
-        toast.success('Documento criado com sucesso!')
+        toast({ title: 'Sucesso', description: 'Documento atualizado com sucesso.' })
+      } else {
+        const { error } = await supabase.from('sector_documents').insert({
+          ...payload,
+          client_id: profile?.client_id,
+        })
+        if (error) throw error
+        toast({ title: 'Sucesso', description: 'Documento cadastrado com sucesso.' })
       }
-      setIsOpen(false)
-      fetchDocuments()
-    } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar documento')
+      setIsModalOpen(false)
+      fetchData()
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
     }
-  }
-
-  const handleAdd = () => {
-    setEditingId(null)
-    form.reset({
-      name: '',
-      document_type: '',
-      plant_id: '',
-      frequency: '',
-      expiration_date: '',
-      alert_lead_days: 30,
-    })
-    setIsOpen(true)
-  }
-
-  const handleEdit = (doc: any) => {
-    setEditingId(doc.id)
-    form.reset({
-      name: doc.name,
-      document_type: doc.document_type,
-      plant_id: doc.plant_id,
-      frequency: doc.frequency || '',
-      expiration_date: doc.expiration_date ? doc.expiration_date.split('T')[0] : '',
-      alert_lead_days: doc.alert_lead_days,
-    })
-    setIsOpen(true)
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este documento?')) return
-    const { error } = await supabase.from('sector_documents').delete().eq('id', id)
-    if (error) {
-      toast.error('Erro ao excluir documento')
-    } else {
-      toast.success('Documento excluído com sucesso')
-      fetchDocuments()
+    if (!confirm('Deseja realmente excluir este documento?')) return
+    try {
+      const { error } = await supabase.from('sector_documents').delete().eq('id', id)
+      if (error) throw error
+      toast({ title: 'Sucesso', description: 'Documento excluído com sucesso.' })
+      fetchData()
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
     }
   }
 
-  const filteredDocs = useMemo(() => {
-    return documents.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()))
-  }, [documents, search])
+  const filteredDocs = documents.filter((doc) => {
+    const matchSearch =
+      doc.name.toLowerCase().includes(search.toLowerCase()) ||
+      doc.document_type.toLowerCase().includes(search.toLowerCase())
+    const matchPlant = plantFilter === 'all' || doc.plant_id === plantFilter
+    return matchSearch && matchPlant
+  })
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-'
-    try {
-      return format(parseISO(dateStr), 'dd/MM/yyyy')
-    } catch {
-      return dateStr
+  const getStatus = (expirationDate: string, alertDays: number) => {
+    if (!expirationDate) return { label: 'Indefinido', color: 'bg-slate-100 text-slate-800' }
+    const today = startOfDay(new Date())
+    const expDate = startOfDay(new Date(expirationDate + 'T00:00:00'))
+
+    if (isBefore(expDate, today)) {
+      return { label: 'Vencido', color: 'bg-red-100 text-red-800 border-red-300' }
     }
+
+    const daysUntilExp = differenceInDays(expDate, today)
+    if (daysUntilExp <= alertDays) {
+      return { label: 'Alerta', color: 'bg-amber-100 text-amber-800 border-amber-300' }
+    }
+
+    return { label: 'Regular', color: 'bg-green-100 text-green-800 border-green-300' }
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-          <FileText className="h-8 w-8 text-brand-vividBlue" />
-          Gestão de Documentos
-        </h1>
-        <Button
-          onClick={handleAdd}
-          className="bg-brand-vividBlue hover:bg-brand-deepBlue w-full sm:w-auto shadow-md"
-        >
-          <Plus className="h-4 w-4 mr-2" />
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Gestão de Documentos</h1>
+          <p className="text-muted-foreground">
+            Gerencie os documentos, certidões e licenças da operação
+          </p>
+        </div>
+        <Button onClick={() => handleOpenModal()}>
+          <Plus className="w-4 h-4 mr-2" />
           Novo Documento
         </Button>
       </div>
 
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b bg-gray-50/50">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar documentos..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-white"
-            />
-          </div>
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative w-full sm:w-72">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+          <Input
+            placeholder="Buscar documentos..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50/50">
-                <TableHead className="font-semibold text-gray-700">Nome</TableHead>
-                <TableHead className="font-semibold text-gray-700">Tipo</TableHead>
-                <TableHead className="font-semibold text-gray-700">Planta</TableHead>
-                <TableHead className="font-semibold text-gray-700">Periodicidade</TableHead>
-                <TableHead className="font-semibold text-gray-700">Vencimento</TableHead>
-                <TableHead className="font-semibold text-gray-700 w-24">Ações</TableHead>
+        <Select value={plantFilter} onValueChange={setPlantFilter}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue placeholder="Todas as Plantas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Plantas</SelectItem>
+            {plants.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="border rounded-lg bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Documento</TableHead>
+              <TableHead>Planta</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Periodicidade</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead>SLA (Alerta)</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[100px] text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8">
+                  Carregando...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDocs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                    Nenhum documento encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredDocs.map((doc) => (
-                  <TableRow key={doc.id} className="hover:bg-gray-50 transition-colors">
-                    <TableCell className="font-medium text-gray-900">{doc.name}</TableCell>
-                    <TableCell className="text-gray-600">{doc.document_type}</TableCell>
-                    <TableCell className="text-gray-600">{doc.plants?.name}</TableCell>
+            ) : filteredDocs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  Nenhum documento encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredDocs.map((doc) => {
+                const status = getStatus(doc.expiration_date, doc.alert_lead_days)
+                return (
+                  <TableRow key={doc.id}>
+                    <TableCell className="font-medium">{doc.name}</TableCell>
+                    <TableCell>{doc.plants?.name}</TableCell>
+                    <TableCell>{doc.document_type}</TableCell>
+                    <TableCell>{doc.frequency || '-'}</TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {doc.frequency || '-'}
-                      </span>
+                      {doc.expiration_date
+                        ? format(new Date(doc.expiration_date + 'T00:00:00'), 'dd/MM/yyyy')
+                        : '-'}
                     </TableCell>
-                    <TableCell className="text-gray-600">
-                      {formatDate(doc.expiration_date)}
-                    </TableCell>
+                    <TableCell>{doc.alert_lead_days} dias</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(doc)}
-                          className="h-8 w-8 text-brand-vividBlue hover:text-brand-deepBlue hover:bg-blue-50"
-                        >
-                          <Edit2 className="h-4 w-4" />
+                      <Badge className={status.color} variant="outline">
+                        {status.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenModal(doc)}>
+                          <Pencil className="w-4 h-4 text-muted-foreground" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(doc.id)}
-                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(doc.id)}>
+                          <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Documento' : 'Novo Documento'}</DialogTitle>
+            <DialogTitle>{editingDoc ? 'Editar Documento' : 'Novo Documento'}</DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label>Nome do Documento</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Planta</Label>
+                <Select
+                  value={formData.plant_id}
+                  onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a planta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plants.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de Documento</Label>
+                <Input
+                  value={formData.document_type}
+                  onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
+                  required
+                  placeholder="Ex: Alvará, Certidão, etc."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Periodicidade</Label>
+                <Select
+                  value={formData.frequency}
+                  onValueChange={(v) => setFormData({ ...formData, frequency: v })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Única">Única</SelectItem>
+                    <SelectItem value="Mensal">Mensal</SelectItem>
+                    <SelectItem value="Trimestral">Trimestral</SelectItem>
+                    <SelectItem value="Semestral">Semestral</SelectItem>
+                    <SelectItem value="Anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Nome do Documento</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Ex: PPRA 2026" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="document_type"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2 sm:col-span-1">
-                      <FormLabel>Tipo</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Ex: Segurança" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="plant_id"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2 sm:col-span-1">
-                      <FormLabel>Planta</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {plants.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="frequency"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Periodicidade</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {PERIODICIDADE_OPCOES.map((op) => (
-                            <SelectItem key={op} value={op}>
-                              {op}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expiration_date"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2 sm:col-span-1">
-                      <FormLabel>Data de Vencimento</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="alert_lead_days"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2 sm:col-span-1">
-                      <FormLabel>Dias para Alerta</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-2">
+                  <Label>Data de Vencimento</Label>
+                  <Input
+                    type="date"
+                    value={formData.expiration_date}
+                    onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>SLA (Dias de Alerta)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.alert_lead_days}
+                    onChange={(e) =>
+                      setFormData({ ...formData, alert_lead_days: parseInt(e.target.value) || 0 })
+                    }
+                    required
+                  />
+                </div>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="bg-brand-vividBlue hover:bg-brand-deepBlue">
-                  Salvar Documento
-                </Button>
-              </div>
-            </form>
-          </Form>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Salvar</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
