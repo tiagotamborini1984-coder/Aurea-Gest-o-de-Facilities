@@ -1,378 +1,240 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
-import { useAuth } from '@/hooks/use-auth'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import {
-  ArrowLeft,
-  Calendar,
-  FileText,
-  AlertCircle,
-  Clock,
-  CheckSquare,
-  PenTool,
-} from 'lucide-react'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, CheckCircle2, AlertTriangle, XCircle, FileText, Loader2 } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function AuditoriaDetalhes() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { toast } = useToast()
 
   const [loading, setLoading] = useState(true)
-  const [role, setRole] = useState('')
   const [execution, setExecution] = useState<any>(null)
-  const [pastExecutions, setPastExecutions] = useState<any[]>([])
-  const [nextExecution, setNextExecution] = useState<any>(null)
+  const [answers, setAnswers] = useState<any[]>([])
 
   useEffect(() => {
-    async function fetchData() {
-      if (!user || !id) return
+    if (id) fetchDetails()
+  }, [id])
 
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
+  const fetchDetails = async () => {
+    try {
+      setLoading(true)
+      const { data: execData, error: execError } = await supabase
+        .from('audit_executions')
+        .select(`
+          *,
+          audits (title, type, scoring_settings),
+          plants (name),
+          profiles (name)
+        `)
+        .eq('id', id)
+        .single()
 
-        const userRole = profile?.role || ''
-        setRole(userRole)
+      if (execError) throw execError
+      setExecution(execData)
 
-        const { data: execData, error: execError } = await supabase
-          .from('audit_executions')
-          .select(`
-            *,
-            audits (*),
-            plants (name),
-            profiles (name),
-            audit_execution_answers (
-              *,
-              audit_actions (*)
-            )
-          `)
-          .eq('id', id)
-          .single()
+      const { data: answersData, error: answersError } = await supabase
+        .from('audit_execution_answers')
+        .select(`
+          *,
+          audit_actions (title, order_index, weight)
+        `)
+        .eq('execution_id', id)
+        .order('order_index', { referencedTable: 'audit_actions', ascending: true })
 
-        if (execError) throw execError
-        setExecution(execData)
-
-        if (userRole === 'Administrador' || userRole === 'Master') {
-          const { data: historyData } = await supabase
-            .from('audit_executions')
-            .select(`
-              id, status, realization_date, final_score, max_score, created_at,
-              tasks ( due_date )
-            `)
-            .eq('audit_id', execData.audit_id)
-            .eq('plant_id', execData.plant_id)
-            .order('created_at', { ascending: false })
-            .limit(50)
-
-          if (historyData) {
-            const next = historyData.find((e) => e.status === 'Pendente' || e.status === 'Rascunho')
-            const past = historyData.filter((e) => e.status === 'Finalizado' && e.id !== id)
-
-            setNextExecution(next)
-            setPastExecutions(past)
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching audit details:', err)
-      } finally {
-        setLoading(false)
-      }
+      if (answersError) throw answersError
+      setAnswers(answersData || [])
+    } catch (err: any) {
+      toast({ title: 'Erro ao carregar', description: err.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchData()
-  }, [user, id])
+  let averageScore = 0
+  let maxScale = 5
+
+  if (execution?.audits?.scoring_settings) {
+    const scores = (execution.audits.scoring_settings as any[]).map((s) => Number(s.score) || 5)
+    if (scores.length > 0) {
+      maxScale = Math.max(...scores)
+    }
+  }
+
+  if (execution?.final_score !== null && execution?.max_score) {
+    averageScore = (execution.final_score / execution.max_score) * maxScale
+  }
+
+  const getStatusColor = (status: string) => {
+    if (status === 'Finalizado') return 'bg-green-500 hover:bg-green-600 text-white'
+    return 'bg-blue-500 hover:bg-blue-600 text-white'
+  }
+
+  const getScoreColor = (score: number | null) => {
+    if (score === null || score === undefined) return 'bg-gray-200 text-gray-800 border-gray-300'
+    if (score >= 4) return 'bg-green-500 text-white border-green-600'
+    if (score >= 3) return 'bg-yellow-500 text-white border-yellow-600'
+    return 'bg-red-500 text-white border-red-600'
+  }
+
+  const getOverallBgColor = (score: number) => {
+    if (execution?.final_score === null || !execution?.max_score)
+      return 'bg-muted text-muted-foreground'
+    if (score >= 4) return 'bg-green-500 text-white'
+    if (score >= 3) return 'bg-yellow-500 text-white'
+    return 'bg-red-500 text-white'
+  }
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-10 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-64 md:col-span-2 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
 
   if (!execution) {
     return (
-      <div className="p-6">
-        <div className="text-center py-10">
-          <AlertCircle className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold">Auditoria não encontrada</h2>
-          <Button variant="link" onClick={() => navigate('/auditoria-checklist/realizadas')}>
-            Voltar
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+        <h2 className="text-xl font-semibold">Auditoria não encontrada</h2>
+        <Button onClick={() => navigate('/auditoria-checklist/realizadas')}>Voltar</Button>
       </div>
     )
   }
 
-  const isAdminOrMaster = role === 'Administrador' || role === 'Master'
-  const isUnique = execution.audits?.frequency === 'Única'
-
-  const getDueDate = (exec: any) => {
-    if (!exec || !exec.tasks) return null
-    return Array.isArray(exec.tasks) ? exec.tasks[0]?.due_date : exec.tasks.due_date
-  }
-
-  const nextDueDate = getDueDate(nextExecution)
-
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 p-6 h-full">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
+        <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Detalhes da Auditoria</h1>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={isAdminOrMaster ? 'md:col-span-2 space-y-6' : 'md:col-span-3 space-y-6'}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                {execution.audits?.title}
-              </CardTitle>
-              <CardDescription>Realizada na planta {execution.plants?.name}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Responsável</p>
-                  <p className="font-medium">{execution.profiles?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Data de Realização</p>
-                  <p className="font-medium">
-                    {execution.realization_date
-                      ? format(new Date(execution.realization_date), 'dd/MM/yyyy', { locale: ptBR })
-                      : 'Não realizada'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Status</p>
-                  <Badge variant={execution.status === 'Finalizado' ? 'default' : 'secondary'}>
-                    {execution.status}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Pontuação</p>
-                  <p className="font-medium">
-                    {execution.final_score !== null ? execution.final_score : '-'} /{' '}
-                    {execution.max_score !== null ? execution.max_score : '-'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckSquare className="h-5 w-5" />
-                Respostas do Checklist
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {execution.audit_execution_answers && execution.audit_execution_answers.length > 0 ? (
-                <div className="space-y-4">
-                  {execution.audit_execution_answers.map((ans: any) => (
-                    <div key={ans.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex justify-between items-start gap-4">
-                        <p className="font-medium">{ans.audit_actions?.title}</p>
-                        <Badge variant="outline" className="shrink-0 bg-secondary/50">
-                          Nota: {ans.score ?? '-'}
-                        </Badge>
-                      </div>
-                      {ans.observations && (
-                        <div className="bg-muted p-3 rounded-md text-sm">
-                          <span className="font-semibold text-muted-foreground mr-2">
-                            Observações:
-                          </span>
-                          {ans.observations}
-                        </div>
-                      )}
-                      {ans.evidence_url && (
-                        <div>
-                          <a
-                            href={ans.evidence_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 w-fit"
-                          >
-                            <FileText className="h-4 w-4" /> Ver Evidência Anexada
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  Nenhuma resposta registrada no checklist para esta auditoria.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {execution.signatures &&
-            Array.isArray(execution.signatures) &&
-            execution.signatures.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PenTool className="h-5 w-5" />
-                    Assinaturas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {execution.signatures.map((sig: any, index: number) => (
-                      <div
-                        key={index}
-                        className="border p-3 rounded-md flex flex-col items-center justify-center gap-2 bg-muted/20"
-                      >
-                        {sig.signature_url ? (
-                          <img
-                            src={sig.signature_url}
-                            alt={`Assinatura de ${sig.name}`}
-                            className="h-16 object-contain"
-                          />
-                        ) : (
-                          <div className="h-16 flex items-center justify-center text-muted-foreground text-xs italic">
-                            Sem Imagem
-                          </div>
-                        )}
-                        <p className="text-sm font-medium text-center">{sig.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{execution.audits?.title}</h1>
+          <p className="text-muted-foreground">
+            Planta: {execution.plants?.name} | Responsável: {execution.profiles?.name}
+          </p>
         </div>
-
-        {isAdminOrMaster && (
-          <div className="space-y-6">
-            <Card className="border-blue-100 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-950/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  Próxima Auditoria
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isUnique ? (
-                  <p className="text-sm text-muted-foreground">
-                    Auditoria de frequência única. Nenhuma execução futura agendada.
-                  </p>
-                ) : nextExecution ? (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Data Agendada (Due Date)</p>
-                      <p className="font-medium text-base">
-                        {nextDueDate
-                          ? format(new Date(nextDueDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
-                          : 'A definir'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Status</p>
-                      <Badge variant="outline" className="bg-white dark:bg-black">
-                        {nextExecution.status}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={() => {
-                        navigate(`/auditoria-checklist/detalhes/${nextExecution.id}`)
-                      }}
-                    >
-                      Ver Tarefa da Próxima
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma execução futura agendada no momento.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Clock className="h-5 w-5" />
-                  Histórico de Execuções
-                </CardTitle>
-                <CardDescription>Últimas auditorias na mesma planta</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {pastExecutions.length > 0 ? (
-                  <div className="space-y-3">
-                    {pastExecutions.map((past) => (
-                      <div
-                        key={past.id}
-                        className="flex flex-col gap-1 border rounded-md p-3 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-sm">
-                            {past.realization_date
-                              ? format(new Date(past.realization_date), 'dd/MM/yyyy', {
-                                  locale: ptBR,
-                                })
-                              : format(new Date(past.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                          </span>
-                          <Badge
-                            variant={
-                              past.final_score &&
-                              past.max_score &&
-                              past.final_score === past.max_score
-                                ? 'default'
-                                : 'secondary'
-                            }
-                            className="text-xs"
-                          >
-                            {past.final_score}/{past.max_score} pts
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-xs text-muted-foreground">{past.status}</span>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0 text-xs text-blue-600"
-                            onClick={() => navigate(`/auditoria-checklist/detalhes/${past.id}`)}
-                          >
-                            Ver Detalhes
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-md text-center">
-                    Nenhum histórico passado encontrado.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Badge className={getStatusColor(execution.status)}>{execution.status}</Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Data de Realização
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {execution.realization_date
+                ? new Date(execution.realization_date + 'T00:00:00').toLocaleDateString('pt-BR')
+                : '-'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pontuação (Bruta)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {execution.final_score !== null ? execution.final_score : '-'} /{' '}
+              {execution.max_score !== null ? execution.max_score : '-'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={`${getOverallBgColor(averageScore)} border-0`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium opacity-90">
+              Resultado Geral (0 a {maxScale})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {execution.final_score !== null && execution.max_score
+                ? averageScore.toFixed(2)
+                : 'N/A'}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="flex-1">
+        <CardHeader>
+          <CardTitle>Detalhes do Checklist</CardTitle>
+          <CardDescription>Respostas e pontuações por item</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[500px] pr-4">
+            <div className="space-y-4">
+              {answers.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  Nenhuma resposta registrada.
+                </p>
+              ) : (
+                answers.map((answer) => (
+                  <div key={answer.id} className="flex flex-col gap-2 p-4 border rounded-lg">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="font-medium flex-1">{answer.audit_actions?.title}</div>
+                      <div
+                        className={`px-3 py-1 rounded-md border font-bold flex items-center gap-2 whitespace-nowrap ${getScoreColor(answer.score)}`}
+                      >
+                        {answer.score === null ? (
+                          'N/A'
+                        ) : (
+                          <>
+                            {answer.score >= 4 && <CheckCircle2 className="h-4 w-4" />}
+                            {answer.score === 3 && <AlertTriangle className="h-4 w-4" />}
+                            {answer.score <= 2 && <XCircle className="h-4 w-4" />}
+                            Nota: {answer.score}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {answer.observations && (
+                      <div className="text-sm text-muted-foreground mt-2 bg-muted p-3 rounded-md">
+                        <strong className="block mb-1 text-foreground">Observações:</strong>
+                        {answer.observations}
+                      </div>
+                    )}
+                    {answer.evidence_url && (
+                      <div className="mt-2">
+                        <a
+                          href={answer.evidence_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 w-fit"
+                        >
+                          <FileText className="h-4 w-4" />
+                          Visualizar Evidência
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   )
 }
