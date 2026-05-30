@@ -17,7 +17,9 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     let q = supabase.from(tableName).select(defaultSelect)
 
     if (tableName === 'profiles') {
-      q = q.order('name', { ascending: true })
+      q = q
+        .order('name', { ascending: true, nullsFirst: false })
+        .order('email', { ascending: true })
     } else {
       q = q.order('created_at', { ascending: false })
     }
@@ -36,7 +38,26 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
 
     const { data: result, error } = await q
 
-    if (!error && result) setData(result as T[])
+    if (!error && result) {
+      let finalData = result as T[]
+
+      if (tableName === 'profiles') {
+        finalData = [...finalData].sort((a: any, b: any) => {
+          const nameA = (a.name || '').trim()
+          const nameB = (b.name || '').trim()
+
+          if (!nameA && !nameB) {
+            return (a.email || '').localeCompare(b.email || '')
+          }
+          if (!nameA) return 1
+          if (!nameB) return -1
+
+          return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
+        })
+      }
+
+      setData(finalData)
+    }
     setLoading(false)
   }, [tableName, user, profile, selectedMasterClient, defaultSelect])
 
