@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils'
 export type FieldDef = {
   name: string
   label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'toggle' | 'image'
+  type: 'text' | 'textarea' | 'number' | 'select' | 'toggle' | 'image' | 'file-multi' | 'date'
   options?: { value: string; label: string }[] | ((form: any) => { value: string; label: string }[])
   required?: boolean
   hidden?: (form: any) => boolean
@@ -79,6 +79,7 @@ export function CrudGeneric({
   const [form, setForm] = useState<any>({})
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const { toast } = useToast()
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -465,7 +466,7 @@ export function CrudGeneric({
                         {f.label} {f.required !== false && <span className="text-red-500">*</span>}
                       </label>
                     )}
-                    {(f.type === 'text' || f.type === 'number') && (
+                    {(f.type === 'text' || f.type === 'number' || f.type === 'date') && (
                       <Input
                         type={f.type}
                         value={form[f.name] ?? ''}
@@ -571,6 +572,7 @@ export function CrudGeneric({
                               const file = e.target.files?.[0]
                               if (!file) return
                               try {
+                                setIsUploading(true)
                                 const fileExt = file.name.split('.').pop()
                                 const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
                                 const { data, error } = await supabase.storage
@@ -594,6 +596,8 @@ export function CrudGeneric({
                                   description: err.message,
                                   variant: 'destructive',
                                 })
+                              } finally {
+                                setIsUploading(false)
                               }
                             }}
                             disabled={f.disabled ? f.disabled(form) : false}
@@ -602,6 +606,91 @@ export function CrudGeneric({
                               formErrors[f.name] && 'border-red-500',
                             )}
                           />
+                        )}
+                      </div>
+                    )}
+                    {f.type === 'file-multi' && (
+                      <div className="space-y-3 mt-1">
+                        <Input
+                          type="file"
+                          multiple
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || [])
+                            if (files.length === 0) return
+                            try {
+                              setIsUploading(true)
+                              const uploads = await Promise.all(
+                                files.map(async (file) => {
+                                  const fileExt = file.name.split('.').pop()
+                                  const fileName = `${Math.random().toString(36).substring(2)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+                                  const { data, error } = await supabase.storage
+                                    .from('images')
+                                    .upload(`documents/${fileName}`, file, {
+                                      cacheControl: '3600',
+                                      upsert: false,
+                                    })
+                                  if (error) throw error
+                                  const { data: urlData } = supabase.storage
+                                    .from('images')
+                                    .getPublicUrl(`documents/${fileName}`)
+                                  return urlData.publicUrl
+                                }),
+                              )
+                              const existingUrls = Array.isArray(form[f.name]) ? form[f.name] : []
+                              setForm({ ...form, [f.name]: [...existingUrls, ...uploads] })
+                              if (formErrors[f.name])
+                                setFormErrors({ ...formErrors, [f.name]: false })
+                              e.target.value = '' // Reset input
+                            } catch (err: any) {
+                              toast({
+                                title: 'Erro no upload múltiplo',
+                                description: err.message,
+                                variant: 'destructive',
+                              })
+                            } finally {
+                              setIsUploading(false)
+                            }
+                          }}
+                          disabled={f.disabled ? f.disabled(form) : false}
+                          className={cn(
+                            'cursor-pointer file:cursor-pointer',
+                            formErrors[f.name] && 'border-red-500',
+                          )}
+                        />
+                        {Array.isArray(form[f.name]) && form[f.name].length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            {form[f.name].map((url: string, index: number) => {
+                              const filename =
+                                url.split('/').pop()?.split('_').slice(1).join('_') ||
+                                `Arquivo ${index + 1}`
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-md text-sm"
+                                >
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-brand-deepBlue hover:underline truncate max-w-[80%]"
+                                  >
+                                    {decodeURIComponent(filename)}
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newUrls = [...form[f.name]]
+                                      newUrls.splice(index, 1)
+                                      setForm({ ...form, [f.name]: newUrls })
+                                    }}
+                                    className="text-red-500 hover:text-red-700 p-1"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
                       </div>
                     )}
@@ -614,8 +703,11 @@ export function CrudGeneric({
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="tech" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Salvar
+              <Button type="submit" variant="tech" disabled={isSubmitting || isUploading}>
+                {isSubmitting || isUploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                {isUploading ? 'Enviando...' : 'Salvar'}
               </Button>
             </div>
           </form>
