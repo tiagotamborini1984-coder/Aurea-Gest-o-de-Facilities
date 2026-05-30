@@ -1,21 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
-import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { useToast } from '@/components/ui/use-toast'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -23,356 +11,331 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2, Edit2, ChevronLeft, Save } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/components/ui/use-toast'
+import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
-  if (!id) return <AuditoriaList />
-  return <AuditoriaForm id={id === 'nova' ? undefined : id} />
-}
-
-function AuditoriaList() {
-  const { user } = useAuth()
-  const [audits, setAudits] = useState<any[]>([])
-
-  useEffect(() => {
-    loadAudits()
-  }, [user])
-
-  const loadAudits = async () => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('client_id')
-      .eq('id', user?.id)
-      .single()
-    if (!profile?.client_id) return
-    const { data } = await supabase
-      .from('audits')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .order('created_at', { ascending: false })
-    setAudits(data || [])
-  }
-
-  return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Configuração de Auditorias</h1>
-        <Button asChild>
-          <Link to="/auditoria-checklist/configuracao/nova">
-            <Plus className="mr-2 h-4 w-4" /> Nova Auditoria
-          </Link>
-        </Button>
-      </div>
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Título</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Frequência</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {audits.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell className="font-medium">{a.title}</TableCell>
-                <TableCell>{a.type}</TableCell>
-                <TableCell>{a.frequency}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" asChild>
-                    <Link to={`/auditoria-checklist/configuracao/${a.id}`}>
-                      <Edit2 className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {audits.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  Nenhuma auditoria configurada.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </Card>
-    </div>
-  )
-}
-
-function AuditoriaForm({ id }: { id?: string }) {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+
+  const [loading, setLoading] = useState(false)
+  const [plants, setPlants] = useState<any[]>([])
+  const [profiles, setProfiles] = useState<any[]>([])
 
   const [audit, setAudit] = useState({
     title: '',
     type: 'Geral',
     frequency: 'Única',
-    start_date: '',
+    start_date: new Date().toISOString().split('T')[0],
   })
-  const [settings, setSettings] = useState([
-    { score: 1, description: 'Muito Ruim', trigger_task: true },
-    { score: 2, description: 'Ruim', trigger_task: true },
-    { score: 3, description: 'Regular', trigger_task: false },
-    { score: 4, description: 'Bom', trigger_task: false },
-    { score: 5, description: 'Excelente', trigger_task: false },
-  ])
-  const [actions, setActions] = useState([{ title: '', weight: 1, evidence_required: false }])
+
+  const [assignments, setAssignments] = useState<any[]>([])
+  const [actions, setActions] = useState<any[]>([])
 
   useEffect(() => {
-    if (id) loadAudit()
+    loadData()
   }, [id])
 
-  const loadAudit = async () => {
-    const { data: aud } = await supabase.from('audits').select('*').eq('id', id).single()
-    if (aud) {
-      setAudit({
-        title: aud.title,
-        type: aud.type,
-        frequency: aud.frequency,
-        start_date: aud.start_date,
-      })
-      if (aud.scoring_settings) setSettings(aud.scoring_settings as any)
-
-      const { data: acts } = await supabase
-        .from('audit_actions')
-        .select('*')
-        .eq('audit_id', aud.id)
-        .order('order_index')
-      if (acts && acts.length > 0) setActions(acts)
-    }
-  }
-
-  const handleSave = async () => {
-    if (!audit.title || !audit.start_date)
-      return toast({
-        title: 'Erro',
-        description: 'Preencha os campos obrigatórios',
-        variant: 'destructive',
-      })
-
+  const loadData = async () => {
+    setLoading(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
     const { data: profile } = await supabase
       .from('profiles')
       .select('client_id')
-      .eq('id', user?.id)
+      .eq('id', user.id)
       .single()
-    if (!profile?.client_id) return
+    const clientId = profile?.client_id
 
-    let auditId = id
+    if (clientId) {
+      const [plantsRes, profilesRes] = await Promise.all([
+        supabase.from('plants').select('*').eq('client_id', clientId),
+        supabase.from('profiles').select('*').eq('client_id', clientId),
+      ])
+      setPlants(plantsRes.data || [])
+      setProfiles(profilesRes.data || [])
+    }
 
     if (id) {
-      await supabase
-        .from('audits')
-        .update({ ...audit, scoring_settings: settings })
-        .eq('id', id)
-    } else {
+      const [auditRes, assignmentsRes, actionsRes] = await Promise.all([
+        supabase.from('audits').select('*').eq('id', id).single(),
+        supabase.from('audit_assignments').select('*').eq('audit_id', id),
+        supabase.from('audit_actions').select('*').eq('audit_id', id).order('order_index'),
+      ])
+      if (auditRes.data) setAudit(auditRes.data as any)
+      if (assignmentsRes.data) setAssignments(assignmentsRes.data)
+      if (actionsRes.data) setActions(actionsRes.data)
+    }
+    setLoading(false)
+  }
+
+  const handleSave = async () => {
+    if (!audit.title) {
+      toast({ title: 'Erro', description: 'Título é obrigatório', variant: 'destructive' })
+      return
+    }
+
+    setLoading(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('client_id')
+      .eq('id', user?.id || '')
+      .single()
+
+    let auditId = id
+    if (!auditId) {
       const { data, error } = await supabase
         .from('audits')
         .insert({
-          client_id: profile.client_id,
           ...audit,
-          scoring_settings: settings,
+          client_id: profile?.client_id,
         })
         .select()
         .single()
-      if (error) return toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      if (error) throw error
       auditId = data.id
+    } else {
+      await supabase.from('audits').update(audit).eq('id', auditId)
     }
 
-    if (auditId) {
-      await supabase.from('audit_actions').delete().eq('audit_id', auditId)
-      const actsToInsert = actions.map((a, idx) => ({
+    await supabase.from('audit_assignments').delete().eq('audit_id', auditId)
+    if (assignments.length > 0) {
+      const assignmentsToInsert = assignments.map((a) => ({
+        audit_id: auditId,
+        plant_id: a.plant_id,
+        assignee_id: a.assignee_id,
+      }))
+      await supabase.from('audit_assignments').insert(assignmentsToInsert)
+    }
+
+    await supabase.from('audit_actions').delete().eq('audit_id', auditId)
+    if (actions.length > 0) {
+      const actionsToInsert = actions.map((a, i) => ({
         audit_id: auditId,
         title: a.title,
-        weight: a.weight,
-        evidence_required: a.evidence_required,
-        order_index: idx,
+        weight: a.weight || 1,
+        evidence_required: a.evidence_required || false,
+        comments_required: a.comments_required || false,
+        order_index: i,
       }))
-      await supabase.from('audit_actions').insert(actsToInsert)
-      toast({ title: 'Sucesso', description: 'Auditoria salva com sucesso' })
-      navigate('/auditoria-checklist/configuracao')
+      await supabase.from('audit_actions').insert(actionsToInsert as any)
     }
+
+    toast({ title: 'Sucesso', description: 'Configuração salva com sucesso' })
+    setLoading(false)
+    navigate('/auditoria-checklist/criadas')
   }
 
+  const addAssignment = () => setAssignments([...assignments, { plant_id: '', assignee_id: '' }])
+  const updateAssignment = (index: number, field: string, val: string) => {
+    const newArr = [...assignments]
+    newArr[index][field] = val
+    setAssignments(newArr)
+  }
+  const removeAssignment = (index: number) =>
+    setAssignments(assignments.filter((_, i) => i !== index))
+
+  const addAction = () =>
+    setActions([
+      ...actions,
+      { title: '', weight: 1, evidence_required: false, comments_required: false },
+    ])
+  const updateAction = (index: number, field: string, val: any) => {
+    const newArr = [...actions]
+    newArr[index][field] = val
+    setActions(newArr)
+  }
+  const removeAction = (index: number) => setActions(actions.filter((_, i) => i !== index))
+
+  if (loading && !plants.length) return <div className="p-8">Carregando...</div>
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => navigate('/auditoria-checklist/configuracao')}
-        >
-          <ChevronLeft className="h-4 w-4" />
+    <div className="p-8 max-w-5xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h1 className="text-2xl font-bold">{id ? 'Editar Auditoria' : 'Nova Auditoria'}</h1>
+        </div>
+        <Button onClick={handleSave} disabled={loading}>
+          <Save className="w-4 h-4 mr-2" /> Salvar
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {id ? 'Editar Auditoria' : 'Nova Auditoria'}
-        </h1>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados Gerais</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Título</Label>
-            <Input
-              value={audit.title}
-              onChange={(e) => setAudit({ ...audit, title: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Data de Início</Label>
-            <Input
-              type="date"
-              value={audit.start_date}
-              onChange={(e) => setAudit({ ...audit, start_date: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Tipo</Label>
-            <Select value={audit.type} onValueChange={(v) => setAudit({ ...audit, type: v })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Geral">Geral</SelectItem>
-                <SelectItem value="Qualidade">Qualidade</SelectItem>
-                <SelectItem value="Segurança">Segurança</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Frequência</Label>
-            <Select
-              value={audit.frequency}
-              onValueChange={(v) => setAudit({ ...audit, frequency: v })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Única">Única</SelectItem>
-                <SelectItem value="Semanal">Semanal</SelectItem>
-                <SelectItem value="Mensal">Mensal</SelectItem>
-                <SelectItem value="Anual">Anual</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="geral">
+        <TabsList>
+          <TabsTrigger value="geral">Dados Gerais</TabsTrigger>
+          <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
+          <TabsTrigger value="checklist">Checklist</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Escala de Avaliação e Ações Corretivas</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Configure as notas e ative a geração automática de tarefas para correções de
-            não-conformidades.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {settings.map((s, idx) => (
-            <div
-              key={idx}
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 border rounded-lg bg-card transition-colors hover:border-primary/50"
-            >
-              <div className="w-20 space-y-1">
-                <Label>Nota</Label>
-                <Input value={s.score} disabled className="font-semibold text-center bg-muted/50" />
-              </div>
-              <div className="flex-1 space-y-1 w-full">
-                <Label>Descrição</Label>
-                <Input
-                  value={s.description}
-                  onChange={(e) => {
-                    const ns = [...settings]
-                    ns[idx].description = e.target.value
-                    setSettings(ns)
-                  }}
-                />
-              </div>
-              <div className="flex items-center gap-2 sm:mt-6">
-                <Switch
-                  checked={s.trigger_task}
-                  onCheckedChange={(v) => {
-                    const ns = [...settings]
-                    ns[idx].trigger_task = v
-                    setSettings(ns)
-                  }}
-                />
-                <Label className="whitespace-nowrap font-medium text-orange-600 dark:text-orange-400">
-                  Gera Ação Corretiva
-                </Label>
-              </div>
+        <TabsContent value="geral" className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Título</Label>
+              <Input
+                value={audit.title}
+                onChange={(e) => setAudit({ ...audit, title: e.target.value })}
+              />
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Itens de Auditoria</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setActions([...actions, { title: '', weight: 1, evidence_required: false }])
-            }
-          >
-            <Plus className="mr-2 h-4 w-4" /> Adicionar Item
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {actions.map((a, idx) => (
-            <div
-              key={idx}
-              className="flex items-end gap-4 p-4 border rounded-lg hover:border-primary/50 transition-colors"
-            >
-              <div className="flex-1 space-y-1">
-                <Label>Item a avaliar</Label>
-                <Input
-                  value={a.title}
-                  onChange={(e) => {
-                    const na = [...actions]
-                    na[idx].title = e.target.value
-                    setActions(na)
-                  }}
-                  placeholder="Ex: Limpeza e organização do ambiente"
-                />
-              </div>
-              <div className="w-24 space-y-1">
-                <Label>Peso</Label>
-                <Input
-                  type="number"
-                  value={a.weight}
-                  onChange={(e) => {
-                    const na = [...actions]
-                    na[idx].weight = Number(e.target.value)
-                    setActions(na)
-                  }}
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setActions(actions.filter((_, i) => i !== idx))}
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={audit.type} onValueChange={(v) => setAudit({ ...audit, type: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Geral">Geral</SelectItem>
+                  <SelectItem value="Qualidade">Qualidade</SelectItem>
+                  <SelectItem value="Segurança">Segurança</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Frequência</Label>
+              <Select
+                value={audit.frequency}
+                onValueChange={(v) => setAudit({ ...audit, frequency: v })}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Única">Única</SelectItem>
+                  <SelectItem value="Diária">Diária</SelectItem>
+                  <SelectItem value="Semanal">Semanal</SelectItem>
+                  <SelectItem value="Mensal">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Início</Label>
+              <Input
+                type="date"
+                value={audit.start_date}
+                onChange={(e) => setAudit({ ...audit, start_date: e.target.value })}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="distribuicao" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium">Plantas e Responsáveis</h3>
+            <Button onClick={addAssignment} variant="outline">
+              <Plus className="w-4 h-4 mr-2" /> Adicionar
+            </Button>
+          </div>
+          {assignments.map((item, index) => (
+            <div key={index} className="flex gap-4 items-end border p-4 rounded-md bg-white">
+              <div className="flex-1 space-y-2">
+                <Label>Planta</Label>
+                <Select
+                  value={item.plant_id}
+                  onValueChange={(v) => updateAssignment(index, 'plant_id', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a planta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plants.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label>Responsável</Label>
+                <Select
+                  value={item.assignee_id}
+                  onValueChange={(v) => updateAssignment(index, 'assignee_id', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="ghost" onClick={() => removeAssignment(index)}>
+                <Trash2 className="w-4 h-4 text-red-500" />
               </Button>
             </div>
           ))}
-        </CardContent>
-      </Card>
+          {assignments.length === 0 && (
+            <p className="text-muted-foreground text-sm">Nenhuma distribuição configurada.</p>
+          )}
+        </TabsContent>
 
-      <div className="flex justify-end pt-4">
-        <Button onClick={handleSave} className="w-full sm:w-auto px-8">
-          <Save className="mr-2 h-4 w-4" /> Salvar Configuração
-        </Button>
-      </div>
+        <TabsContent value="checklist" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium">Itens do Checklist</h3>
+            <Button onClick={addAction} variant="outline">
+              <Plus className="w-4 h-4 mr-2" /> Adicionar Item
+            </Button>
+          </div>
+          {actions.map((action, index) => (
+            <div key={index} className="flex gap-4 items-start border p-4 rounded-md bg-white">
+              <div className="flex-1 space-y-4">
+                <div>
+                  <Label>Título do Item</Label>
+                  <Input
+                    value={action.title}
+                    onChange={(e) => updateAction(index, 'title', e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={action.evidence_required}
+                      onCheckedChange={(c) => updateAction(index, 'evidence_required', c)}
+                    />
+                    <Label>Obrigatório Evidência</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={action.comments_required}
+                      onCheckedChange={(c) => updateAction(index, 'comments_required', c)}
+                    />
+                    <Label>Obrigatório Comentário</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label>Peso:</Label>
+                    <Input
+                      type="number"
+                      className="w-24"
+                      value={action.weight}
+                      onChange={(e) => updateAction(index, 'weight', parseFloat(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <Button variant="ghost" onClick={() => removeAction(index)}>
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </Button>
+            </div>
+          ))}
+          {actions.length === 0 && (
+            <p className="text-muted-foreground text-sm">Nenhum item configurado.</p>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
