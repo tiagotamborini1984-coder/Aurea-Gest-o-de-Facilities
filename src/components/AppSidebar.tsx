@@ -19,6 +19,7 @@ import {
   Wrench,
   PieChart,
   ClipboardList,
+  FileText,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -145,6 +146,11 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Gestão de Documentos',
+      icon: FileText,
+      path: '/gestao-documentos',
+    },
+    {
       title: 'Gestão de Imóveis',
       icon: Home,
       subItems: [
@@ -253,6 +259,7 @@ export function AppSidebar() {
           'Gestão de Acidentes',
           'Gestão da Manutenção',
           'Treinamentos',
+          'Gestão de Documentos',
         ]
       }
 

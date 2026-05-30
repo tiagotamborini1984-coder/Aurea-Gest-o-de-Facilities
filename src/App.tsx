@@ -17,6 +17,9 @@ import EmailReports from './pages/gestao-terceiros/EmailReports'
 import BookMetas from './pages/gestao-terceiros/BookMetas'
 import Clientes from './pages/admin/Clientes'
 
+// Gestão de Documentos Pages
+import Documentos from './pages/gestao-documentos/Documentos'
+
 // Gestão de Imóveis Pages
 // Gestão de Lockers Pages
 import DashboardLockers from './pages/gestao-lockers/Dashboard'
@@ -181,6 +184,9 @@ const App = () => (
                         path="/gestao-manutencao/cadastros"
                         element={<CadastrosManutencao />}
                       />
+
+                      {/* Gestão de Documentos */}
+                      <Route path="/gestao-documentos" element={<Documentos />} />
 
                       {/* Gestão de Lockers */}
                       <Route path="/gestao-lockers/dashboard" element={<DashboardLockers />} />

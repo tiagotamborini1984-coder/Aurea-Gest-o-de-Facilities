@@ -33,6 +33,8 @@ interface AppContextType {
   activeClient: Client | null
   selectedMasterClient: string | 'all'
   setSelectedMasterClient: (id: string | 'all') => void
+  selectedPlant: string | 'all'
+  setSelectedPlant: (id: string | 'all') => void
   addClient: (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => Promise<boolean>
   updateClient: (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => Promise<boolean>
   deleteClient: (id: string) => Promise<boolean>
@@ -47,6 +49,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activeClient, setActiveClient] = useState<Client | null>(null)
   const [selectedMasterClient, setSelectedMasterClient] = useState<string | 'all'>('all')
+  const [selectedPlant, setSelectedPlant] = useState<string | 'all'>('all')
 
   useEffect(() => {
     if (user) {
@@ -192,6 +195,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         activeClient,
         selectedMasterClient,
         setSelectedMasterClient,
+        selectedPlant,
+        setSelectedPlant,
         addClient,
         updateClient,
         deleteClient,

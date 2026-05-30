@@ -25,12 +25,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { DynamicBreadcrumb } from './DynamicBreadcrumb'
+import { useMasterData } from '@/hooks/use-master-data'
 
 export function AppHeader() {
   const navigate = useNavigate()
   const { isMobile } = useSidebar()
   const { signOut } = useAuth()
-  const { profile, clients, selectedMasterClient, setSelectedMasterClient } = useAppStore()
+  const {
+    profile,
+    clients,
+    selectedMasterClient,
+    setSelectedMasterClient,
+    selectedPlant,
+    setSelectedPlant,
+  } = useAppStore()
+  const { plants } = useMasterData()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { theme, setTheme } = useTheme()
 
@@ -64,6 +73,21 @@ export function AppHeader() {
               </Select>
             </div>
           )}
+          <div className="hidden md:flex items-center ml-4">
+            <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+              <SelectTrigger className="w-[180px] h-8 text-xs bg-muted/50 border-border rounded-full focus:ring-1 focus:ring-primary text-foreground">
+                <SelectValue placeholder="Todas as Plantas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Plantas</SelectItem>
+                {plants?.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-3 lg:gap-4">
