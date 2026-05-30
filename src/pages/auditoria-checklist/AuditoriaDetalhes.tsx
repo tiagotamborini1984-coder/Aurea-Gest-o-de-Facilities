@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
-import { useAuth } from '@/hooks/use-auth'
+import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
-import { Printer, ArrowLeft, Calendar, FileText, Activity } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -12,45 +14,51 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { format } from 'date-fns'
+import { Printer, ArrowLeft, Calendar, FileText, Settings, Target, Hash } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
-const isValidUUID = (uuid: string) =>
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(
-    uuid,
-  )
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-'
+  if (dateStr.length === 10) {
+    const [y, m, d] = dateStr.split('-')
+    return `${d}/${m}/${y}`
+  }
+  try {
+    return format(parseISO(dateStr), 'dd/MM/yyyy')
+  } catch {
+    return '-'
+  }
+}
 
 export default function AuditoriaDetalhes() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const { toast } = useToast()
 
+  const [loading, setLoading] = useState(true)
   const [audit, setAudit] = useState<any>(null)
   const [actions, setActions] = useState<any[]>([])
   const [executions, setExecutions] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string>('')
 
   useEffect(() => {
-    const fetchRole = async () => {
-      if (!user) return
-      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (data) setUserRole(data.role)
-    }
-    fetchRole()
-  }, [user])
-
-  useEffect(() => {
-    const fetchAuditData = async () => {
-      if (!id || !isValidUUID(id)) {
-        setError('ID da auditoria inválido ou não encontrado.')
-        setLoading(false)
-        return
-      }
-
-      setLoading(true)
+    const loadData = async () => {
+      if (!id) return
       try {
-        // Fetch Audit
+        setLoading(true)
+
+        const { data: userData } = await supabase.auth.getUser()
+        if (!userData.user) return
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userData.user.id)
+          .single()
+
+        const role = profile?.role || ''
+        setUserRole(role)
+
         const { data: auditData, error: auditError } = await supabase
           .from('audits')
           .select('*')
@@ -58,217 +66,300 @@ export default function AuditoriaDetalhes() {
           .single()
 
         if (auditError || !auditData) {
-          throw new Error('Auditoria não encontrada.')
+          setAudit(null)
+          return
         }
+
         setAudit(auditData)
 
-        // Fetch Actions
         const { data: actionsData } = await supabase
           .from('audit_actions')
           .select('*')
           .eq('audit_id', id)
           .order('order_index', { ascending: true })
 
-        if (actionsData) {
-          setActions(actionsData)
-        }
+        setActions(actionsData || [])
 
-        // Fetch Executions - history
-        const { data: execsData, error: execsError } = await supabase
-          .from('audit_executions')
-          .select(`
-            *,
-            assignee:profiles(name)
-          `)
-          .eq('audit_id', id)
-          .order('created_at', { ascending: false })
+        if (['Master', 'Administrador'].includes(role)) {
+          const { data: execsData, error: execsError } = await supabase
+            .from('audit_executions')
+            .select(`
+              *,
+              profiles (name),
+              plants (name)
+            `)
+            .eq('audit_id', id)
+            .order('created_at', { ascending: false })
 
-        if (execsData) {
-          setExecutions(execsData)
-        } else if (execsError) {
-          console.error('Error fetching executions:', execsError)
+          if (!execsError && execsData) {
+            setExecutions(execsData)
+          }
         }
       } catch (err: any) {
-        setError(err.message)
+        toast({
+          title: 'Erro ao carregar auditoria',
+          description: err.message,
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }
     }
 
-    fetchAuditData()
-  }, [id])
+    loadData()
+  }, [id, toast])
 
   const handlePrint = () => {
     window.print()
   }
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="p-8 flex justify-center text-muted-foreground animate-pulse">
-        Carregando detalhes...
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-10 w-1/3" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+        <Skeleton className="h-64" />
       </div>
     )
-  if (error)
-    return (
-      <div className="p-8 max-w-4xl mx-auto space-y-4">
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <div className="text-red-500 bg-red-50 p-4 rounded-md border border-red-100">{error}</div>
-      </div>
-    )
-  if (!audit) return null
+  }
 
-  // Ensure role visibility based on criteria
-  const canSeeHistory =
-    userRole === 'Administrador' || userRole === 'Master' || userRole === 'Gestor'
+  if (!audit) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <div className="bg-muted p-4 rounded-full">
+          <FileText className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <h2 className="text-2xl font-bold">Auditoria não encontrada</h2>
+        <p className="text-muted-foreground">
+          A auditoria solicitada não existe ou você não tem permissão para acessá-la.
+        </p>
+        <Link to="/auditoria-checklist/dashboard">
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar ao Dashboard
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
+  const scoringSettings = Array.isArray(audit.scoring_settings) ? audit.scoring_settings : []
 
   return (
-    <div className="p-8 space-y-6 max-w-6xl mx-auto bg-background min-h-screen">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print-hide">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => navigate(-1)} title="Voltar">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+    <div className="p-6 max-w-6xl mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full bg-background">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+        <div className="flex items-center gap-2">
+          <Link to="/auditoria-checklist/criadas">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
           <h1 className="text-3xl font-bold tracking-tight">Detalhes da Auditoria</h1>
         </div>
-        <Button onClick={handlePrint} className="print-hide w-full sm:w-auto">
-          <Printer className="w-4 h-4 mr-2" />
-          Imprimir
+        <Button onClick={handlePrint} className="print:hidden">
+          <Printer className="mr-2 h-4 w-4" /> Imprimir
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 print-break-inside-avoid rounded-xl border bg-card text-card-foreground shadow">
-          <div className="flex flex-col space-y-1.5 p-6">
-            <h3 className="font-semibold leading-none tracking-tight text-xl">{audit.title}</h3>
-            <p className="text-sm text-muted-foreground">Informações gerais da auditoria</p>
-          </div>
-          <div className="p-6 pt-0 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 bg-secondary/30 p-3 rounded-lg">
-                <FileText className="w-5 h-5 text-primary" />
-                <div>
-                  <div className="text-xs text-muted-foreground font-medium uppercase">Tipo</div>
-                  <div className="font-semibold">{audit.type}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-secondary/30 p-3 rounded-lg">
-                <Activity className="w-5 h-5 text-primary" />
-                <div>
-                  <div className="text-xs text-muted-foreground font-medium uppercase">
-                    Frequência
-                  </div>
-                  <div className="font-semibold">{audit.frequency}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-secondary/30 p-3 rounded-lg">
-                <Calendar className="w-5 h-5 text-primary" />
-                <div>
-                  <div className="text-xs text-muted-foreground font-medium uppercase">
-                    Início Vigência
-                  </div>
-                  <div className="font-semibold">
-                    {audit.start_date
-                      ? format(new Date(audit.start_date + 'T00:00:00'), 'dd/MM/yyyy')
-                      : '-'}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-secondary/30 p-3 rounded-lg">
-                <Activity className="w-5 h-5 text-primary" />
-                <div>
-                  <div className="text-xs text-muted-foreground font-medium uppercase">Status</div>
-                  <div
-                    className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${audit.status === 'Ativo' ? 'border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
-                  >
-                    {audit.status}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="print-break-inside-avoid rounded-xl border bg-card text-card-foreground shadow">
-          <div className="flex flex-col space-y-1.5 p-6">
-            <h3 className="font-semibold leading-none tracking-tight text-lg">
-              Itens Verificados ({actions.length})
-            </h3>
-          </div>
-          <div className="p-6 pt-0">
-            <ul className="space-y-3 text-sm">
-              {actions.slice(0, 5).map((action) => (
-                <li key={action.id} className="flex gap-2 items-start">
-                  <span className="font-semibold bg-secondary text-secondary-foreground rounded-full w-5 h-5 flex items-center justify-center shrink-0 text-xs">
-                    {action.order_index + 1}
-                  </span>
-                  <span className="leading-tight">{action.title}</span>
-                </li>
-              ))}
-              {actions.length > 5 && (
-                <li className="text-muted-foreground italic text-center pt-2 border-t mt-2">
-                  ...e mais {actions.length - 5} ações na checklist.
-                </li>
-              )}
-              {actions.length === 0 && (
-                <li className="text-muted-foreground text-center">Nenhuma ação cadastrada.</li>
-              )}
-            </ul>
-          </div>
-        </div>
+      <div className="hidden print:block mb-8">
+        <h1 className="text-3xl font-bold">{audit.title}</h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          Documento gerado em {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+        </p>
       </div>
 
-      {canSeeHistory && (
-        <div className="print-break-inside-avoid rounded-xl border bg-card text-card-foreground shadow mt-6">
-          <div className="flex flex-col space-y-1.5 p-6">
-            <h3 className="font-semibold leading-none tracking-tight text-xl">
-              Histórico de Realizações
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe o desempenho e compliance ao longo do tempo
-            </p>
-          </div>
-          <div className="p-6 pt-0">
-            {executions.length === 0 ? (
-              <div className="text-center py-10 bg-secondary/20 rounded-lg border border-dashed border-border text-muted-foreground">
-                <Activity className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                Nenhum histórico de realização encontrado
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="print:shadow-none print:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" /> Informações Gerais
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Título</p>
+                <p className="font-medium">{audit.title}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <Badge
+                  variant={audit.status === 'Ativo' ? 'default' : 'secondary'}
+                  className="mt-1"
+                >
+                  {audit.status}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Tipo</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                  <span>{audit.type}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Frequência</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>{audit.frequency}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Data de Início</p>
+                <p className="font-medium mt-1">{formatDate(audit.start_date)}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Aviso Prévio</p>
+                <p className="font-medium mt-1">{audit.advance_notice_days || 0} dias</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="print:shadow-none print:border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" /> Sistema de Pontuação
+            </CardTitle>
+            <CardDescription>Critérios de avaliação para esta auditoria</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {scoringSettings.length > 0 ? (
+              <div className="space-y-3">
+                {scoringSettings.map((setting: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded-md bg-muted/50 border"
+                  >
+                    <span className="font-medium">{setting.description}</span>
+                    <Badge variant="outline" className="font-mono">
+                      {setting.score} {setting.score === 1 ? 'ponto' : 'pontos'}
+                    </Badge>
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-secondary/50 hover:bg-secondary/50">
-                      <TableHead>Data de Realização</TableHead>
-                      <TableHead>Responsável</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Pontuação</TableHead>
+              <p className="text-sm text-muted-foreground italic">
+                Sem configuração de pontuação definida.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="print:shadow-none print:border-border print:break-inside-avoid">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Hash className="h-5 w-5" /> Itens do Checklist ({actions.length})
+          </CardTitle>
+          <CardDescription>Ações que devem ser verificadas durante a execução</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16 text-center">#</TableHead>
+                  <TableHead>Descrição do Item</TableHead>
+                  <TableHead className="text-center">Peso</TableHead>
+                  <TableHead className="text-center">Requisitos</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {actions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                      Nenhuma ação cadastrada neste checklist.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  actions.map((action, index) => (
+                    <TableRow key={action.id}>
+                      <TableCell className="text-center font-medium">{index + 1}</TableCell>
+                      <TableCell>{action.title}</TableCell>
+                      <TableCell className="text-center">{action.weight}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
+                          {action.evidence_required && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Foto/Evidência
+                            </Badge>
+                          )}
+                          {action.comments_required && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Observação
+                            </Badge>
+                          )}
+                          {!action.evidence_required && !action.comments_required && <span>-</span>}
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {executions.map((exec) => (
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {['Master', 'Administrador'].includes(userRole) && (
+        <Card className="print:shadow-none print:border-border print:break-before-page">
+          <CardHeader>
+            <CardTitle>Histórico de Realizações</CardTitle>
+            <CardDescription>
+              Últimas execuções desta auditoria registradas no sistema
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Planta</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead className="text-right">Pontuação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {executions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                        Nenhuma execução registrada para esta auditoria.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    executions.map((exec) => (
                       <TableRow key={exec.id}>
                         <TableCell className="font-medium">
                           {exec.realization_date
-                            ? format(new Date(exec.realization_date + 'T00:00:00'), 'dd/MM/yyyy')
-                            : format(new Date(exec.created_at), 'dd/MM/yyyy')}
+                            ? formatDate(exec.realization_date)
+                            : formatDate(exec.created_at)}
                         </TableCell>
-                        <TableCell>{exec.assignee?.name || 'Desconhecido'}</TableCell>
                         <TableCell>
-                          <div
-                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${exec.status === 'Finalizado' ? 'border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80' : exec.status === 'Rascunho' ? 'text-foreground border-border' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                          <Badge
+                            variant={
+                              exec.status === 'Finalizado'
+                                ? 'default'
+                                : exec.status === 'Pendente'
+                                  ? 'destructive'
+                                  : 'secondary'
+                            }
                           >
                             {exec.status}
-                          </div>
+                          </Badge>
                         </TableCell>
+                        <TableCell>{exec.plants?.name || '-'}</TableCell>
+                        <TableCell>{exec.profiles?.name || '-'}</TableCell>
                         <TableCell className="text-right">
-                          {exec.final_score !== null ? (
-                            <span className="font-semibold">
-                              {exec.final_score}{' '}
-                              <span className="text-muted-foreground font-normal text-xs">
-                                / {exec.max_score || '-'}
+                          {exec.final_score !== null && exec.max_score !== null ? (
+                            <span className="font-mono font-medium">
+                              {exec.final_score} / {exec.max_score}
+                              <span className="text-xs text-muted-foreground ml-1">
+                                ({Math.round((exec.final_score / exec.max_score) * 100)}%)
                               </span>
                             </span>
                           ) : (
@@ -276,13 +367,13 @@ export default function AuditoriaDetalhes() {
                           )}
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        </div>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )
