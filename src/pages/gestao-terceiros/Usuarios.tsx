@@ -1,388 +1,394 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { useCrud } from '@/hooks/use-crud'
-import { useMasterData } from '@/hooks/use-master-data'
-import { useToast } from '@/components/ui/use-toast'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
 import { useAppStore } from '@/store/AppContext'
+import { CrudGeneric } from '@/components/gestao-terceiros/CrudGeneric'
+import { Users } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+
+const ALL_MENUS = [
+  'Dashboard',
+  'Lançamentos',
+  'Treinamentos',
+  'Cadastros',
+  'Relatórios',
+  'Configurações',
+  'Auditoria',
+  'Painel de Chamados',
+  'Planejamento',
+]
+
+const ALL_MODULES = [
+  'Gestão de Terceiros',
+  'Limpeza e Jardinagem',
+  'Gestão de Tarefas',
+  'Auditoria e Checklist',
+  'Dashboard Estratégico',
+  'Organograma e Fluxos',
+  'Gestão de Acidentes',
+  'Gestão de Budget',
+  'Gestão de Manutenção',
+  'Gestão de Documentos',
+  'Gestão de Lockers',
+  'Gestão de Imóveis',
+  'Gestão de Encomendas',
+  'BI',
+]
 
 export default function Usuarios() {
   const { profile, selectedMasterClient } = useAppStore()
-  const { data: users, loading, fetchAll: fetchUsers } = useCrud<any>('profiles')
-  const { plants } = useMasterData()
-  const { toast } = useToast()
+  const [plants, setPlants] = useState<any[]>([])
+  const [clientModules, setClientModules] = useState<string[]>([])
+  const [clients, setClients] = useState<any[]>([])
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<any>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'Operacional',
-    authorized_plants: [] as string[],
-  })
-  const [submitting, setSubmitting] = useState(false)
+  useEffect(() => {
+    async function loadData() {
+      if (!profile) return
 
-  const roles =
-    profile?.role === 'Master'
-      ? ['Master', 'Administrador', 'Gestor', 'Operacional']
-      : ['Administrador', 'Gestor', 'Operacional']
-
-  const handleOpenDialog = (user?: any) => {
-    if (user) {
-      setEditingUser(user)
-      setFormData({
-        name: user.name || '',
-        email: user.email || '',
-        password: '',
-        role: user.role || 'Operacional',
-        authorized_plants: Array.isArray(user.authorized_plants) ? user.authorized_plants : [],
-      })
-    } else {
-      setEditingUser(null)
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        role: 'Operacional',
-        authorized_plants: [],
-      })
-    }
-    setIsDialogOpen(true)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-
-    let targetClientId = profile?.client_id
-    if (profile?.role === 'Master' && selectedMasterClient !== 'all') {
-      targetClientId = selectedMasterClient
-    }
-
-    try {
-      if (editingUser) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            name: formData.name,
-            role: formData.role,
-            authorized_plants: formData.authorized_plants,
-          })
-          .eq('id', editingUser.id)
-
-        if (profileError) throw profileError
-
-        if (formData.password) {
-          const { error: pwdError } = await supabase.functions.invoke('update-user-password', {
-            body: { userId: editingUser.id, password: formData.password },
-          })
-          if (pwdError) throw pwdError
-        }
-      } else {
-        const { error: createError } = await supabase.functions.invoke('create-user', {
-          body: {
-            email: formData.email,
-            password: formData.password,
-            name: formData.name,
-            role: formData.role,
-            authorized_plants: formData.authorized_plants,
-            client_id: targetClientId,
-          },
-        })
-        if (createError) throw createError
+      let clientId = profile.client_id
+      if (profile.role === 'Master' && selectedMasterClient !== 'all') {
+        clientId = selectedMasterClient
       }
 
-      toast({
-        title: 'Sucesso',
-        description: `Usuário ${editingUser ? 'atualizado' : 'criado'} com sucesso.`,
-      })
-      setIsDialogOpen(false)
-      fetchUsers()
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Ocorreu um erro ao salvar o usuário',
-        variant: 'destructive',
-      })
-    } finally {
-      setSubmitting(false)
+      let q = supabase.from('plants').select('id, name, client_id')
+      if (clientId) {
+        q = q.eq('client_id', clientId)
+      }
+      const { data: pData } = await q
+      if (pData) setPlants(pData)
+
+      if (clientId) {
+        const { data: cData } = await supabase
+          .from('clients')
+          .select('modules')
+          .eq('id', clientId)
+          .single()
+        if (cData && cData.modules) {
+          setClientModules(Array.isArray(cData.modules) ? cData.modules : [])
+        }
+      } else if (profile.role === 'Master') {
+        const { data: cData } = await supabase.from('clients').select('id, name, modules')
+        if (cData) setClients(cData)
+        setClientModules(ALL_MODULES)
+      }
     }
-  }
+    loadData()
+  }, [profile, selectedMasterClient])
 
-  const handleDelete = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return
-    try {
-      const { error } = await supabase.functions.invoke('delete-user', {
-        body: { userId },
-      })
-      if (error) throw error
-      toast({ title: 'Sucesso', description: 'Usuário excluído com sucesso.' })
-      fetchUsers()
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Erro ao excluir usuário',
-        variant: 'destructive',
-      })
+  const fetchQuery = async () => {
+    if (!profile) return []
+    let q = supabase.from('profiles').select('*, clients(name)')
+
+    if (profile.role !== 'Master') {
+      q = q.eq('client_id', profile.client_id)
+    } else if (selectedMasterClient !== 'all') {
+      q = q.eq('client_id', selectedMasterClient)
     }
+
+    const { data, error } = await q
+    if (error) throw error
+    return data || []
   }
 
-  const togglePlant = (plantId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      authorized_plants: prev.authorized_plants.includes(plantId)
-        ? prev.authorized_plants.filter((id) => id !== plantId)
-        : [...prev.authorized_plants, plantId],
-    }))
+  const handleAdd = async (form: any) => {
+    if (!form.password || form.password.trim() === '') {
+      return { success: false, error: { message: 'A senha é obrigatória para novos usuários.' } }
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+    if (!token) return { success: false, error: { message: 'Sem sessão' } }
+
+    const payload = {
+      email: form.email,
+      password: form.password,
+      name: form.name,
+      role: form.role,
+      client_id: form.client_id || profile?.client_id,
+      accessible_menus: form.accessible_menus || [],
+      authorized_plants: form.authorized_plants || [],
+      force_password_change: form.force_password_change || false,
+    }
+
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: { message: data.error || 'Erro ao criar usuário' } }
+    }
+    return { success: true }
   }
 
-  if (loading)
+  const handleUpdate = async (id: string, form: any) => {
+    const updateData: any = {
+      name: form.name,
+      role: form.role,
+      accessible_menus: form.accessible_menus || [],
+      authorized_plants: form.authorized_plants || [],
+      force_password_change: form.force_password_change || false,
+    }
+
+    if (profile?.role === 'Master' && form.role !== 'Master') {
+      updateData.client_id = form.client_id
+    } else if (form.role === 'Master') {
+      updateData.client_id = null
+    }
+
+    const { error } = await supabase.from('profiles').update(updateData).eq('id', id)
+    if (error) return { success: false, error }
+
+    if (form.password && form.password.trim() !== '') {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      if (token) {
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-user-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId: id, password: form.password }),
+        })
+      }
+    }
+
+    return { success: true }
+  }
+
+  const handleRemove = async (id: string) => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+    if (!token) return { success: false, error: { message: 'Sem sessão' } }
+
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId: id }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: { message: data.error || 'Erro ao excluir usuário' } }
+    }
+    return { success: true }
+  }
+
+  const roleOptions = [
+    { value: 'Operacional', label: 'Operacional' },
+    { value: 'Gestor', label: 'Gestor' },
+    { value: 'Administrador', label: 'Administrador' },
+  ]
+  if (profile?.role === 'Master') {
+    roleOptions.push({ value: 'Master', label: 'Master' })
+  }
+
+  const fields = [
+    { name: 'name', label: 'Nome', type: 'text' as const },
+    { name: 'email', label: 'E-mail', type: 'text' as const, disabled: (f: any) => !!f.id },
+    {
+      name: 'password',
+      label: 'Senha (deixe em branco para não alterar)',
+      type: 'text' as const,
+      required: false,
+    },
+    { name: 'role', label: 'Perfil de Acesso', type: 'select' as const, options: roleOptions },
+    ...(profile?.role === 'Master' && selectedMasterClient === 'all'
+      ? [
+          {
+            name: 'client_id',
+            label: 'Cliente',
+            type: 'select' as const,
+            options: clients.map((c: any) => ({ value: c.id, label: c.name })),
+            hidden: (f: any) => f.role === 'Master',
+          },
+        ]
+      : []),
+    {
+      name: 'force_password_change',
+      label: 'Forçar troca de senha no próximo login?',
+      type: 'toggle' as const,
+    },
+  ]
+
+  const columns = [
+    { header: 'Nome', accessor: 'name' },
+    { header: 'E-mail', accessor: 'email' },
+    { header: 'Perfil', accessor: 'role' },
+    ...(profile?.role === 'Master' && selectedMasterClient === 'all'
+      ? [
+          {
+            header: 'Cliente',
+            accessor: 'clients',
+            render: (item: any) => item.clients?.name || '-',
+          },
+        ]
+      : []),
+  ]
+
+  const extraFormContent = (form: any, setForm: any) => {
+    if (form.role === 'Master' || form.role === 'Administrador') {
+      return (
+        <div className="text-sm text-muted-foreground p-4 bg-blue-50 rounded-lg border border-blue-100 mt-4">
+          Usuários com perfil Master ou Administrador têm acesso irrestrito a todos os módulos,
+          menus e plantas.
+        </div>
+      )
+    }
+
+    const authPlants = form.authorized_plants || []
+
+    let accModules: string[] = []
+    let accMenus: string[] = []
+
+    if (Array.isArray(form.accessible_menus)) {
+      accModules = form.accessible_menus.filter((m: string) => ALL_MODULES.includes(m))
+      accMenus = form.accessible_menus.filter((m: string) => ALL_MENUS.includes(m))
+    } else if (form.accessible_menus && typeof form.accessible_menus === 'object') {
+      accModules = form.accessible_menus.modules || []
+      accMenus = form.accessible_menus.menus || []
+    }
+
+    const availablePlants = form.client_id
+      ? plants.filter((p) => p.client_id === form.client_id)
+      : plants
+
+    let availableModules = clientModules
+    if (form.client_id && clients.length > 0) {
+      const c = clients.find((cl: any) => cl.id === form.client_id)
+      if (c && c.modules) {
+        availableModules = Array.isArray(c.modules) ? c.modules : []
+      }
+    }
+
+    const togglePlant = (id: string) => {
+      if (authPlants.includes(id)) {
+        setForm({ ...form, authorized_plants: authPlants.filter((p: string) => p !== id) })
+      } else {
+        setForm({ ...form, authorized_plants: [...authPlants, id] })
+      }
+    }
+
+    const toggleModule = (mod: string) => {
+      let newModules = [...accModules]
+      if (newModules.includes(mod)) {
+        newModules = newModules.filter((m) => m !== mod)
+      } else {
+        newModules.push(mod)
+      }
+      setForm({ ...form, accessible_menus: [...newModules, ...accMenus] })
+    }
+
+    const toggleMenu = (menu: string) => {
+      let newMenus = [...accMenus]
+      if (newMenus.includes(menu)) {
+        newMenus = newMenus.filter((m) => m !== menu)
+      } else {
+        newMenus.push(menu)
+      }
+      setForm({ ...form, accessible_menus: [...accModules, ...newMenus] })
+    }
+
     return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="animate-spin w-8 h-8 text-primary" />
-      </div>
-    )
-
-  return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-          Usuários
-        </h1>
-        <Button onClick={() => handleOpenDialog()} className="shadow-sm">
-          <Plus className="w-4 h-4 mr-2" /> Novo Usuário
-        </Button>
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50/50 dark:bg-slate-800/50">
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Nível de Acesso</TableHead>
-                <TableHead>Plantas Autorizadas</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user: any) => (
-                <TableRow
-                  key={user.id}
-                  className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+      <div className="space-y-6 pt-4 border-t border-gray-100 mt-4">
+        <div>
+          <h4 className="text-sm font-semibold text-brand-graphite mb-3">Plantas Autorizadas</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-40 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            {availablePlants.map((p: any) => (
+              <div key={p.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`plant-${p.id}`}
+                  checked={authPlants.includes(p.id)}
+                  onCheckedChange={() => togglePlant(p.id)}
+                />
+                <Label
+                  htmlFor={`plant-${p.id}`}
+                  className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  <TableCell className="font-medium text-slate-900 dark:text-slate-100">
-                    {user.name}
-                  </TableCell>
-                  <TableCell className="text-slate-500 dark:text-slate-400">{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="font-normal">
-                      {user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {Array.isArray(user.authorized_plants) && user.authorized_plants.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {user.authorized_plants.map((pid: string) => {
-                          const plant = plants.find((p) => p.id === pid)
-                          return plant ? (
-                            <Badge
-                              key={pid}
-                              variant="outline"
-                              className="text-[10px] font-normal px-1.5 py-0"
-                            >
-                              {plant.name}
-                            </Badge>
-                          ) : null
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">Todas / Padrão</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-primary"
-                        onClick={() => handleOpenDialog(user)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-500 hover:text-destructive"
-                        onClick={() => handleDelete(user.id)}
-                        disabled={user.id === profile?.id}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {users.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-slate-500">
-                    Nenhum usuário encontrado.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                  {p.name}
+                </Label>
+              </div>
+            ))}
+            {availablePlants.length === 0 && (
+              <span className="text-sm text-muted-foreground">Nenhuma planta encontrada.</span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-brand-graphite mb-3">Módulos Permitidos</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            {availableModules.map((m) => (
+              <div key={m} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`mod-${m}`}
+                  checked={accModules.includes(m)}
+                  onCheckedChange={() => toggleModule(m)}
+                />
+                <Label
+                  htmlFor={`mod-${m}`}
+                  className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  {m}
+                </Label>
+              </div>
+            ))}
+            {availableModules.length === 0 && (
+              <span className="text-sm text-muted-foreground">
+                Nenhum módulo disponível no cliente.
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-brand-graphite mb-3">Menus Permitidos</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            {ALL_MENUS.map((m) => (
+              <div key={m} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`menu-${m}`}
+                  checked={accMenus.includes(m)}
+                  onCheckedChange={() => toggleMenu(m)}
+                />
+                <Label
+                  htmlFor={`menu-${m}`}
+                  className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  {m}
+                </Label>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+    )
+  }
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome Completo</Label>
-              <Input
-                id="name"
-                required
-                placeholder="João da Silva"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                disabled={!!editingUser}
-                placeholder="joao@exemplo.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">{editingUser ? 'Nova Senha (opcional)' : 'Senha'}</Label>
-              <Input
-                id="password"
-                type="password"
-                required={!editingUser}
-                minLength={6}
-                placeholder={
-                  editingUser ? 'Deixe em branco para manter a atual' : 'Mínimo 6 caracteres'
-                }
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Nível de Acesso</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(val) => setFormData({ ...formData, role: val })}
-              >
-                <SelectTrigger id="role">
-                  <SelectValue placeholder="Selecione o nível" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Label>Plantas Autorizadas</Label>
-              <ScrollArea className="h-[140px] w-full rounded-md border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50">
-                <div className="space-y-3">
-                  {plants.length > 0 ? (
-                    plants.map((plant) => (
-                      <div key={plant.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          id={`plant-${plant.id}`}
-                          checked={formData.authorized_plants.includes(plant.id)}
-                          onCheckedChange={() => togglePlant(plant.id)}
-                          className="mt-0.5"
-                        />
-                        <div className="grid gap-1.5 leading-none">
-                          <label
-                            htmlFor={`plant-${plant.id}`}
-                            className="text-sm font-medium leading-none cursor-pointer"
-                          >
-                            {plant.name}
-                          </label>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-slate-500 text-center py-4">
-                      Nenhuma planta disponível no momento.
-                    </p>
-                  )}
-                </div>
-              </ScrollArea>
-              <p className="text-[11px] text-slate-500 leading-tight">
-                Selecione as plantas que este usuário poderá acessar. Se nenhuma for selecionada, o
-                usuário terá acesso padrão conforme seu nível.
-              </p>
-            </div>
-
-            <DialogFooter className="pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                disabled={submitting}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Salvar
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+  return (
+    <div className="max-w-7xl mx-auto space-y-6 pb-10">
+      <CrudGeneric
+        title="Usuários"
+        singularName="Usuário"
+        subtitle="Gerencie os usuários e suas permissões de acesso"
+        tableName="profiles"
+        icon={Users}
+        fields={fields}
+        columns={columns}
+        fetchQuery={fetchQuery}
+        onAdd={handleAdd}
+        onUpdate={handleUpdate}
+        onRemove={handleRemove}
+        extraFormContent={extraFormContent}
+      />
     </div>
   )
 }
