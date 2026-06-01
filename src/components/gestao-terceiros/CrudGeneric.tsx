@@ -71,6 +71,7 @@ export function CrudGeneric({
   plants,
   canAdd,
   extraActions,
+  extraFilters,
   extraFormContent,
 }: any) {
   const { activeClient } = useAppStore()
@@ -83,6 +84,7 @@ export function CrudGeneric({
   const { toast } = useToast()
 
   const [searchTerm, setSearchTerm] = useState('')
+  const [functionSearchTerm, setFunctionSearchTerm] = useState('')
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<any>(null)
@@ -271,6 +273,20 @@ export function CrudGeneric({
     const matchesPlant =
       selectedPlant === 'all' || !plantField || item[plantField] === selectedPlant
 
+    const matchesFunction =
+      functionSearchTerm === '' ||
+      (() => {
+        const fTerm = functionSearchTerm.toLowerCase()
+        if (item.functions?.name && String(item.functions.name).toLowerCase().includes(fTerm))
+          return true
+        if (
+          item.org_functions?.name &&
+          String(item.org_functions.name).toLowerCase().includes(fTerm)
+        )
+          return true
+        return false
+      })()
+
     const matchesSearch =
       searchTerm === '' ||
       (() => {
@@ -317,7 +333,7 @@ export function CrudGeneric({
         )
       })()
 
-    return matchesPlant && matchesSearch
+    return matchesPlant && matchesSearch && matchesFunction
   })
 
   const getPlantName = (item: any) => {
@@ -343,33 +359,56 @@ export function CrudGeneric({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex-1 w-full flex items-center px-3 gap-2 sm:border-r border-gray-100">
-          <Search className="w-5 h-5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        {plantField && plants && plants.length > 0 && (
-          <div className="w-full sm:w-72">
-            <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-              <SelectTrigger className="border-0 shadow-none focus:ring-0 bg-transparent h-10">
-                <SelectValue placeholder="Selecione a planta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Plantas</SelectItem>
-                {plants.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="space-y-4">
+        {(plantField || extraFilters) && (
+          <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+            {plantField && plants && plants.length > 0 && (
+              <div className="w-full sm:w-72">
+                <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                  <SelectTrigger className="border-0 shadow-none focus:ring-0 bg-transparent h-10">
+                    <SelectValue placeholder="Selecione a planta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Plantas</SelectItem>
+                    {plants.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {extraFilters && (
+              <div className="flex items-center gap-4 flex-wrap w-full">{extraFilters}</div>
+            )}
           </div>
         )}
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex-1 w-full flex items-center px-3 gap-2 sm:border-r border-gray-100">
+            <Search className="w-5 h-5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          {(tableName === 'employees' ||
+            tableName === 'contracted_headcount' ||
+            tableName === 'org_collaborators') && (
+            <div className="flex-1 w-full flex items-center px-3 gap-2">
+              <Search className="w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar por função..."
+                className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
+                value={functionSearchTerm}
+                onChange={(e) => setFunctionSearchTerm(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="animate-fade-in">
