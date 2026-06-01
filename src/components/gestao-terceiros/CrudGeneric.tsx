@@ -270,15 +270,53 @@ export function CrudGeneric({
   const filteredData = data.filter((item) => {
     const matchesPlant =
       selectedPlant === 'all' || !plantField || item[plantField] === selectedPlant
+
     const matchesSearch =
-      !searchFields ||
-      searchFields.length === 0 ||
       searchTerm === '' ||
-      searchFields.some((field: string) =>
-        String(item[field] || '')
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()),
-      )
+      (() => {
+        const term = searchTerm.toLowerCase()
+
+        // Always check these common related fields for function search
+        if (item.functions?.name && String(item.functions.name).toLowerCase().includes(term))
+          return true
+        if (
+          item.org_functions?.name &&
+          String(item.org_functions.name).toLowerCase().includes(term)
+        )
+          return true
+        if (item.name && String(item.name).toLowerCase().includes(term)) return true
+
+        if (searchFields && searchFields.length > 0) {
+          return searchFields.some((field: string) => {
+            const parts = field.split('.')
+            let val = item
+            for (const part of parts) {
+              if (val) val = val[part]
+              else break
+            }
+            return String(val || '')
+              .toLowerCase()
+              .includes(term)
+          })
+        }
+
+        // Default fallback
+        return (
+          String(item.description || '')
+            .toLowerCase()
+            .includes(term) ||
+          String(item.company_name || '')
+            .toLowerCase()
+            .includes(term) ||
+          String(item.title || '')
+            .toLowerCase()
+            .includes(term) ||
+          String(item.type || '')
+            .toLowerCase()
+            .includes(term)
+        )
+      })()
+
     return matchesPlant && matchesSearch
   })
 
@@ -341,7 +379,7 @@ export function CrudGeneric({
           </div>
         ) : filteredData.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground bg-white rounded-xl border border-gray-100 border-dashed">
-            Nenhum registro encontrado.
+            Nenhum resultado encontrado.
           </div>
         ) : columns ? (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

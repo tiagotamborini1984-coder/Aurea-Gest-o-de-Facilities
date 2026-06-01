@@ -9,12 +9,21 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
   const [data, setData] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
 
+  const getQuerySelect = useCallback(() => {
+    if (defaultSelect === '*') {
+      if (tableName === 'employees' || tableName === 'contracted_headcount')
+        return '*, functions(name)'
+      if (tableName === 'org_collaborators') return '*, org_functions(name)'
+    }
+    return defaultSelect
+  }, [tableName, defaultSelect])
+
   const fetchAll = useCallback(async () => {
     if (!user || !profile) return
     if (profile.role !== 'Master' && !profile.client_id) return
 
     setLoading(true)
-    let q = supabase.from(tableName).select(defaultSelect)
+    let q = supabase.from(tableName).select(getQuerySelect())
 
     if (tableName === 'profiles') {
       q = q
@@ -57,9 +66,12 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
       }
 
       setData(finalData)
+      setLoading(false)
+      return finalData
     }
     setLoading(false)
-  }, [tableName, user, profile, selectedMasterClient, defaultSelect])
+    return []
+  }, [tableName, user, profile, selectedMasterClient, getQuerySelect])
 
   useEffect(() => {
     fetchAll()
@@ -78,7 +90,11 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     }
 
     const payload = { ...record, client_id: (record as any).client_id || targetClientId }
-    const { data: result, error } = await supabase.from(tableName).insert(payload).select().single()
+    const { data: result, error } = await supabase
+      .from(tableName)
+      .insert(payload)
+      .select(getQuerySelect())
+      .single()
 
     if (!error && result) {
       setData((prev) => [result as T, ...prev])
@@ -92,7 +108,7 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
       .from(tableName)
       .update(record)
       .eq('id', id)
-      .select()
+      .select(getQuerySelect())
       .single()
 
     if (!error && result) {
