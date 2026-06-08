@@ -1,29 +1,23 @@
-import { z } from 'zod'
+import * as z from 'zod'
 
-export const auditConfigSchema = z.object({
+export const auditSchema = z.object({
   title: z.string().min(1, 'Obrigatório'),
   type: z.string().min(1, 'Obrigatório'),
   frequency: z.string().min(1, 'Obrigatório'),
   start_date: z.string().min(1, 'Obrigatório'),
-  advance_notice_days: z.coerce.number().min(0),
-  scoring_settings: z.array(
+  advance_notice_days: z.coerce.number().min(0).default(0),
+  status: z.string().default('Ativo'),
+  scoring_settings: z.any().optional(),
+  actions: z.array(
     z.object({
-      score: z.coerce.number(),
-      description: z.string().min(1, 'Obrigatório'),
-      trigger_task: z.boolean().default(false),
+      id: z.string().optional(),
+      title: z.string().min(1, 'Obrigatório'),
+      evidence_required: z.boolean().default(false),
+      comments_required: z.boolean().default(false),
+      weight: z.coerce.number().min(1).default(1),
+      order_index: z.coerce.number().default(0),
     }),
   ),
-  actions: z
-    .array(
-      z.object({
-        id: z.string().optional(),
-        title: z.string().min(1, 'Obrigatório'),
-        weight: z.coerce.number().min(1),
-        evidence_required: z.boolean().default(false),
-        comments_required: z.boolean().default(false),
-      }),
-    )
-    .min(1, 'Adicione pelo menos um item'),
   assignments: z.array(
     z.object({
       plant_id: z.string().min(1, 'Obrigatório'),
@@ -32,4 +26,4 @@ export const auditConfigSchema = z.object({
   ),
 })
 
-export type AuditConfigForm = z.infer<typeof auditConfigSchema>
+export type AuditFormValues = z.infer<typeof auditSchema>

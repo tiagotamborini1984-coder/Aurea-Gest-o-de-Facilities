@@ -1,10 +1,18 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
+import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Plus, Trash2, Save, ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
-import { useAuth } from '@/hooks/use-auth'
-import { Button } from '@/components/ui/button'
+import { getAuditConfig, saveAuditConfig } from '@/services/audit'
+import { useMasterData } from '@/hooks/use-master-data'
+import { useAppStore } from '@/store/AppContext'
+import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -12,497 +20,631 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { useToast } from '@/components/ui/use-toast'
-import { Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+const auditSchema = z.object({
+  title: z.string().min(1, 'Título é obrigatório'),
+  type: z.string().min(1, 'Tipo é obrigatório'),
+  frequency: z.string().min(1, 'Frequência é obrigatória'),
+  start_date: z.string().min(1, 'Data de início é obrigatória'),
+  advance_notice_days: z.coerce.number().min(0).default(0),
+  status: z.string().default('Ativo'),
+  scoring_settings: z
+    .array(
+      z.object({
+        score: z.coerce.number().min(1),
+        description: z.string().min(1, 'Descrição é obrigatória'),
+        trigger_task: z.boolean().default(false),
+      }),
+    )
+    .min(1, 'Pelo menos um nível de pontuação é obrigatório'),
+  actions: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        title: z.string().min(1, 'Título da ação é obrigatório'),
+        weight: z.coerce.number().min(1).default(1),
+        evidence_required: z.boolean().default(false),
+        comments_required: z.boolean().default(false),
+        order_index: z.number().default(0),
+      }),
+    )
+    .min(1, 'Pelo menos um item de checklist é obrigatório'),
+  assignments: z
+    .array(
+      z.object({
+        plant_id: z.string().min(1, 'Planta é obrigatória'),
+        assignee_id: z.string().min(1, 'Responsável é obrigatório'),
+      }),
+    )
+    .min(1, 'Pelo menos uma atribuição é obrigatória'),
+})
+
+type AuditFormValues = z.infer<typeof auditSchema>
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const { toast } = useToast()
-
+  const { profile, selectedMasterClient } = useAppStore()
+  const { plants } = useMasterData()
+  const [profiles, setProfiles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [clientId, setClientId] = useState<string | null>(null)
 
-  const [title, setTitle] = useState('')
-  const [type, setType] = useState('Geral')
-  const [frequency, setFrequency] = useState('Única')
-  const [startDate, setStartDate] = useState('')
-  const [advanceNotice, setAdvanceNotice] = useState(0)
+  const clientId = profile?.role === 'Master' ? selectedMasterClient : profile?.client_id
 
-  const [scoringSettings, setScoringSettings] = useState([
-    { score: 1, description: 'Muito Ruim', trigger_task: true },
-    { score: 2, description: 'Ruim', trigger_task: true },
-    { score: 3, description: 'Regular', trigger_task: false },
-    { score: 4, description: 'Bom', trigger_task: false },
-    { score: 5, description: 'Excelente', trigger_task: false },
-  ])
+  const form = useForm<AuditFormValues>({
+    resolver: zodResolver(auditSchema),
+    defaultValues: {
+      title: '',
+      type: 'Geral',
+      frequency: 'Mensal',
+      start_date: new Date().toISOString().split('T')[0],
+      advance_notice_days: 0,
+      status: 'Ativo',
+      scoring_settings: [
+        { score: 1, description: 'Muito Ruim', trigger_task: true },
+        { score: 2, description: 'Ruim', trigger_task: true },
+        { score: 3, description: 'Regular', trigger_task: false },
+        { score: 4, description: 'Bom', trigger_task: false },
+        { score: 5, description: 'Excelente', trigger_task: false },
+      ],
+      actions: [
+        {
+          title: '',
+          weight: 1,
+          evidence_required: false,
+          comments_required: false,
+          order_index: 0,
+        },
+      ],
+      assignments: [{ plant_id: '', assignee_id: '' }],
+    },
+  })
 
-  const [actions, setActions] = useState<any[]>([])
-  const [assignments, setAssignments] = useState<any[]>([])
-  const [plants, setPlants] = useState<any[]>([])
-  const [profiles, setProfiles] = useState<any[]>([])
+  const {
+    fields: scoreFields,
+    append: appendScore,
+    remove: removeScore,
+  } = useFieldArray({
+    control: form.control,
+    name: 'scoring_settings',
+  })
 
-  const [expandedAssignments, setExpandedAssignments] = useState(true)
+  const {
+    fields: actionFields,
+    append: appendAction,
+    remove: removeAction,
+  } = useFieldArray({
+    control: form.control,
+    name: 'actions',
+  })
+
+  const {
+    fields: assignmentFields,
+    append: appendAssignment,
+    remove: removeAssignment,
+  } = useFieldArray({
+    control: form.control,
+    name: 'assignments',
+  })
 
   useEffect(() => {
-    if (user) loadData()
-  }, [id, user])
+    async function loadData() {
+      if (!clientId || clientId === 'all') return
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id')
-        .eq('id', user?.id)
-        .single()
-      if (!profile?.client_id) throw new Error('Cliente não encontrado')
-      setClientId(profile.client_id)
+      try {
+        setLoading(true)
+        // Load profiles
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, name, role, email')
+          .eq('client_id', clientId)
+          .order('name')
 
-      const [plantsRes, profilesRes] = await Promise.all([
-        supabase.from('plants').select('id, name').eq('client_id', profile.client_id),
-        supabase.from('profiles').select('id, name').eq('client_id', profile.client_id),
-      ])
-      if (plantsRes.data) setPlants(plantsRes.data)
-      if (profilesRes.data) setProfiles(profilesRes.data)
-
-      if (id) {
-        const { data: audit } = await supabase.from('audits').select('*').eq('id', id).single()
-        if (audit) {
-          setTitle(audit.title)
-          setType(audit.type)
-          setFrequency(audit.frequency)
-          setStartDate(audit.start_date)
-          setAdvanceNotice(audit.advance_notice_days || 0)
-          if (audit.scoring_settings) setScoringSettings(audit.scoring_settings as any)
-
-          const { data: acts } = await supabase
-            .from('audit_actions')
-            .select('*')
-            .eq('audit_id', id)
-            .order('order_index')
-          if (acts) setActions(acts)
-
-          const { data: asgs } = await supabase
-            .from('audit_assignments')
-            .select('*')
-            .eq('audit_id', id)
-          if (asgs) setAssignments(asgs)
+        if (profilesData) {
+          setProfiles(profilesData)
         }
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleSave = async (status: string) => {
-    if (!title || !startDate) {
-      toast({
-        title: 'Aviso',
-        description: 'Preencha os campos obrigatórios (Título e Data)',
-        variant: 'destructive',
-      })
+        // Load audit if editing
+        if (id && id !== 'nova') {
+          const { audit, actions, assignments } = await getAuditConfig(id)
+
+          form.reset({
+            title: audit.title || '',
+            type: audit.type || 'Geral',
+            frequency: audit.frequency || 'Mensal',
+            start_date: audit.start_date || new Date().toISOString().split('T')[0],
+            advance_notice_days: audit.advance_notice_days || 0,
+            status: audit.status || 'Ativo',
+            scoring_settings: audit.scoring_settings || [],
+            actions:
+              actions?.map((a: any) => ({
+                id: a.id,
+                title: a.title,
+                weight: a.weight,
+                evidence_required: a.evidence_required,
+                comments_required: a.comments_required,
+                order_index: a.order_index,
+              })) || [],
+            assignments:
+              assignments?.map((a: any) => ({
+                plant_id: a.plant_id,
+                assignee_id: a.assignee_id,
+              })) || [],
+          })
+        }
+      } catch (error: any) {
+        console.error(error)
+        toast.error('Erro ao carregar os dados da auditoria')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [id, clientId, form])
+
+  const onSubmit = async (values: AuditFormValues) => {
+    if (!clientId || clientId === 'all') {
+      toast.error('Selecione um cliente válido')
       return
     }
-    setSaving(true)
+
     try {
-      let auditId = id
+      setSaving(true)
+
       const auditData = {
-        client_id: clientId,
-        title,
-        type,
-        frequency,
-        start_date: startDate,
-        advance_notice_days: advanceNotice,
-        scoring_settings: scoringSettings,
-        status,
+        title: values.title,
+        type: values.type,
+        frequency: values.frequency,
+        start_date: values.start_date,
+        advance_notice_days: values.advance_notice_days,
+        status: values.status,
+        scoring_settings: values.scoring_settings,
       }
 
-      if (auditId) {
-        await supabase.from('audits').update(auditData).eq('id', auditId)
-      } else {
-        const { data, error } = await supabase.from('audits').insert(auditData).select().single()
-        if (error) throw error
-        auditId = data.id
-      }
+      await saveAuditConfig({
+        auditId: id && id !== 'nova' ? id : undefined,
+        clientId,
+        auditData,
+        actions: values.actions.map((a, i) => ({ ...a, order_index: i })),
+        assignments: values.assignments,
+      })
 
-      if (auditId) {
-        await supabase.from('audit_actions').delete().eq('audit_id', auditId)
-        await supabase.from('audit_assignments').delete().eq('audit_id', auditId)
-
-        if (actions.length > 0) {
-          const acts = actions.map((a, i) => ({
-            ...a,
-            id: undefined,
-            audit_id: auditId,
-            order_index: i,
-          }))
-          await supabase.from('audit_actions').insert(acts)
-        }
-        if (assignments.length > 0) {
-          const asgs = assignments.map((a) => ({ ...a, id: undefined, audit_id: auditId }))
-          await supabase.from('audit_assignments').insert(asgs)
-        }
-      }
-
-      toast({ title: 'Sucesso', description: 'Auditoria salva com sucesso!' })
-      navigate('/auditoria-checklist/dashboard')
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+      toast.success('Auditoria salva com sucesso!')
+      navigate('/auditoria-checklist/criadas')
+    } catch (error: any) {
+      console.error(error)
+      toast.error('Erro ao salvar auditoria')
     } finally {
       setSaving(false)
     }
   }
 
-  const ActionButtons = () => (
-    <div className="flex gap-3">
-      <Button variant="outline" onClick={() => handleSave('Rascunho')} disabled={saving}>
-        Salvar como Rascunho
-      </Button>
-      <Button variant="default" onClick={() => handleSave('Ativo')} disabled={saving}>
-        Salvar
-      </Button>
-    </div>
-  )
-
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="animate-spin h-8 w-8 text-primary" />
+      <div className="p-8 text-center text-muted-foreground animate-pulse">
+        Carregando dados da auditoria...
       </div>
     )
+  }
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Configuração de Auditoria</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Defina os parâmetros, critérios e checklist da auditoria.
-          </p>
-        </div>
-        <ActionButtons />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados Básicos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Título da Auditoria *</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Auditoria de Segurança"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Geral">Geral</SelectItem>
-                  <SelectItem value="Segurança">Segurança</SelectItem>
-                  <SelectItem value="Qualidade">Qualidade</SelectItem>
-                  <SelectItem value="Meio Ambiente">Meio Ambiente</SelectItem>
-                  <SelectItem value="5S">5S</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Frequência</Label>
-              <Select value={frequency} onValueChange={setFrequency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Única">Única</SelectItem>
-                  <SelectItem value="Diária">Diária</SelectItem>
-                  <SelectItem value="Semanal">Semanal</SelectItem>
-                  <SelectItem value="Mensal">Mensal</SelectItem>
-                  <SelectItem value="Semestral">Semestral</SelectItem>
-                  <SelectItem value="Anual">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Data de Início *</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Aviso Prévio (dias antes da execução)</Label>
-              <Input
-                type="number"
-                min="0"
-                value={advanceNotice}
-                onChange={(e) => setAdvanceNotice(Number(e.target.value))}
-                className="max-w-[200px]"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Critérios e Notas</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Configure a escala de avaliação e quais notas exigem plano de ação.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-[80px_1fr_100px] gap-4 mb-2 px-3">
-            <Label className="text-xs text-muted-foreground uppercase">Nota</Label>
-            <Label className="text-xs text-muted-foreground uppercase">Descrição</Label>
-            <Label className="text-xs text-muted-foreground uppercase text-center">
-              Gera Ação?
-            </Label>
-          </div>
-          <div className="space-y-3">
-            {scoringSettings.map((setting, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-[80px_1fr_100px] gap-4 items-center p-3 bg-muted/30 rounded-md border border-border/50"
-              >
-                <Input
-                  type="number"
-                  value={setting.score}
-                  onChange={(e) => {
-                    const newSettings = [...scoringSettings]
-                    newSettings[idx].score = Number(e.target.value)
-                    setScoringSettings(newSettings)
-                  }}
-                />
-                <Input
-                  value={setting.description}
-                  onChange={(e) => {
-                    const newSettings = [...scoringSettings]
-                    newSettings[idx].description = e.target.value
-                    setScoringSettings(newSettings)
-                  }}
-                />
-                <div className="flex justify-center">
-                  <Checkbox
-                    checked={setting.trigger_task}
-                    onCheckedChange={(c) => {
-                      const newSettings = [...scoringSettings]
-                      newSettings[idx].trigger_task = !!c
-                      setScoringSettings(newSettings)
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Ações / Checklist</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Adicione os itens que serão verificados nesta auditoria.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {actions.map((action, idx) => (
-              <div
-                key={idx}
-                className="flex gap-4 items-start bg-muted/20 p-4 rounded-md border border-border/50"
-              >
-                <div className="flex-1 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Item de Verificação</Label>
-                    <Input
-                      value={action.title}
-                      onChange={(e) => {
-                        const newActions = [...actions]
-                        newActions[idx].title = e.target.value
-                        setActions(newActions)
-                      }}
-                      placeholder="Ex: Equipamentos de proteção individual em uso"
-                    />
-                  </div>
-                  <div className="flex gap-6">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={action.evidence_required}
-                        onCheckedChange={(c) => {
-                          const newActions = [...actions]
-                          newActions[idx].evidence_required = !!c
-                          setActions(newActions)
-                        }}
-                      />
-                      <Label className="text-sm font-normal cursor-pointer">
-                        Exigir Evidência (Foto)
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={action.comments_required}
-                        onCheckedChange={(c) => {
-                          const newActions = [...actions]
-                          newActions[idx].comments_required = !!c
-                          setActions(newActions)
-                        }}
-                      />
-                      <Label className="text-sm font-normal cursor-pointer">
-                        Exigir Comentário
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="w-24 space-y-2">
-                  <Label>Peso</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={action.weight}
-                    onChange={(e) => {
-                      const newActions = [...actions]
-                      newActions[idx].weight = Number(e.target.value)
-                      setActions(newActions)
-                    }}
-                  />
-                </div>
-
-                <div className="pt-8">
-                  <Button
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10"
-                    size="icon"
-                    onClick={() => setActions(actions.filter((_, i) => i !== idx))}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            <Button
-              variant="outline"
-              onClick={() =>
-                setActions([
-                  ...actions,
-                  { title: '', weight: 1, evidence_required: false, comments_required: false },
-                ])
-              }
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Item
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <div
-          className="px-6 py-4 flex flex-row justify-between items-center cursor-pointer hover:bg-muted/30 transition-colors"
-          onClick={() => setExpandedAssignments(!expandedAssignments)}
-        >
-          <div>
-            <CardTitle className="text-lg">Unidades e Responsáveis</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Defina onde a auditoria será aplicada e quem irá realizá-la.
-            </p>
-          </div>
-          <Button variant="ghost" size="icon" className="pointer-events-none">
-            {expandedAssignments ? (
-              <ChevronUp className="h-5 w-5" />
-            ) : (
-              <ChevronDown className="h-5 w-5" />
-            )}
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/auditoria-checklist/criadas')}
+          >
+            <ArrowLeft className="h-4 w-4" />
           </Button>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {id && id !== 'nova' ? 'Editar Auditoria' : 'Nova Auditoria'}
+          </h1>
         </div>
-        {expandedAssignments && (
-          <CardContent className="pt-2 border-t border-border/50">
-            <div className="space-y-4 pt-4">
-              {assignments.map((asg, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-col md:flex-row gap-4 items-end bg-muted/20 p-4 rounded-md border border-border/50"
-                >
-                  <div className="flex-1 w-full">
-                    <Label className="mb-2 block">Unidade / Planta</Label>
-                    <Select
-                      value={asg.plant_id}
-                      onValueChange={(val) => {
-                        const newAsgs = [...assignments]
-                        newAsgs[idx].plant_id = val
-                        setAssignments(newAsgs)
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plants.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1 w-full">
-                    <Label className="mb-2 block">Responsável</Label>
-                    <Select
-                      value={asg.assignee_id}
-                      onValueChange={(val) => {
-                        const newAsgs = [...assignments]
-                        newAsgs[idx].assignee_id = val
-                        setAssignments(newAsgs)
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profiles.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10 md:w-auto w-full"
-                    onClick={() => setAssignments(assignments.filter((_, i) => i !== idx))}
-                  >
-                    <Trash2 className="w-4 h-4 md:mr-0 mr-2" />
-                    <span className="md:hidden">Remover Responsável</span>
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                onClick={() => setAssignments([...assignments, { plant_id: '', assignee_id: '' }])}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Responsável
-              </Button>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
-      <div className="flex justify-end pt-4">
-        <ActionButtons />
+        <Button onClick={form.handleSubmit(onSubmit)} disabled={saving}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? 'Salvando...' : 'Salvar'}
+        </Button>
       </div>
+
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+        <Tabs defaultValue="geral" className="w-full">
+          <TabsList className="grid w-full grid-cols-1 md:grid-cols-4 h-auto md:h-10 gap-2 mb-6">
+            <TabsTrigger value="geral">Configurações Gerais</TabsTrigger>
+            <TabsTrigger value="pontuacao">Escala de Pontuação</TabsTrigger>
+            <TabsTrigger value="checklist">Itens do Checklist</TabsTrigger>
+            <TabsTrigger value="atribuicoes">Plantas e Responsáveis</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="geral" className="focus-visible:outline-none">
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+              <div className="flex flex-col space-y-1.5 p-6">
+                <h3 className="text-lg font-semibold leading-none tracking-tight">
+                  Dados Principais
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Informações básicas sobre a auditoria.
+                </p>
+              </div>
+              <div className="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Título</Label>
+                  <Input {...form.register('title')} placeholder="Ex: Inspeção de Qualidade 5S" />
+                  {form.formState.errors.title && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.title.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Controller
+                    name="type"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Geral">Geral</SelectItem>
+                          <SelectItem value="Qualidade">Qualidade</SelectItem>
+                          <SelectItem value="Segurança">Segurança</SelectItem>
+                          <SelectItem value="Limpeza">Limpeza</SelectItem>
+                          <SelectItem value="Manutenção">Manutenção</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Frequência</Label>
+                  <Controller
+                    name="frequency"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a frequência" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Única">Única</SelectItem>
+                          <SelectItem value="Diária">Diária</SelectItem>
+                          <SelectItem value="Semanal">Semanal</SelectItem>
+                          <SelectItem value="Mensal">Mensal</SelectItem>
+                          <SelectItem value="Semestral">Semestral</SelectItem>
+                          <SelectItem value="Anual">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Data de Início</Label>
+                  <Input type="date" {...form.register('start_date')} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Dias de Aviso Prévio</Label>
+                  <Input type="number" min="0" {...form.register('advance_notice_days')} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Controller
+                    name="status"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ativo">Ativo</SelectItem>
+                          <SelectItem value="Inativo">Inativo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pontuacao" className="focus-visible:outline-none">
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+              <div className="flex flex-col space-y-1.5 p-6">
+                <h3 className="text-lg font-semibold leading-none tracking-tight">
+                  Escala de Pontuação Global
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Defina a escala numérica (ex: 1 a 5) e quais notas devem gerar uma tarefa
+                  corretiva automática.
+                </p>
+              </div>
+              <div className="p-6 pt-0 space-y-4">
+                <div className="grid grid-cols-12 gap-4 font-medium text-sm text-muted-foreground pb-2 border-b">
+                  <div className="col-span-3 md:col-span-2">Nota</div>
+                  <div className="col-span-5 md:col-span-7">Descrição</div>
+                  <div className="col-span-3 md:col-span-2 text-center text-xs md:text-sm">
+                    Gera Tarefa?
+                  </div>
+                  <div className="col-span-1"></div>
+                </div>
+
+                {scoreFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-3 md:col-span-2">
+                      <Input type="number" {...form.register(`scoring_settings.${index}.score`)} />
+                    </div>
+                    <div className="col-span-5 md:col-span-7">
+                      <Input
+                        {...form.register(`scoring_settings.${index}.description`)}
+                        placeholder="Ex: Bom, Ruim..."
+                      />
+                    </div>
+                    <div className="col-span-3 md:col-span-2 flex justify-center">
+                      <Controller
+                        name={`scoring_settings.${index}.trigger_task`}
+                        control={form.control}
+                        render={({ field: f }) => (
+                          <Switch checked={f.value} onCheckedChange={f.onChange} />
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeScore(index)}
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-4 border-dashed"
+                  onClick={() =>
+                    appendScore({
+                      score: scoreFields.length + 1,
+                      description: '',
+                      trigger_task: false,
+                    })
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Nota
+                </Button>
+                {form.formState.errors.scoring_settings && (
+                  <p className="text-sm text-destructive mt-2">
+                    {form.formState.errors.scoring_settings.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="checklist" className="focus-visible:outline-none">
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+              <div className="flex flex-col space-y-1.5 p-6">
+                <h3 className="text-lg font-semibold leading-none tracking-tight">
+                  Itens do Checklist
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure as perguntas/ações, seus pesos na nota final e requisitos de evidências.
+                </p>
+              </div>
+              <div className="p-6 pt-0 space-y-4">
+                <div className="grid grid-cols-12 gap-2 md:gap-4 font-medium text-sm text-muted-foreground pb-2 border-b">
+                  <div className="col-span-5 md:col-span-6">Título / Pergunta</div>
+                  <div className="col-span-3 md:col-span-2">Peso</div>
+                  <div
+                    className="col-span-1 text-center text-xs md:text-sm"
+                    title="Exigir Foto/Evidência"
+                  >
+                    Foto?
+                  </div>
+                  <div
+                    className="col-span-2 text-center text-xs md:text-sm"
+                    title="Exigir Observação"
+                  >
+                    Obs?
+                  </div>
+                  <div className="col-span-1"></div>
+                </div>
+
+                {actionFields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="grid grid-cols-12 gap-2 md:gap-4 items-center bg-muted/20 p-3 rounded-lg border border-border/50"
+                  >
+                    <div className="col-span-5 md:col-span-6">
+                      <Input
+                        {...form.register(`actions.${index}.title`)}
+                        placeholder="Descreva o que deve ser verificado..."
+                      />
+                    </div>
+                    <div className="col-span-3 md:col-span-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        {...form.register(`actions.${index}.weight`)}
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      <Controller
+                        name={`actions.${index}.evidence_required`}
+                        control={form.control}
+                        render={({ field: f }) => (
+                          <Switch checked={f.value} onCheckedChange={f.onChange} />
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-2 flex justify-center">
+                      <Controller
+                        name={`actions.${index}.comments_required`}
+                        control={form.control}
+                        render={({ field: f }) => (
+                          <Switch checked={f.value} onCheckedChange={f.onChange} />
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeAction(index)}
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-4 border-dashed"
+                  onClick={() =>
+                    appendAction({
+                      title: '',
+                      weight: 1,
+                      evidence_required: false,
+                      comments_required: false,
+                      order_index: actionFields.length,
+                    })
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Item ao Checklist
+                </Button>
+                {form.formState.errors.actions && (
+                  <p className="text-sm text-destructive mt-2">
+                    {form.formState.errors.actions.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="atribuicoes" className="focus-visible:outline-none">
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+              <div className="flex flex-col space-y-1.5 p-6">
+                <h3 className="text-lg font-semibold leading-none tracking-tight">
+                  Distribuição da Auditoria
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Selecione as plantas onde a auditoria será aplicada e quem são os responsáveis
+                  pela execução.
+                </p>
+              </div>
+              <div className="p-6 pt-0 space-y-4">
+                <div className="grid grid-cols-12 gap-4 font-medium text-sm text-muted-foreground pb-2 border-b">
+                  <div className="col-span-12 md:col-span-5">Planta</div>
+                  <div className="col-span-10 md:col-span-6">Responsável (Executor)</div>
+                  <div className="col-span-2 md:col-span-1"></div>
+                </div>
+
+                {assignmentFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-2 md:gap-4 items-center">
+                    <div className="col-span-12 md:col-span-5 mb-2 md:mb-0">
+                      <Controller
+                        name={`assignments.${index}.plant_id`}
+                        control={form.control}
+                        render={({ field: f }) => (
+                          <Select onValueChange={f.onChange} value={f.value || undefined}>
+                            <SelectTrigger
+                              className={
+                                form.formState.errors.assignments?.[index]?.plant_id
+                                  ? 'border-destructive'
+                                  : ''
+                              }
+                            >
+                              <SelectValue placeholder="Selecione a planta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {plants.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-10 md:col-span-6">
+                      <Controller
+                        name={`assignments.${index}.assignee_id`}
+                        control={form.control}
+                        render={({ field: f }) => (
+                          <Select onValueChange={f.onChange} value={f.value || undefined}>
+                            <SelectTrigger
+                              className={
+                                form.formState.errors.assignments?.[index]?.assignee_id
+                                  ? 'border-destructive'
+                                  : ''
+                              }
+                            >
+                              <SelectValue placeholder="Selecione o responsável" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {profiles.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name} {p.email ? `(${p.email})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeAssignment(index)}
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-4 border-dashed"
+                  onClick={() => appendAssignment({ plant_id: '', assignee_id: '' })}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Atribuição
+                </Button>
+                {form.formState.errors.assignments && (
+                  <p className="text-sm text-destructive mt-2">
+                    {form.formState.errors.assignments.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </form>
     </div>
   )
 }

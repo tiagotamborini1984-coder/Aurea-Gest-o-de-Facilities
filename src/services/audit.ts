@@ -32,3 +32,130 @@ export const submitAuditExecution = async (
   if (error) throw error
   return data
 }
+
+export const getAuditConfig = async (auditId: string) => {
+  const { data: audit, error: auditError } = await supabase
+    .from('audits')
+    .select('*')
+    .eq('id', auditId)
+    .single()
+
+  if (auditError) throw auditError
+
+  const { data: actions, error: actionsError } = await supabase
+    .from('audit_actions')
+    .select('*')
+    .eq('audit_id', auditId)
+    .order('order_index', { ascending: true })
+
+  if (actionsError) throw actionsError
+
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from('audit_assignments')
+    .select('*')
+    .eq('audit_id', auditId)
+
+  if (assignmentsError) throw assignmentsError
+
+  return { audit, actions, assignments }
+}
+
+export const saveAuditConfig = async ({
+  auditId,
+  clientId,
+  auditData,
+  actions,
+  assignments,
+}: {
+  auditId?: string
+  clientId: string
+  auditData: any
+  actions: any[]
+  assignments: any[]
+}) => {
+  let currentAuditId = auditId
+
+  // Prevent overwriting scoring_settings if it's explicitly null or undefined
+  const safeAuditData = { ...auditData }
+  if (safeAuditData.scoring_settings === undefined || safeAuditData.scoring_settings === null) {
+    delete safeAuditData.scoring_settings
+  }
+
+  // 1. Save or Update Audit
+  if (currentAuditId) {
+    const { error } = await supabase.from('audits').update(safeAuditData).eq('id', currentAuditId)
+    if (error) throw error
+  } else {
+    const { data, error } = await supabase
+      .from('audits')
+      .insert({ ...safeAuditData, client_id: clientId })
+      .select()
+      .single()
+    if (error) throw error
+    currentAuditId = data.id
+  }
+
+  // 2. Manage Actions with Upsert to prevent Data Loss
+  if (currentAuditId) {
+    // Get existing actions
+    const { data: existingActions } = await supabase
+      .from('audit_actions')
+      .select('id, title')
+      .eq('audit_id', currentAuditId)
+
+    const actionsToUpsert = actions.map((a) => {
+      const existing = existingActions?.find(
+        (ex) => (a.id && ex.id === a.id) || (!a.id && ex.title === a.title),
+      )
+      return {
+        ...(existing?.id || a.id ? { id: existing?.id || a.id } : {}),
+        audit_id: currentAuditId,
+        title: a.title,
+        evidence_required: a.evidence_required || false,
+        comments_required: a.comments_required || false,
+        weight: a.weight ?? 1,
+        order_index: a.order_index ?? 0,
+      }
+    })
+
+    const upsertedIds = actionsToUpsert.map((a) => a.id).filter(Boolean) as string[]
+    const existingActionIds = existingActions?.map((a) => a.id) || []
+
+    const actionsToDelete = existingActionIds.filter((id) => !upsertedIds.includes(id))
+
+    if (actionsToDelete.length > 0) {
+      const { error } = await supabase.from('audit_actions').delete().in('id', actionsToDelete)
+      if (error) throw error
+    }
+
+    if (actionsToUpsert.length > 0) {
+      const { error } = await supabase.from('audit_actions').upsert(actionsToUpsert)
+      if (error) throw error
+    }
+
+    // 3. Manage Assignments
+    await supabase.from('audit_assignments').delete().eq('audit_id', currentAuditId)
+
+    if (assignments.length > 0) {
+      const assignmentsToInsert = assignments.map((a) => ({
+        audit_id: currentAuditId,
+        plant_id: a.plant_id,
+        assignee_id: a.assignee_id,
+      }))
+      const { error } = await supabase.from('audit_assignments').insert(assignmentsToInsert)
+      if (error) throw error
+    }
+  }
+
+  // Fetch updated actions to ensure IDs are populated and returned correctly
+  const { data: updatedActions } = await supabase
+    .from('audit_actions')
+    .select('*')
+    .eq('audit_id', currentAuditId)
+    .order('order_index', { ascending: true })
+
+  return {
+    auditId: currentAuditId,
+    actions: updatedActions || [],
+  }
+}
