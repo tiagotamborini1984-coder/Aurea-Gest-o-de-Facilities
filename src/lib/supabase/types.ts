@@ -4879,6 +4879,19 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION set_audit_action_id_if_null()
+//   CREATE OR REPLACE FUNCTION public.set_audit_action_id_if_null()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//     IF NEW.id IS NULL THEN
+//       NEW.id := gen_random_uuid();
+//     END IF;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION set_task_number()
 //   CREATE OR REPLACE FUNCTION public.set_task_number()
 //    RETURNS trigger
@@ -5133,6 +5146,8 @@ export const Constants = {
 //
 
 // --- TRIGGERS ---
+// Table: audit_actions
+//   ensure_audit_action_id: CREATE TRIGGER ensure_audit_action_id BEFORE INSERT ON public.audit_actions FOR EACH ROW WHEN ((new.id IS NULL)) EXECUTE FUNCTION set_audit_action_id_if_null()
 // Table: audit_executions
 //   on_audit_execution_finalized: CREATE TRIGGER on_audit_execution_finalized AFTER UPDATE ON public.audit_executions FOR EACH ROW EXECUTE FUNCTION handle_audit_execution_finalized()
 // Table: audit_logs
