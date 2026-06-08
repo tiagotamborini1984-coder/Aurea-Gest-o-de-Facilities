@@ -1,31 +1,9 @@
-import React, { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useForm, useFieldArray, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { toast } from 'sonner'
-import {
-  Plus,
-  Trash2,
-  Save,
-  Send,
-  ArrowLeft,
-  Settings2,
-  Users,
-  FileText,
-  CheckSquare,
-  Building2,
-  User,
-} from 'lucide-react'
-
-import { Button } from '@/components/ui/button'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -33,644 +11,511 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-
-const schema = z.object({
-  title: z.string().min(1, 'Título é obrigatório'),
-  type: z.string().min(1, 'Tipo é obrigatório'),
-  frequency: z.string().min(1, 'Frequência é obrigatória'),
-  start_date: z.string().min(1, 'Data de início é obrigatória'),
-  advance_notice_days: z.coerce.number().min(0).optional().default(0),
-  scoring_settings: z
-    .array(
-      z.object({
-        score: z.coerce.number(),
-        description: z.string().min(1, 'Descrição é obrigatória'),
-        trigger_task: z.boolean(),
-      }),
-    )
-    .min(1, 'Adicione pelo menos uma nota na escala'),
-  assignments: z
-    .array(
-      z.object({
-        plant_id: z.string().min(1, 'Planta é obrigatória'),
-        assignee_id: z.string().min(1, 'Responsável é obrigatório'),
-      }),
-    )
-    .min(1, 'Adicione pelo menos uma distribuição'),
-  actions: z
-    .array(
-      z.object({
-        id: z.string().optional(),
-        title: z.string().min(1, 'Título da ação é obrigatório'),
-        evidence_required: z.boolean(),
-        comments_required: z.boolean(),
-        weight: z.coerce.number().min(1),
-      }),
-    )
-    .min(1, 'Adicione pelo menos uma ação no checklist'),
-})
-
-type FormValues = z.infer<typeof schema>
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
+import { ClipboardList, Plus, Trash2, Edit2, ChevronLeft, Save, AlertCircle } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { activeClient } = useAppStore()
+  const { toast } = useToast()
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [plants, setPlants] = useState<any[]>([])
-  const [profiles, setProfiles] = useState<any[]>([])
+  const [audits, setAudits] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      title: '',
-      type: 'Geral',
-      frequency: 'Única',
-      start_date: new Date().toISOString().split('T')[0],
-      advance_notice_days: 0,
-      scoring_settings: [
-        { score: 1, description: 'Muito Ruim', trigger_task: true },
-        { score: 2, description: 'Ruim', trigger_task: true },
-        { score: 3, description: 'Regular', trigger_task: false },
-        { score: 4, description: 'Bom', trigger_task: false },
-        { score: 5, description: 'Excelente', trigger_task: false },
-      ],
-      assignments: [{ plant_id: '', assignee_id: '' }],
-      actions: [{ title: '', evidence_required: false, comments_required: false, weight: 1 }],
-    },
-  })
+  const [isEditing, setIsEditing] = useState(false)
+  const [currentAudit, setCurrentAudit] = useState<any>(null)
+  const [actions, setActions] = useState<any[]>([])
 
-  const {
-    fields: scoreFields,
-    append: appendScore,
-    remove: removeScore,
-  } = useFieldArray({ control: form.control, name: 'scoring_settings' })
-  const {
-    fields: assignFields,
-    append: appendAssign,
-    remove: removeAssign,
-  } = useFieldArray({ control: form.control, name: 'assignments' })
-  const {
-    fields: actionFields,
-    append: appendAction,
-    remove: removeAction,
-  } = useFieldArray({ control: form.control, name: 'actions' })
+  const [actionDialog, setActionDialog] = useState(false)
+  const [editingAction, setEditingAction] = useState<any>(null)
 
   useEffect(() => {
-    async function load() {
-      if (!activeClient) return
-      try {
-        setLoading(true)
-        const [plantsRes, profilesRes] = await Promise.all([
-          supabase.from('plants').select('*').eq('client_id', activeClient.id),
-          supabase.from('profiles').select('*').eq('client_id', activeClient.id),
-        ])
-
-        if (plantsRes.data) setPlants(plantsRes.data)
-        if (profilesRes.data) setProfiles(profilesRes.data)
-
-        if (id) {
-          const { data: audit, error: auditErr } = await supabase
-            .from('audits')
-            .select('*')
-            .eq('id', id)
-            .single()
-
-          if (auditErr) throw auditErr
-
-          const { data: assignments } = await supabase
-            .from('audit_assignments')
-            .select('*')
-            .eq('audit_id', id)
-
-          const { data: actions } = await supabase
-            .from('audit_actions')
-            .select('*')
-            .eq('audit_id', id)
-            .order('order_index', { ascending: true })
-
-          form.reset({
-            title: audit.title,
-            type: audit.type,
-            frequency: audit.frequency,
-            start_date: audit.start_date,
-            advance_notice_days: audit.advance_notice_days || 0,
-            scoring_settings: audit.scoring_settings || [],
-            assignments: assignments?.length
-              ? assignments.map((a) => ({ plant_id: a.plant_id, assignee_id: a.assignee_id }))
-              : [{ plant_id: '', assignee_id: '' }],
-            actions: actions?.length
-              ? actions.map((a) => ({
-                  id: a.id,
-                  title: a.title,
-                  evidence_required: a.evidence_required,
-                  comments_required: a.comments_required,
-                  weight: a.weight,
-                }))
-              : [{ title: '', evidence_required: false, comments_required: false, weight: 1 }],
-          })
-        }
-      } catch (e: any) {
-        toast.error('Erro ao carregar dados: ' + e.message)
-      } finally {
-        setLoading(false)
+    if (activeClient) {
+      if (id) {
+        fetchAuditDetails(id)
+      } else {
+        fetchAudits()
+        setIsEditing(false)
+        setCurrentAudit(null)
       }
     }
-    load()
-  }, [activeClient, id, form])
+  }, [activeClient, id])
 
-  const onSubmit = async (values: FormValues, status: 'Rascunho' | 'Ativo') => {
-    if (!activeClient) return
+  const fetchAudits = async () => {
+    setIsLoading(true)
+    const { data } = await supabase
+      .from('audits')
+      .select('*')
+      .eq('client_id', activeClient?.id)
+      .order('created_at', { ascending: false })
+
+    if (data) setAudits(data)
+    setIsLoading(false)
+  }
+
+  const fetchAuditDetails = async (auditId: string) => {
+    setIsLoading(true)
+    if (auditId === 'nova') {
+      setCurrentAudit({
+        title: '',
+        type: 'Geral',
+        frequency: 'Única',
+        start_date: new Date().toISOString().split('T')[0],
+        status: 'Rascunho',
+      })
+      setActions([])
+      setIsEditing(true)
+    } else {
+      const { data: audit } = await supabase.from('audits').select('*').eq('id', auditId).single()
+      if (audit) {
+        setCurrentAudit(audit)
+        const { data: actData } = await supabase
+          .from('audit_actions')
+          .select('*')
+          .eq('audit_id', auditId)
+          .order('order_index')
+        setActions(actData || [])
+        setIsEditing(true)
+      }
+    }
+    setIsLoading(false)
+  }
+
+  const handleSaveAudit = async (asDraft: boolean) => {
+    if (!currentAudit.title || !currentAudit.start_date) {
+      toast({ title: 'Preencha título e data de início.', variant: 'destructive' })
+      return
+    }
+
+    if (actions.length === 0 && !asDraft) {
+      toast({ title: 'Auditorias ativas precisam ter ações no checklist.', variant: 'destructive' })
+      return
+    }
+
+    setIsSaving(true)
     try {
-      setSaving(true)
-
-      const auditData = {
-        client_id: activeClient.id,
-        title: values.title,
-        type: values.type,
-        frequency: values.frequency,
-        start_date: values.start_date,
-        advance_notice_days: values.advance_notice_days,
-        scoring_settings: values.scoring_settings,
-        status,
+      const auditPayload = {
+        id: currentAudit.id || undefined,
+        client_id: activeClient?.id,
+        title: currentAudit.title,
+        type: currentAudit.type,
+        frequency: currentAudit.frequency,
+        start_date: currentAudit.start_date,
+        status: asDraft ? 'Rascunho' : 'Ativo',
       }
 
-      let auditId = id
-      if (id) {
-        const { error } = await supabase.from('audits').update(auditData).eq('id', id)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase.from('audits').insert(auditData).select().single()
-        if (error) throw error
-        auditId = data.id
+      const { data: savedAudit, error: auditErr } = await supabase
+        .from('audits')
+        .upsert(auditPayload)
+        .select()
+        .single()
+
+      if (auditErr) throw auditErr
+
+      if (actions.length > 0) {
+        const actionsPayload = actions.map((a, idx) => {
+          const { id, created_at, ...rest } = a
+          return {
+            ...rest,
+            audit_id: savedAudit.id,
+            order_index: idx,
+            // Strip temporary IDs entirely to let DB generate UUID, avoiding not-null errors
+            id: id?.startsWith('temp-') ? undefined : id,
+          }
+        })
+
+        const { error: actErr } = await supabase.from('audit_actions').upsert(actionsPayload)
+        if (actErr) throw actErr
       }
 
-      if (!auditId) throw new Error('Falha ao obter ID da auditoria.')
-
-      // Handle actions cleanup
-      const actionIds = values.actions.map((a) => a.id).filter(Boolean)
-      if (id) {
-        if (actionIds.length > 0) {
-          await supabase
-            .from('audit_actions')
-            .delete()
-            .eq('audit_id', id)
-            .not('id', 'in', `(${actionIds.join(',')})`)
-        } else {
-          await supabase.from('audit_actions').delete().eq('audit_id', id)
-        }
-      }
-
-      // Upsert actions
-      const actionsToInsert = values.actions.map((a, i) => ({
-        ...(a.id ? { id: a.id } : {}),
-        audit_id: auditId,
-        title: a.title,
-        evidence_required: a.evidence_required,
-        comments_required: a.comments_required,
-        weight: a.weight,
-        order_index: i,
-      }))
-
-      const { error: actionsErr } = await supabase.from('audit_actions').upsert(actionsToInsert)
-      if (actionsErr) throw actionsErr
-
-      // Recreate assignments
-      await supabase.from('audit_assignments').delete().eq('audit_id', auditId)
-
-      const uniqueAssigns = values.assignments.filter(
-        (v, i, a) =>
-          a.findIndex((t) => t.plant_id === v.plant_id && t.assignee_id === v.assignee_id) === i,
-      )
-
-      const assignsToInsert = uniqueAssigns.map((a) => ({
-        audit_id: auditId,
-        plant_id: a.plant_id,
-        assignee_id: a.assignee_id,
-      }))
-
-      if (assignsToInsert.length > 0) {
-        const { error: assignsErr } = await supabase
-          .from('audit_assignments')
-          .insert(assignsToInsert)
-        if (assignsErr) throw assignsErr
-      }
-
-      toast.success(
-        status === 'Rascunho' ? 'Rascunho salvo com sucesso!' : 'Auditoria publicada com sucesso!',
-      )
-      navigate('/auditoria-checklist/criadas')
-    } catch (e: any) {
-      toast.error('Erro ao salvar: ' + e.message)
+      toast({ title: 'Template salvo com sucesso!' })
+      navigate('/auditoria-checklist/configuracao')
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
     } finally {
-      setSaving(false)
+      setIsSaving(false)
     }
   }
 
-  if (loading) {
+  const handleSaveAction = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingAction.title) return
+
+    if (editingAction.id) {
+      setActions((prev) => prev.map((a) => (a.id === editingAction.id ? editingAction : a)))
+    } else {
+      setActions((prev) => [...prev, { ...editingAction, id: `temp-${crypto.randomUUID()}` }])
+    }
+    setActionDialog(false)
+  }
+
+  const handleDeleteAction = async (id: string) => {
+    if (!id.startsWith('temp-')) {
+      const { error } = await supabase.from('audit_actions').delete().eq('id', id)
+      if (error) {
+        toast({ title: 'Erro ao deletar', description: error.message, variant: 'destructive' })
+        return
+      }
+    }
+    setActions((prev) => prev.filter((a) => a.id !== id))
+  }
+
+  if (isEditing) {
     return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+        <div className="flex items-center gap-4 mb-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/auditoria-checklist/configuracao')}
+            className="h-8 w-8"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              {currentAudit?.id ? 'Editar Template' : 'Novo Template de Auditoria'}
+            </h1>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="md:col-span-1 h-fit">
+            <CardHeader className="bg-slate-50 border-b pb-4">
+              <h3 className="font-semibold text-lg">Detalhes Gerais</h3>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Título da Auditoria</Label>
+                <Input
+                  value={currentAudit?.title || ''}
+                  onChange={(e) => setCurrentAudit({ ...currentAudit, title: e.target.value })}
+                  placeholder="Ex: Inspeção de Qualidade ISO"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  value={currentAudit?.type || 'Geral'}
+                  onValueChange={(v) => setCurrentAudit({ ...currentAudit, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Geral">Geral</SelectItem>
+                    <SelectItem value="Qualidade">Qualidade</SelectItem>
+                    <SelectItem value="Segurança">Segurança (SSMA)</SelectItem>
+                    <SelectItem value="Operacional">Operacional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Frequência de Geração</Label>
+                <Select
+                  value={currentAudit?.frequency || 'Única'}
+                  onValueChange={(v) => setCurrentAudit({ ...currentAudit, frequency: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Única">Única</SelectItem>
+                    <SelectItem value="Semanal">Semanal</SelectItem>
+                    <SelectItem value="Mensal">Mensal</SelectItem>
+                    <SelectItem value="Semestral">Semestral</SelectItem>
+                    <SelectItem value="Anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Data de Início</Label>
+                <Input
+                  type="date"
+                  value={currentAudit?.start_date || ''}
+                  onChange={(e) => setCurrentAudit({ ...currentAudit, start_date: e.target.value })}
+                />
+              </div>
+
+              <div className="pt-4 border-t flex flex-col gap-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleSaveAudit(true)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar como Rascunho'}
+                </Button>
+                <Button
+                  variant="tech"
+                  className="w-full"
+                  onClick={() => handleSaveAudit(false)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Salvando...' : 'Ativar Template'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-2">
+            <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between pb-4">
+              <h3 className="font-semibold text-lg">Itens do Checklist</h3>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingAction({
+                    title: '',
+                    evidence_required: false,
+                    weight: 1,
+                    comments_required: false,
+                  })
+                  setActionDialog(true)
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {actions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground flex flex-col items-center">
+                  <AlertCircle className="w-10 h-10 mb-3 opacity-20" />
+                  <p>O checklist está vazio.</p>
+                  <p className="text-sm">Adicione ações que deverão ser verificadas.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pergunta / Ação</TableHead>
+                      <TableHead className="w-24 text-center">Peso</TableHead>
+                      <TableHead className="w-24 text-center">Evidência</TableHead>
+                      <TableHead className="w-20 text-right"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {actions.map((act, index) => (
+                      <TableRow key={act.id || index}>
+                        <TableCell className="font-medium text-sm">{act.title}</TableCell>
+                        <TableCell className="text-center">{act.weight}</TableCell>
+                        <TableCell className="text-center">
+                          {act.evidence_required ? (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                              Sim
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Não</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setEditingAction(act)
+                                setActionDialog(true)
+                              }}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleDeleteAction(act.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Dialog open={actionDialog} onOpenChange={setActionDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingAction?.id ? 'Editar Ação' : 'Nova Ação do Checklist'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSaveAction} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>O que deve ser verificado?</Label>
+                <Input
+                  required
+                  value={editingAction?.title || ''}
+                  onChange={(e) => setEditingAction({ ...editingAction, title: e.target.value })}
+                  placeholder="Ex: O extintor está desobstruído?"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Peso (Relevância)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    value={editingAction?.weight || 1}
+                    onChange={(e) =>
+                      setEditingAction({ ...editingAction, weight: parseInt(e.target.value) })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 pt-2">
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                  <div>
+                    <Label className="font-semibold text-sm">Exigir Evidência Fotográfica?</Label>
+                    <p className="text-xs text-muted-foreground">
+                      O auditor deverá anexar uma foto.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingAction?.evidence_required || false}
+                    onCheckedChange={(v) =>
+                      setEditingAction({ ...editingAction, evidence_required: v })
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                  <div>
+                    <Label className="font-semibold text-sm">Exigir Comentário?</Label>
+                    <p className="text-xs text-muted-foreground">
+                      O auditor deverá justificar a nota.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingAction?.comments_required || false}
+                    onCheckedChange={(v) =>
+                      setEditingAction({ ...editingAction, comments_required: v })
+                    }
+                  />
+                </div>
+              </div>
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setActionDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Salvar Ação</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-5xl animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {id ? 'Editar Modelo de Auditoria' : 'Novo Modelo de Auditoria'}
-            </h1>
-            <p className="text-muted-foreground">
-              Configure as perguntas, escala de notas e distribuição.
-            </p>
-          </div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <ClipboardList className="h-8 w-8 text-brand-vividBlue" />
+            Templates de Auditoria
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Crie e gerencie os formulários padronizados para inspeções.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={form.handleSubmit((d) => onSubmit(d, 'Rascunho'))}
-            disabled={saving}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Salvar como Rascunho
-          </Button>
-          <Button onClick={form.handleSubmit((d) => onSubmit(d, 'Ativo'))} disabled={saving}>
-            <Send className="h-4 w-4 mr-2" />
-            Publicar Auditoria
-          </Button>
-        </div>
+        <Button variant="tech" onClick={() => navigate('/auditoria-checklist/configuracao/nova')}>
+          <Plus className="w-4 h-4 mr-2" /> Novo Template
+        </Button>
       </div>
 
-      <div className="space-y-6 pb-24">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Configurações Gerais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Título da Auditoria</Label>
-              <Input placeholder="Ex: Auditoria Mensal de Segurança" {...form.register('title')} />
-              {form.formState.errors.title && (
-                <span className="text-xs text-red-500">{form.formState.errors.title.message}</span>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Controller
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Geral">Geral</SelectItem>
-                      <SelectItem value="Qualidade">Qualidade</SelectItem>
-                      <SelectItem value="Segurança">Segurança</SelectItem>
-                      <SelectItem value="Meio Ambiente">Meio Ambiente</SelectItem>
-                      <SelectItem value="5S">5S</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Frequência</Label>
-              <Controller
-                control={form.control}
-                name="frequency"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Única">Única</SelectItem>
-                      <SelectItem value="Diária">Diária</SelectItem>
-                      <SelectItem value="Semanal">Semanal</SelectItem>
-                      <SelectItem value="Mensal">Mensal</SelectItem>
-                      <SelectItem value="Semestral">Semestral</SelectItem>
-                      <SelectItem value="Anual">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data de Início</Label>
-              <Input type="date" {...form.register('start_date')} />
-              {form.formState.errors.start_date && (
-                <span className="text-xs text-red-500">
-                  {form.formState.errors.start_date.message}
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Aviso Prévio (dias)</Label>
-              <Input type="number" min="0" {...form.register('advance_notice_days')} />
-              <p className="text-xs text-muted-foreground">
-                Quantos dias antes a tarefa deve ser gerada.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Distribuição e Responsáveis
-            </CardTitle>
-            <CardDescription>
-              Defina em quais plantas esta auditoria será aplicada e quem será o responsável por
-              preenchê-la.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {assignFields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="flex flex-col md:flex-row items-start md:items-end gap-4 p-4 border rounded-lg bg-slate-50/50"
-                >
-                  <div className="space-y-2 w-full md:flex-1">
-                    <Label className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" /> Planta
-                    </Label>
-                    <Controller
-                      control={form.control}
-                      name={`assignments.${index}.plant_id`}
-                      render={({ field: f }) => (
-                        <Select value={f.value} onValueChange={f.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a planta" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {plants.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {form.formState.errors.assignments?.[index]?.plant_id && (
-                      <span className="text-xs text-red-500">
-                        {form.formState.errors.assignments[index].plant_id.message}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Título</TableHead>
+                <TableHead>Frequência</TableHead>
+                <TableHead>Data Início</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    Carregando templates...
+                  </TableCell>
+                </TableRow>
+              ) : audits.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    Nenhum template cadastrado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                audits.map((audit) => (
+                  <TableRow key={audit.id} className="hover:bg-slate-50/50">
+                    <TableCell className="font-medium">
+                      {audit.title}{' '}
+                      <span className="block text-xs text-muted-foreground font-normal">
+                        {audit.type}
                       </span>
-                    )}
-                  </div>
-                  <div className="space-y-2 w-full md:flex-1">
-                    <Label className="flex items-center gap-2">
-                      <User className="h-4 w-4" /> Responsável
-                    </Label>
-                    <Controller
-                      control={form.control}
-                      name={`assignments.${index}.assignee_id`}
-                      render={({ field: f }) => (
-                        <Select value={f.value} onValueChange={f.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o responsável" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {profiles.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name} ({p.role})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {form.formState.errors.assignments?.[index]?.assignee_id && (
-                      <span className="text-xs text-red-500">
-                        {form.formState.errors.assignments[index].assignee_id.message}
-                      </span>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    onClick={() => removeAssign(index)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 mb-1 w-full md:w-auto"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => appendAssign({ plant_id: '', assignee_id: '' })}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Distribuição
-              </Button>
-              {form.formState.errors.assignments?.root && (
-                <p className="text-sm text-red-500 mt-2">
-                  {form.formState.errors.assignments.root.message}
-                </p>
+                    </TableCell>
+                    <TableCell>{audit.frequency}</TableCell>
+                    <TableCell>{new Date(audit.start_date).toLocaleDateString('pt-BR')}</TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          audit.status === 'Ativo'
+                            ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                            : 'bg-slate-100 text-slate-800 hover:bg-slate-100'
+                        }
+                      >
+                        {audit.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/auditoria-checklist/configuracao/${audit.id}`)}
+                      >
+                        <Edit2 className="w-4 h-4 text-brand-deepBlue" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-primary" />
-              Configuração de Notas
-            </CardTitle>
-            <CardDescription>
-              Defina a escala de notas, os rótulos e se uma nota baixa deve abrir uma ação corretiva
-              automática.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {scoreFields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="flex flex-col md:flex-row items-start md:items-end gap-4 p-4 border rounded-lg bg-slate-50/50"
-                >
-                  <div className="space-y-2 w-full md:w-24">
-                    <Label>Nota</Label>
-                    <Input type="number" {...form.register(`scoring_settings.${index}.score`)} />
-                    {form.formState.errors.scoring_settings?.[index]?.score && (
-                      <span className="text-xs text-red-500">
-                        {form.formState.errors.scoring_settings[index].score.message}
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-2 w-full md:flex-1">
-                    <Label>Descrição (Ex: Ruim, Excelente)</Label>
-                    <Input {...form.register(`scoring_settings.${index}.description`)} />
-                    {form.formState.errors.scoring_settings?.[index]?.description && (
-                      <span className="text-xs text-red-500">
-                        {form.formState.errors.scoring_settings[index].description.message}
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-2 flex items-center gap-2 md:mb-2 w-full md:w-auto">
-                    <Controller
-                      control={form.control}
-                      name={`scoring_settings.${index}.trigger_task`}
-                      render={({ field: f }) => (
-                        <Switch checked={f.value} onCheckedChange={f.onChange} />
-                      )}
-                    />
-                    <Label className="font-normal whitespace-nowrap">Gerar Ação Corretiva</Label>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    onClick={() => removeScore(index)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 mb-1 w-full md:w-auto"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  appendScore({
-                    score: scoreFields.length + 1,
-                    description: '',
-                    trigger_task: false,
-                  })
-                }
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Nota
-              </Button>
-              {form.formState.errors.scoring_settings?.root && (
-                <p className="text-sm text-red-500 mt-2">
-                  {form.formState.errors.scoring_settings.root.message}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CheckSquare className="h-5 w-5 text-primary" />
-              Itens do Checklist
-            </CardTitle>
-            <CardDescription>Adicione os pontos que serão avaliados na auditoria.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {actionFields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="p-4 border rounded-lg space-y-4 bg-white shadow-sm transition-all hover:border-primary/30"
-                >
-                  <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                    <div className="space-y-2 w-full md:flex-1">
-                      <Label>Pergunta / Ponto de Verificação</Label>
-                      <Textarea
-                        placeholder="Ex: Os extintores estão dentro da validade e desobstruídos?"
-                        {...form.register(`actions.${index}.title`)}
-                        className="resize-none"
-                      />
-                      {form.formState.errors.actions?.[index]?.title && (
-                        <span className="text-xs text-red-500">
-                          {form.formState.errors.actions[index].title.message}
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-2 w-full md:w-32">
-                      <Label>Peso na Nota</Label>
-                      <Input type="number" {...form.register(`actions.${index}.weight`)} />
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      type="button"
-                      onClick={() => removeAction(index)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 md:mt-8 w-full md:w-auto self-end md:self-auto"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pt-2">
-                    <div className="flex items-center gap-2">
-                      <Controller
-                        control={form.control}
-                        name={`actions.${index}.evidence_required`}
-                        render={({ field: f }) => (
-                          <Switch checked={f.value} onCheckedChange={f.onChange} />
-                        )}
-                      />
-                      <Label className="text-sm font-normal cursor-pointer">
-                        Exigir Foto/Evidência
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Controller
-                        control={form.control}
-                        name={`actions.${index}.comments_required`}
-                        render={({ field: f }) => (
-                          <Switch checked={f.value} onCheckedChange={f.onChange} />
-                        )}
-                      />
-                      <Label className="text-sm font-normal cursor-pointer">
-                        Exigir Comentário
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  appendAction({
-                    title: '',
-                    evidence_required: false,
-                    comments_required: false,
-                    weight: 1,
-                  })
-                }
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Ponto de Verificação
-              </Button>
-              {form.formState.errors.actions?.root && (
-                <p className="text-sm text-red-500 mt-2">
-                  {form.formState.errors.actions.root.message}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

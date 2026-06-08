@@ -1,7 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useAppStore } from '@/store/AppContext'
+import { useTrainingStatus } from '@/hooks/use-training-status'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -9,764 +13,291 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
-import { useMasterData } from '@/hooks/use-master-data'
-import { supabase } from '@/lib/supabase/client'
-import { useAppStore } from '@/store/AppContext'
-import { format, addMonths, isBefore, startOfDay, endOfMonth } from 'date-fns'
-import { useDashboardLogs } from './hooks/useDashboardLogs'
+import { Button } from '@/components/ui/button'
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import {
+  CalendarCheck,
   Search,
   Users,
-  Wrench,
-  Target,
-  Save,
+  AlertCircle,
   CheckCircle2,
-  XCircle,
-  Check,
-  Calendar as CalendarIcon,
   AlertTriangle,
+  Info,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Lancamentos() {
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [isNonWorkingDay, setIsNonWorkingDay] = useState(false)
-  const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
-  const [plantId, setPlantId] = useState<string>('')
-  const [selectedCompany, setSelectedCompany] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState<'staff' | 'equipment' | 'metas'>('staff')
-  const [presences, setPresences] = useState<Record<string, boolean>>({})
-  const [goalValues, setGoalValues] = useState<Record<string, number>>({})
-  const [searchTerm, setSearchTerm] = useState('')
-  const [equipmentFilter, setEquipmentFilter] = useState('all')
-  const [goalFilter, setGoalFilter] = useState('all')
-  const [isSaving, setIsSaving] = useState(false)
-
+  const { activeClient } = useAppStore()
+  const { getTrainingStatuses } = useTrainingStatus()
   const { toast } = useToast()
-  const {
-    plants,
-    employees,
-    equipment,
-    functions,
-    locations,
-    goals,
-    functionRequiredTrainings,
-    employeeTrainingRecords,
-    trainings,
-  } = useMasterData()
-  const { profile, activeClient } = useAppStore()
+
+  const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
+  const [plants, setPlants] = useState<any[]>([])
+  const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [employees, setEmployees] = useState<any[]>([])
+  const [dailyLogs, setDailyLogs] = useState<any[]>([])
+  const [trainingStatuses, setTrainingStatuses] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    if (plants.length > 0 && !plantId) {
-      setPlantId(plants[0].id)
+    if (activeClient) {
+      fetchPlants()
     }
-  }, [plants, plantId])
-
-  const availableCompanies = useMemo(() => {
-    if (!plantId || !date) return []
-    const currentRefMonth = `${date.substring(0, 7)}-01`
-    const emps = employees.filter(
-      (e) => e.plant_id === plantId && e.reference_month === currentRefMonth,
-    )
-    return Array.from(new Set(emps.map((e) => e.company_name).filter(Boolean))).sort()
-  }, [employees, plantId, date])
+  }, [activeClient])
 
   useEffect(() => {
-    if (activeTab === 'staff' && availableCompanies.length > 0) {
-      if (
-        selectedCompany &&
-        selectedCompany !== 'all' &&
-        !availableCompanies.includes(selectedCompany)
-      ) {
-        setSelectedCompany('all')
-      } else if (!selectedCompany) {
-        setSelectedCompany('all')
-      }
+    if (activeClient && date) {
+      fetchData()
     }
-  }, [availableCompanies, activeTab, selectedCompany])
+  }, [activeClient, selectedPlant, date])
 
-  const activeMonth = activeTab === 'metas' ? month : date.substring(0, 7)
-  const targetPlants = useMemo(() => plants.filter((p) => p.id === plantId), [plants, plantId])
+  const fetchPlants = async () => {
+    const { data } = await supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient?.id)
+      .order('name')
+    if (data) setPlants(data)
+  }
 
-  const { rawLogs: dashboardLogs, monthlyGoals: dashboardMonthlyGoals } = useDashboardLogs(
-    `${activeMonth}-01`,
-    format(endOfMonth(new Date(`${activeMonth}-01T00:00:00`)), 'yyyy-MM-dd'),
-    activeMonth,
-    targetPlants,
-  )
+  const fetchData = async () => {
+    setIsLoading(true)
+    const referenceMonth = date.substring(0, 7) + '-01'
 
-  useEffect(() => {
-    if (!plantId || !profile) return
+    let q = supabase
+      .from('employees')
+      .select('*, functions(name)')
+      .eq('client_id', activeClient?.id)
+      .eq('reference_month', referenceMonth)
+      .eq('status', 'Ativo')
 
-    const fetchNWD = async () => {
-      const { data } = await supabase
-        .from('plant_non_working_days')
+    if (selectedPlant !== 'all') {
+      q = q.eq('plant_id', selectedPlant)
+    }
+
+    const { data: emps } = await q
+
+    if (emps) {
+      setEmployees(emps)
+      const statuses = await getTrainingStatuses(emps)
+      setTrainingStatuses(statuses)
+
+      // Fetch logs for the specific date
+      const { data: logs } = await supabase
+        .from('daily_logs')
         .select('*')
-        .eq('plant_id', plantId)
+        .eq('client_id', activeClient?.id)
         .eq('date', date)
-        .maybeSingle()
-      setIsNonWorkingDay(!!data)
-    }
-    fetchNWD()
-  }, [date, month, plantId, activeTab, profile])
+        .eq('type', 'staff')
 
-  useEffect(() => {
-    if (activeTab === 'metas') {
-      const g: Record<string, number> = {}
-      dashboardMonthlyGoals.forEach((d) => {
-        g[d.goal_id] = Number(d.value)
-      })
-      setGoalValues(g)
+      setDailyLogs(logs || [])
+    }
+    setIsLoading(false)
+  }
+
+  const handleToggleLog = async (employeeId: string, plantId: string, currentStatus: boolean) => {
+    const existingLog = dailyLogs.find((l) => l.reference_id === employeeId)
+
+    if (existingLog) {
+      if (currentStatus) {
+        // Remove log to set false
+        await supabase.from('daily_logs').delete().eq('id', existingLog.id)
+        setDailyLogs((prev) => prev.filter((l) => l.id !== existingLog.id))
+      }
     } else {
-      const p: Record<string, boolean> = {}
-      dashboardLogs.forEach((d) => {
-        if (d.date.startsWith(date) && d.type === activeTab) {
-          p[d.reference_id] = d.status
+      if (!currentStatus) {
+        // Add log to set true
+        const newLog = {
+          client_id: activeClient?.id,
+          plant_id: plantId,
+          reference_id: employeeId,
+          type: 'staff',
+          date: date,
+          status: true,
         }
-      })
-      setPresences(p)
+        const { data, error } = await supabase.from('daily_logs').insert(newLog).select().single()
+        if (data && !error) {
+          setDailyLogs((prev) => [...prev, data])
+        } else if (error) {
+          toast({
+            title: 'Erro ao registrar presença',
+            description: error.message,
+            variant: 'destructive',
+          })
+        }
+      }
     }
-  }, [dashboardLogs, dashboardMonthlyGoals, date, activeTab])
+  }
 
-  const handleToggleNWD = async (checked: boolean) => {
-    setIsNonWorkingDay(checked)
-    if (!profile || !plantId) return
-
-    try {
-      if (checked) {
-        const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
-        const { error } = await supabase.from('plant_non_working_days').upsert(
-          {
-            client_id: targetClientId,
-            plant_id: plantId,
-            date: date,
-            description: 'Marcado via Lançamentos',
-          },
-          { onConflict: 'plant_id,date' },
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Concluído':
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Regular
+          </Badge>
         )
-        if (error) throw error
-        toast({
-          title: 'Dia marcado como não útil (Feriado/Folga)',
-          className: 'bg-amber-50 text-amber-900 border-amber-200',
-        })
-      } else {
-        const { error } = await supabase
-          .from('plant_non_working_days')
-          .delete()
-          .eq('plant_id', plantId)
-          .eq('date', date)
-        if (error) throw error
-        toast({
-          title: 'Dia marcado como útil',
-          className: 'bg-green-50 text-green-900 border-green-200',
-        })
-      }
-    } catch (error) {
-      console.error(error)
-      toast({ variant: 'destructive', title: 'Erro ao alterar status do dia' })
-      setIsNonWorkingDay(!checked)
+      case 'Pendente':
+        return (
+          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">
+            <AlertTriangle className="w-3 h-3 mr-1" /> Pendente
+          </Badge>
+        )
+      case 'Vencido':
+        return (
+          <Badge className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200">
+            <AlertCircle className="w-3 h-3 mr-1" /> Vencido
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="outline" className="text-gray-500">
+            <Info className="w-3 h-3 mr-1" /> N/A
+          </Badge>
+        )
     }
   }
 
-  const handleSave = async () => {
-    if (!profile || !plantId) return
-    setIsSaving(true)
-
-    try {
-      if (activeTab === 'metas') {
-        const activeGoals = goals.filter((g) => g.is_active)
-        const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
-        const payload = activeGoals.map((g) => ({
-          client_id: targetClientId,
-          plant_id: plantId,
-          goal_id: g.id,
-          reference_month: `${month}-01`,
-          value: goalValues[g.id] || 0,
-        }))
-
-        if (payload.length > 0) {
-          const { error } = await supabase
-            .from('monthly_goals_data')
-            .upsert(payload, { onConflict: 'plant_id,goal_id,reference_month' })
-          if (error) throw error
-          toast({
-            title: 'Metas salvas com sucesso',
-            className: 'bg-green-50 text-green-900 border-green-200',
-          })
-        }
-      } else {
-        const currentRefMonth = `${date.substring(0, 7)}-01`
-        const list =
-          activeTab === 'staff'
-            ? employees.filter(
-                (e) =>
-                  e.plant_id === plantId &&
-                  (selectedCompany === 'all' || e.company_name === selectedCompany) &&
-                  e.reference_month === currentRefMonth,
-              )
-            : equipment.filter((e) => e.plant_id === plantId)
-
-        const targetClientId = plants.find((p) => p.id === plantId)?.client_id || profile.client_id
-        const payload = list.map((item) => ({
-          client_id: targetClientId,
-          plant_id: plantId,
-          date,
-          type: activeTab,
-          reference_id: item.id,
-          status: presences[item.id] ?? false,
-        }))
-
-        if (payload.length > 0) {
-          const { error } = await supabase
-            .from('daily_logs')
-            .upsert(payload, { onConflict: 'date,type,reference_id' })
-          if (error) throw error
-          toast({
-            title: 'Lançamentos salvos com sucesso',
-            className: 'bg-green-50 text-green-900 border-green-200',
-          })
-        }
-      }
-    } catch (error) {
-      console.error(error)
-      toast({ variant: 'destructive', title: 'Erro ao salvar lançamentos' })
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const { filteredData, groupedData, summary, equipmentTypes } = useMemo(() => {
-    const searchLower = searchTerm.toLowerCase()
-
-    const currentPlantEq = equipment.filter((e) => e.plant_id === plantId)
-    const eqTypes = Array.from(new Set(currentPlantEq.map((e) => e.type).filter(Boolean)))
-
-    if (activeTab === 'staff') {
-      if (!selectedCompany) {
-        return { filteredData: [], groupedData: {}, equipmentTypes: eqTypes, summary: null }
-      }
-
-      const currentRefMonth = `${date.substring(0, 7)}-01`
-      const filtered = employees.filter(
-        (e) =>
-          e.plant_id === plantId &&
-          (selectedCompany === 'all' || e.company_name === selectedCompany) &&
-          e.reference_month === currentRefMonth &&
-          e.name.toLowerCase().includes(searchLower),
-      )
-      const grouped = filtered.reduce(
-        (acc, emp) => {
-          const funcName = functions.find((f) => f.id === emp.function_id)?.name || 'Outros'
-          if (!acc[funcName]) acc[funcName] = []
-          acc[funcName].push(emp)
-          return acc
-        },
-        {} as Record<string, typeof employees>,
-      )
-
-      const presentCount = filtered.filter((e) => presences[e.id]).length
-      return {
-        filteredData: filtered,
-        groupedData: grouped,
-        equipmentTypes: eqTypes,
-        summary: {
-          total: filtered.length,
-          present: presentCount,
-          absent: filtered.length - presentCount,
-          labels: ['total', 'presentes', 'ausentes'],
-        },
-      }
-    } else if (activeTab === 'equipment') {
-      let filtered = currentPlantEq.filter((e) => e.name.toLowerCase().includes(searchLower))
-
-      if (equipmentFilter !== 'all') {
-        filtered = filtered.filter((e) => e.type === equipmentFilter)
-      }
-
-      const grouped = filtered.reduce(
-        (acc, eq) => {
-          const groupName = eq.name || 'Outros'
-          if (!acc[groupName]) acc[groupName] = []
-          acc[groupName].push(eq)
-          return acc
-        },
-        {} as Record<string, typeof equipment>,
-      )
-
-      const availableCount = filtered.filter((e) => presences[e.id]).length
-      return {
-        filteredData: filtered,
-        groupedData: grouped,
-        equipmentTypes: eqTypes,
-        summary: {
-          total: filtered.length,
-          present: availableCount,
-          absent: filtered.length - availableCount,
-          labels: ['total', 'disponíveis', 'indisponíveis'],
-        },
-      }
-    } else {
-      let filtered = goals.filter((g) => g.is_active && g.name.toLowerCase().includes(searchLower))
-
-      if (goalFilter !== 'all') {
-        filtered = filtered.filter((g) => g.id === goalFilter)
-      }
-
-      return {
-        filteredData: filtered,
-        groupedData: { Metas: filtered },
-        equipmentTypes: eqTypes,
-        summary: null,
-      }
-    }
-  }, [
-    activeTab,
-    employees,
-    equipment,
-    goals,
-    functions,
-    plantId,
-    searchTerm,
-    presences,
-    equipmentFilter,
-    goalFilter,
-    selectedCompany,
-    date,
-  ])
-
-  const CustomCheckbox = ({
-    checked,
-    onChange,
-  }: {
-    checked: boolean
-    onChange: (v: boolean) => void
-  }) => (
-    <div
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-colors border shadow-sm shrink-0',
-        checked
-          ? 'bg-[#65a34e] border-[#65a34e]'
-          : 'bg-white border-slate-300 hover:border-[#65a34e]',
-      )}
-    >
-      {checked && <Check className="w-3.5 h-3.5 text-white" />}
-    </div>
+  const filteredEmployees = employees.filter(
+    (e) =>
+      e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e.registration_number &&
+        e.registration_number.toLowerCase().includes(searchTerm.toLowerCase())),
   )
-
-  const themeColor = activeClient?.primaryColor || 'hsl(var(--primary))'
-  const canSave = activeTab !== 'staff' || selectedCompany !== ''
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-800">Lançamento de Presença</h2>
-        <p className="text-muted-foreground mt-1">
-          Registre a presença diária de colaboradores e equipamentos
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+          <CalendarCheck className="h-8 w-8 text-brand-vividBlue" />
+          Lançamentos de Presença
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Registre a presença diária e verifique a conformidade de treinamentos.
         </p>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 sm:gap-6 flex-wrap">
-          {activeTab !== 'metas' ? (
-            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px]">
-              <label className="text-xs font-semibold text-slate-700">Data</label>
-              <div className="relative">
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="pl-10 h-11"
-                />
-                <CalendarIcon className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px]">
-              <label className="text-xs font-semibold text-slate-700">Mês de Referência</label>
-              <div className="relative">
-                <Input
-                  type="month"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className="pl-10 h-11"
-                />
-                <CalendarIcon className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px]">
-            <label className="text-xs font-semibold text-slate-700">Planta</label>
-            <Select value={plantId} onValueChange={setPlantId}>
-              <SelectTrigger className="h-11 bg-white">
-                <SelectValue placeholder="Selecione a planta" />
-              </SelectTrigger>
-              <SelectContent>
-                {plants.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {activeTab !== 'metas' && plantId && (
-            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] flex flex-col justify-end pb-1 animate-in fade-in">
-              <div className="flex items-center space-x-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm h-11">
-                <Switch id="nwd-mode" checked={isNonWorkingDay} onCheckedChange={handleToggleNWD} />
-                <Label
-                  htmlFor="nwd-mode"
-                  className="text-xs font-semibold text-slate-700 cursor-pointer leading-tight flex flex-col"
-                >
-                  Dia Não Útil{' '}
-                  <span className="text-[10px] text-slate-500 font-normal mt-0.5">
-                    Ignorar no absenteísmo
-                  </span>
-                </Label>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'staff' && (
-            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
-              <label className="text-xs font-semibold text-slate-700">
-                Empresa <span className="text-red-500">*</span>
-              </label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger className="h-11 bg-white">
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as empresas</SelectItem>
-                  {availableCompanies.map((c) => (
-                    <SelectItem key={c as string} value={c as string}>
-                      {c as string}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {activeTab === 'equipment' && (
-            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
-              <label className="text-xs font-semibold text-slate-700">Tipo de Equipamento</label>
-              <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
-                <SelectTrigger className="h-11 bg-white">
-                  <SelectValue placeholder="Todos os tipos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  {equipmentTypes.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {activeTab === 'metas' && (
-            <div className="space-y-1.5 flex-1 min-w-[200px] max-w-[300px] animate-in fade-in">
-              <label className="text-xs font-semibold text-slate-700">Filtrar Meta</label>
-              <Select value={goalFilter} onValueChange={setGoalFilter}>
-                <SelectTrigger className="h-11 bg-white">
-                  <SelectValue placeholder="Todas as metas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as metas</SelectItem>
-                  {goals
-                    .filter((g) => g.is_active)
-                    .map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 custom-scrollbar">
-        <button
-          onClick={() => {
-            setActiveTab('staff')
-            setEquipmentFilter('all')
-            setGoalFilter('all')
-          }}
-          className={cn(
-            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
-            activeTab === 'staff'
-              ? 'text-white shadow-md'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50',
-          )}
-          style={activeTab === 'staff' ? { backgroundColor: themeColor } : {}}
-        >
-          <Users className="h-4 w-4" /> Colaboradores
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('equipment')
-            setGoalFilter('all')
-          }}
-          className={cn(
-            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
-            activeTab === 'equipment'
-              ? 'text-white shadow-md'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50',
-          )}
-          style={activeTab === 'equipment' ? { backgroundColor: themeColor } : {}}
-        >
-          <Wrench className="h-4 w-4" /> Equipamentos
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('metas')
-            setEquipmentFilter('all')
-          }}
-          className={cn(
-            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all shrink-0',
-            activeTab === 'metas'
-              ? 'text-white shadow-md'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50',
-          )}
-          style={activeTab === 'metas' ? { backgroundColor: themeColor } : {}}
-        >
-          <Target className="h-4 w-4" /> Book de Metas
-        </button>
-      </div>
-
-      {plantId && (
-        <div className="space-y-4 animate-slide-up">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-            {summary ? (
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-medium text-sm">
-                  <Users className="h-4 w-4 text-slate-600" />
-                  {summary.total} {summary.labels[0]}
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-green-200 bg-green-50 text-green-700 font-medium text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  {summary.present} {summary.labels[1]}
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 font-medium text-sm">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  {summary.absent} {summary.labels[2]}
-                </div>
-              </div>
-            ) : activeTab === 'staff' && !selectedCompany ? (
-              <div className="text-sm font-medium text-slate-600 px-2">
-                Selecione uma empresa para visualizar
-              </div>
-            ) : (
-              <div className="text-sm font-medium text-slate-600 px-2">
-                Preencha os valores do mês de referência
-              </div>
-            )}
-
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || !canSave}
-              className="w-full sm:w-auto shadow-md"
-              style={{ backgroundColor: themeColor }}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving ? 'Salvando...' : 'Salvar Lançamento'}
-            </Button>
-          </div>
-
-          {activeTab !== 'metas' && (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+      <Card>
+        <CardHeader className="pb-4 border-b">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <Input
-                placeholder={`Buscar ${activeTab === 'staff' ? 'colaborador' : 'equipamento'}...`}
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full sm:w-auto bg-white"
+              />
+              <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                <SelectTrigger className="w-full sm:w-[220px] bg-white">
+                  <SelectValue placeholder="Todas as Plantas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Plantas</SelectItem>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Buscar colaborador..."
+                className="pl-9 bg-white"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-12 bg-white border-slate-200 rounded-xl shadow-sm text-base text-slate-800 placeholder:text-slate-500"
-                disabled={activeTab === 'staff' && !selectedCompany}
               />
             </div>
-          )}
-
-          <div className="space-y-6 pb-10">
-            {activeTab === 'metas' ? (
-              <div className="space-y-3">
-                {filteredData.length === 0 ? (
-                  <div className="p-8 text-center text-slate-600 bg-white rounded-xl border border-slate-200">
-                    Nenhuma meta encontrada.
-                  </div>
-                ) : (
-                  filteredData.map((goal: any) => (
-                    <div
-                      key={goal.id}
-                      className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex items-center p-4 pl-0 transition-all hover:border-slate-300"
-                    >
-                      <div
-                        className="w-1.5 self-stretch mr-4 rounded-r-full"
-                        style={{ backgroundColor: themeColor }}
-                      />
-                      <div className="flex-1 pr-4">
-                        <h4 className="text-base font-semibold text-slate-800">{goal.name}</h4>
-                        {goal.description && (
-                          <p className="text-sm text-slate-600 mt-0.5">{goal.description}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 pr-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          className="w-20 text-center font-medium shadow-sm focus-visible:ring-1 text-slate-800"
-                          value={goalValues[goal.id] === undefined ? '' : goalValues[goal.id]}
-                          onChange={(e) =>
-                            setGoalValues((prev) => ({
-                              ...prev,
-                              [goal.id]: e.target.value === '' ? 0 : Number(e.target.value),
-                            }))
-                          }
-                        />
-                        <span className="text-slate-600 font-medium">%</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : activeTab === 'staff' && !selectedCompany ? (
-              <div className="p-12 text-center text-slate-600 bg-white rounded-xl border border-slate-200">
-                Por favor, selecione uma empresa para iniciar os lançamentos.
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                {Object.keys(groupedData).length === 0 ? (
-                  <div className="p-12 text-center text-slate-600">
-                    Nenhum registro encontrado para esta busca/planta.
-                  </div>
-                ) : (
-                  Object.entries(groupedData).map(([groupName, items]: [string, any[]]) => (
-                    <div key={groupName} className="border-b border-slate-100 last:border-0">
-                      <div className="bg-slate-50/80 px-4 py-3 flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                        <h3 className="font-semibold text-slate-800 text-sm">{groupName}</h3>
-                        <span className="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
-                          {items.length}
-                        </span>
-                      </div>
-
-                      <div className="divide-y divide-slate-100">
-                        {items.map((item) => {
-                          const isPresent = presences[item.id] || false
-                          const locName = locations.find((l) => l.id === item.location_id)?.name
-
-                          let isNonCompliant = false
-                          let complianceMessage = ''
-
-                          if (activeTab === 'staff') {
-                            const empRequiredTrainings = functionRequiredTrainings.filter(
-                              (frt) => frt.function_id === item.function_id,
-                            )
-
-                            if (empRequiredTrainings.length > 0) {
-                              for (const req of empRequiredTrainings) {
-                                const record = employeeTrainingRecords.find(
-                                  (etr) =>
-                                    etr.employee_id === item.id &&
-                                    etr.training_id === req.training_id,
-                                )
-                                const training = trainings.find((t) => t.id === req.training_id)
-
-                                if (!record) {
-                                  isNonCompliant = true
-                                  complianceMessage = `Pendente: ${training?.name}`
-                                  break
-                                } else if (training?.validity_months) {
-                                  const completionDate = new Date(
-                                    record.completion_date + 'T12:00:00',
-                                  )
-                                  const expirationDate = addMonths(
-                                    completionDate,
-                                    training.validity_months,
-                                  )
-                                  if (isBefore(expirationDate, startOfDay(new Date()))) {
-                                    isNonCompliant = true
-                                    complianceMessage = `Vencido: ${training?.name}`
-                                    break
-                                  }
-                                }
-                              }
-                            }
-                          }
-
-                          return (
-                            <div
-                              key={item.id}
-                              className="px-4 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
-                            >
-                              <div className="flex items-start gap-4">
-                                <div className="mt-1">
-                                  <CustomCheckbox
-                                    checked={isPresent}
-                                    onChange={(v) =>
-                                      setPresences((prev) => ({ ...prev, [item.id]: v }))
-                                    }
-                                  />
-                                </div>
-                                <div>
-                                  <p
-                                    className={cn(
-                                      'font-medium',
-                                      isNonCompliant ? 'text-red-700' : 'text-slate-800',
-                                    )}
-                                  >
-                                    {item.name}
-                                  </p>
-                                  {activeTab === 'staff' && (
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5">
-                                      <p className="text-xs text-slate-600">
-                                        {item.company_name} -{' '}
-                                        {plants.find((p) => p.id === plantId)?.code}
-                                        {locName ? ` - ${locName}` : ''}
-                                      </p>
-                                      {isNonCompliant && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700 bg-red-50 px-1.5 py-0.5 rounded w-fit">
-                                          <AlertTriangle className="h-3 w-3" />
-                                          {complianceMessage}
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="shrink-0">
-                                {isPresent ? (
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#65a34e] text-white shadow-sm">
-                                    {activeTab === 'staff' ? 'Presente' : 'Disponível'}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-white border border-slate-300 text-slate-600">
-                                    {activeTab === 'staff' ? 'Ausente' : 'Indisponível'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow>
+                  <TableHead>Colaborador</TableHead>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Função</TableHead>
+                  <TableHead className="text-center">Treinamentos</TableHead>
+                  <TableHead className="text-right">Presença</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      Carregando colaboradores...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredEmployees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      <Users className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                      Nenhum colaborador encontrado para este filtro.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredEmployees.map((emp) => {
+                    const isPresent = dailyLogs.some((l) => l.reference_id === emp.id)
+                    const status = trainingStatuses[emp.id] || 'N/A'
+
+                    return (
+                      <TableRow key={emp.id} className="hover:bg-slate-50/50">
+                        <TableCell>
+                          <div className="font-medium text-gray-900">{emp.name}</div>
+                          {emp.registration_number && (
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {emp.registration_number}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {emp.company_name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {emp.functions?.name || '-'}
+                        </TableCell>
+                        <TableCell className="text-center">{getStatusBadge(status)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <span className="text-sm font-medium text-gray-600">
+                              {isPresent ? 'Presente' : 'Ausente'}
+                            </span>
+                            <Switch
+                              checked={isPresent}
+                              onCheckedChange={() =>
+                                handleToggleLog(emp.id, emp.plant_id, isPresent)
+                              }
+                              className={
+                                status === 'Vencido' || status === 'Pendente'
+                                  ? 'data-[state=checked]:bg-amber-500'
+                                  : ''
+                              }
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

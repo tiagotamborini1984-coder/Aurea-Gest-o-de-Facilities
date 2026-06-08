@@ -906,6 +906,7 @@ export type Database = {
           name: string
           plant_id: string
           reference_month: string
+          registration_number: string | null
           status: string
         }
         Insert: {
@@ -919,6 +920,7 @@ export type Database = {
           name: string
           plant_id: string
           reference_month?: string
+          registration_number?: string | null
           status?: string
         }
         Update: {
@@ -932,6 +934,7 @@ export type Database = {
           name?: string
           plant_id?: string
           reference_month?: string
+          registration_number?: string | null
           status?: string
         }
         Relationships: [
@@ -2991,6 +2994,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_duplicate_functions: {
+        Args: { p_client_id: string; p_dry_run?: boolean; p_plant_id?: string }
+        Returns: number
+      }
       create_package: { Args: { p_payload: Json }; Returns: Json }
       get_maintenance_public_options: {
         Args: { p_slug: string }
@@ -3349,6 +3356,7 @@ export const Constants = {
 //   company_id: uuid (nullable)
 //   reference_month: date (not null, default: date_trunc('month'::text, (CURRENT_DATE)::timestamp with time zone))
 //   status: text (not null, default: 'Ativo'::text)
+//   registration_number: text (nullable)
 // Table: equipment
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -4293,6 +4301,81 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION cleanup_duplicate_functions(uuid, uuid, boolean)
+//   CREATE OR REPLACE FUNCTION public.cleanup_duplicate_functions(p_client_id uuid, p_plant_id uuid DEFAULT NULL::uuid, p_dry_run boolean DEFAULT true)
+//    RETURNS integer
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_duplicate_count integer := 0;
+//     r RECORD;
+//     v_primary_id UUID;
+//     v_dup_ids UUID[];
+//   BEGIN
+//     -- Iterate over sets of functions with identical names (case-insensitive, trimmed)
+//     FOR r IN (
+//       SELECT lower(trim(f.name)) as func_name, array_agg(f.id ORDER BY f.created_at ASC) as all_ids
+//       FROM public.functions f
+//       WHERE f.client_id = p_client_id
+//       GROUP BY lower(trim(f.name))
+//       HAVING count(*) > 1
+//     ) LOOP
+//
+//       -- If a plant is specified, we only process this set if at least one of these duplicate functions
+//       -- is actually used by an employee or headcount in that specific plant.
+//       IF p_plant_id IS NOT NULL THEN
+//         IF NOT EXISTS (
+//           SELECT 1 FROM public.employees WHERE function_id = ANY(r.all_ids) AND plant_id = p_plant_id
+//           UNION ALL
+//           SELECT 1 FROM public.contracted_headcount WHERE function_id = ANY(r.all_ids) AND plant_id = p_plant_id
+//         ) THEN
+//           CONTINUE;
+//         END IF;
+//       END IF;
+//
+//       -- The primary is the first one (oldest created_at)
+//       v_primary_id := r.all_ids[1];
+//       -- The rest are duplicates to be merged and deleted
+//       v_dup_ids := r.all_ids[2:array_length(r.all_ids, 1)];
+//
+//       v_duplicate_count := v_duplicate_count + array_length(v_dup_ids, 1);
+//
+//       -- If not a dry run, perform the merge operations
+//       IF NOT p_dry_run THEN
+//         -- 1. Re-map employees
+//         UPDATE public.employees
+//         SET function_id = v_primary_id
+//         WHERE function_id = ANY(v_dup_ids);
+//
+//         -- 2. Re-map contracted_headcount
+//         UPDATE public.contracted_headcount
+//         SET function_id = v_primary_id
+//         WHERE function_id = ANY(v_dup_ids);
+//
+//         -- 3. Re-map org_collaborators
+//         UPDATE public.org_collaborators
+//         SET function_id = v_primary_id
+//         WHERE function_id = ANY(v_dup_ids);
+//
+//         -- 4. Re-map function_required_trainings (safely ignore duplicates)
+//         INSERT INTO public.function_required_trainings (client_id, function_id, training_id)
+//         SELECT client_id, v_primary_id, training_id
+//         FROM public.function_required_trainings
+//         WHERE function_id = ANY(v_dup_ids)
+//         ON CONFLICT (function_id, training_id) DO NOTHING;
+//
+//         DELETE FROM public.function_required_trainings WHERE function_id = ANY(v_dup_ids);
+//
+//         -- 5. Delete the duplicate function records
+//         DELETE FROM public.functions WHERE id = ANY(v_dup_ids);
+//       END IF;
+//     END LOOP;
+//
+//     RETURN v_duplicate_count;
+//   END;
+//   $function$
+//
 // FUNCTION create_package(jsonb)
 //   CREATE OR REPLACE FUNCTION public.create_package(p_payload jsonb)
 //    RETURNS jsonb
@@ -4526,6 +4609,38 @@ export const Constants = {
 //     END IF;
 //
 //     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION handle_employee_registration_number()
+//   CREATE OR REPLACE FUNCTION public.handle_employee_registration_number()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_seq INT;
+//   BEGIN
+//       IF NEW.registration_number IS NULL OR NEW.registration_number = '' THEN
+//           -- Try to inherit from an existing record of the same person
+//           SELECT registration_number INTO NEW.registration_number
+//           FROM public.employees
+//           WHERE client_id = NEW.client_id
+//             AND lower(trim(name)) = lower(trim(NEW.name))
+//             AND lower(trim(company_name)) = lower(trim(NEW.company_name))
+//             AND registration_number IS NOT NULL
+//           LIMIT 1;
+//
+//           -- If none found, generate a new sequence
+//           IF NEW.registration_number IS NULL THEN
+//               SELECT COALESCE(MAX(SUBSTRING(registration_number FROM 'REG-([0-9]+)')::INT), 0) + 1 INTO v_seq
+//               FROM public.employees
+//               WHERE client_id = NEW.client_id AND registration_number LIKE 'REG-%';
+//
+//               NEW.registration_number := 'REG-' || LPAD(v_seq::TEXT, 5, '0');
+//           END IF;
+//       END IF;
+//       RETURN NEW;
 //   END;
 //   $function$
 //
@@ -5030,6 +5145,7 @@ export const Constants = {
 //   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: employees
 //   audit_employees: CREATE TRIGGER audit_employees AFTER INSERT OR DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+//   on_employee_insert: CREATE TRIGGER on_employee_insert BEFORE INSERT ON public.employees FOR EACH ROW EXECUTE FUNCTION handle_employee_registration_number()
 //   prevent_employee_deletion_with_logs_trigger: CREATE TRIGGER prevent_employee_deletion_with_logs_trigger BEFORE DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION prevent_employee_deletion_with_logs()
 // Table: equipment
 //   audit_equipment: CREATE TRIGGER audit_equipment AFTER INSERT OR DELETE ON public.equipment FOR EACH ROW EXECUTE FUNCTION log_audit_action()
@@ -5070,6 +5186,8 @@ export const Constants = {
 //   CREATE UNIQUE INDEX employee_training_records_employee_id_training_id_key ON public.employee_training_records USING btree (employee_id, training_id)
 // Table: function_required_trainings
 //   CREATE UNIQUE INDEX function_required_trainings_function_id_training_id_key ON public.function_required_trainings USING btree (function_id, training_id)
+// Table: functions
+//   CREATE INDEX idx_functions_name_client ON public.functions USING btree (lower(TRIM(BOTH FROM name)), client_id)
 // Table: locker_occupations
 //   CREATE UNIQUE INDEX one_active_locker_per_collab ON public.locker_occupations USING btree (collaborator_id) WHERE (status = 'Ativo'::text)
 // Table: maintenance_plan_checklist_items
