@@ -800,6 +800,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          is_published: boolean
           plant_id: string
           reference_id: string
           status: boolean
@@ -810,6 +811,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          is_published?: boolean
           plant_id: string
           reference_id: string
           status?: boolean
@@ -820,6 +822,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          is_published?: boolean
           plant_id?: string
           reference_id?: string
           status?: boolean
@@ -3340,6 +3343,7 @@ export const Constants = {
 //   reference_id: uuid (not null)
 //   status: boolean (not null, default: false)
 //   created_at: timestamp with time zone (not null, default: now())
+//   is_published: boolean (not null, default: false)
 // Table: employee_training_records
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
