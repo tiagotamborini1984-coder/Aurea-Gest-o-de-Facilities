@@ -4923,6 +4923,27 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION prevent_duplicate_employee()
+//   CREATE OR REPLACE FUNCTION public.prevent_duplicate_employee()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     IF EXISTS (
+//       SELECT 1 FROM public.employees
+//       WHERE client_id = NEW.client_id
+//         AND lower(trim(name)) = lower(trim(NEW.name))
+//         AND lower(trim(company_name)) = lower(trim(NEW.company_name))
+//         AND reference_month = NEW.reference_month
+//         AND id != NEW.id
+//     ) THEN
+//       RAISE EXCEPTION 'Um colaborador com o mesmo nome e empresa já existe neste mês de referência.';
+//     END IF;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION prevent_employee_deletion_with_logs()
 //   CREATE OR REPLACE FUNCTION public.prevent_employee_deletion_with_logs()
 //    RETURNS trigger
@@ -5232,6 +5253,7 @@ export const Constants = {
 //   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: employees
 //   audit_employees: CREATE TRIGGER audit_employees AFTER INSERT OR DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+//   check_duplicate_employee: CREATE TRIGGER check_duplicate_employee BEFORE INSERT OR UPDATE ON public.employees FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_employee()
 //   on_employee_insert: CREATE TRIGGER on_employee_insert BEFORE INSERT ON public.employees FOR EACH ROW EXECUTE FUNCTION handle_employee_registration_number()
 //   prevent_employee_deletion_with_logs_trigger: CREATE TRIGGER prevent_employee_deletion_with_logs_trigger BEFORE DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION prevent_employee_deletion_with_logs()
 // Table: equipment

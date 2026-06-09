@@ -1,24 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { format, parseISO, subDays, addDays } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWeekend } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import {
-  CalendarIcon,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Save,
-  Send,
-  Users,
-  Wrench,
-  Building2,
-  AlertTriangle,
-  FileEdit,
-} from 'lucide-react'
-import { useAppStore } from '@/store/AppContext'
-import { supabase } from '@/lib/supabase/client'
-import { useToast } from '@/hooks/use-toast'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Check, Building2, Info, Loader2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -26,516 +12,500 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
+import { TrainingStatusCell } from '@/components/gestao-terceiros/TrainingStatusCell'
+import { useTrainingStatus } from '@/hooks/use-training-status'
 import { cn } from '@/lib/utils'
 
 export default function Lancamentos() {
-  const { activeClient, profile } = useAppStore()
   const { toast } = useToast()
+  const { getTrainingStatuses } = useTrainingStatus()
 
-  const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
-  const [selectedPlant, setSelectedPlant] = useState<string>('')
+  const [referenceMonth, setReferenceMonth] = useState<string>(format(new Date(), 'yyyy-MM'))
   const [plants, setPlants] = useState<any[]>([])
+  const [selectedPlant, setSelectedPlant] = useState<string>('')
 
   const [employees, setEmployees] = useState<any[]>([])
-  const [equipments, setEquipments] = useState<any[]>([])
-
-  const [logs, setLogs] = useState<Record<string, boolean>>({})
-  const [isNonWorkingDay, setIsNonWorkingDay] = useState(false)
-  const [isPublished, setIsPublished] = useState(false)
+  const [equipment, setEquipment] = useState<any[]>([])
+  const [dailyLogs, setDailyLogs] = useState<any[]>([])
+  const [nonWorkingDays, setNonWorkingDays] = useState<any[]>([])
+  const [trainingStatuses, setTrainingStatuses] = useState<any>({ statusMap: {}, detailsMap: {} })
 
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  const isPlantAuthorized = (plantId: string) => {
-    if (profile?.role === 'Master' || profile?.role === 'Administrador') return true
-    const authPlants = profile?.authorized_plants as string[] | undefined
-    return authPlants ? authPlants.includes(plantId) : false
-  }
+  const [activeTab, setActiveTab] = useState('colaboradores')
 
   useEffect(() => {
-    if (!activeClient?.id) return
-    supabase
-      .from('plants')
-      .select('id, name')
-      .eq('client_id', activeClient.id)
-      .order('name')
-      .then(({ data }) => {
-        const authorized = data?.filter((p) => isPlantAuthorized(p.id)) || []
-        setPlants(authorized)
-        if (authorized.length > 0 && !selectedPlant) {
-          setSelectedPlant(authorized[0].id)
-        }
-      })
-  }, [activeClient?.id, profile])
+    const fetchPlants = async () => {
+      const { data } = await supabase.from('plants').select('id, name').order('name')
+      if (data && data.length > 0) {
+        setPlants(data)
+        setSelectedPlant(data[0].id)
+      }
+    }
+    fetchPlants()
+  }, [])
 
   useEffect(() => {
-    if (!selectedPlant || !date) return
-    loadData()
-  }, [selectedPlant, date])
+    if (selectedPlant && referenceMonth) {
+      loadData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlant, referenceMonth])
 
   const loadData = async () => {
     setLoading(true)
+    try {
+      const monthStart = `${referenceMonth}-01`
+      const dateStart = startOfMonth(parseISO(monthStart))
+      const dateEnd = endOfMonth(dateStart)
 
-    // 1. Fetch Non-Working Day Status
-    const { data: nwd } = await supabase
-      .from('plant_non_working_days')
-      .select('id')
-      .eq('plant_id', selectedPlant)
-      .eq('date', date)
-    setIsNonWorkingDay(nwd && nwd.length > 0 ? true : false)
-
-    // 2. Fetch Active Employees and Equipment
-    const [empRes, eqRes] = await Promise.all([
-      supabase
+      // Colaboradores (Filter purely by reference_month to deduplicate historical records)
+      const { data: emps } = await supabase
         .from('employees')
-        .select('id, name, company_name, function_id')
+        .select('id, name, company_name, function_id, registration_number, reference_month')
         .eq('plant_id', selectedPlant)
         .eq('status', 'Ativo')
-        .order('name'),
-      supabase
+        .eq('reference_month', monthStart)
+        .order('name')
+
+      if (emps) {
+        setEmployees(emps)
+        const statuses = await getTrainingStatuses(emps, true)
+        setTrainingStatuses(statuses || { statusMap: {}, detailsMap: {} })
+      } else {
+        setEmployees([])
+      }
+
+      // Equipamentos
+      const { data: eqs } = await supabase
         .from('equipment')
-        .select('id, name, type')
+        .select('id, name, type, quantity')
         .eq('plant_id', selectedPlant)
         .eq('status', 'Ativo')
-        .order('name'),
-    ])
-    setEmployees(empRes.data || [])
-    setEquipments(eqRes.data || [])
+        .order('name')
+      setEquipment(eqs || [])
 
-    // 3. Fetch Existing Logs
-    const { data: logRes } = await supabase
-      .from('daily_logs')
-      .select('reference_id, status, type, is_published')
-      .eq('plant_id', selectedPlant)
-      .eq('date', date)
+      // Diário de Lançamentos
+      const { data: logs } = await supabase
+        .from('daily_logs')
+        .select('*')
+        .eq('plant_id', selectedPlant)
+        .gte('date', format(dateStart, 'yyyy-MM-dd'))
+        .lte('date', format(dateEnd, 'yyyy-MM-dd'))
+      setDailyLogs(logs || [])
 
-    const newLogs: Record<string, boolean> = {}
-    let published = false
-    if (logRes && logRes.length > 0) {
-      logRes.forEach((l) => {
-        newLogs[l.reference_id] = l.status
-        // Consider day published if any entry is marked as published
-        if (l.is_published) published = true
-      })
+      // Dias Não Úteis
+      const { data: nwDays } = await supabase
+        .from('plant_non_working_days')
+        .select('*')
+        .eq('plant_id', selectedPlant)
+        .gte('date', format(dateStart, 'yyyy-MM-dd'))
+        .lte('date', format(dateEnd, 'yyyy-MM-dd'))
+      setNonWorkingDays(nwDays || [])
+    } catch (error) {
+      console.error(error)
+      toast({ title: 'Erro ao carregar dados', variant: 'destructive' })
+    } finally {
+      setLoading(false)
     }
-    setLogs(newLogs)
-    setIsPublished(published)
-    setLoading(false)
   }
 
-  const handleSave = async (publish: boolean) => {
-    if (!activeClient?.id || !selectedPlant) return
-    setSaving(true)
+  const handleToggleLog = async (
+    type: 'staff' | 'equipment',
+    referenceId: string,
+    date: string,
+    currentStatus: boolean,
+  ) => {
+    const { data: clientData } = await supabase
+      .from('plants')
+      .select('client_id')
+      .eq('id', selectedPlant)
+      .single()
+    const clientId = clientData?.client_id
 
-    // Manage Non-Working Day
-    if (isNonWorkingDay) {
-      await supabase.from('plant_non_working_days').upsert(
-        {
-          client_id: activeClient.id,
-          plant_id: selectedPlant,
-          date: date,
-          description: 'Feriado / Dia não útil',
-        },
-        { onConflict: 'plant_id, date' },
-      )
+    if (!clientId) return
+
+    const existingLog = dailyLogs.find(
+      (l) => l.type === type && l.reference_id === referenceId && l.date === date,
+    )
+    const newStatus = !currentStatus
+
+    if (existingLog) {
+      const { error } = await supabase
+        .from('daily_logs')
+        .update({ status: newStatus })
+        .eq('id', existingLog.id)
+
+      if (!error) {
+        setDailyLogs((prev) =>
+          prev.map((l) => (l.id === existingLog.id ? { ...l, status: newStatus } : l)),
+        )
+      }
     } else {
-      await supabase
-        .from('plant_non_working_days')
-        .delete()
-        .eq('plant_id', selectedPlant)
-        .eq('date', date)
-    }
+      const { data, error } = await supabase
+        .from('daily_logs')
+        .insert({
+          client_id: clientId,
+          plant_id: selectedPlant,
+          type,
+          reference_id: referenceId,
+          date,
+          status: newStatus,
+          is_published: false,
+        })
+        .select()
+        .single()
 
-    // Prepare upsert payload
-    const payload = []
-
-    employees.forEach((emp) => {
-      payload.push({
-        client_id: activeClient.id,
-        plant_id: selectedPlant,
-        date: date,
-        type: 'staff',
-        reference_id: emp.id,
-        status: !!logs[emp.id],
-        is_published: publish,
-      })
-    })
-
-    equipments.forEach((eq) => {
-      payload.push({
-        client_id: activeClient.id,
-        plant_id: selectedPlant,
-        date: date,
-        type: 'equipment',
-        reference_id: eq.id,
-        status: !!logs[eq.id],
-        is_published: publish,
-      })
-    })
-
-    if (payload.length > 0) {
-      const { error } = await supabase.from('daily_logs').upsert(payload as any, {
-        onConflict: 'date, type, reference_id',
-      })
-      if (error) {
-        toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-        setSaving(false)
-        return
+      if (!error && data) {
+        setDailyLogs((prev) => [...prev, data])
       }
     }
-
-    setIsPublished(publish)
-    toast({
-      title: publish ? 'Lançamentos publicados com sucesso!' : 'Rascunho salvo com sucesso!',
-      className: publish ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : '',
-    })
-    setSaving(false)
   }
 
-  const markAll = (type: 'staff' | 'equipment', val: boolean) => {
-    const newLogs = { ...logs }
-    if (type === 'staff') {
-      employees.forEach((e) => {
-        newLogs[e.id] = val
-      })
+  const toggleNonWorkingDay = async (date: string) => {
+    const { data: clientData } = await supabase
+      .from('plants')
+      .select('client_id')
+      .eq('id', selectedPlant)
+      .single()
+    const clientId = clientData?.client_id
+    if (!clientId) return
+
+    const existing = nonWorkingDays.find((d) => d.date === date)
+    if (existing) {
+      const { error } = await supabase.from('plant_non_working_days').delete().eq('id', existing.id)
+      if (!error) {
+        setNonWorkingDays((prev) => prev.filter((d) => d.id !== existing.id))
+      }
     } else {
-      equipments.forEach((e) => {
-        newLogs[e.id] = val
-      })
+      const { data, error } = await supabase
+        .from('plant_non_working_days')
+        .insert({
+          client_id: clientId,
+          plant_id: selectedPlant,
+          date,
+          description: 'Dia Não Útil',
+        })
+        .select()
+        .single()
+      if (!error && data) {
+        setNonWorkingDays((prev) => [...prev, data])
+      }
     }
-    setLogs(newLogs)
   }
 
-  // Group Employees by Company
-  const groupedEmployees = useMemo(() => {
-    return employees.reduce(
-      (acc, emp) => {
-        const comp = emp.company_name || 'Sem Empresa'
-        if (!acc[comp]) acc[comp] = []
-        acc[comp].push(emp)
-        return acc
-      },
-      {} as Record<string, any[]>,
-    )
-  }, [employees])
-
-  // Group Equipment by Type
-  const groupedEquipments = useMemo(() => {
-    return equipments.reduce(
-      (acc, eq) => {
-        const t = eq.type || 'Geral'
-        if (!acc[t]) acc[t] = []
-        acc[t].push(eq)
-        return acc
-      },
-      {} as Record<string, any[]>,
-    )
-  }, [equipments])
-
-  const handlePrevDay = () => setDate((prev) => format(subDays(parseISO(prev), 1), 'yyyy-MM-dd'))
-  const handleNextDay = () => setDate((prev) => format(addDays(parseISO(prev), 1), 'yyyy-MM-dd'))
-
-  const formattedDate = format(parseISO(date), "dd 'de' MMMM, yyyy", { locale: ptBR })
+  const daysInMonth = useMemo(() => {
+    if (!referenceMonth) return []
+    const monthStart = `${referenceMonth}-01`
+    const dateStart = startOfMonth(parseISO(monthStart))
+    const dateEnd = endOfMonth(dateStart)
+    return eachDayOfInterval({ start: dateStart, end: dateEnd })
+  }, [referenceMonth])
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6 animate-fade-in-up">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-[1400px] mx-auto space-y-6 pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-            <FileEdit className="h-8 w-8 text-brand-vividBlue" />
-            Lançamentos Operacionais
-          </h1>
-          <p className="text-slate-500 mt-2 text-base">
-            Gerencie o apontamento diário de presença do efetivo e utilização de equipamentos.
+          <h2 className="text-3xl font-bold tracking-tight text-[#0F4C81]">Lançamentos</h2>
+          <p className="text-muted-foreground mt-1">
+            Gerencie a presença de terceiros e equipamentos mês a mês.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm w-full md:w-auto">
-          <Building2 className="h-5 w-5 text-slate-400 ml-2 shrink-0" />
-          <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-            <SelectTrigger className="w-full md:w-[250px] border-0 shadow-none focus:ring-0 text-base h-10 bg-transparent">
-              <SelectValue placeholder="Selecione uma planta..." />
-            </SelectTrigger>
-            <SelectContent>
-              {plants.map((p) => (
-                <SelectItem key={p.id} value={p.id} className="text-base py-2">
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex items-center gap-2 bg-white border rounded-md px-3 py-1 shadow-sm">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+              <SelectTrigger className="w-[200px] border-0 bg-transparent focus:ring-0 shadow-none h-8 p-0 text-sm">
+                <SelectValue placeholder="Selecione a planta" />
+              </SelectTrigger>
+              <SelectContent>
+                {plants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Input
+            type="month"
+            value={referenceMonth}
+            onChange={(e) => setReferenceMonth(e.target.value)}
+            className="w-[180px] shadow-sm"
+          />
         </div>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="pb-5 border-b bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
-              <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-9 w-9">
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <div className="flex items-center px-4 font-medium text-slate-700 min-w-[180px] justify-center gap-2">
-                <CalendarIcon className="h-4 w-4 text-brand-vividBlue" />
-                <span className="capitalize">{formattedDate}</span>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleNextDay} className="h-9 w-9">
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {isPublished && (
-              <Badge
-                variant="default"
-                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium"
-              >
-                Publicado
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-slate-200 shadow-sm">
-            <Label
-              htmlFor="nwd-toggle"
-              className="text-base font-medium text-slate-700 cursor-pointer"
-            >
-              Dia Não Útil
-            </Label>
-            <Switch
-              id="nwd-toggle"
-              checked={isNonWorkingDay}
-              onCheckedChange={setIsNonWorkingDay}
-              className="data-[state=checked]:bg-amber-500"
-            />
-          </div>
+      <Card className="border-t-4 border-t-[#2B95D6] shadow-md">
+        <CardHeader className="pb-3">
+          <CardTitle>Diário de Frequência</CardTitle>
+          <CardDescription>
+            Mês de Referência:{' '}
+            {format(parseISO(`${referenceMonth}-01`), 'MMMM yyyy', { locale: ptBR })}
+          </CardDescription>
         </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <TabsList className="bg-slate-100 p-1">
+                <TabsTrigger
+                  value="colaboradores"
+                  className="data-[state=active]:bg-white data-[state=active]:text-[#0F4C81] data-[state=active]:shadow-sm"
+                >
+                  Colaboradores
+                </TabsTrigger>
+                <TabsTrigger
+                  value="equipamentos"
+                  className="data-[state=active]:bg-white data-[state=active]:text-[#0F4C81] data-[state=active]:shadow-sm"
+                >
+                  Equipamentos
+                </TabsTrigger>
+              </TabsList>
 
-        <CardContent className="p-6">
-          {!selectedPlant ? (
-            <div className="py-20 text-center text-slate-500">
-              <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-lg">Selecione uma planta para carregar os apontamentos.</p>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-slate-50 px-3 py-1.5 rounded-full border">
+                <Info className="h-4 w-4 text-blue-500" />
+                <span>
+                  Clique no cabeçalho do dia para alternar <strong>Dia Não Útil</strong>.
+                </span>
+              </div>
             </div>
-          ) : loading ? (
-            <div className="py-20 flex justify-center">
-              <Loader2 className="h-10 w-10 animate-spin text-brand-vividBlue" />
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {isNonWorkingDay && (
-                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md flex items-start shadow-sm mb-6 animate-fade-in">
-                  <AlertTriangle className="h-6 w-6 text-amber-600 mr-3 mt-0.5 shrink-0" />
-                  <div>
-                    <h3 className="text-amber-900 font-bold text-base">
-                      Dia marcado como Não Útil
-                    </h3>
-                    <p className="text-amber-800 text-sm mt-1">
-                      Você ainda pode realizar apontamentos (ex: equipes de plantão), mas os
-                      indicadores do dashboard irão ignorar o efetivo total esperado para este dia.
-                    </p>
-                  </div>
-                </div>
-              )}
 
-              <Tabs defaultValue="efetivo" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 max-w-[400px] h-12">
-                  <TabsTrigger
-                    value="efetivo"
-                    className="text-base h-10 data-[state=active]:bg-brand-vividBlue data-[state=active]:text-white transition-all"
-                  >
-                    <Users className="w-4 h-4 mr-2" /> Efetivo ({employees.length})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="equipamentos"
-                    className="text-base h-10 data-[state=active]:bg-brand-vividBlue data-[state=active]:text-white transition-all"
-                  >
-                    <Wrench className="w-4 h-4 mr-2" /> Equipamentos ({equipments.length})
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* EFETIVO TAB */}
-                <TabsContent value="efetivo" className="mt-6 space-y-6 animate-fade-in">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => markAll('staff', true)}
-                      className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
-                    >
-                      Marcar Todos
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => markAll('staff', false)}
-                      className="text-slate-600"
-                    >
-                      Desmarcar Todos
-                    </Button>
-                  </div>
-
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin mb-4 text-[#2B95D6]" />
+                <p>Carregando dados da planta...</p>
+              </div>
+            ) : (
+              <>
+                <TabsContent value="colaboradores" className="m-0 focus-visible:outline-none">
                   {employees.length === 0 ? (
-                    <div className="py-10 text-center text-slate-500 border rounded-lg bg-slate-50">
-                      <p>Nenhum colaborador ativo encontrado nesta planta.</p>
+                    <div className="text-center py-16 border rounded-lg bg-slate-50/50">
+                      <p className="text-muted-foreground">
+                        Nenhum colaborador ativo encontrado para o mês de{' '}
+                        {format(parseISO(`${referenceMonth}-01`), 'MMMM/yyyy', { locale: ptBR })}.
+                      </p>
                     </div>
                   ) : (
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                      {Object.entries(groupedEmployees).map(([company, emps]) => (
-                        <div
-                          key={company}
-                          className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm flex flex-col"
-                        >
-                          <div className="bg-slate-100/80 px-4 py-3 border-b flex justify-between items-center">
-                            <span
-                              className="font-semibold text-slate-800 text-[15px] truncate pr-2"
-                              title={company}
-                            >
-                              {company}
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="bg-white text-slate-600 font-medium border border-slate-200"
-                            >
-                              {emps.filter((e) => logs[e.id]).length} / {emps.length}
-                            </Badge>
-                          </div>
-                          <div className="divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[400px]">
-                            {emps.map((emp) => (
-                              <label
-                                key={emp.id}
-                                className="flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 cursor-pointer transition-colors group"
-                              >
-                                <div className="flex flex-col pr-4">
-                                  <span className="font-medium text-slate-700 text-sm group-hover:text-brand-vividBlue transition-colors">
-                                    {emp.name}
-                                  </span>
+                    <div className="rounded-lg border overflow-x-auto bg-white max-h-[60vh] overflow-y-auto relative shadow-sm">
+                      <Table className="w-max min-w-full border-collapse">
+                        <TableHeader className="sticky top-0 z-30 bg-slate-50 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                          <TableRow className="border-b">
+                            <TableHead className="min-w-[220px] sticky left-0 z-40 bg-slate-50 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                              Colaborador
+                            </TableHead>
+                            <TableHead className="min-w-[150px] border-r">Empresa</TableHead>
+                            <TableHead className="min-w-[140px] border-r text-center">
+                              Treinamentos
+                            </TableHead>
+                            {daysInMonth.map((day) => {
+                              const dateStr = format(day, 'yyyy-MM-dd')
+                              const isNW = nonWorkingDays.some((d) => d.date === dateStr)
+                              const isWknd = isWeekend(day)
+                              return (
+                                <TableHead
+                                  key={dateStr}
+                                  className={cn(
+                                    'text-center px-1 min-w-[44px] cursor-pointer hover:bg-slate-200 transition-colors border-r select-none',
+                                    isNW || isWknd
+                                      ? 'bg-slate-100 text-slate-500'
+                                      : 'text-slate-700',
+                                  )}
+                                  onClick={() => toggleNonWorkingDay(dateStr)}
+                                  title={isNW ? 'Remover Dia Não Útil' : 'Marcar como Dia Não Útil'}
+                                >
+                                  <div className="flex flex-col items-center justify-center gap-0.5">
+                                    <span className="text-[10px] uppercase font-medium">
+                                      {format(day, 'E', { locale: ptBR }).substring(0, 3)}
+                                    </span>
+                                    <span className="font-semibold text-sm">
+                                      {format(day, 'd')}
+                                    </span>
+                                  </div>
+                                </TableHead>
+                              )
+                            })}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {employees.map((emp) => (
+                            <TableRow key={emp.id} className="hover:bg-slate-50/50 group">
+                              <TableCell className="min-w-[220px] sticky left-0 z-20 bg-white group-hover:bg-slate-50/50 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] font-medium text-sm">
+                                <div className="truncate max-w-[200px]" title={emp.name}>
+                                  {emp.name}
                                 </div>
-                                <Checkbox
-                                  checked={!!logs[emp.id]}
-                                  onCheckedChange={(c) =>
-                                    setLogs((prev) => ({ ...prev, [emp.id]: !!c }))
-                                  }
-                                  className="h-5 w-5 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                              </TableCell>
+                              <TableCell className="min-w-[150px] border-r text-xs text-muted-foreground">
+                                <div className="truncate max-w-[130px]" title={emp.company_name}>
+                                  {emp.company_name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="min-w-[140px] border-r text-center">
+                                <TrainingStatusCell
+                                  employeeName={emp.name}
+                                  statusData={{
+                                    status: trainingStatuses.statusMap?.[emp.id] || 'N/A',
+                                    details: trainingStatuses.detailsMap?.[emp.id] || [],
+                                  }}
                                 />
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                              </TableCell>
+                              {daysInMonth.map((day) => {
+                                const dateStr = format(day, 'yyyy-MM-dd')
+                                const isNW = nonWorkingDays.some((d) => d.date === dateStr)
+                                const isWknd = isWeekend(day)
+                                const log = dailyLogs.find(
+                                  (l) =>
+                                    l.type === 'staff' &&
+                                    l.reference_id === emp.id &&
+                                    l.date === dateStr,
+                                )
+
+                                return (
+                                  <TableCell
+                                    key={dateStr}
+                                    className={cn(
+                                      'text-center p-0 border-r',
+                                      isNW || isWknd ? 'bg-slate-50' : '',
+                                    )}
+                                  >
+                                    <button
+                                      onClick={() =>
+                                        handleToggleLog('staff', emp.id, dateStr, !!log?.status)
+                                      }
+                                      className="w-full h-full min-h-[44px] flex items-center justify-center hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      disabled={isNW}
+                                      title={isNW ? 'Dia não útil' : 'Marcar presença'}
+                                    >
+                                      {log?.status && (
+                                        <Check className="h-5 w-5 text-emerald-500 drop-shadow-sm" />
+                                      )}
+                                    </button>
+                                  </TableCell>
+                                )
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </TabsContent>
 
-                {/* EQUIPAMENTOS TAB */}
-                <TabsContent value="equipamentos" className="mt-6 space-y-6 animate-fade-in">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => markAll('equipment', true)}
-                      className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
-                    >
-                      Marcar Todos
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => markAll('equipment', false)}
-                      className="text-slate-600"
-                    >
-                      Desmarcar Todos
-                    </Button>
-                  </div>
-
-                  {equipments.length === 0 ? (
-                    <div className="py-10 text-center text-slate-500 border rounded-lg bg-slate-50">
-                      <p>Nenhum equipamento ativo encontrado nesta planta.</p>
+                <TabsContent value="equipamentos" className="m-0 focus-visible:outline-none">
+                  {equipment.length === 0 ? (
+                    <div className="text-center py-16 border rounded-lg bg-slate-50/50">
+                      <p className="text-muted-foreground">
+                        Nenhum equipamento ativo cadastrado na planta selecionada.
+                      </p>
                     </div>
                   ) : (
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                      {Object.entries(groupedEquipments).map(([type, eqs]) => (
-                        <div
-                          key={type}
-                          className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm flex flex-col"
-                        >
-                          <div className="bg-slate-100/80 px-4 py-3 border-b flex justify-between items-center">
-                            <span
-                              className="font-semibold text-slate-800 text-[15px] truncate pr-2"
-                              title={type}
-                            >
-                              {type}
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="bg-white text-slate-600 font-medium border border-slate-200"
-                            >
-                              {eqs.filter((e) => logs[e.id]).length} / {eqs.length}
-                            </Badge>
-                          </div>
-                          <div className="divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[400px]">
-                            {eqs.map((eq) => (
-                              <label
-                                key={eq.id}
-                                className="flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 cursor-pointer transition-colors group"
-                              >
-                                <div className="flex flex-col pr-4">
-                                  <span className="font-medium text-slate-700 text-sm group-hover:text-brand-vividBlue transition-colors">
-                                    {eq.name}
-                                  </span>
+                    <div className="rounded-lg border overflow-x-auto bg-white max-h-[60vh] overflow-y-auto relative shadow-sm">
+                      <Table className="w-max min-w-full border-collapse">
+                        <TableHeader className="sticky top-0 z-30 bg-slate-50 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                          <TableRow className="border-b">
+                            <TableHead className="min-w-[220px] sticky left-0 z-40 bg-slate-50 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                              Equipamento
+                            </TableHead>
+                            <TableHead className="min-w-[150px] border-r">Tipo</TableHead>
+                            <TableHead className="min-w-[80px] border-r text-center">
+                              Qtd.
+                            </TableHead>
+                            {daysInMonth.map((day) => {
+                              const dateStr = format(day, 'yyyy-MM-dd')
+                              const isNW = nonWorkingDays.some((d) => d.date === dateStr)
+                              const isWknd = isWeekend(day)
+                              return (
+                                <TableHead
+                                  key={dateStr}
+                                  className={cn(
+                                    'text-center px-1 min-w-[44px] cursor-pointer hover:bg-slate-200 transition-colors border-r select-none',
+                                    isNW || isWknd
+                                      ? 'bg-slate-100 text-slate-500'
+                                      : 'text-slate-700',
+                                  )}
+                                  onClick={() => toggleNonWorkingDay(dateStr)}
+                                >
+                                  <div className="flex flex-col items-center justify-center gap-0.5">
+                                    <span className="text-[10px] uppercase font-medium">
+                                      {format(day, 'E', { locale: ptBR }).substring(0, 3)}
+                                    </span>
+                                    <span className="font-semibold text-sm">
+                                      {format(day, 'd')}
+                                    </span>
+                                  </div>
+                                </TableHead>
+                              )
+                            })}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {equipment.map((eq) => (
+                            <TableRow key={eq.id} className="hover:bg-slate-50/50 group">
+                              <TableCell className="min-w-[220px] sticky left-0 z-20 bg-white group-hover:bg-slate-50/50 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] font-medium text-sm">
+                                <div className="truncate max-w-[200px]" title={eq.name}>
+                                  {eq.name}
                                 </div>
-                                <Checkbox
-                                  checked={!!logs[eq.id]}
-                                  onCheckedChange={(c) =>
-                                    setLogs((prev) => ({ ...prev, [eq.id]: !!c }))
-                                  }
-                                  className="h-5 w-5 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                                />
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                              </TableCell>
+                              <TableCell className="min-w-[150px] border-r text-xs text-muted-foreground capitalize">
+                                {eq.type}
+                              </TableCell>
+                              <TableCell className="min-w-[80px] border-r text-center text-sm font-medium">
+                                {eq.quantity}
+                              </TableCell>
+                              {daysInMonth.map((day) => {
+                                const dateStr = format(day, 'yyyy-MM-dd')
+                                const isNW = nonWorkingDays.some((d) => d.date === dateStr)
+                                const isWknd = isWeekend(day)
+                                const log = dailyLogs.find(
+                                  (l) =>
+                                    l.type === 'equipment' &&
+                                    l.reference_id === eq.id &&
+                                    l.date === dateStr,
+                                )
+
+                                return (
+                                  <TableCell
+                                    key={dateStr}
+                                    className={cn(
+                                      'text-center p-0 border-r',
+                                      isNW || isWknd ? 'bg-slate-50' : '',
+                                    )}
+                                  >
+                                    <button
+                                      onClick={() =>
+                                        handleToggleLog('equipment', eq.id, dateStr, !!log?.status)
+                                      }
+                                      className="w-full h-full min-h-[44px] flex items-center justify-center hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      disabled={isNW}
+                                    >
+                                      {log?.status && (
+                                        <Check className="h-5 w-5 text-emerald-500 drop-shadow-sm" />
+                                      )}
+                                    </button>
+                                  </TableCell>
+                                )
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </TabsContent>
-              </Tabs>
-            </div>
-          )}
+              </>
+            )}
+          </Tabs>
         </CardContent>
-
-        {selectedPlant && !loading && (
-          <div className="p-6 bg-slate-50 border-t flex flex-col sm:flex-row justify-end items-center gap-3 rounded-b-xl">
-            <Button
-              variant="outline"
-              onClick={() => handleSave(false)}
-              disabled={saving}
-              className="w-full sm:w-auto h-11 text-base bg-white shadow-sm hover:bg-slate-100"
-            >
-              {saving ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : (
-                <Save className="h-5 w-5 mr-2" />
-              )}
-              Salvar como Rascunho
-            </Button>
-            <Button
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="w-full sm:w-auto h-11 text-base bg-brand-vividBlue hover:bg-brand-vividBlue/90 text-white shadow-sm"
-            >
-              {saving ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : (
-                <Send className="h-5 w-5 mr-2" />
-              )}
-              Publicar Lançamentos
-            </Button>
-          </div>
-        )}
       </Card>
     </div>
   )
