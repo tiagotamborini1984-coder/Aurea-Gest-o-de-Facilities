@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT false;

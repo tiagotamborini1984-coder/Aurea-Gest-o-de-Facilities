@@ -2994,6 +2994,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_duplicate_employees: {
+        Args: { p_client_id: string; p_dry_run?: boolean; p_plant_id?: string }
+        Returns: number
+      }
       cleanup_duplicate_functions: {
         Args: { p_client_id: string; p_dry_run?: boolean; p_plant_id?: string }
         Returns: number
@@ -4301,6 +4305,70 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION cleanup_duplicate_employees(uuid, uuid, boolean)
+//   CREATE OR REPLACE FUNCTION public.cleanup_duplicate_employees(p_client_id uuid, p_plant_id uuid DEFAULT NULL::uuid, p_dry_run boolean DEFAULT true)
+//    RETURNS integer
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_duplicate_count integer := 0;
+//     r RECORD;
+//     v_primary_id UUID;
+//     v_dup_ids UUID[];
+//   BEGIN
+//     -- Iterate over sets of employees with identical names and reference_month
+//     FOR r IN (
+//       SELECT lower(trim(e.name)) as emp_name, e.reference_month, array_agg(e.id ORDER BY e.created_at ASC) as all_ids
+//       FROM public.employees e
+//       WHERE e.client_id = p_client_id
+//         AND (p_plant_id IS NULL OR e.plant_id = p_plant_id)
+//       GROUP BY lower(trim(e.name)), e.reference_month
+//       HAVING count(*) > 1
+//     ) LOOP
+//
+//       v_primary_id := r.all_ids[1];
+//       v_dup_ids := r.all_ids[2:array_length(r.all_ids, 1)];
+//
+//       v_duplicate_count := v_duplicate_count + array_length(v_dup_ids, 1);
+//
+//       IF NOT p_dry_run THEN
+//         -- Resolve unique constraint conflicts on daily_logs
+//         DELETE FROM public.daily_logs
+//         WHERE reference_id = ANY(v_dup_ids) AND type = 'staff'
+//           AND EXISTS (
+//             SELECT 1 FROM public.daily_logs dl2
+//             WHERE dl2.reference_id = v_primary_id
+//               AND dl2.type = 'staff'
+//               AND dl2.date = public.daily_logs.date
+//           );
+//
+//         UPDATE public.daily_logs
+//         SET reference_id = v_primary_id
+//         WHERE reference_id = ANY(v_dup_ids) AND type = 'staff';
+//
+//         -- Resolve unique constraint conflicts on employee_training_records
+//         DELETE FROM public.employee_training_records
+//         WHERE employee_id = ANY(v_dup_ids)
+//           AND EXISTS (
+//             SELECT 1 FROM public.employee_training_records r2
+//             WHERE r2.employee_id = v_primary_id
+//               AND r2.training_id = public.employee_training_records.training_id
+//           );
+//
+//         UPDATE public.employee_training_records
+//         SET employee_id = v_primary_id
+//         WHERE employee_id = ANY(v_dup_ids);
+//
+//         -- Delete the duplicates
+//         DELETE FROM public.employees WHERE id = ANY(v_dup_ids);
+//       END IF;
+//     END LOOP;
+//
+//     RETURN v_duplicate_count;
+//   END;
+//   $function$
+//
 // FUNCTION cleanup_duplicate_functions(uuid, uuid, boolean)
 //   CREATE OR REPLACE FUNCTION public.cleanup_duplicate_functions(p_client_id uuid, p_plant_id uuid DEFAULT NULL::uuid, p_dry_run boolean DEFAULT true)
 //    RETURNS integer
@@ -5199,6 +5267,8 @@ export const Constants = {
 //   CREATE UNIQUE INDEX daily_logs_date_type_reference_id_key ON public.daily_logs USING btree (date, type, reference_id)
 // Table: employee_training_records
 //   CREATE UNIQUE INDEX employee_training_records_employee_id_training_id_key ON public.employee_training_records USING btree (employee_id, training_id)
+// Table: employees
+//   CREATE UNIQUE INDEX unique_active_employee_per_plant_month ON public.employees USING btree (client_id, plant_id, lower(TRIM(BOTH FROM name)), reference_month) WHERE (status = 'Ativo'::text)
 // Table: function_required_trainings
 //   CREATE UNIQUE INDEX function_required_trainings_function_id_training_id_key ON public.function_required_trainings USING btree (function_id, training_id)
 // Table: functions
