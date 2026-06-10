@@ -4,33 +4,32 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 function addFrequency(date: Date, frequency: string): Date {
-  const d = new Date(date)
+  const d = new Date(date);
   switch (frequency) {
     case 'Diária':
-      d.setUTCDate(d.getUTCDate() + 1)
-      break
+      d.setUTCDate(d.getUTCDate() + 1);
+      break;
     case 'Semanal':
-      d.setUTCDate(d.getUTCDate() + 7)
-      break
+      d.setUTCDate(d.getUTCDate() + 7);
+      break;
     case 'Mensal':
-      d.setUTCMonth(d.getUTCMonth() + 1)
-      break
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      break;
     case 'Semestral':
-      d.setUTCMonth(d.getUTCMonth() + 6)
-      break
+      d.setUTCMonth(d.getUTCMonth() + 6);
+      break;
     case 'Anual':
-      d.setUTCFullYear(d.getUTCFullYear() + 1)
-      break
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      break;
     case 'Única':
     default:
-      break
+      break;
   }
-  return d
+  return d;
 }
 
 Deno.serve(async (req: Request) => {
@@ -64,25 +63,28 @@ Deno.serve(async (req: Request) => {
     let generatedCount = 0
 
     for (const audit of audits || []) {
+      
       let { data: typeRes } = await supabaseClient
         .from('task_types')
-        .select('id')
+        .select('id, sla_hours')
         .eq('client_id', audit.client_id)
         .ilike('name', '%Auditoria%')
         .limit(1)
-
+          
       let typeId = typeRes?.[0]?.id
+      let typeSla = typeRes?.[0]?.sla_hours
 
       if (!typeId) {
         let { data: fallbackTypeRes } = await supabaseClient
           .from('task_types')
-          .select('id')
+          .select('id, sla_hours')
           .eq('client_id', audit.client_id)
           .order('created_at', { ascending: true })
           .limit(1)
         typeId = fallbackTypeRes?.[0]?.id
+        typeSla = fallbackTypeRes?.[0]?.sla_hours
       }
-
+          
       let { data: statusRes } = await supabaseClient
         .from('task_statuses')
         .select('id')
@@ -90,7 +92,7 @@ Deno.serve(async (req: Request) => {
         .eq('is_terminal', false)
         .order('created_at', { ascending: true })
         .limit(1)
-
+      
       let statusId = statusRes?.[0]?.id
 
       if (!typeId || !statusId) {
@@ -105,17 +107,15 @@ Deno.serve(async (req: Request) => {
           .eq('plant_id', assign.plant_id)
           .order('created_at', { ascending: false })
 
-        const pendingExec = (existingExecs || []).find(
-          (e) => e.status === 'Pendente' || e.status === 'Rascunho',
-        )
-
+        const pendingExec = (existingExecs || []).find(e => e.status === 'Pendente' || e.status === 'Rascunho')
+        
         if (pendingExec) {
           if (pendingExec.assignee_id !== assign.assignee_id) {
             await supabaseClient
               .from('audit_executions')
               .update({ assignee_id: assign.assignee_id })
               .eq('id', pendingExec.id)
-
+              
             if (pendingExec.task_id) {
               await supabaseClient
                 .from('tasks')
@@ -123,20 +123,20 @@ Deno.serve(async (req: Request) => {
                 .eq('id', pendingExec.task_id)
             }
           }
-          continue
+          continue;
         }
 
-        let nextDueDate: Date
-
+        let nextDueDate: Date;
+        
         if (existingExecs && existingExecs.length > 0) {
-          if (audit.frequency === 'Única') continue
+          if (audit.frequency === 'Única') continue;
 
-          const lastExec = existingExecs.find((e) => e.status === 'Finalizado') || existingExecs[0]
-          const baseDateStr = lastExec.realization_date || lastExec.created_at.split('T')[0]
-          const baseDate = new Date(baseDateStr + 'T00:00:00Z')
-          nextDueDate = addFrequency(baseDate, audit.frequency)
+          const lastExec = existingExecs.find(e => e.status === 'Finalizado') || existingExecs[0];
+          const baseDateStr = lastExec.realization_date || lastExec.created_at.split('T')[0];
+          const baseDate = new Date(baseDateStr + 'T00:00:00Z');
+          nextDueDate = addFrequency(baseDate, audit.frequency);
         } else {
-          nextDueDate = new Date(audit.start_date + 'T00:00:00Z')
+          nextDueDate = new Date(audit.start_date + 'T00:00:00Z');
         }
 
         // Prevent nextDueDate from being in the past for recurring audits
@@ -148,9 +148,9 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        const advanceNotice = audit.advance_notice_days || 0
-        const triggerDate = new Date(nextDueDate)
-        triggerDate.setUTCDate(triggerDate.getUTCDate() - advanceNotice)
+        const advanceNotice = audit.advance_notice_days || 0;
+        const triggerDate = new Date(nextDueDate);
+        triggerDate.setUTCDate(triggerDate.getUTCDate() - advanceNotice);
 
         if (today >= triggerDate) {
           const { data: createdToday } = await supabaseClient
@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
             .gte('created_at', todayStr + 'T00:00:00Z')
 
           if (createdToday && createdToday.length > 0) {
-            continue
+            continue;
           }
 
           const { data: adminUser } = await supabaseClient
@@ -170,22 +170,30 @@ Deno.serve(async (req: Request) => {
             .eq('client_id', audit.client_id)
             .in('role', ['Administrador', 'Master'])
             .limit(1)
-
+          
           const requesterId = adminUser?.[0]?.id || assign.assignee_id
 
-          const targetDateStr = nextDueDate.toISOString().split('T')[0]
+          const targetDateStr = nextDueDate.toISOString().split('T')[0];
+          const targetDateTime = new Date(`${targetDateStr}T00:00:00.000Z`);
+          
+          let calculatedDueDate: string;
+          if (audit.sla_days !== null && audit.sla_days !== undefined) {
+             calculatedDueDate = new Date(targetDateTime.getTime() + (audit.sla_days * 24 * 60 * 60 * 1000)).toISOString();
+          } else {
+             calculatedDueDate = nextDueDate.toISOString();
+          }
 
           const taskTitle = `Auditoria: ${audit.title}`
           const taskDesc = `Por favor, realize a auditoria "${audit.title}" agendada para ${targetDateStr.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`
-
+          
           // Fetch open statuses
           const { data: openStatuses } = await supabaseClient
             .from('task_statuses')
             .select('id')
             .eq('client_id', audit.client_id)
             .eq('is_terminal', false)
-
-          const openStatusIds = openStatuses?.map((s) => s.id) || [statusId]
+            
+          const openStatusIds = openStatuses?.map(s => s.id) || [statusId]
 
           // Check for existing open task
           const { data: existingTasks } = await supabaseClient
@@ -208,14 +216,14 @@ Deno.serve(async (req: Request) => {
               .update({
                 description: taskDesc,
                 assignee_id: assign.assignee_id,
-                due_date: new Date(`${targetDateStr}T23:59:59.999Z`).toISOString(),
+                due_date: calculatedDueDate
               })
               .eq('id', finalTaskId)
-
+              
             await supabaseClient.from('task_timeline').insert({
               task_id: finalTaskId,
               user_id: requesterId,
-              content: `Tarefa de auditoria atualizada pelo agendador. Prazo ajustado para a frequência correta.`,
+              content: `Tarefa de auditoria atualizada pelo agendador. Prazo ajustado para a frequência correta considerando a configuração de SLA.`,
               action_type: 'comment',
             })
           } else {
@@ -231,12 +239,12 @@ Deno.serve(async (req: Request) => {
                 task_number: 'GERANDO...',
                 title: taskTitle,
                 description: taskDesc,
-                due_date: new Date(`${targetDateStr}T23:59:59.999Z`).toISOString(),
+                due_date: calculatedDueDate,
                 status_updated_at: new Date().toISOString(),
               } as any)
               .select()
               .single()
-
+              
             if (newTask) finalTaskId = newTask.id
           }
 
@@ -247,7 +255,7 @@ Deno.serve(async (req: Request) => {
               .select('id')
               .eq('task_id', finalTaskId)
               .limit(1)
-
+              
             if (!execsForTask || execsForTask.length === 0) {
               await supabaseClient.from('audit_executions').insert({
                 audit_id: audit.id,
