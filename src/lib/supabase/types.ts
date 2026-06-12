@@ -4555,27 +4555,36 @@ export const Constants = {
 //     v_new_task_id UUID;
 //     v_audit RECORD;
 //     v_base_date TIMESTAMP;
+//     v_next_date TIMESTAMP;
 //   BEGIN
 //     SELECT * INTO v_audit FROM public.audits WHERE id = NEW.audit_id;
 //
 //     v_base_date := v_audit.start_date::TIMESTAMP;
 //
-//     IF v_audit.sla_days IS NOT NULL THEN
-//       v_next_due_date := v_base_date + (v_audit.sla_days || ' days')::INTERVAL;
+//     IF v_audit.frequency = 'Diária' THEN
+//       v_next_date := v_base_date + INTERVAL '1 day';
+//     ELSIF v_audit.frequency = 'Semanal' THEN
+//       v_next_date := v_base_date + INTERVAL '1 week';
+//     ELSIF v_audit.frequency = 'Quinzenal' THEN
+//       v_next_date := v_base_date + INTERVAL '15 days';
+//     ELSIF v_audit.frequency = 'Mensal' THEN
+//       v_next_date := v_base_date + INTERVAL '1 month';
+//     ELSIF v_audit.frequency = 'Bimestral' THEN
+//       v_next_date := v_base_date + INTERVAL '2 months';
+//     ELSIF v_audit.frequency = 'Trimestral' THEN
+//       v_next_date := v_base_date + INTERVAL '3 months';
+//     ELSIF v_audit.frequency = 'Semestral' THEN
+//       v_next_date := v_base_date + INTERVAL '6 months';
+//     ELSIF v_audit.frequency = 'Anual' THEN
+//       v_next_date := v_base_date + INTERVAL '1 year';
 //     ELSE
-//       IF v_audit.frequency = 'Diária' THEN
-//         v_next_due_date := v_base_date + INTERVAL '1 day';
-//       ELSIF v_audit.frequency = 'Semanal' THEN
-//         v_next_due_date := v_base_date + INTERVAL '1 week';
-//       ELSIF v_audit.frequency = 'Mensal' THEN
-//         v_next_due_date := v_base_date + INTERVAL '1 month';
-//       ELSIF v_audit.frequency = 'Semestral' THEN
-//         v_next_due_date := v_base_date + INTERVAL '6 months';
-//       ELSIF v_audit.frequency = 'Anual' THEN
-//         v_next_due_date := v_base_date + INTERVAL '1 year';
-//       ELSE
-//         v_next_due_date := v_base_date + INTERVAL '1 month';
-//       END IF;
+//       v_next_date := v_base_date;
+//     END IF;
+//
+//     IF v_audit.sla_days IS NOT NULL THEN
+//       v_next_due_date := v_next_date + (v_audit.sla_days || ' days')::INTERVAL;
+//     ELSE
+//       v_next_due_date := v_next_date;
 //     END IF;
 //
 //     IF NOT EXISTS (
@@ -4595,7 +4604,7 @@ export const Constants = {
 //
 //       IF v_task_type_id IS NOT NULL AND v_status_id IS NOT NULL THEN
 //         v_task_title := 'Auditoria: ' || v_audit.title;
-//         v_task_desc := 'Por favor, realize a auditoria "' || v_audit.title || '" agendada para ' || to_char(v_next_due_date, 'DD/MM/YYYY') || '. Acesse os detalhes da tarefa para preencher o checklist.';
+//         v_task_desc := 'Execução automática de auditoria: ' || v_audit.title || '. Frequência: ' || v_audit.frequency || '.';
 //
 //         SELECT id INTO v_requester_id FROM public.profiles
 //         WHERE client_id = v_audit.client_id AND role IN ('Administrador', 'Master') LIMIT 1;
@@ -4697,24 +4706,54 @@ export const Constants = {
 //     v_status_id uuid;
 //     v_task_id uuid;
 //     v_due_date timestamptz;
+//     v_base_date timestamp;
+//     v_next_date timestamp;
 //   BEGIN
 //     SELECT * INTO v_audit FROM public.audits WHERE id = NEW.audit_id;
 //     IF NOT FOUND THEN RETURN NEW; END IF;
 //
-//     IF v_audit.status != 'Ativa' THEN RETURN NEW; END IF;
+//     IF v_audit.status != 'Ativa' AND v_audit.status != 'Ativo' THEN RETURN NEW; END IF;
 //
 //     IF NOT EXISTS (SELECT 1 FROM public.audit_executions WHERE audit_id = NEW.audit_id AND assignee_id = NEW.assignee_id AND plant_id = NEW.plant_id) THEN
 //       -- Get Task Type
-//       SELECT id INTO v_type_id FROM public.task_types WHERE client_id = v_audit.client_id AND name = 'Auditoria' LIMIT 1;
+//       SELECT id INTO v_type_id FROM public.task_types WHERE client_id = v_audit.client_id AND name ILIKE '%Auditoria%' LIMIT 1;
 //       IF v_type_id IS NULL THEN
 //         INSERT INTO public.task_types (client_id, name, sla_hours) VALUES (v_audit.client_id, 'Auditoria', 24) RETURNING id INTO v_type_id;
 //       END IF;
 //
 //       -- Get Status
 //       SELECT id INTO v_status_id FROM public.task_statuses WHERE client_id = v_audit.client_id AND name = 'Aberta' LIMIT 1;
+//       IF v_status_id IS NULL THEN
+//         SELECT id INTO v_status_id FROM public.task_statuses WHERE client_id = v_audit.client_id AND is_terminal = false ORDER BY created_at LIMIT 1;
+//       END IF;
 //
-//       -- Calculate due date strictly by Audit Start Date + sla_days
-//       v_due_date := v_audit.start_date::timestamptz + (COALESCE(v_audit.sla_days, 0) * interval '1 day');
+//       v_base_date := v_audit.start_date::timestamp;
+//
+//       IF v_audit.frequency = 'Diária' THEN
+//         v_next_date := v_base_date + INTERVAL '1 day';
+//       ELSIF v_audit.frequency = 'Semanal' THEN
+//         v_next_date := v_base_date + INTERVAL '1 week';
+//       ELSIF v_audit.frequency = 'Quinzenal' THEN
+//         v_next_date := v_base_date + INTERVAL '15 days';
+//       ELSIF v_audit.frequency = 'Mensal' THEN
+//         v_next_date := v_base_date + INTERVAL '1 month';
+//       ELSIF v_audit.frequency = 'Bimestral' THEN
+//         v_next_date := v_base_date + INTERVAL '2 months';
+//       ELSIF v_audit.frequency = 'Trimestral' THEN
+//         v_next_date := v_base_date + INTERVAL '3 months';
+//       ELSIF v_audit.frequency = 'Semestral' THEN
+//         v_next_date := v_base_date + INTERVAL '6 months';
+//       ELSIF v_audit.frequency = 'Anual' THEN
+//         v_next_date := v_base_date + INTERVAL '1 year';
+//       ELSE
+//         v_next_date := v_base_date;
+//       END IF;
+//
+//       IF v_audit.sla_days IS NOT NULL THEN
+//         v_due_date := v_next_date + (v_audit.sla_days || ' days')::interval;
+//       ELSE
+//         v_due_date := v_next_date;
+//       END IF;
 //
 //       INSERT INTO public.tasks (
 //         client_id, plant_id, type_id, status_id, requester_id, assignee_id,
@@ -4723,15 +4762,15 @@ export const Constants = {
 //         v_audit.client_id, NEW.plant_id, v_type_id, v_status_id,
 //         NEW.assignee_id, NEW.assignee_id,
 //         'Auditoria: ' || v_audit.title,
-//         'Auditoria atribuída: ' || v_audit.title,
-//         'AUD-' || upper(substr(md5(random()::text), 1, 6)),
+//         'Execução automática de auditoria: ' || v_audit.title || '. Frequência: ' || v_audit.frequency || '.',
+//         'GERANDO...',
 //         v_due_date
 //       ) RETURNING id INTO v_task_id;
 //
 //       INSERT INTO public.audit_executions (
 //         audit_id, plant_id, assignee_id, status, task_id
 //       ) VALUES (
-//         v_audit.id, NEW.plant_id, NEW.assignee_id, 'Aberta', v_task_id
+//         v_audit.id, NEW.plant_id, NEW.assignee_id, 'Pendente', v_task_id
 //       );
 //     END IF;
 //
@@ -4824,11 +4863,13 @@ export const Constants = {
 //           ) VALUES (
 //             v_audit.client_id,
 //             NEW.plant_id,
+//             v_task_type_id,
+//             v_task_status_id,
 //             NEW.assignee_id,
 //             NEW.assignee_id,
 //             'GERANDO...',
 //             'Auditoria: ' || v_audit.title,
-//             'Por favor, realize a auditoria "' || v_audit.title || '" agendada para ' || to_char(v_next_date, 'DD/MM/YYYY') || '. Acesse os detalhes da tarefa para preencher o checklist.',
+//             'Execução automática de auditoria: ' || v_audit.title || '. Frequência: ' || v_audit.frequency || '.',
 //             v_next_due_date,
 //             NOW(),
 //             v_task_participants

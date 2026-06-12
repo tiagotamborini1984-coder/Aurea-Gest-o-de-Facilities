@@ -42,6 +42,7 @@ export default function Lancamentos() {
 
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('colaboradores')
+  const [toggling, setToggling] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -125,49 +126,72 @@ export default function Lancamentos() {
     date: string,
     currentStatus: boolean,
   ) => {
-    const { data: clientData } = await supabase
-      .from('plants')
-      .select('client_id')
-      .eq('id', selectedPlant)
-      .single()
-    const clientId = clientData?.client_id
+    const toggleKey = `${type}-${referenceId}-${date}`
+    if (toggling[toggleKey]) return
 
-    if (!clientId) return
+    setToggling((prev) => ({ ...prev, [toggleKey]: true }))
 
-    const existingLog = dailyLogs.find(
-      (l) => l.type === type && l.reference_id === referenceId && l.date === date,
-    )
-    const newStatus = !currentStatus
+    try {
+      const { data: clientData, error: clientError } = await supabase
+        .from('plants')
+        .select('client_id')
+        .eq('id', selectedPlant)
+        .single()
 
-    if (existingLog) {
-      const { error } = await supabase
-        .from('daily_logs')
-        .update({ status: newStatus })
-        .eq('id', existingLog.id)
+      const clientId = clientData?.client_id
 
-      if (!error) {
-        setDailyLogs((prev) =>
-          prev.map((l) => (l.id === existingLog.id ? { ...l, status: newStatus } : l)),
-        )
+      if (clientError || !clientId) {
+        toast({
+          title: 'Erro',
+          description: 'Planta não encontrada ou sem cliente associado.',
+          variant: 'destructive',
+        })
+        return
       }
-    } else {
+
+      const newStatus = !currentStatus
+
       const { data, error } = await supabase
         .from('daily_logs')
-        .insert({
-          client_id: clientId,
-          plant_id: selectedPlant,
-          type,
-          reference_id: referenceId,
-          date,
-          status: newStatus,
-          is_published: false,
-        })
+        .upsert(
+          {
+            client_id: clientId,
+            plant_id: selectedPlant,
+            type,
+            reference_id: referenceId,
+            date,
+            status: newStatus,
+            is_published: false,
+          },
+          { onConflict: 'date,type,reference_id' },
+        )
         .select()
         .single()
 
-      if (!error && data) {
-        setDailyLogs((prev) => [...prev, data])
+      if (error) throw error
+
+      if (data) {
+        setDailyLogs((prev) => {
+          const exists = prev.some(
+            (l) => l.date === date && l.type === type && l.reference_id === referenceId,
+          )
+          if (exists) {
+            return prev.map((l) =>
+              l.date === date && l.type === type && l.reference_id === referenceId ? data : l,
+            )
+          }
+          return [...prev, data]
+        })
       }
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro ao salvar lançamento',
+        description: error.message || 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      })
+    } finally {
+      setToggling((prev) => ({ ...prev, [toggleKey]: false }))
     }
   }
 
@@ -383,12 +407,14 @@ export default function Lancamentos() {
                                         handleToggleLog('staff', emp.id, dateStr, !!log?.status)
                                       }
                                       className="w-full h-full min-h-[44px] flex items-center justify-center hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                      disabled={isNW}
+                                      disabled={isNW || toggling[`staff-${emp.id}-${dateStr}`]}
                                       title={isNW ? 'Dia não útil' : 'Marcar presença'}
                                     >
-                                      {log?.status && (
+                                      {toggling[`staff-${emp.id}-${dateStr}`] ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                                      ) : log?.status ? (
                                         <Check className="h-5 w-5 text-emerald-500 drop-shadow-sm" />
-                                      )}
+                                      ) : null}
                                     </button>
                                   </TableCell>
                                 )
@@ -486,11 +512,14 @@ export default function Lancamentos() {
                                         handleToggleLog('equipment', eq.id, dateStr, !!log?.status)
                                       }
                                       className="w-full h-full min-h-[44px] flex items-center justify-center hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                      disabled={isNW}
+                                      disabled={isNW || toggling[`equipment-${eq.id}-${dateStr}`]}
+                                      title={isNW ? 'Dia não útil' : 'Marcar presença'}
                                     >
-                                      {log?.status && (
+                                      {toggling[`equipment-${eq.id}-${dateStr}`] ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                                      ) : log?.status ? (
                                         <Check className="h-5 w-5 text-emerald-500 drop-shadow-sm" />
-                                      )}
+                                      ) : null}
                                     </button>
                                   </TableCell>
                                 )
