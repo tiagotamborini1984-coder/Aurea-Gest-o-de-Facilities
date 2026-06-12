@@ -159,7 +159,7 @@ export default function Lancamentos() {
         is_published: false,
       }
 
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from('daily_logs')
         .upsert(payload, { onConflict: 'date,type,reference_id' })
         .select()
@@ -167,22 +167,27 @@ export default function Lancamentos() {
 
       if (error) throw error
 
-      if (data) {
-        setDailyLogs((prev) => {
-          const exists = prev.some(
-            (l) => l.date === date && l.type === type && l.reference_id === referenceId,
-          )
-          if (exists) {
-            return prev.map((l) =>
-              l.date === date && l.type === type && l.reference_id === referenceId ? data : l,
-            )
-          }
-          return [...prev, data]
-        })
+      if (status === 200 || status === 201) {
+        // Re-fetch only the logs for this specific date and plant to ensure full synchronization
+        const { data: updatedLogs } = await supabase
+          .from('daily_logs')
+          .select('*')
+          .eq('plant_id', selectedPlant)
+          .eq('date', date)
+
+        if (updatedLogs) {
+          setDailyLogs((prev) => {
+            const filtered = prev.filter((l) => l.date !== date)
+            return [...filtered, ...updatedLogs]
+          })
+        }
+
         toast({
           title: 'Sucesso',
           description: `Registro atualizado para ${newStatus ? 'Presente' : 'Ausente'} com sucesso.`,
         })
+      } else {
+        throw new Error('Status inesperado ao salvar: ' + status)
       }
     } catch (error: any) {
       console.error('Save error:', error)
