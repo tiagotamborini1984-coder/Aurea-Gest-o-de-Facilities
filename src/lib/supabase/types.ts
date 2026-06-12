@@ -4096,8 +4096,8 @@ export const Constants = {
 //     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 // Table: daily_logs
 //   Policy "plant_isolation_daily_logs" (ALL, PERMISSIVE) roles={authenticated}
-//     USING: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
-//     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
+//     USING: is_plant_authorized(plant_id)
+//     WITH CHECK: is_plant_authorized(plant_id)
 // Table: employee_training_records
 //   Policy "tenant_isolation_employee_training_records" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))

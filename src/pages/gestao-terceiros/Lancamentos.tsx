@@ -46,7 +46,7 @@ export default function Lancamentos() {
 
   useEffect(() => {
     const fetchPlants = async () => {
-      const { data } = await supabase.from('plants').select('id, name').order('name')
+      const { data } = await supabase.from('plants').select('id, name, client_id').order('name')
       if (data && data.length > 0) {
         setPlants(data)
         setSelectedPlant(data[0].id)
@@ -132,15 +132,10 @@ export default function Lancamentos() {
     setToggling((prev) => ({ ...prev, [toggleKey]: true }))
 
     try {
-      const { data: clientData, error: clientError } = await supabase
-        .from('plants')
-        .select('client_id')
-        .eq('id', selectedPlant)
-        .single()
+      const currentPlant = plants.find((p) => p.id === selectedPlant)
+      const clientId = currentPlant?.client_id
 
-      const clientId = clientData?.client_id
-
-      if (clientError || !clientId) {
+      if (!clientId) {
         toast({
           title: 'Erro',
           description: 'Planta não encontrada ou sem cliente associado.',
@@ -150,21 +145,27 @@ export default function Lancamentos() {
       }
 
       const newStatus = !currentStatus
+      const existingLog = dailyLogs.find(
+        (l) => l.type === type && l.reference_id === referenceId && l.date === date,
+      )
+
+      const payload: any = {
+        client_id: clientId,
+        plant_id: selectedPlant,
+        type,
+        reference_id: referenceId,
+        date,
+        status: newStatus,
+        is_published: false,
+      }
+
+      if (existingLog?.id) {
+        payload.id = existingLog.id
+      }
 
       const { data, error } = await supabase
         .from('daily_logs')
-        .upsert(
-          {
-            client_id: clientId,
-            plant_id: selectedPlant,
-            type,
-            reference_id: referenceId,
-            date,
-            status: newStatus,
-            is_published: false,
-          },
-          { onConflict: 'date,type,reference_id' },
-        )
+        .upsert(payload, { onConflict: 'date,type,reference_id' })
         .select()
         .single()
 
@@ -182,6 +183,10 @@ export default function Lancamentos() {
           }
           return [...prev, data]
         })
+        toast({
+          title: 'Sucesso',
+          description: `Registro atualizado para ${newStatus ? 'Presente' : 'Ausente'} com sucesso.`,
+        })
       }
     } catch (error: any) {
       console.error(error)
@@ -196,12 +201,8 @@ export default function Lancamentos() {
   }
 
   const toggleNonWorkingDay = async (date: string) => {
-    const { data: clientData } = await supabase
-      .from('plants')
-      .select('client_id')
-      .eq('id', selectedPlant)
-      .single()
-    const clientId = clientData?.client_id
+    const currentPlant = plants.find((p) => p.id === selectedPlant)
+    const clientId = currentPlant?.client_id
     if (!clientId) return
 
     const existing = nonWorkingDays.find((d) => d.date === date)
@@ -209,6 +210,16 @@ export default function Lancamentos() {
       const { error } = await supabase.from('plant_non_working_days').delete().eq('id', existing.id)
       if (!error) {
         setNonWorkingDays((prev) => prev.filter((d) => d.id !== existing.id))
+        toast({
+          title: 'Sucesso',
+          description: 'Dia marcado como útil.',
+        })
+      } else {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível alterar o status do dia.',
+          variant: 'destructive',
+        })
       }
     } else {
       const { data, error } = await supabase
@@ -223,6 +234,16 @@ export default function Lancamentos() {
         .single()
       if (!error && data) {
         setNonWorkingDays((prev) => [...prev, data])
+        toast({
+          title: 'Sucesso',
+          description: 'Dia marcado como não útil.',
+        })
+      } else {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível alterar o status do dia.',
+          variant: 'destructive',
+        })
       }
     }
   }

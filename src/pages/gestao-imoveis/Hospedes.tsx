@@ -27,10 +27,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Users, Briefcase, Edit, Trash2 } from 'lucide-react'
+import { Plus, Users, Briefcase, Edit, Trash2, Search } from 'lucide-react'
 
 export default function Hospedes() {
   const [guests, setGuests] = useState<any[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [costCenters, setCostCenters] = useState<any[]>([])
   const { activeClient } = useAppStore()
   const [open, setOpen] = useState(false)
@@ -42,6 +43,10 @@ export default function Hospedes() {
     cost_center_id: 'none',
     department: '',
   })
+
+  const filteredGuests = guests.filter((guest) =>
+    guest.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   useEffect(() => {
     if (activeClient) {
@@ -129,99 +134,111 @@ export default function Hospedes() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold flex items-center gap-3 text-slate-800">
           <Users className="h-8 w-8 text-primary" /> Hóspedes
         </h1>
-        <Dialog
-          open={open}
-          onOpenChange={(val) => {
-            setOpen(val)
-            if (!val) setEditingId(null)
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button
-              onClick={() => {
-                setEditingId(null)
-                setFormData({
-                  name: '',
-                  email: '',
-                  phone: '',
-                  cost_center_id: 'none',
-                  department: '',
-                })
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Novo Hóspede
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingId ? 'Editar Hóspede' : 'Cadastrar Hóspede'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Nome Completo</Label>
-                <Input
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="João da Silva"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="joao@empresa.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Centro de Custo</Label>
-                <Select
-                  value={formData.cost_center_id}
-                  onValueChange={(val) => setFormData({ ...formData, cost_center_id: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um centro de custo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
-                    {costCenters.map((cc) => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        {cc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Departamento</Label>
-                <Input
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  placeholder="Ex: Recursos Humanos, TI"
-                />
-              </div>
-              <Button type="submit" className="w-full mt-4">
-                {editingId ? 'Atualizar Hóspede' : 'Salvar Hóspede'}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+            <Input
+              type="text"
+              placeholder="Buscar por nome..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-full sm:w-64"
+            />
+          </div>
+          <Dialog
+            open={open}
+            onOpenChange={(val) => {
+              setOpen(val)
+              if (!val) setEditingId(null)
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => {
+                  setEditingId(null)
+                  setFormData({
+                    name: '',
+                    email: '',
+                    phone: '',
+                    cost_center_id: 'none',
+                    department: '',
+                  })
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Novo Hóspede
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingId ? 'Editar Hóspede' : 'Cadastrar Hóspede'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Nome Completo</Label>
+                  <Input
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="João da Silva"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>E-mail</Label>
+                    <Input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="joao@empresa.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone</Label>
+                    <Input
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Centro de Custo</Label>
+                  <Select
+                    value={formData.cost_center_id}
+                    onValueChange={(val) => setFormData({ ...formData, cost_center_id: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um centro de custo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {costCenters.map((cc) => (
+                        <SelectItem key={cc.id} value={cc.id}>
+                          {cc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Departamento</Label>
+                  <Input
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    placeholder="Ex: Recursos Humanos, TI"
+                  />
+                </div>
+                <Button type="submit" className="w-full mt-4">
+                  {editingId ? 'Atualizar Hóspede' : 'Salvar Hóspede'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
@@ -237,7 +254,7 @@ export default function Hospedes() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {guests.map((g) => (
+            {filteredGuests.map((g) => (
               <TableRow key={g.id} className="hover:bg-slate-50/50">
                 <TableCell className="font-medium text-slate-900">{g.name}</TableCell>
                 <TableCell className="text-slate-600">{g.email || '-'}</TableCell>
@@ -265,12 +282,16 @@ export default function Hospedes() {
                 </TableCell>
               </TableRow>
             ))}
-            {guests.length === 0 && (
+            {filteredGuests.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12 text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <Users className="h-10 w-10 text-slate-300 mb-3" />
-                    <p>Nenhum hóspede cadastrado.</p>
+                    {searchTerm ? (
+                      <p>Nenhum hóspede encontrado com este nome.</p>
+                    ) : (
+                      <p>Nenhum hóspede cadastrado.</p>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
