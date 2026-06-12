@@ -149,7 +149,7 @@ export default function Lancamentos() {
         (l) => l.type === type && l.reference_id === referenceId && l.date === date,
       )
 
-      const payload: any = {
+      const payload = {
         client_id: clientId,
         plant_id: selectedPlant,
         type,
@@ -157,10 +157,6 @@ export default function Lancamentos() {
         date,
         status: newStatus,
         is_published: false,
-      }
-
-      if (existingLog?.id) {
-        payload.id = existingLog.id
       }
 
       const { data, error } = await supabase
@@ -189,7 +185,7 @@ export default function Lancamentos() {
         })
       }
     } catch (error: any) {
-      console.error(error)
+      console.error('Save error:', error)
       toast({
         title: 'Erro ao salvar lançamento',
         description: error.message || 'Tente novamente mais tarde.',
