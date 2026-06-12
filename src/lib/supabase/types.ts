@@ -810,7 +810,7 @@ export type Database = {
           type: string
         }
         Insert: {
-          client_id: string
+          client_id?: string
           created_at?: string
           date: string
           id?: string
@@ -3351,7 +3351,7 @@ export const Constants = {
 //   reference_month: date (not null, default: date_trunc('month'::text, (CURRENT_DATE)::timestamp with time zone))
 // Table: daily_logs
 //   id: uuid (not null, default: gen_random_uuid())
-//   client_id: uuid (not null)
+//   client_id: uuid (not null, default: get_user_client_id())
 //   date: date (not null)
 //   plant_id: uuid (not null)
 //   type: text (not null)
@@ -4096,16 +4096,16 @@ export const Constants = {
 //     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 // Table: daily_logs
 //   Policy "plant_isolation_daily_logs" (ALL, PERMISSIVE) roles={authenticated}
-//     USING: is_plant_authorized(plant_id)
-//     WITH CHECK: is_plant_authorized(plant_id)
+//     USING: (((lower(get_user_role()) = 'master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
+//     WITH CHECK: (((lower(get_user_role()) = 'master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 // Table: employee_training_records
 //   Policy "tenant_isolation_employee_training_records" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))
 //     WITH CHECK: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))
 // Table: employees
 //   Policy "plant_isolation_employees" (ALL, PERMISSIVE) roles={authenticated}
-//     USING: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
-//     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
+//     USING: (((lower(get_user_role()) = 'master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
+//     WITH CHECK: (((lower(get_user_role()) = 'master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 // Table: equipment
 //   Policy "plant_isolation_equipment" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
@@ -4198,6 +4198,15 @@ export const Constants = {
 //     USING: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 //     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 // Table: plant_non_working_days
+//   Policy "Enable delete for authorized users" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: is_plant_authorized(plant_id)
+//   Policy "Enable insert for authorized users" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: is_plant_authorized(plant_id)
+//   Policy "Enable read access for authorized users" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: is_plant_authorized(plant_id)
+//   Policy "Enable update for authorized users" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: is_plant_authorized(plant_id)
+//     WITH CHECK: is_plant_authorized(plant_id)
 //   Policy "plant_isolation_plant_non_working_days" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 //     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
@@ -4989,24 +4998,38 @@ export const Constants = {
 //   CREATE OR REPLACE FUNCTION public.is_plant_authorized(p_id uuid)
 //    RETURNS boolean
 //    LANGUAGE plpgsql
-//    STABLE SECURITY DEFINER
-//    SET search_path TO 'public'
+//    SECURITY DEFINER
 //   AS $function$
 //   DECLARE
+//     v_authorized_plants jsonb;
 //     v_role text;
-//     v_plants jsonb;
+//     v_client_id uuid;
 //   BEGIN
-//     v_role := public.get_user_role();
-//     IF v_role IN ('Master', 'Administrador') THEN
+//     -- Get user profile info
+//     SELECT authorized_plants, lower(role), client_id INTO v_authorized_plants, v_role, v_client_id
+//     FROM public.profiles
+//     WHERE id = auth.uid();
+//
+//     -- Master has full access
+//     IF v_role = 'master' THEN
 //       RETURN true;
 //     END IF;
 //
-//     v_plants := public.get_user_authorized_plants();
-//     IF v_plants IS NULL OR jsonb_typeof(v_plants) != 'array' OR jsonb_array_length(v_plants) = 0 THEN
-//       RETURN false;
+//     -- Admin has access to all plants of their client
+//     IF v_role IN ('admin', 'administrador') THEN
+//       IF EXISTS (SELECT 1 FROM public.plants WHERE id = p_id AND client_id = v_client_id) THEN
+//           RETURN true;
+//       END IF;
 //     END IF;
 //
-//     RETURN v_plants @> to_jsonb(p_id::text);
+//     -- Operator / User must have the plant in authorized_plants
+//     IF v_authorized_plants IS NOT NULL AND jsonb_typeof(v_authorized_plants) = 'array' THEN
+//       IF v_authorized_plants @> to_jsonb(p_id::text) OR v_authorized_plants @> to_jsonb(p_id) THEN
+//         RETURN true;
+//       END IF;
+//     END IF;
+//
+//     RETURN false;
 //   END;
 //   $function$
 //
@@ -5204,6 +5227,104 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION submit_audit_execution(uuid, json, text, boolean, json)
+//   CREATE OR REPLACE FUNCTION public.submit_audit_execution(p_execution_id uuid, p_answers json, p_participants text, p_is_draft boolean DEFAULT false, p_signatures json DEFAULT NULL::json)
+//    RETURNS json
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_execution record;
+//     v_audit record;
+//     v_answer record;
+//     v_total_score numeric := 0;
+//     v_max_score numeric := 0;
+//     v_task_type_id uuid;
+//     v_task_status_id uuid;
+//     v_due_date timestamptz;
+//     v_sla_hours numeric;
+//   BEGIN
+//     -- Get execution and audit details
+//     SELECT * INTO v_execution FROM public.audit_executions WHERE id = p_execution_id;
+//     IF NOT FOUND THEN RAISE EXCEPTION 'Execution not found'; END IF;
+//
+//     SELECT * INTO v_audit FROM public.audits WHERE id = v_execution.audit_id;
+//
+//     -- Update execution status and participants
+//     UPDATE public.audit_executions
+//     SET
+//       status = CASE WHEN p_is_draft THEN 'Em Andamento' ELSE 'Finalizada' END,
+//       participants = p_participants,
+//       signatures = p_signatures,
+//       realization_date = CASE WHEN NOT p_is_draft THEN NOW() ELSE realization_date END
+//     WHERE id = p_execution_id;
+//
+//     -- If finalizing task
+//     IF NOT p_is_draft AND v_execution.task_id IS NOT NULL THEN
+//       UPDATE public.tasks
+//       SET
+//         status_id = COALESCE((SELECT id FROM public.task_statuses WHERE client_id = v_audit.client_id AND is_terminal = true LIMIT 1), status_id),
+//         closed_at = NOW()
+//       WHERE id = v_execution.task_id;
+//     END IF;
+//
+//     DELETE FROM public.audit_execution_answers WHERE execution_id = p_execution_id;
+//
+//     FOR v_answer IN SELECT * FROM json_array_elements(p_answers)
+//     LOOP
+//       INSERT INTO public.audit_execution_answers (
+//         execution_id, action_id, score, observations, evidence_url, corrective_assignee_id, corrective_due_date
+//       ) VALUES (
+//         p_execution_id,
+//         (v_answer.value->>'action_id')::uuid,
+//         (v_answer.value->>'score')::numeric,
+//         v_answer.value->>'observations',
+//         v_answer.value->>'evidence_url',
+//         NULLIF(v_answer.value->>'corrective_assignee_id', '')::uuid,
+//         (v_answer.value->>'corrective_due_date')::timestamp
+//       );
+//
+//       IF (v_answer.value->>'score')::numeric IS NOT NULL THEN
+//         v_total_score := v_total_score + (v_answer.value->>'score')::numeric;
+//         v_max_score := v_max_score + COALESCE((SELECT weight FROM public.audit_actions WHERE id = (v_answer.value->>'action_id')::uuid), 1);
+//       END IF;
+//
+//       IF NOT p_is_draft AND NULLIF(v_answer.value->>'corrective_assignee_id', '') IS NOT NULL THEN
+//         SELECT id, sla_hours INTO v_task_type_id, v_sla_hours FROM public.task_types WHERE client_id = v_audit.client_id AND name = 'Ação Corretiva' LIMIT 1;
+//         IF v_task_type_id IS NULL THEN
+//           INSERT INTO public.task_types (client_id, name, sla_hours) VALUES (v_audit.client_id, 'Ação Corretiva', 48) RETURNING id, 48 INTO v_task_type_id, v_sla_hours;
+//         END IF;
+//
+//         SELECT id INTO v_task_status_id FROM public.task_statuses WHERE client_id = v_audit.client_id AND name = 'Aberta' LIMIT 1;
+//
+//         IF v_answer.value->>'corrective_due_date' IS NOT NULL THEN
+//           v_due_date := (v_answer.value->>'corrective_due_date')::timestamptz;
+//         ELSE
+//           v_due_date := NOW() + (COALESCE(v_audit.sla_days, COALESCE(v_sla_hours, 48) / 24.0, 2) * interval '1 day');
+//         END IF;
+//
+//         INSERT INTO public.tasks (
+//           client_id, plant_id, type_id, status_id, requester_id, assignee_id,
+//           title, description, task_number, due_date
+//         ) VALUES (
+//           v_audit.client_id, v_execution.plant_id, v_task_type_id, v_task_status_id,
+//           v_execution.assignee_id, (v_answer.value->>'corrective_assignee_id')::uuid,
+//           'Ação Corretiva: ' || v_audit.title,
+//           'Ação corretiva gerada pela auditoria. Obs: ' || COALESCE(v_answer.value->>'observations', ''),
+//           'COR-' || upper(substr(md5(random()::text), 1, 6)),
+//           v_due_date
+//         );
+//       END IF;
+//     END LOOP;
+//
+//     UPDATE public.audit_executions
+//     SET final_score = v_total_score, max_score = v_max_score
+//     WHERE id = p_execution_id;
+//
+//     RETURN json_build_object('success', true, 'execution_id', p_execution_id);
+//   END;
+//   $function$
+//
 // FUNCTION submit_audit_execution(uuid, jsonb, text, boolean, jsonb)
 //   CREATE OR REPLACE FUNCTION public.submit_audit_execution(p_execution_id uuid, p_answers jsonb, p_participants text, p_is_draft boolean DEFAULT false, p_signatures jsonb DEFAULT '[]'::jsonb)
 //    RETURNS jsonb
@@ -5390,104 +5511,6 @@ export const Constants = {
 //   END;
 //   $function$
 //
-// FUNCTION submit_audit_execution(uuid, json, text, boolean, json)
-//   CREATE OR REPLACE FUNCTION public.submit_audit_execution(p_execution_id uuid, p_answers json, p_participants text, p_is_draft boolean DEFAULT false, p_signatures json DEFAULT NULL::json)
-//    RETURNS json
-//    LANGUAGE plpgsql
-//    SECURITY DEFINER
-//   AS $function$
-//   DECLARE
-//     v_execution record;
-//     v_audit record;
-//     v_answer record;
-//     v_total_score numeric := 0;
-//     v_max_score numeric := 0;
-//     v_task_type_id uuid;
-//     v_task_status_id uuid;
-//     v_due_date timestamptz;
-//     v_sla_hours numeric;
-//   BEGIN
-//     -- Get execution and audit details
-//     SELECT * INTO v_execution FROM public.audit_executions WHERE id = p_execution_id;
-//     IF NOT FOUND THEN RAISE EXCEPTION 'Execution not found'; END IF;
-//
-//     SELECT * INTO v_audit FROM public.audits WHERE id = v_execution.audit_id;
-//
-//     -- Update execution status and participants
-//     UPDATE public.audit_executions
-//     SET
-//       status = CASE WHEN p_is_draft THEN 'Em Andamento' ELSE 'Finalizada' END,
-//       participants = p_participants,
-//       signatures = p_signatures,
-//       realization_date = CASE WHEN NOT p_is_draft THEN NOW() ELSE realization_date END
-//     WHERE id = p_execution_id;
-//
-//     -- If finalizing task
-//     IF NOT p_is_draft AND v_execution.task_id IS NOT NULL THEN
-//       UPDATE public.tasks
-//       SET
-//         status_id = COALESCE((SELECT id FROM public.task_statuses WHERE client_id = v_audit.client_id AND is_terminal = true LIMIT 1), status_id),
-//         closed_at = NOW()
-//       WHERE id = v_execution.task_id;
-//     END IF;
-//
-//     DELETE FROM public.audit_execution_answers WHERE execution_id = p_execution_id;
-//
-//     FOR v_answer IN SELECT * FROM json_array_elements(p_answers)
-//     LOOP
-//       INSERT INTO public.audit_execution_answers (
-//         execution_id, action_id, score, observations, evidence_url, corrective_assignee_id, corrective_due_date
-//       ) VALUES (
-//         p_execution_id,
-//         (v_answer.value->>'action_id')::uuid,
-//         (v_answer.value->>'score')::numeric,
-//         v_answer.value->>'observations',
-//         v_answer.value->>'evidence_url',
-//         NULLIF(v_answer.value->>'corrective_assignee_id', '')::uuid,
-//         (v_answer.value->>'corrective_due_date')::timestamp
-//       );
-//
-//       IF (v_answer.value->>'score')::numeric IS NOT NULL THEN
-//         v_total_score := v_total_score + (v_answer.value->>'score')::numeric;
-//         v_max_score := v_max_score + COALESCE((SELECT weight FROM public.audit_actions WHERE id = (v_answer.value->>'action_id')::uuid), 1);
-//       END IF;
-//
-//       IF NOT p_is_draft AND NULLIF(v_answer.value->>'corrective_assignee_id', '') IS NOT NULL THEN
-//         SELECT id, sla_hours INTO v_task_type_id, v_sla_hours FROM public.task_types WHERE client_id = v_audit.client_id AND name = 'Ação Corretiva' LIMIT 1;
-//         IF v_task_type_id IS NULL THEN
-//           INSERT INTO public.task_types (client_id, name, sla_hours) VALUES (v_audit.client_id, 'Ação Corretiva', 48) RETURNING id, 48 INTO v_task_type_id, v_sla_hours;
-//         END IF;
-//
-//         SELECT id INTO v_task_status_id FROM public.task_statuses WHERE client_id = v_audit.client_id AND name = 'Aberta' LIMIT 1;
-//
-//         IF v_answer.value->>'corrective_due_date' IS NOT NULL THEN
-//           v_due_date := (v_answer.value->>'corrective_due_date')::timestamptz;
-//         ELSE
-//           v_due_date := NOW() + (COALESCE(v_audit.sla_days, COALESCE(v_sla_hours, 48) / 24.0, 2) * interval '1 day');
-//         END IF;
-//
-//         INSERT INTO public.tasks (
-//           client_id, plant_id, type_id, status_id, requester_id, assignee_id,
-//           title, description, task_number, due_date
-//         ) VALUES (
-//           v_audit.client_id, v_execution.plant_id, v_task_type_id, v_task_status_id,
-//           v_execution.assignee_id, (v_answer.value->>'corrective_assignee_id')::uuid,
-//           'Ação Corretiva: ' || v_audit.title,
-//           'Ação corretiva gerada pela auditoria. Obs: ' || COALESCE(v_answer.value->>'observations', ''),
-//           'COR-' || upper(substr(md5(random()::text), 1, 6)),
-//           v_due_date
-//         );
-//       END IF;
-//     END LOOP;
-//
-//     UPDATE public.audit_executions
-//     SET final_score = v_total_score, max_score = v_max_score
-//     WHERE id = p_execution_id;
-//
-//     RETURN json_build_object('success', true, 'execution_id', p_execution_id);
-//   END;
-//   $function$
-//
 // FUNCTION submit_maintenance_ticket(uuid, uuid, uuid, uuid, uuid, text, text, text, jsonb)
 //   CREATE OR REPLACE FUNCTION public.submit_maintenance_ticket(p_client_id uuid, p_plant_id uuid, p_area_id uuid, p_sublocation_id uuid, p_asset_id uuid, p_requester_name text, p_requester_email text, p_description text, p_photos jsonb)
 //    RETURNS jsonb
@@ -5518,6 +5541,32 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION trigger_audit_daily_logs()
+//   CREATE OR REPLACE FUNCTION public.trigger_audit_daily_logs()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_user_id uuid;
+//   BEGIN
+//     v_user_id := auth.uid();
+//     IF v_user_id IS NULL THEN
+//       v_user_id := '00000000-0000-0000-0000-000000000000'::uuid;
+//     END IF;
+//
+//     INSERT INTO public.audit_logs (action_type, client_id, user_id, details)
+//     VALUES (
+//       TG_OP,
+//       COALESCE(NEW.client_id, OLD.client_id),
+//       v_user_id,
+//       'Daily Log ' || TG_OP || ' for reference ' || COALESCE(NEW.reference_id, OLD.reference_id) || ' on date ' || COALESCE(NEW.date, OLD.date)::text
+//     );
+//
+//     RETURN COALESCE(NEW, OLD);
+//   END;
+//   $function$
+//
 
 // --- TRIGGERS ---
 // Table: audit_actions
@@ -5537,7 +5586,7 @@ export const Constants = {
 // Table: cleaning_gardening_schedules
 //   audit_cleaning_gardening_schedules: CREATE TRIGGER audit_cleaning_gardening_schedules AFTER INSERT OR DELETE OR UPDATE ON public.cleaning_gardening_schedules FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: daily_logs
-//   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+//   audit_daily_logs: CREATE TRIGGER audit_daily_logs AFTER INSERT OR DELETE OR UPDATE ON public.daily_logs FOR EACH ROW EXECUTE FUNCTION trigger_audit_daily_logs()
 // Table: employees
 //   audit_employees: CREATE TRIGGER audit_employees AFTER INSERT OR DELETE ON public.employees FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 //   check_duplicate_employee: CREATE TRIGGER check_duplicate_employee BEFORE INSERT OR UPDATE ON public.employees FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_employee()

@@ -69,14 +69,25 @@ export default function Lancamentos() {
       const dateStart = startOfMonth(parseISO(monthStart))
       const dateEnd = endOfMonth(dateStart)
 
+      const currentPlantObj = plants.find((p) => p.id === selectedPlant)
+      if (!currentPlantObj) {
+        setEmployees([])
+        setEquipment([])
+        setLoading(false)
+        return
+      }
+
       // Colaboradores (Filter purely by reference_month to deduplicate historical records)
-      const { data: emps } = await supabase
+      const { data: emps, error: empsError } = await supabase
         .from('employees')
         .select('id, name, company_name, function_id, registration_number, reference_month')
         .eq('plant_id', selectedPlant)
+        .eq('client_id', currentPlantObj.client_id)
         .eq('status', 'Ativo')
         .eq('reference_month', monthStart)
         .order('name')
+
+      if (empsError) throw empsError
 
       if (emps) {
         setEmployees(emps)
@@ -87,34 +98,48 @@ export default function Lancamentos() {
       }
 
       // Equipamentos
-      const { data: eqs } = await supabase
+      const { data: eqs, error: eqsError } = await supabase
         .from('equipment')
         .select('id, name, type, quantity')
         .eq('plant_id', selectedPlant)
+        .eq('client_id', currentPlantObj.client_id)
         .eq('status', 'Ativo')
         .order('name')
+
+      if (eqsError) throw eqsError
       setEquipment(eqs || [])
 
       // Diário de Lançamentos
-      const { data: logs } = await supabase
+      const { data: logs, error: logsError } = await supabase
         .from('daily_logs')
         .select('*')
         .eq('plant_id', selectedPlant)
+        .eq('client_id', currentPlantObj.client_id)
         .gte('date', format(dateStart, 'yyyy-MM-dd'))
         .lte('date', format(dateEnd, 'yyyy-MM-dd'))
+
+      if (logsError) throw logsError
       setDailyLogs(logs || [])
 
       // Dias Não Úteis
-      const { data: nwDays } = await supabase
+      const { data: nwDays, error: nwDaysError } = await supabase
         .from('plant_non_working_days')
         .select('*')
         .eq('plant_id', selectedPlant)
+        .eq('client_id', currentPlantObj.client_id)
         .gte('date', format(dateStart, 'yyyy-MM-dd'))
         .lte('date', format(dateEnd, 'yyyy-MM-dd'))
+
+      if (nwDaysError) throw nwDaysError
       setNonWorkingDays(nwDays || [])
-    } catch (error) {
-      console.error(error)
-      toast({ title: 'Erro ao carregar dados', variant: 'destructive' })
+    } catch (error: any) {
+      console.error('Data loading error:', error)
+      const errorMsg = error.message || error.details || 'Ocorreu um erro ao carregar os dados.'
+      toast({
+        title: 'Erro ao carregar dados',
+        description: errorMsg,
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -149,7 +174,7 @@ export default function Lancamentos() {
         (l) => l.type === type && l.reference_id === referenceId && l.date === date,
       )
 
-      const payload = {
+      const payload: any = {
         client_id: clientId,
         plant_id: selectedPlant,
         type,
@@ -157,6 +182,10 @@ export default function Lancamentos() {
         date,
         status: newStatus,
         is_published: false,
+      }
+
+      if (existingLog?.id) {
+        payload.id = existingLog.id
       }
 
       const { data, error, status } = await supabase
@@ -167,12 +196,13 @@ export default function Lancamentos() {
 
       if (error) throw error
 
-      if (status === 200 || status === 201) {
+      if (status >= 200 && status < 300) {
         // Re-fetch only the logs for this specific date and plant to ensure full synchronization
         const { data: updatedLogs } = await supabase
           .from('daily_logs')
           .select('*')
           .eq('plant_id', selectedPlant)
+          .eq('client_id', clientId)
           .eq('date', date)
 
         if (updatedLogs) {
@@ -180,6 +210,21 @@ export default function Lancamentos() {
             const filtered = prev.filter((l) => l.date !== date)
             return [...filtered, ...updatedLogs]
           })
+        }
+
+        // Registrar no audit_logs
+        try {
+          const { data: userData } = await supabase.auth.getUser()
+          if (userData?.user) {
+            await supabase.from('audit_logs').insert({
+              client_id: clientId,
+              user_id: userData.user.id,
+              action_type: existingLog ? 'Atualização' : 'Inclusão',
+              details: `Registro de presença (${newStatus ? 'Presente' : 'Ausente'}) para ${type} ID ${referenceId} na data ${date} (Planta: ${selectedPlant})`,
+            })
+          }
+        } catch (auditError) {
+          console.error('Erro ao registrar auditoria:', auditError)
         }
 
         toast({
@@ -191,9 +236,18 @@ export default function Lancamentos() {
       }
     } catch (error: any) {
       console.error('Save error:', error)
+      let description = error.message || 'Tente novamente mais tarde.'
+
+      if (error.code === '42501') {
+        description =
+          'Você não tem permissão para alterar os lançamentos desta planta (Erro de RLS).'
+      } else if (error.code === '23505') {
+        description = 'Conflito de registro: Este lançamento já existe para esta data.'
+      }
+
       toast({
         title: 'Erro ao salvar lançamento',
-        description: error.message || 'Tente novamente mais tarde.',
+        description,
         variant: 'destructive',
       })
     } finally {
@@ -338,8 +392,7 @@ export default function Lancamentos() {
                   {employees.length === 0 ? (
                     <div className="text-center py-16 border rounded-lg bg-slate-50/50">
                       <p className="text-muted-foreground">
-                        Nenhum colaborador ativo encontrado para o mês de{' '}
-                        {format(parseISO(`${referenceMonth}-01`), 'MMMM/yyyy', { locale: ptBR })}.
+                        Nenhum colaborador encontrado para esta unidade neste mês.
                       </p>
                     </div>
                   ) : (
