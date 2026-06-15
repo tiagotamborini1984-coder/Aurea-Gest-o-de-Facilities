@@ -170,10 +170,16 @@ export default function Lancamentos() {
     const clientId = currentPlant?.client_id
 
     try {
-      if (!clientId) {
+      let finalClientId = clientId
+      if (!finalClientId) {
+        const { data: rpcClientId } = await supabase.rpc('get_user_client_id')
+        if (rpcClientId) finalClientId = rpcClientId
+      }
+
+      if (!finalClientId) {
         toast({
           title: 'Vínculo de cliente inválido',
-          description: `A planta '${currentPlant?.name || 'selecionada'}' não possui um cliente associado.`,
+          description: `A planta '${currentPlant?.name || 'selecionada'}' não possui um cliente associado e não foi possível identificar o cliente do usuário.`,
           variant: 'destructive',
         })
         setToggling((prev) => ({ ...prev, [toggleKey]: false }))
@@ -181,12 +187,9 @@ export default function Lancamentos() {
       }
 
       const newStatus = !currentStatus
-      const existingLog = dailyLogs.find(
-        (l) => l.type === type && l.reference_id === referenceId && l.date === date,
-      )
 
       const payload: any = {
-        client_id: clientId,
+        client_id: finalClientId,
         plant_id: selectedPlant,
         type,
         reference_id: referenceId,
@@ -195,10 +198,7 @@ export default function Lancamentos() {
         is_published: false,
       }
 
-      if (existingLog?.id) {
-        payload.id = existingLog.id
-      }
-
+      // DO NOT pass `id` so the upsert relies entirely on the unique constraint `date,type,reference_id`.
       const response = await supabase
         .from('daily_logs')
         .upsert(payload, { onConflict: 'date,type,reference_id' })
@@ -221,12 +221,20 @@ export default function Lancamentos() {
       }
 
       if (status >= 200 && status < 300) {
-        // State Consistency: refresh the logs from the database as requested
+        // Immediate local state update for fast UI feedback
+        setDailyLogs((prev) => {
+          const filtered = prev.filter(
+            (l) => !(l.type === type && l.reference_id === referenceId && l.date === date),
+          )
+          return [...filtered, data]
+        })
+
+        // State Consistency: refresh the logs from the database in background
         const [year, month] = referenceMonth.split('-').map(Number)
         const dateStart = new Date(year, month - 1, 1)
         const dateEnd = new Date(year, month, 0)
 
-        await fetchDailyLogs(clientId, selectedPlant, dateStart, dateEnd)
+        fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd).catch(console.error)
 
         toast({
           title: 'Sucesso',
