@@ -4096,8 +4096,8 @@ export const Constants = {
 //     WITH CHECK: (((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
 // Table: daily_logs
 //   Policy "plant_isolation_daily_logs" (ALL, PERMISSIVE) roles={authenticated}
-//     USING: (((lower(get_user_role()) = 'master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
-//     WITH CHECK: (((lower(get_user_role()) = 'master'::text) OR (client_id = get_user_client_id())) AND is_plant_authorized(plant_id))
+//     USING: (EXISTS ( SELECT 1    FROM profiles p   WHERE ((p.id = auth.uid()) AND ((p.role = ANY (ARRAY['Master'::text, 'Admin'::text])) OR ((p.authorized_plants IS NOT NULL) AND (jsonb_typeof(p.authorized_plants) = 'array'::text) AND (p.authorized_plants @> jsonb_build_array((daily_logs.plant_id)::text)))))))
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles p   WHERE ((p.id = auth.uid()) AND ((p.role = ANY (ARRAY['Master'::text, 'Admin'::text])) OR ((p.authorized_plants IS NOT NULL) AND (jsonb_typeof(p.authorized_plants) = 'array'::text) AND (p.authorized_plants @> jsonb_build_array((daily_logs.plant_id)::text)))))))
 // Table: employee_training_records
 //   Policy "tenant_isolation_employee_training_records" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))

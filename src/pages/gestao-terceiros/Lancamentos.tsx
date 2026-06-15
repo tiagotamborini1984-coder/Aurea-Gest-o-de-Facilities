@@ -78,12 +78,12 @@ export default function Lancamentos() {
       }
 
       // Colaboradores (Filter purely by reference_month to deduplicate historical records)
+      // Removed status filter to ensure historical visibility (e.g., June 2024 records for currently inactive employees)
       const { data: emps, error: empsError } = await supabase
         .from('employees')
-        .select('id, name, company_name, function_id, registration_number, reference_month')
+        .select('id, name, company_name, function_id, registration_number, reference_month, status')
         .eq('plant_id', selectedPlant)
         .eq('client_id', currentPlantObj.client_id)
-        .eq('status', 'Ativo')
         .eq('reference_month', monthStart)
         .order('name')
 
