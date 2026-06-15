@@ -18,7 +18,7 @@ BEGIN
   DELETE FROM public.daily_logs
   WHERE id IN (
     SELECT id FROM (
-      SELECT id, ROW_NUMBER() OVER (PARTITION BY date, type, reference_id ORDER BY updated_at DESC, id ASC) as rnum
+      SELECT id, ROW_NUMBER() OVER (PARTITION BY date, type, reference_id ORDER BY created_at DESC, id ASC) as rnum
       FROM public.daily_logs
     ) t
     WHERE t.rnum > 1
