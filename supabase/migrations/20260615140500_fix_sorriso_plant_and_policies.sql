@@ -56,8 +56,8 @@ BEGIN
 
   -- 4. Ensure the test user has access to this plant in their profile
   IF v_user_id IS NOT NULL THEN
-    INSERT INTO public.profiles (id, email, name, role, is_admin)
-    VALUES (v_user_id, 'lptamborini@hotmail.com', 'Lucas', 'admin', false)
+    INSERT INTO public.profiles (id, email, name, role)
+    VALUES (v_user_id, 'lptamborini@hotmail.com', 'Lucas', 'admin')
     ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
 
     SELECT authorized_plants INTO v_plants_jsonb FROM public.profiles WHERE id = v_user_id;
@@ -93,8 +93,7 @@ CREATE POLICY "daily_logs_select" ON public.daily_logs
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
       AND (
-        profiles.is_admin = true
-        OR profiles.role IN ('Master', 'Administrador', 'admin')
+        profiles.role IN ('Master', 'Administrador', 'admin')
         OR (profiles.authorized_plants IS NOT NULL AND profiles.authorized_plants @> to_jsonb(plant_id::text))
       )
     )
@@ -107,8 +106,7 @@ CREATE POLICY "daily_logs_insert" ON public.daily_logs
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
       AND (
-        profiles.is_admin = true
-        OR profiles.role IN ('Master', 'Administrador', 'admin')
+        profiles.role IN ('Master', 'Administrador', 'admin')
         OR (profiles.authorized_plants IS NOT NULL AND profiles.authorized_plants @> to_jsonb(plant_id::text))
       )
     )
@@ -121,8 +119,7 @@ CREATE POLICY "daily_logs_update" ON public.daily_logs
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
       AND (
-        profiles.is_admin = true
-        OR profiles.role IN ('Master', 'Administrador', 'admin')
+        profiles.role IN ('Master', 'Administrador', 'admin')
         OR (profiles.authorized_plants IS NOT NULL AND profiles.authorized_plants @> to_jsonb(plant_id::text))
       )
     )
@@ -132,8 +129,7 @@ CREATE POLICY "daily_logs_update" ON public.daily_logs
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid()
       AND (
-        profiles.is_admin = true
-        OR profiles.role IN ('Master', 'Administrador', 'admin')
+        profiles.role IN ('Master', 'Administrador', 'admin')
         OR (profiles.authorized_plants IS NOT NULL AND profiles.authorized_plants @> to_jsonb(plant_id::text))
       )
     )
