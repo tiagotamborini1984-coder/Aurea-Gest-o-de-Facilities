@@ -195,26 +195,19 @@ export default function Lancamentos() {
         is_published: false,
       }
 
-      let data
-      let error
-      let status
-
       if (existingLog?.id) {
-        const response = await supabase
-          .from('daily_logs')
-          .update({ status: newStatus, is_published: false })
-          .eq('id', existingLog.id)
-          .select()
-          .maybeSingle()
-        data = response.data
-        error = response.error
-        status = response.status
-      } else {
-        const response = await supabase.from('daily_logs').insert(payload).select().maybeSingle()
-        data = response.data
-        error = response.error
-        status = response.status
+        payload.id = existingLog.id
       }
+
+      const response = await supabase
+        .from('daily_logs')
+        .upsert(payload, { onConflict: 'date,type,reference_id' })
+        .select()
+        .maybeSingle()
+
+      const data = response.data
+      const error = response.error
+      const status = response.status
 
       if (error) {
         throw error
