@@ -157,16 +157,17 @@ export default function Lancamentos() {
 
     setToggling((prev) => ({ ...prev, [toggleKey]: true }))
 
-    try {
-      const currentPlant = plants.find((p) => p.id === selectedPlant)
-      const clientId = currentPlant?.client_id
+    const currentPlant = plants.find((p) => p.id === selectedPlant)
+    const clientId = currentPlant?.client_id
 
+    try {
       if (!clientId) {
         toast({
-          title: 'Erro',
-          description: 'Planta não encontrada ou sem cliente associado.',
+          title: 'Vínculo de cliente inválido',
+          description: `A planta '${currentPlant?.name || 'selecionada'}' não possui um cliente associado.`,
           variant: 'destructive',
         })
+        setToggling((prev) => ({ ...prev, [toggleKey]: false }))
         return
       }
 
@@ -239,10 +240,17 @@ export default function Lancamentos() {
       console.error('Save error:', error)
       let description = error.message || error.details || 'Tente novamente mais tarde.'
 
+      const plantName = currentPlant?.name || 'selecionada'
+
       if (error.code === '42501') {
-        description = `Você não tem permissão para alterar os lançamentos desta planta (Erro de RLS). Detalhes: ${error.message}`
+        description = `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
       } else if (error.code === '23505') {
         description = 'Conflito de registro: Este lançamento já existe para esta data.'
+      } else if (
+        error.message?.includes('violates foreign key constraint') ||
+        error.code === '23503'
+      ) {
+        description = 'Vínculo de cliente ou planta inválido no sistema.'
       }
 
       toast({
@@ -258,9 +266,19 @@ export default function Lancamentos() {
   const toggleNonWorkingDay = async (date: string) => {
     const currentPlant = plants.find((p) => p.id === selectedPlant)
     const clientId = currentPlant?.client_id
-    if (!clientId) return
 
+    if (!clientId) {
+      toast({
+        title: 'Vínculo de cliente inválido',
+        description: `A planta '${currentPlant?.name || 'selecionada'}' não possui um cliente associado.`,
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const plantName = currentPlant?.name || 'selecionada'
     const existing = nonWorkingDays.find((d) => d.date === date)
+
     if (existing) {
       const { error } = await supabase.from('plant_non_working_days').delete().eq('id', existing.id)
       if (!error) {
@@ -271,8 +289,11 @@ export default function Lancamentos() {
         })
       } else {
         toast({
-          title: 'Erro',
-          description: 'Não foi possível alterar o status do dia.',
+          title: 'Erro de permissão',
+          description:
+            error.code === '42501'
+              ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
+              : 'Não foi possível alterar o status do dia.',
           variant: 'destructive',
         })
       }
@@ -287,6 +308,7 @@ export default function Lancamentos() {
         })
         .select()
         .single()
+
       if (!error && data) {
         setNonWorkingDays((prev) => [...prev, data])
         toast({
@@ -295,8 +317,11 @@ export default function Lancamentos() {
         })
       } else {
         toast({
-          title: 'Erro',
-          description: 'Não foi possível alterar o status do dia.',
+          title: 'Erro ao salvar',
+          description:
+            error?.code === '42501'
+              ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
+              : 'Não foi possível alterar o status do dia.',
           variant: 'destructive',
         })
       }
