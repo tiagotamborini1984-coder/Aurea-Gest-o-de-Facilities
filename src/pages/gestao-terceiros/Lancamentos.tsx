@@ -195,15 +195,26 @@ export default function Lancamentos() {
         is_published: false,
       }
 
-      if (existingLog?.id) {
-        payload.id = existingLog.id
-      }
+      let data
+      let error
+      let status
 
-      const { data, error, status } = await supabase
-        .from('daily_logs')
-        .upsert(payload, { onConflict: 'date,type,reference_id' })
-        .select()
-        .maybeSingle()
+      if (existingLog?.id) {
+        const response = await supabase
+          .from('daily_logs')
+          .update({ status: newStatus, is_published: false })
+          .eq('id', existingLog.id)
+          .select()
+          .maybeSingle()
+        data = response.data
+        error = response.error
+        status = response.status
+      } else {
+        const response = await supabase.from('daily_logs').insert(payload).select().maybeSingle()
+        data = response.data
+        error = response.error
+        status = response.status
+      }
 
       if (error) {
         throw error
@@ -292,11 +303,11 @@ export default function Lancamentos() {
       } else {
         console.error('[BugScanner] Error deleting non working day:', error)
         toast({
-          title: 'Erro de permissão',
+          title: 'Erro ao excluir',
           description:
             error.code === '42501'
               ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
-              : 'Não foi possível alterar o status do dia.',
+              : `Não foi possível alterar o status do dia. Erro: ${error.message || error.code}`,
           variant: 'destructive',
         })
       }
@@ -323,9 +334,9 @@ export default function Lancamentos() {
         toast({
           title: 'Erro ao salvar',
           description:
-            error?.code === '42501' || !data
+            error?.code === '42501'
               ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
-              : 'Não foi possível alterar o status do dia.',
+              : `Não foi possível alterar o status do dia. Erro: ${error?.message || 'Desconhecido'}`,
           variant: 'destructive',
         })
       }
