@@ -10,7 +10,7 @@ BEGIN
   SELECT client_id INTO v_client_id FROM public.profiles WHERE id = auth.uid();
   RETURN v_client_id;
 END;
-$;
+$$;
 
 DO $$
 BEGIN
