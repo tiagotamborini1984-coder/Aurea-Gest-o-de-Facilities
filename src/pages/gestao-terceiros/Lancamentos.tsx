@@ -62,6 +62,24 @@ export default function Lancamentos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlant, referenceMonth])
 
+  const fetchDailyLogs = async (
+    clientId: string,
+    plantId: string,
+    startDate: Date,
+    endDate: Date,
+  ) => {
+    const { data: logs, error: logsError } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .eq('plant_id', plantId)
+      .eq('client_id', clientId)
+      .gte('date', format(startDate, 'yyyy-MM-dd'))
+      .lte('date', format(endDate, 'yyyy-MM-dd'))
+
+    if (logsError) throw logsError
+    setDailyLogs(logs || [])
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
@@ -111,16 +129,7 @@ export default function Lancamentos() {
       setEquipment(eqs || [])
 
       // Diário de Lançamentos
-      const { data: logs, error: logsError } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .eq('plant_id', selectedPlant)
-        .eq('client_id', currentPlantObj.client_id)
-        .gte('date', format(dateStart, 'yyyy-MM-dd'))
-        .lte('date', format(dateEnd, 'yyyy-MM-dd'))
-
-      if (logsError) throw logsError
-      setDailyLogs(logs || [])
+      await fetchDailyLogs(currentPlantObj.client_id, selectedPlant, dateStart, dateEnd)
 
       // Dias Não Úteis
       const { data: nwDays, error: nwDaysError } = await supabase
@@ -208,18 +217,12 @@ export default function Lancamentos() {
       }
 
       if (status >= 200 && status < 300) {
-        // State Consistency: refresh the specific date directly from the response if possible
-        setDailyLogs((prev) => {
-          const filtered = prev.filter(
-            (l) =>
-              !(
-                l.type === data.type &&
-                l.reference_id === data.reference_id &&
-                l.date === data.date
-              ),
-          )
-          return [...filtered, data]
-        })
+        // State Consistency: refresh the logs from the database as requested
+        const [year, month] = referenceMonth.split('-').map(Number)
+        const dateStart = new Date(year, month - 1, 1)
+        const dateEnd = new Date(year, month, 0)
+
+        await fetchDailyLogs(clientId, selectedPlant, dateStart, dateEnd)
 
         toast({
           title: 'Sucesso',
@@ -248,6 +251,8 @@ export default function Lancamentos() {
       ) {
         description =
           'Vínculo de cliente ou planta inválido no sistema. Por favor, contate o administrador.'
+      } else if (error.message) {
+        description = `Erro do banco de dados: ${error.message}`
       }
 
       toast({
