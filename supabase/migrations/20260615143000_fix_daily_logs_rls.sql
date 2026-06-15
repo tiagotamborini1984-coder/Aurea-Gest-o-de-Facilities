@@ -26,7 +26,7 @@ BEGIN
   
   RETURN v_client_id;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.is_plant_authorized(p_plant_id uuid)
 RETURNS boolean
@@ -73,7 +73,7 @@ BEGIN
   -- 6. If authorized_plants is null/empty but plant belongs to client, default allow
   RETURN true;
 END;
-$;
+$$;
 
 DO $$
 BEGIN
