@@ -4098,12 +4098,12 @@ export const Constants = {
 //   Policy "daily_logs_delete" (DELETE, PERMISSIVE) roles={authenticated}
 //     USING: ((client_id = get_user_client_id()) AND is_plant_authorized(plant_id))
 //   Policy "daily_logs_insert" (INSERT, PERMISSIVE) roles={authenticated}
-//     WITH CHECK: ((client_id = get_user_client_id()) AND is_plant_authorized(plant_id))
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND ((profiles.role = ANY (ARRAY['Master'::text, 'Administrador'::text, 'admin'::text])) OR ((profiles.authorized_plants IS NOT NULL) AND (profiles.authorized_plants @> to_jsonb((daily_logs.plant_id)::text)))))))
 //   Policy "daily_logs_select" (SELECT, PERMISSIVE) roles={authenticated}
-//     USING: ((client_id = get_user_client_id()) AND is_plant_authorized(plant_id))
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND ((profiles.role = ANY (ARRAY['Master'::text, 'Administrador'::text, 'admin'::text])) OR ((profiles.authorized_plants IS NOT NULL) AND (profiles.authorized_plants @> to_jsonb((daily_logs.plant_id)::text)))))))
 //   Policy "daily_logs_update" (UPDATE, PERMISSIVE) roles={authenticated}
-//     USING: ((client_id = get_user_client_id()) AND is_plant_authorized(plant_id))
-//     WITH CHECK: ((client_id = get_user_client_id()) AND is_plant_authorized(plant_id))
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND ((profiles.role = ANY (ARRAY['Master'::text, 'Administrador'::text, 'admin'::text])) OR ((profiles.authorized_plants IS NOT NULL) AND (profiles.authorized_plants @> to_jsonb((daily_logs.plant_id)::text)))))))
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND ((profiles.role = ANY (ARRAY['Master'::text, 'Administrador'::text, 'admin'::text])) OR ((profiles.authorized_plants IS NOT NULL) AND (profiles.authorized_plants @> to_jsonb((daily_logs.plant_id)::text)))))))
 // Table: employee_training_records
 //   Policy "tenant_isolation_employee_training_records" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))

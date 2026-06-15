@@ -214,27 +214,12 @@ export default function Lancamentos() {
           })
         }
 
-        // Registrar no audit_logs
-        try {
-          const { data: userData } = await supabase.auth.getUser()
-          if (userData?.user) {
-            await supabase.from('audit_logs').insert({
-              client_id: clientId,
-              user_id: userData.user.id,
-              action_type: existingLog ? 'Atualização' : 'Inclusão',
-              details: `Registro de presença (${newStatus ? 'Presente' : 'Ausente'}) para ${type} ID ${referenceId} na data ${date} (Planta: ${selectedPlant})`,
-            })
-          }
-        } catch (auditError) {
-          console.error('Erro ao registrar auditoria:', auditError)
-        }
-
         toast({
           title: 'Sucesso',
           description: `Registro atualizado para ${newStatus ? 'Presente' : 'Ausente'} com sucesso.`,
         })
       } else {
-        throw new Error('Status inesperado ao salvar: ' + status)
+        throw { message: 'Status inesperado ao salvar: ' + status, code: 'UNKNOWN' }
       }
     } catch (error: any) {
       console.error('Save error:', error)
@@ -243,14 +228,15 @@ export default function Lancamentos() {
       const plantName = currentPlant?.name || 'selecionada'
 
       if (error.code === '42501') {
-        description = `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
+        description = `Erro de permissão na planta ${plantName}. Verifique suas autorizações de acesso a esta unidade.`
       } else if (error.code === '23505') {
         description = 'Conflito de registro: Este lançamento já existe para esta data.'
       } else if (
         error.message?.includes('violates foreign key constraint') ||
         error.code === '23503'
       ) {
-        description = 'Vínculo de cliente ou planta inválido no sistema.'
+        description =
+          'Vínculo de cliente ou planta inválido no sistema. Por favor, contate o administrador.'
       }
 
       toast({
