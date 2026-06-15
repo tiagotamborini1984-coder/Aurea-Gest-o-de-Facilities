@@ -65,9 +65,10 @@ export default function Lancamentos() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const monthStart = `${referenceMonth}-01`
-      const dateStart = startOfMonth(parseISO(monthStart))
-      const dateEnd = endOfMonth(dateStart)
+      const [year, month] = referenceMonth.split('-').map(Number)
+      const dateStart = new Date(year, month - 1, 1)
+      const dateEnd = new Date(year, month, 0)
+      const monthStartDb = `${referenceMonth}-01`
 
       const currentPlantObj = plants.find((p) => p.id === selectedPlant)
       if (!currentPlantObj) {
@@ -84,7 +85,7 @@ export default function Lancamentos() {
         .select('id, name, company_name, function_id, registration_number, reference_month, status')
         .eq('plant_id', selectedPlant)
         .eq('client_id', currentPlantObj.client_id)
-        .eq('reference_month', monthStart)
+        .eq('reference_month', monthStartDb)
         .order('name')
 
       if (empsError) throw empsError
@@ -236,11 +237,10 @@ export default function Lancamentos() {
       }
     } catch (error: any) {
       console.error('Save error:', error)
-      let description = error.message || 'Tente novamente mais tarde.'
+      let description = error.message || error.details || 'Tente novamente mais tarde.'
 
       if (error.code === '42501') {
-        description =
-          'Você não tem permissão para alterar os lançamentos desta planta (Erro de RLS).'
+        description = `Você não tem permissão para alterar os lançamentos desta planta (Erro de RLS). Detalhes: ${error.message}`
       } else if (error.code === '23505') {
         description = 'Conflito de registro: Este lançamento já existe para esta data.'
       }
@@ -305,9 +305,9 @@ export default function Lancamentos() {
 
   const daysInMonth = useMemo(() => {
     if (!referenceMonth) return []
-    const monthStart = `${referenceMonth}-01`
-    const dateStart = startOfMonth(parseISO(monthStart))
-    const dateEnd = endOfMonth(dateStart)
+    const [year, month] = referenceMonth.split('-').map(Number)
+    const dateStart = new Date(year, month - 1, 1)
+    const dateEnd = new Date(year, month, 0)
     return eachDayOfInterval({ start: dateStart, end: dateEnd })
   }, [referenceMonth])
 
@@ -352,8 +352,16 @@ export default function Lancamentos() {
           <CardTitle>Diário de Frequência</CardTitle>
           <CardDescription>
             Mês de Referência:{' '}
-            {format(parseISO(`${referenceMonth}-01`), 'MMMM yyyy', { locale: ptBR })}
-          </CardDescription>
+            {format(
+              new Date(
+                Number(referenceMonth.split('-')[0]),
+                Number(referenceMonth.split('-')[1]) - 1,
+                1,
+              ),
+              'MMMM yyyy',
+              { locale: ptBR },
+            )}
+          </CardDescription>{' '}
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
