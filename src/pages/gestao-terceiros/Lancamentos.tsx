@@ -194,25 +194,32 @@ export default function Lancamentos() {
         .from('daily_logs')
         .upsert(payload, { onConflict: 'date,type,reference_id' })
         .select()
-        .single()
+        .maybeSingle()
 
-      if (error) throw error
+      if (error) {
+        throw error
+      }
+
+      if (!data) {
+        throw {
+          message: 'A operação não retornou dados. Verifique suas permissões na planta.',
+          code: 'RLS_NO_DATA',
+        }
+      }
 
       if (status >= 200 && status < 300) {
-        // Re-fetch only the logs for this specific date and plant to ensure full synchronization
-        const { data: updatedLogs } = await supabase
-          .from('daily_logs')
-          .select('*')
-          .eq('plant_id', selectedPlant)
-          .eq('client_id', clientId)
-          .eq('date', date)
-
-        if (updatedLogs) {
-          setDailyLogs((prev) => {
-            const filtered = prev.filter((l) => l.date !== date)
-            return [...filtered, ...updatedLogs]
-          })
-        }
+        // State Consistency: refresh the specific date directly from the response if possible
+        setDailyLogs((prev) => {
+          const filtered = prev.filter(
+            (l) =>
+              !(
+                l.type === data.type &&
+                l.reference_id === data.reference_id &&
+                l.date === data.date
+              ),
+          )
+          return [...filtered, data]
+        })
 
         toast({
           title: 'Sucesso',
@@ -222,12 +229,16 @@ export default function Lancamentos() {
         throw { message: 'Status inesperado ao salvar: ' + status, code: 'UNKNOWN' }
       }
     } catch (error: any) {
-      console.error('Save error:', error)
-      let description = error.message || error.details || 'Tente novamente mais tarde.'
+      console.error('[BugScanner] Save error in daily_logs:', {
+        error,
+        payload: { type, referenceId, date, currentStatus, newStatus: !currentStatus },
+        plant: selectedPlant,
+      })
 
+      let description = error.message || error.details || 'Tente novamente mais tarde.'
       const plantName = currentPlant?.name || 'selecionada'
 
-      if (error.code === '42501') {
+      if (error.code === '42501' || error.code === 'RLS_NO_DATA') {
         description = `Erro de permissão na planta ${plantName}. Verifique suas autorizações de acesso a esta unidade.`
       } else if (error.code === '23505') {
         description = 'Conflito de registro: Este lançamento já existe para esta data.'
@@ -274,6 +285,7 @@ export default function Lancamentos() {
           description: 'Dia marcado como útil.',
         })
       } else {
+        console.error('[BugScanner] Error deleting non working day:', error)
         toast({
           title: 'Erro de permissão',
           description:
@@ -293,7 +305,7 @@ export default function Lancamentos() {
           description: 'Dia Não Útil',
         })
         .select()
-        .single()
+        .maybeSingle()
 
       if (!error && data) {
         setNonWorkingDays((prev) => [...prev, data])
@@ -302,10 +314,11 @@ export default function Lancamentos() {
           description: 'Dia marcado como não útil.',
         })
       } else {
+        console.error('[BugScanner] Error inserting non working day:', error)
         toast({
           title: 'Erro ao salvar',
           description:
-            error?.code === '42501'
+            error?.code === '42501' || !data
               ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
               : 'Não foi possível alterar o status do dia.',
           variant: 'destructive',
