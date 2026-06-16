@@ -91,6 +91,13 @@ import PlanejamentoManutencao from './pages/gestao-manutencao/Planejamento'
 import PreventivasManutencao from './pages/gestao-manutencao/Preventivas'
 import CadastrosManutencao from './pages/gestao-manutencao/Cadastros'
 
+// Gestão de Estoque
+import CatalogoEstoque from './pages/gestao-estoque/Catalogo'
+import MeusPedidosEstoque from './pages/gestao-estoque/MeusPedidos'
+import GestaoPedidosEstoque from './pages/gestao-estoque/GestaoPedidos'
+import ProdutosEstoque from './pages/gestao-estoque/Produtos'
+import DashboardEstoque from './pages/gestao-estoque/Dashboard'
+
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
     <AuthProvider>
@@ -214,6 +221,16 @@ const App = () => (
                         element={<CentrosCustoImoveis />}
                       />
                       <Route path="/gestao-imoveis/relatorios" element={<RelatoriosImoveis />} />
+
+                      {/* Gestão de Estoque */}
+                      <Route path="/gestao-estoque/catalogo" element={<CatalogoEstoque />} />
+                      <Route path="/gestao-estoque/meus-pedidos" element={<MeusPedidosEstoque />} />
+                      <Route
+                        path="/gestao-estoque/gestao-pedidos"
+                        element={<GestaoPedidosEstoque />}
+                      />
+                      <Route path="/gestao-estoque/produtos" element={<ProdutosEstoque />} />
+                      <Route path="/gestao-estoque/dashboard" element={<DashboardEstoque />} />
 
                       {/* Gestão de Encomendas */}
                       <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />

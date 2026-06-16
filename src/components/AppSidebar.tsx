@@ -163,6 +163,17 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Gestão de Estoque',
+      icon: Package,
+      subItems: [
+        { title: 'Catálogo', path: '/gestao-estoque/catalogo' },
+        { title: 'Meus Pedidos', path: '/gestao-estoque/meus-pedidos' },
+        { title: 'Gestão de Pedidos', path: '/gestao-estoque/gestao-pedidos' },
+        { title: 'Produtos', path: '/gestao-estoque/produtos' },
+        { title: 'Dashboard', path: '/gestao-estoque/dashboard' },
+      ],
+    },
+    {
       title: 'Gestão de Encomendas',
       icon: Package,
       subItems: [
@@ -298,6 +309,28 @@ export function AppSidebar() {
           )
         } else if (item.title === 'Gestão de Imóveis') {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
+        } else if (item.title === 'Gestão de Estoque') {
+          filteredSubItems = item.subItems.filter(
+            (sub: any) =>
+              userMenus.includes('Gestão de Estoque') ||
+              userMenus.includes(`Gestão de Estoque:${sub.title}`) ||
+              role === 'Administrador' ||
+              role === 'Master' ||
+              sub.title === 'Catálogo' ||
+              sub.title === 'Meus Pedidos',
+          )
+          if (
+            role !== 'Administrador' &&
+            role !== 'Master' &&
+            !userMenus.includes('Gestão de Estoque:Gestão de Pedidos')
+          ) {
+            filteredSubItems = filteredSubItems.filter(
+              (s: any) =>
+                s.title !== 'Gestão de Pedidos' &&
+                s.title !== 'Produtos' &&
+                s.title !== 'Dashboard',
+            )
+          }
         } else if (item.title === 'Gestão de Lockers') {
           filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
         } else if (item.title === 'Gestão da Manutenção') {

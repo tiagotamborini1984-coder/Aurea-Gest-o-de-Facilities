@@ -1,0 +1,342 @@
+import { useState, useEffect } from 'react'
+import { useAppStore } from '@/store/AppContext'
+import { inventoryService } from '@/services/inventory'
+import { useAuth } from '@/hooks/use-auth'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ShoppingCart, Search, FileText, Plus, Minus, PackageOpen } from 'lucide-react'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+} from '@/components/ui/sheet'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
+
+export default function Catalogo() {
+  const { activeClient } = useAppStore()
+  const { user } = useAuth()
+  const [products, setProducts] = useState<any[]>([])
+  const [plants, setPlants] = useState<any[]>([])
+  const [areas, setAreas] = useState<any[]>([])
+
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('all')
+
+  const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
+  const [selectedPlant, setSelectedPlant] = useState('')
+  const [selectedArea, setSelectedArea] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
+
+  useEffect(() => {
+    if (activeClient) {
+      loadData()
+    }
+  }, [activeClient])
+
+  useEffect(() => {
+    if (selectedPlant) {
+      inventoryService.getAreas(selectedPlant).then(setAreas)
+    } else {
+      setAreas([])
+    }
+    setSelectedArea('')
+  }, [selectedPlant])
+
+  const loadData = async () => {
+    try {
+      const prods = await inventoryService.getProducts(activeClient.id)
+      setProducts(prods)
+      const pts = await inventoryService.getPlants(activeClient.id)
+      setPlants(pts)
+    } catch (err) {
+      toast.error('Erro ao carregar catálogo')
+    }
+  }
+
+  const addToCart = (product: any) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id)
+      if (existing) {
+        return prev.map((item) =>
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+        )
+      }
+      return [...prev, { product, quantity: 1 }]
+    })
+    toast.success('Adicionado ao carrinho')
+  }
+
+  const updateQuantity = (productId: string, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.id === productId) {
+            const newQ = Math.max(0, item.quantity + delta)
+            return { ...item, quantity: newQ }
+          }
+          return item
+        })
+        .filter((item) => item.quantity > 0),
+    )
+  }
+
+  const submitRequest = async () => {
+    if (!selectedPlant || !selectedArea) {
+      toast.error('Selecione a planta e a área')
+      return
+    }
+    if (cart.length === 0) return
+
+    setIsSubmitting(true)
+    try {
+      const requestData = {
+        client_id: activeClient.id,
+        plant_id: selectedPlant,
+        requester_id: user?.id,
+        area_id: selectedArea,
+        status: 'Pendente',
+        total_items: cart.reduce((acc, item) => acc + item.quantity, 0),
+      }
+      const itemsData = cart.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      }))
+
+      await inventoryService.submitRequest(requestData, itemsData)
+      toast.success('Pedido enviado com sucesso!')
+      setCart([])
+      setCartOpen(false)
+      setSelectedPlant('')
+      setSelectedArea('')
+    } catch (err) {
+      toast.error('Erro ao enviar pedido')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const categories = [
+    'all',
+    ...Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
+  ]
+  const filtered = products.filter((p) => {
+    const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
+    const mCat = category === 'all' || p.category === category
+    return mSearch && mCat
+  })
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Catálogo de Produtos</h1>
+          <p className="text-slate-500">Solicite materiais e itens de estoque</p>
+        </div>
+
+        <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+          <SheetTrigger asChild>
+            <Button className="relative">
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Carrinho
+              {cart.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {cart.length}
+                </span>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="flex flex-col h-full w-[400px] sm:w-[540px]">
+            <SheetHeader>
+              <SheetTitle>Meu Pedido</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-auto py-4 space-y-6">
+              {cart.length === 0 ? (
+                <div className="text-center text-slate-500 py-10">Carrinho vazio</div>
+              ) : (
+                <div className="space-y-4">
+                  {cart.map((item) => (
+                    <div
+                      key={item.product.id}
+                      className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.product.name}</p>
+                        <p className="text-xs text-slate-500">{item.product.category}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateQuantity(item.product.id, -1)}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="w-6 text-center text-sm">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateQuantity(item.product.id, 1)}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cart.length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-slate-200">
+                  <div className="space-y-2">
+                    <Label>Planta / Local</Label>
+                    <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a planta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plants.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Área / Departamento</Label>
+                    <Select
+                      value={selectedArea}
+                      onValueChange={setSelectedArea}
+                      disabled={!selectedPlant}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a área" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {areas.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+            <SheetFooter className="mt-auto pt-4 border-t border-slate-200">
+              <Button
+                disabled={cart.length === 0 || !selectedPlant || !selectedArea || isSubmitting}
+                onClick={submitRequest}
+                className="w-full"
+              >
+                {isSubmitting ? 'Enviando...' : 'Confirmar Pedido'}
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Buscar produtos..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="w-[200px]">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c === 'all' ? 'Todas' : c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {filtered.map((product) => (
+          <Card
+            key={product.id}
+            className="overflow-hidden flex flex-col hover:border-brand-vividBlue transition-colors"
+          >
+            <div className="aspect-square bg-slate-100 relative">
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                  <PackageOpen className="w-16 h-16" />
+                </div>
+              )}
+            </div>
+            <CardHeader className="p-4 pb-2">
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
+                  <p className="text-xs text-slate-500 mt-1">{product.category}</p>
+                </div>
+                {product.sds_url && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-blue-600 hover:text-blue-800"
+                    asChild
+                  >
+                    <a href={product.sds_url} target="_blank" rel="noreferrer" title="Ver FDS/SDS">
+                      <FileText className="w-4 h-4" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 flex-1">
+              <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description}</p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs font-medium bg-slate-100 px-2 py-1 rounded">
+                  Estoque: {product.current_stock} {product.unit_of_measure}
+                </span>
+              </div>
+            </CardContent>
+            <CardFooter className="p-4 pt-0">
+              <Button onClick={() => addToCart(product)} className="w-full" variant="outline">
+                Adicionar
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+        {filtered.length === 0 && (
+          <div className="col-span-full py-12 text-center text-slate-500">
+            Nenhum produto encontrado.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
