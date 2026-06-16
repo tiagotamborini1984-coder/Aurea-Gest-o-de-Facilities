@@ -5,22 +5,30 @@ export function useTrainingStatus() {
   const getTrainingStatuses = useCallback(async (employees: any[], includeDetails = false) => {
     if (!employees || employees.length === 0) return {}
 
-    // Extract unique registration numbers
+    // Extract unique registration numbers safely
     const regNumbers = Array.from(
-      new Set(employees.map((e) => e.registration_number).filter(Boolean)),
+      new Set(employees?.map((e) => e?.registration_number).filter(Boolean)),
     )
-    if (regNumbers.length === 0) return {}
 
-    // Fetch all related employees sharing these registration numbers and all required trainings
-    const [{ data: allEmps }, { data: reqTrainings }] = await Promise.all([
-      supabase
-        .from('employees')
-        .select('id, registration_number')
-        .in('registration_number', regNumbers as string[]),
+    // Fetch all required trainings, and employees matching registration numbers if available
+    const promises: Promise<any>[] = [
       supabase.from('function_required_trainings').select('*, trainings(*)'),
-    ])
+    ]
 
-    const allEmpIds = allEmps?.map((e) => e.id) || []
+    if (regNumbers.length > 0) {
+      promises.push(
+        supabase
+          .from('employees')
+          .select('id, registration_number')
+          .in('registration_number', regNumbers as string[]),
+      )
+    }
+
+    const results = await Promise.all(promises)
+    const reqTrainings = results[0]?.data || []
+    const allEmps = results[1]?.data || []
+
+    const allEmpIds = allEmps?.map((e: any) => e?.id).filter(Boolean) || []
     let allRecords: any[] = []
 
     if (allEmpIds.length > 0) {
@@ -41,7 +49,8 @@ export function useTrainingStatus() {
     // Map records by registration number
     const recordsByReg: Record<string, any[]> = {}
     allRecords.forEach((r) => {
-      const emp = allEmps?.find((e) => e.id === r.employee_id)
+      if (!r) return
+      const emp = allEmps?.find((e: any) => e?.id === r.employee_id)
       if (emp && emp.registration_number) {
         if (!recordsByReg[emp.registration_number]) recordsByReg[emp.registration_number] = []
         recordsByReg[emp.registration_number].push(r)
@@ -52,14 +61,16 @@ export function useTrainingStatus() {
     const statusMap: Record<string, 'Apto' | 'Inapto' | 'Isento' | 'Função não definida'> = {}
     const detailsMap: Record<string, any[]> = {}
 
-    employees.forEach((emp) => {
+    employees?.forEach((emp) => {
+      if (!emp || !emp.id) return
+
       if (!emp.function_id) {
         statusMap[emp.id] = 'Função não definida'
         detailsMap[emp.id] = []
         return
       }
 
-      const reqs = reqTrainings?.filter((rt) => rt.function_id === emp.function_id) || []
+      const reqs = reqTrainings?.filter((rt: any) => rt?.function_id === emp.function_id) || []
       if (reqs.length === 0) {
         statusMap[emp.id] = 'Isento'
         detailsMap[emp.id] = []
@@ -71,7 +82,8 @@ export function useTrainingStatus() {
       const details: any[] = []
 
       for (const req of reqs) {
-        const recordsForReq = myRecords.filter((r) => r.training_id === req.training_id)
+        if (!req) continue
+        const recordsForReq = myRecords.filter((r) => r?.training_id === req.training_id)
 
         let reqStatus = 'Concluído'
         let latest = null
@@ -81,11 +93,13 @@ export function useTrainingStatus() {
           status = 'Inapto'
         } else {
           latest = recordsForReq.sort(
-            (a, b) => new Date(b.completion_date).getTime() - new Date(a.completion_date).getTime(),
+            (a, b) =>
+              new Date(b?.completion_date || 0).getTime() -
+              new Date(a?.completion_date || 0).getTime(),
           )[0]
 
-          const validity = latest.trainings?.validity_months || 0
-          if (validity > 0) {
+          const validity = latest?.trainings?.validity_months || 0
+          if (validity > 0 && latest?.completion_date) {
             const expDate = new Date(latest.completion_date)
             expDate.setMonth(expDate.getMonth() + validity)
             if (expDate < new Date()) {
@@ -97,7 +111,7 @@ export function useTrainingStatus() {
 
         details.push({
           training_id: req.training_id,
-          training_name: req.trainings?.name,
+          training_name: req.trainings?.name || 'Treinamento Desconhecido',
           status: reqStatus,
           completion_date: latest?.completion_date,
           document_url: latest?.document_url,

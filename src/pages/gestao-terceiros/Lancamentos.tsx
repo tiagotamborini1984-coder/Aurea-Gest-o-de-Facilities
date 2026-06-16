@@ -129,12 +129,15 @@ export default function Lancamentos() {
       if (empsError && empsError.code !== 'PGRST116') throw empsError
 
       if (emps) {
-        const sortedEmps = [...emps].sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+        const sortedEmps = [...emps].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''))
         const uniqueEmpsMap = new Map()
         sortedEmps.forEach((e) => {
-          const key = e.registration_number
-            ? `reg-${e.registration_number}`
-            : `name-${e.name || ''}-${e.company_name || ''}`
+          if (!e) return
+          const key =
+            e.id ||
+            (e.registration_number
+              ? `reg-${e.registration_number}`
+              : `name-${e.name || ''}-${e.company_name || ''}`)
           uniqueEmpsMap.set(key, e)
         })
         const uniqueEmps = Array.from(uniqueEmpsMap.values())
@@ -167,12 +170,16 @@ export default function Lancamentos() {
       if (eqsError && eqsError.code !== 'PGRST116') throw eqsError
 
       if (eqs) {
-        const sortedEqs = [...eqs].sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+        const sortedEqs = [...eqs].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''))
         const uniqueEqsMap = new Map()
         sortedEqs.forEach((e) => {
-          if (e.name) uniqueEqsMap.set(e.name, e)
+          if (!e) return
+          const key = e.id || e.name
+          if (key) uniqueEqsMap.set(key, e)
         })
         setEquipment(Array.from(uniqueEqsMap.values()))
+      } else {
+        setEquipment([])
       }
     } catch (error: any) {
       console.error('Data loading error:', error)
@@ -449,11 +456,9 @@ export default function Lancamentos() {
             ) : (
               <>
                 <TabsContent value="colaboradores" className="m-0 focus-visible:outline-none">
-                  {employees.length === 0 ? (
+                  {!employees || employees.length === 0 ? (
                     <div className="text-center py-16 border rounded-lg bg-white shadow-sm">
-                      <p className="text-muted-foreground">
-                        Nenhum colaborador ativo nesta unidade.
-                      </p>
+                      <p className="text-muted-foreground">Nenhum registro encontrado.</p>
                     </div>
                   ) : (
                     <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
@@ -468,8 +473,9 @@ export default function Lancamentos() {
                         </TableHeader>
                         <TableBody>
                           {employees.map((emp) => {
+                            if (!emp || !emp.id) return null
                             const log = dailyLogs.find(
-                              (l) => l.type === 'staff' && l.reference_id === emp.id,
+                              (l) => l?.type === 'staff' && l?.reference_id === emp.id,
                             )
                             const isPresent = !!log?.status
                             return (
@@ -477,18 +483,18 @@ export default function Lancamentos() {
                                 key={emp.id}
                                 className={cn(isNonWorkingDay && 'opacity-60')}
                               >
-                                <TableCell className="font-medium">{emp.name}</TableCell>
+                                <TableCell className="font-medium">{emp.name || '-'}</TableCell>
                                 <TableCell className="text-muted-foreground text-sm">
-                                  {emp.company_name}
+                                  {emp.company_name || '-'}
                                 </TableCell>
                                 <TableCell className="text-center">
                                   <TrainingStatusCell
-                                    employeeName={emp.name}
+                                    employeeName={emp.name || ''}
                                     statusData={{
                                       status:
-                                        trainingStatuses.statusMap?.[emp.id] ||
+                                        trainingStatuses?.statusMap?.[emp.id] ||
                                         (emp.function_id ? 'Isento' : 'Função não definida'),
-                                      details: trainingStatuses.detailsMap?.[emp.id] || [],
+                                      details: trainingStatuses?.detailsMap?.[emp.id] || [],
                                     }}
                                   />
                                 </TableCell>
@@ -513,11 +519,9 @@ export default function Lancamentos() {
                   )}
                 </TabsContent>
                 <TabsContent value="equipamentos" className="m-0 focus-visible:outline-none">
-                  {equipment.length === 0 ? (
+                  {!equipment || equipment.length === 0 ? (
                     <div className="text-center py-16 border rounded-lg bg-white shadow-sm">
-                      <p className="text-muted-foreground">
-                        Nenhum equipamento ativo nesta unidade.
-                      </p>
+                      <p className="text-muted-foreground">Nenhum registro encontrado.</p>
                     </div>
                   ) : (
                     <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
@@ -532,17 +536,20 @@ export default function Lancamentos() {
                         </TableHeader>
                         <TableBody>
                           {equipment.map((eq) => {
+                            if (!eq || !eq.id) return null
                             const log = dailyLogs.find(
-                              (l) => l.type === 'equipment' && l.reference_id === eq.id,
+                              (l) => l?.type === 'equipment' && l?.reference_id === eq.id,
                             )
                             const isUsed = !!log?.status
                             return (
                               <TableRow key={eq.id} className={cn(isNonWorkingDay && 'opacity-60')}>
-                                <TableCell className="font-medium">{eq.name}</TableCell>
+                                <TableCell className="font-medium">{eq.name || '-'}</TableCell>
                                 <TableCell className="text-muted-foreground text-sm capitalize">
-                                  {eq.type}
+                                  {eq.type || '-'}
                                 </TableCell>
-                                <TableCell className="text-center text-sm">{eq.quantity}</TableCell>
+                                <TableCell className="text-center text-sm">
+                                  {eq.quantity || 0}
+                                </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end pr-4">
                                     <Switch
