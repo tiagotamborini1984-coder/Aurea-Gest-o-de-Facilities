@@ -13,32 +13,32 @@ DROP POLICY IF EXISTS "Users can view daily_logs" ON public.daily_logs;
 CREATE POLICY "daily_logs_select" ON public.daily_logs
     FOR SELECT TO authenticated
     USING (
-        (client_id = public.get_user_client_id() OR public.is_master_user())
+        (client_id = public.get_user_client_id() OR public.get_user_role() = 'Master'::text)
         AND public.is_plant_authorized(plant_id)
     );
 
 CREATE POLICY "daily_logs_insert" ON public.daily_logs
     FOR INSERT TO authenticated
     WITH CHECK (
-        (client_id = public.get_user_client_id() OR public.is_master_user())
+        (client_id = public.get_user_client_id() OR public.get_user_role() = 'Master'::text)
         AND public.is_plant_authorized(plant_id)
     );
 
 CREATE POLICY "daily_logs_update" ON public.daily_logs
     FOR UPDATE TO authenticated
     USING (
-        (client_id = public.get_user_client_id() OR public.is_master_user())
+        (client_id = public.get_user_client_id() OR public.get_user_role() = 'Master'::text)
         AND public.is_plant_authorized(plant_id)
     )
     WITH CHECK (
-        (client_id = public.get_user_client_id() OR public.is_master_user())
+        (client_id = public.get_user_client_id() OR public.get_user_role() = 'Master'::text)
         AND public.is_plant_authorized(plant_id)
     );
 
 CREATE POLICY "daily_logs_delete" ON public.daily_logs
     FOR DELETE TO authenticated
     USING (
-        (client_id = public.get_user_client_id() OR public.is_master_user())
+        (client_id = public.get_user_client_id() OR public.get_user_role() = 'Master'::text)
         AND public.is_plant_authorized(plant_id)
     );
 
