@@ -180,6 +180,10 @@ export default function Lancamentos() {
               const existing = uniqueEmpsMap.get(key)
               if (e.reference_month === refMonth && existing.reference_month !== refMonth) {
                 uniqueEmpsMap.set(key, e)
+              } else if (staffLogIds.includes(e.id) && !staffLogIds.includes(existing.id)) {
+                uniqueEmpsMap.set(key, e)
+              } else if (e.status === 'Ativo' && existing.status !== 'Ativo') {
+                uniqueEmpsMap.set(key, e)
               } else if (!existing.reference_month && e.reference_month) {
                 uniqueEmpsMap.set(key, e)
               }
