@@ -537,6 +537,7 @@ export function useDashboardCalculations(
         notaGeral: count > 0 ? (sum / count).toFixed(1) : '0.0',
         absenteeismTarget,
       },
+      activeLogs,
     }
   }, [
     logs,

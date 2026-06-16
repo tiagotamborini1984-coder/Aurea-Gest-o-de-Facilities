@@ -45,19 +45,6 @@ export default function DashboardGestor() {
   const filteredContracted = contracted || []
   const filteredLocations = locations || []
   const filteredGoals = goals || []
-  const filteredEmployees = useMemo(() => {
-    if (!employees) return []
-    const seen = new Set()
-    return employees.filter((e: any) => {
-      if (e.status && e.status !== 'Ativo') return false
-      const regNum = e.registration_number?.trim()
-      const name = e.name?.toLowerCase().trim()
-      const key = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  }, [employees])
   const filteredEquipment = equipment || []
 
   const [nonWorkingDays, setNonWorkingDays] = useState<any[]>([])
@@ -87,6 +74,26 @@ export default function DashboardGestor() {
   const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
 
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return []
+    const seen = new Set()
+    const logReferenceIds = new Set(logs?.map((l: any) => l.reference_id) || [])
+
+    return employees.filter((e: any) => {
+      // Exclui apenas inativos para garantir que todos que trabalharam/estão afastados mas logaram apareçam
+      if (e.status && e.status === 'Inativo') return false
+
+      const regNum = e.registration_number?.trim()
+      const name = e.name?.toLowerCase().trim()
+      const key = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
+      const hasLog = logReferenceIds.has(e.id)
+
+      if (seen.has(key) && !hasLog) return false
+      seen.add(key)
+      return true
+    })
+  }, [employees, logs])
+
   const {
     metrics,
     plantStats,
@@ -95,6 +102,7 @@ export default function DashboardGestor() {
     collaboratorStats,
     goalsData,
     dailyTrend,
+    activeLogs,
   } = useDashboardCalculations(
     logs,
     monthlyGoals,
@@ -161,7 +169,7 @@ export default function DashboardGestor() {
           <DashboardMetricsCards
             metrics={metrics}
             activeTab={activeTab}
-            logs={logs}
+            logs={activeLogs}
             employees={filteredEmployees}
             equipment={filteredEquipment}
             selectedPlants={selectedPlants}
