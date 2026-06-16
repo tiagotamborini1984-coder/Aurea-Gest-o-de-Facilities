@@ -26,6 +26,12 @@ import { TrainingStatusCell } from '@/components/gestao-terceiros/TrainingStatus
 import { useTrainingStatus } from '@/hooks/use-training-status'
 import { cn } from '@/lib/utils'
 
+// Robust date normalization function to fix the "missing day" bug
+const normalizeDate = (dateVal: string | null | undefined) => {
+  if (!dateVal) return ''
+  return dateVal.split('T')[0]
+}
+
 export default function Lancamentos() {
   const { toast } = useToast()
   const { getTrainingStatuses } = useTrainingStatus()
@@ -55,6 +61,7 @@ export default function Lancamentos() {
     fetchPlants()
   }, [])
 
+  // Acts as our Query Key for Cache Invalidation: refetches when plant or month changes
   useEffect(() => {
     if (selectedPlant && referenceMonth) {
       loadData()
@@ -62,13 +69,24 @@ export default function Lancamentos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlant, referenceMonth])
 
-  const fetchDailyLogs = async (plantId: string, startDate: Date, endDate: Date) => {
-    const { data: logs, error: logsError } = await supabase
+  const fetchDailyLogs = async (
+    clientId: string | null,
+    plantId: string,
+    startDate: Date,
+    endDate: Date,
+  ) => {
+    let query = supabase
       .from('daily_logs')
       .select('*')
       .eq('plant_id', plantId)
       .gte('date', format(startDate, 'yyyy-MM-dd'))
       .lte('date', format(endDate, 'yyyy-MM-dd'))
+
+    if (clientId) {
+      query = query.eq('client_id', clientId)
+    }
+
+    const { data: logs, error: logsError } = await query
 
     if (logsError) throw logsError
 
@@ -93,10 +111,16 @@ export default function Lancamentos() {
         return
       }
 
-      // 1. Fetch Daily Logs first to optimize joined queries and capture all records with logs
-      const fetchedLogs = await fetchDailyLogs(selectedPlant, dateStart, dateEnd)
+      let finalClientId = currentPlantObj.client_id
+      if (!finalClientId) {
+        const { data: rpcClientId } = await supabase.rpc('get_user_client_id')
+        if (rpcClientId) finalClientId = rpcClientId
+      }
 
-      // 2. Colaboradores: Fetch by reference_month OR if they have daily_logs in the current month
+      // 1. Fetch Daily Logs first to optimize joined queries and capture all records with logs
+      const fetchedLogs = await fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd)
+
+      // 2. Colaboradores: Fetch active OR if they have daily_logs in the current month
       const staffLogIds = Array.from(
         new Set(fetchedLogs.filter((l) => l.type === 'staff').map((l) => l.reference_id)),
       )
@@ -107,11 +131,9 @@ export default function Lancamentos() {
         .eq('plant_id', selectedPlant)
 
       if (staffLogIds.length > 0) {
-        empsQuery = empsQuery.or(
-          `reference_month.eq.${monthStartDb},id.in.(${staffLogIds.join(',')})`,
-        )
+        empsQuery = empsQuery.or(`status.eq.Ativo,id.in.(${staffLogIds.join(',')})`)
       } else {
-        empsQuery = empsQuery.eq('reference_month', monthStartDb)
+        empsQuery = empsQuery.eq('status', 'Ativo')
       }
       empsQuery = empsQuery.order('name')
 
@@ -245,7 +267,7 @@ export default function Lancamentos() {
         // Immediate local state update for fast UI feedback
         setDailyLogs((prev) => {
           const filtered = prev.filter((l) => {
-            const logDate = l.date ? l.date.split('T')[0] : ''
+            const logDate = normalizeDate(l.date)
             return !(l.type === type && l.reference_id === referenceId && logDate === date)
           })
           return [...filtered, data]
@@ -256,7 +278,7 @@ export default function Lancamentos() {
         const dateStart = new Date(year, month - 1, 1)
         const dateEnd = new Date(year, month, 0)
 
-        await fetchDailyLogs(selectedPlant, dateStart, dateEnd)
+        await fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd)
 
         toast({
           title: 'Sucesso',
@@ -282,7 +304,6 @@ export default function Lancamentos() {
 
       let description = error.message || error.details || 'Tente novamente mais tarde.'
 
-      // We prioritize showing the specific backend message, but we provide more context if it's a known error
       if (isRLS) {
         description = `Erro de permissão: ${error.message || 'Verifique suas permissões de acesso para esta planta.'}`
       } else if (isConflict) {
@@ -322,7 +343,7 @@ export default function Lancamentos() {
     }
 
     const existing = nonWorkingDays.find((d) => {
-      const nwDate = d.date ? d.date.split('T')[0] : ''
+      const nwDate = normalizeDate(d.date)
       return nwDate === date
     })
 
@@ -492,7 +513,7 @@ export default function Lancamentos() {
                             {daysInMonth.map((day) => {
                               const dateStr = format(day, 'yyyy-MM-dd')
                               const isNW = nonWorkingDays.some((d) => {
-                                const nwDate = d.date ? d.date.split('T')[0] : ''
+                                const nwDate = normalizeDate(d.date)
                                 return nwDate === dateStr
                               })
                               const isWknd = isWeekend(day)
@@ -546,12 +567,12 @@ export default function Lancamentos() {
                               {daysInMonth.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd')
                                 const isNW = nonWorkingDays.some((d) => {
-                                  const nwDate = d.date ? d.date.split('T')[0] : ''
+                                  const nwDate = normalizeDate(d.date)
                                   return nwDate === dateStr
                                 })
                                 const isWknd = isWeekend(day)
                                 const log = dailyLogs.find((l) => {
-                                  const logDate = l.date ? l.date.split('T')[0] : ''
+                                  const logDate = normalizeDate(l.date)
                                   return (
                                     l.type === 'staff' &&
                                     l.reference_id === emp.id &&
@@ -614,7 +635,7 @@ export default function Lancamentos() {
                             {daysInMonth.map((day) => {
                               const dateStr = format(day, 'yyyy-MM-dd')
                               const isNW = nonWorkingDays.some((d) => {
-                                const nwDate = d.date ? d.date.split('T')[0] : ''
+                                const nwDate = normalizeDate(d.date)
                                 return nwDate === dateStr
                               })
                               const isWknd = isWeekend(day)
@@ -659,12 +680,12 @@ export default function Lancamentos() {
                               {daysInMonth.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd')
                                 const isNW = nonWorkingDays.some((d) => {
-                                  const nwDate = d.date ? d.date.split('T')[0] : ''
+                                  const nwDate = normalizeDate(d.date)
                                   return nwDate === dateStr
                                 })
                                 const isWknd = isWeekend(day)
                                 const log = dailyLogs.find((l) => {
-                                  const logDate = l.date ? l.date.split('T')[0] : ''
+                                  const logDate = normalizeDate(l.date)
                                   return (
                                     l.type === 'equipment' &&
                                     l.reference_id === eq.id &&
