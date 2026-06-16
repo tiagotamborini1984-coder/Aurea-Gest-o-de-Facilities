@@ -251,10 +251,14 @@ export default function Lancamentos() {
       })
 
       let description = error.message || error.details || 'Tente novamente mais tarde.'
-      const plantName = currentPlant?.name || 'selecionada'
 
-      if (error.code === '42501' || error.code === 'RLS_NO_DATA') {
-        description = `Erro de permissão na planta ${plantName}. Verifique suas autorizações de acesso a esta unidade.`
+      if (
+        error.code === '42501' ||
+        error.code === 'RLS_NO_DATA' ||
+        error.message?.includes('row-level security')
+      ) {
+        description =
+          'Não foi possível salvar o lançamento. Verifique suas permissões de acesso para esta planta.'
       } else if (error.code === '23505') {
         description = 'Conflito de registro: Este lançamento já existe para esta data.'
       } else if (
@@ -306,8 +310,8 @@ export default function Lancamentos() {
         toast({
           title: 'Erro ao excluir',
           description:
-            error.code === '42501'
-              ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
+            error.code === '42501' || error.message?.includes('row-level security')
+              ? 'Não foi possível salvar o lançamento. Verifique suas permissões de acesso para esta planta.'
               : `Não foi possível alterar o status do dia. Erro: ${error.message || error.code}`,
           variant: 'destructive',
         })
@@ -335,8 +339,8 @@ export default function Lancamentos() {
         toast({
           title: 'Erro ao salvar',
           description:
-            error?.code === '42501'
-              ? `Erro de permissão na planta ${plantName}. Verifique suas autorizações (Erro de RLS).`
+            error?.code === '42501' || error?.message?.includes('row-level security')
+              ? 'Não foi possível salvar o lançamento. Verifique suas permissões de acesso para esta planta.'
               : `Não foi possível alterar o status do dia. Erro: ${error?.message || 'Desconhecido'}`,
           variant: 'destructive',
         })
