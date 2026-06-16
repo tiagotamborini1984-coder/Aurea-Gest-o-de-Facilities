@@ -229,12 +229,12 @@ export default function Lancamentos() {
           return [...filtered, data]
         })
 
-        // State Consistency: refresh the logs from the database in background
+        // State Consistency: refresh the logs from the database to ensure UI is perfectly synced
         const [year, month] = referenceMonth.split('-').map(Number)
         const dateStart = new Date(year, month - 1, 1)
         const dateEnd = new Date(year, month, 0)
 
-        fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd).catch(console.error)
+        await fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd)
 
         toast({
           title: 'Sucesso',
@@ -250,25 +250,25 @@ export default function Lancamentos() {
         plant: selectedPlant,
       })
 
-      let description = error.message || error.details || 'Tente novamente mais tarde.'
-
-      if (
+      const isRLS =
         error.code === '42501' ||
         error.code === 'RLS_NO_DATA' ||
         error.message?.includes('row-level security')
-      ) {
-        description =
-          'Não foi possível salvar o lançamento. Verifique suas permissões de acesso para esta planta.'
-      } else if (error.code === '23505') {
-        description = 'Conflito de registro: Este lançamento já existe para esta data.'
-      } else if (
-        error.message?.includes('violates foreign key constraint') ||
-        error.code === '23503'
-      ) {
-        description =
-          'Vínculo de cliente ou planta inválido no sistema. Por favor, contate o administrador.'
+      const isConflict = error.code === '23505'
+      const isFK =
+        error.message?.includes('violates foreign key constraint') || error.code === '23503'
+
+      let description = error.message || error.details || 'Tente novamente mais tarde.'
+
+      // We prioritize showing the specific backend message, but we provide more context if it's a known error
+      if (isRLS) {
+        description = `Erro de permissão: ${error.message || 'Verifique suas permissões de acesso para esta planta.'}`
+      } else if (isConflict) {
+        description = `Conflito: ${error.message || 'Este lançamento já existe para esta data.'}`
+      } else if (isFK) {
+        description = `Erro de vínculo: ${error.message || 'Cliente ou planta inválido no sistema.'}`
       } else if (error.message) {
-        description = `Erro do banco de dados: ${error.message}`
+        description = `Detalhes do erro: ${error.message}`
       }
 
       toast({
