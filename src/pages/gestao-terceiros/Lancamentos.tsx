@@ -55,6 +55,8 @@ export default function Lancamentos() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('colaboradores')
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
+  const [isEditingPublished, setIsEditingPublished] = useState(false)
+  const [dirtyLogs, setDirtyLogs] = useState<Set<string>>(new Set())
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
 
@@ -90,6 +92,8 @@ export default function Lancamentos() {
     setTrainingStatuses({ statusMap: {}, detailsMap: {} })
     setIsNonWorkingDay(false)
     setNonWorkingDayId(null)
+    setIsEditingPublished(false)
+    setDirtyLogs(new Set())
 
     try {
       const currentPlantObj = plants.find((p) => p.id === selectedPlant)
@@ -292,6 +296,33 @@ export default function Lancamentos() {
     const toggleKey = `${type}-${referenceId}`
     if (toggling[toggleKey]) return
 
+    if (isEditingPublished) {
+      setDirtyLogs((prev) => {
+        const next = new Set(prev)
+        next.add(toggleKey)
+        return next
+      })
+      setDailyLogs((prev) => {
+        const existing = prev.find((l) => l.type === type && l.reference_id === referenceId)
+        if (existing) {
+          return prev.map((l) => (l === existing ? { ...l, status: newStatus } : l))
+        } else {
+          return [
+            ...prev,
+            {
+              plant_id: selectedPlant,
+              date: dateStr,
+              type,
+              reference_id: referenceId,
+              status: newStatus,
+              is_published: true,
+            },
+          ]
+        }
+      })
+      return
+    }
+
     setToggling((prev) => ({ ...prev, [toggleKey]: true }))
 
     const currentPlant = plants.find((p) => p.id === selectedPlant)
@@ -337,6 +368,53 @@ export default function Lancamentos() {
       })
     } finally {
       setToggling((prev) => ({ ...prev, [toggleKey]: false }))
+    }
+  }
+
+  const handleSaveChanges = async () => {
+    setLoading(true)
+    try {
+      const currentPlant = plants.find((p) => p.id === selectedPlant)
+      let clientId = currentPlant?.client_id
+
+      if (!clientId) {
+        const { data: rpcClientId } = await supabase.rpc('get_user_client_id')
+        if (rpcClientId) clientId = rpcClientId
+      }
+
+      if (!clientId) throw new Error('Vínculo de cliente inválido')
+
+      const logsToUpsert = dailyLogs
+        .filter((l) => dirtyLogs.has(`${l.type}-${l.reference_id}`))
+        .map((l) => ({
+          client_id: clientId,
+          plant_id: selectedPlant,
+          type: l.type,
+          reference_id: l.reference_id,
+          date: dateStr,
+          status: l.status,
+          is_published: true,
+        }))
+
+      if (logsToUpsert.length > 0) {
+        const { error } = await supabase
+          .from('daily_logs')
+          .upsert(logsToUpsert, { onConflict: 'date,type,reference_id' })
+
+        if (error) throw error
+      }
+
+      toast({ title: 'Sucesso', description: 'Alterações salvas com sucesso!' })
+      setIsEditingPublished(false)
+      setDirtyLogs(new Set())
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao salvar as alterações.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -458,19 +536,54 @@ export default function Lancamentos() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {dailyLogs.length > 0 && (
-              <Button
-                variant={isDayPublished ? 'outline' : 'default'}
-                onClick={handlePublishDay}
-                disabled={isDayPublished}
-                className={cn(
-                  isDayPublished
-                    ? 'text-emerald-600 border-emerald-200 bg-emerald-50'
-                    : 'bg-[#0F4C81] hover:bg-[#0F4C81]/90 text-white',
+              <div className="flex items-center gap-2">
+                {isDayPublished ? (
+                  isEditingPublished ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditingPublished(false)
+                          setDirtyLogs(new Set())
+                          loadDataForDate(true)
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleSaveChanges}
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Salvar Alterações
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium shadow-sm">
+                        <Check className="h-4 w-4" />
+                        Dia Finalizado
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditingPublished(true)}
+                        className="text-amber-700 border-amber-200 hover:bg-amber-50"
+                      >
+                        Editar Lançamentos
+                      </Button>
+                    </>
+                  )
+                ) : (
+                  <Button
+                    variant="default"
+                    onClick={handlePublishDay}
+                    className="bg-[#0F4C81] hover:bg-[#0F4C81]/90 text-white"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    Finalizar Lançamentos
+                  </Button>
                 )}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                {isDayPublished ? 'Dia Finalizado' : 'Finalizar Lançamentos'}
-              </Button>
+              </div>
             )}
             <div className="flex items-center gap-3 bg-white border px-3 py-2 rounded-lg shadow-sm">
               <span className="text-sm font-medium text-slate-700">Dia Não Útil</span>
@@ -484,6 +597,19 @@ export default function Lancamentos() {
         </CardHeader>
 
         <CardContent>
+          {isEditingPublished && (
+            <div className="bg-amber-100 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 animate-in fade-in zoom-in duration-300">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-sm">Editando dia finalizado</p>
+                <p className="text-sm opacity-90">
+                  Você está alterando os registros de um dia que já foi publicado. Não esqueça de
+                  salvar suas alterações.
+                </p>
+              </div>
+            </div>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="bg-white border p-1 shadow-sm">
               <TabsTrigger
@@ -557,7 +683,10 @@ export default function Lancamentos() {
                                       onCheckedChange={(checked) =>
                                         handleToggleLog('staff', emp.id, checked)
                                       }
-                                      disabled={toggling[`staff-${emp.id}`] || !!log?.is_published}
+                                      disabled={
+                                        toggling[`staff-${emp.id}`] ||
+                                        (!!log?.is_published && !isEditingPublished)
+                                      }
                                       className="data-[state=checked]:bg-emerald-500"
                                     />
                                   </div>
@@ -610,7 +739,8 @@ export default function Lancamentos() {
                                         handleToggleLog('equipment', eq.id, checked)
                                       }
                                       disabled={
-                                        toggling[`equipment-${eq.id}`] || !!log?.is_published
+                                        toggling[`equipment-${eq.id}`] ||
+                                        (!!log?.is_published && !isEditingPublished)
                                       }
                                       className="data-[state=checked]:bg-emerald-500"
                                     />
