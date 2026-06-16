@@ -50,7 +50,8 @@ export function useTrainingStatus() {
 
       const reqs = reqTrainings?.filter((rt: any) => rt?.function_id === emp.function_id) || []
       if (reqs.length === 0) {
-        statusMap[emp.id] = 'Isento'
+        // Automatically Apto if there are no specific requirements
+        statusMap[emp.id] = 'Apto'
         detailsMap[emp.id] = []
         return
       }

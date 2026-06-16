@@ -70,13 +70,17 @@ export default function Lancamentos() {
   }, [])
 
   useEffect(() => {
+    let isActive = true
     if (selectedPlant && dateStr) {
-      loadDataForDate()
+      loadDataForDate(isActive)
+    }
+    return () => {
+      isActive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlant, dateStr])
 
-  const loadDataForDate = async () => {
+  const loadDataForDate = async (isActive: boolean = true) => {
     setLoading(true)
 
     // Reset state
@@ -98,6 +102,8 @@ export default function Lancamentos() {
         .eq('date', dateStr)
 
       if (logsError && logsError.code !== 'PGRST116') throw logsError
+      if (!isActive) return
+
       const fetchedLogs = logs || []
       setDailyLogs(fetchedLogs)
 
@@ -121,38 +127,73 @@ export default function Lancamentos() {
         new Set(
           fetchedLogs
             .filter((l) => l?.type === 'staff' && l?.reference_id)
-            .map((l) => l.reference_id),
+            .map((l) => String(l.reference_id)),
         ),
       )
-      let empsQuery = supabase
-        .from('employees')
-        .select('id, name, company_name, function_id, status, registration_number')
-        .eq('plant_id', selectedPlant)
 
-      if (staffLogIds.length > 0)
-        empsQuery = empsQuery.or(`status.eq.Ativo,id.in.(${staffLogIds.join(',')})`)
-      else empsQuery = empsQuery.eq('status', 'Ativo')
-      empsQuery = empsQuery.order('name')
+      const refMonth = format(selectedDate, 'yyyy-MM')
+      let fetchedEmps: any[] = []
 
-      const { data: emps, error: empsError } = await empsQuery
-      if (empsError && empsError.code !== 'PGRST116') throw empsError
+      // Try using the new RPC for unique employees
+      const { data: rpcEmps, error: rpcError } = await supabase.rpc('get_attendance_employees', {
+        p_plant_id: selectedPlant,
+        p_reference_month: refMonth,
+        p_staff_log_ids: staffLogIds,
+      })
 
-      if (emps && emps.length > 0) {
-        // Guarantee strictly one row per employee by id
-        const uniqueEmpsMap = new Map()
-        emps.forEach((e) => {
-          if (e && e.id && !uniqueEmpsMap.has(e.id)) {
-            uniqueEmpsMap.set(e.id, e)
-          }
-        })
-        const uniqueEmps = Array.from(uniqueEmpsMap.values()).sort((a, b) =>
-          (a.name || '').localeCompare(b.name || ''),
+      if (!isActive) return
+
+      if (!rpcError && rpcEmps) {
+        fetchedEmps = rpcEmps
+      } else {
+        // Fallback to standard query if RPC fails or doesn't exist yet
+        console.warn(
+          'RPC get_attendance_employees failed or not available. Using fallback.',
+          rpcError,
         )
+        let empsQuery = supabase
+          .from('employees')
+          .select(
+            'id, name, company_name, function_id, status, registration_number, reference_month',
+          )
+          .eq('plant_id', selectedPlant)
 
+        if (staffLogIds.length > 0)
+          empsQuery = empsQuery.or(`status.eq.Ativo,id.in.(${staffLogIds.join(',')})`)
+        else empsQuery = empsQuery.eq('status', 'Ativo')
+
+        const { data: emps, error: empsError } = await empsQuery
+        if (empsError && empsError.code !== 'PGRST116') throw empsError
+
+        if (emps && emps.length > 0) {
+          const uniqueEmpsMap = new Map()
+          emps.forEach((e) => {
+            if (!e || !e.id) return
+            const key = e.name?.trim().toLowerCase() || e.id
+            if (!uniqueEmpsMap.has(key)) {
+              uniqueEmpsMap.set(key, e)
+            } else {
+              const existing = uniqueEmpsMap.get(key)
+              if (e.reference_month === refMonth && existing.reference_month !== refMonth) {
+                uniqueEmpsMap.set(key, e)
+              } else if (!existing.reference_month && e.reference_month) {
+                uniqueEmpsMap.set(key, e)
+              }
+            }
+          })
+          fetchedEmps = Array.from(uniqueEmpsMap.values())
+        }
+      }
+
+      if (fetchedEmps && fetchedEmps.length > 0) {
+        const uniqueEmps = fetchedEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        if (!isActive) return
         setEmployees(uniqueEmps)
         const statuses = await getTrainingStatuses(uniqueEmps, true)
+        if (!isActive) return
         setTrainingStatuses(statuses || { statusMap: {}, detailsMap: {} })
       } else {
+        if (!isActive) return
         setEmployees([])
         setTrainingStatuses({ statusMap: {}, detailsMap: {} })
       }
@@ -187,11 +228,12 @@ export default function Lancamentos() {
         const uniqueEqs = Array.from(uniqueEqsMap.values()).sort((a, b) =>
           (a.name || '').localeCompare(b.name || ''),
         )
-        setEquipment(uniqueEqs)
+        if (isActive) setEquipment(uniqueEqs)
       } else {
-        setEquipment([])
+        if (isActive) setEquipment([])
       }
     } catch (error: any) {
+      if (!isActive) return
       console.error('Data loading error:', error)
       toast({
         title: 'Erro',
@@ -199,7 +241,7 @@ export default function Lancamentos() {
         variant: 'destructive',
       })
     } finally {
-      setLoading(false)
+      if (isActive) setLoading(false)
     }
   }
 
@@ -311,7 +353,7 @@ export default function Lancamentos() {
     }
   }
 
-  const isDayPublished = dailyLogs.length > 0 && dailyLogs.every((l) => l.is_published)
+  const isDayPublished = dailyLogs?.length > 0 && dailyLogs.every((l) => l?.is_published)
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-6 pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -484,7 +526,7 @@ export default function Lancamentos() {
                         <TableBody>
                           {employees.map((emp) => {
                             if (!emp || !emp.id) return null
-                            const log = dailyLogs.find(
+                            const log = dailyLogs?.find(
                               (l) => l?.type === 'staff' && l?.reference_id === emp.id,
                             )
                             const isPresent = !!log?.status
@@ -499,11 +541,11 @@ export default function Lancamentos() {
                                 </TableCell>
                                 <TableCell className="text-center">
                                   <TrainingStatusCell
-                                    employeeName={emp.name || ''}
+                                    employeeName={emp?.name || ''}
                                     statusData={{
                                       status:
                                         trainingStatuses?.statusMap?.[emp.id] ||
-                                        (emp.function_id ? 'Isento' : 'Função não definida'),
+                                        (emp?.function_id ? 'Apto' : 'Função não definida'),
                                       details: trainingStatuses?.detailsMap?.[emp.id] || [],
                                     }}
                                   />
@@ -547,7 +589,7 @@ export default function Lancamentos() {
                         <TableBody>
                           {equipment.map((eq) => {
                             if (!eq || !eq.id) return null
-                            const log = dailyLogs.find(
+                            const log = dailyLogs?.find(
                               (l) => l?.type === 'equipment' && l?.reference_id === eq.id,
                             )
                             const isUsed = !!log?.status
