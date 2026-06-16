@@ -49,6 +49,7 @@ export default function DashboardGestor() {
     if (!employees) return []
     const seen = new Set()
     return employees.filter((e: any) => {
+      if (e.status && e.status !== 'Ativo') return false
       const regNum = e.registration_number?.trim()
       const name = e.name?.toLowerCase().trim()
       const key = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`

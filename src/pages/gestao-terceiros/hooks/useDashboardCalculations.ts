@@ -34,7 +34,19 @@ export function useDashboardCalculations(
 
     const validEqIds = new Set(equipment.map((e) => e.id))
 
-    const processedLogs = logs.map((l) => ({ ...l, date: normalizeDate(l.date) }))
+    const deduplicatedProcessedLogsMap = new Map<string, any>()
+    logs.forEach((l) => {
+      const lDate = normalizeDate(l.date)
+      const key = `${lDate}_${l.type}_${l.reference_id}_${l.plant_id}`
+      if (!deduplicatedProcessedLogsMap.has(key)) {
+        deduplicatedProcessedLogsMap.set(key, { ...l, date: lDate })
+      } else {
+        if (l.status) {
+          deduplicatedProcessedLogsMap.get(key).status = true
+        }
+      }
+    })
+    const processedLogs = Array.from(deduplicatedProcessedLogsMap.values())
 
     const filteredLogs = processedLogs.filter(
       (l) => validPlants.includes(l.plant_id) && l.date >= dateFrom && l.date <= dateTo,
