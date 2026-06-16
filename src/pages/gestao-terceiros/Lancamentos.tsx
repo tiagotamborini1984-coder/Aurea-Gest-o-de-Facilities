@@ -96,13 +96,19 @@ export default function Lancamentos() {
         return
       }
 
+      let finalClientId = currentPlantObj.client_id
+      if (!finalClientId) {
+        const { data: rpcClientId } = await supabase.rpc('get_user_client_id')
+        if (rpcClientId) finalClientId = rpcClientId
+      }
+
       // Colaboradores (Filter purely by reference_month to deduplicate historical records)
       // Removed status filter to ensure historical visibility (e.g., June 2024 records for currently inactive employees)
       const { data: emps, error: empsError } = await supabase
         .from('employees')
         .select('id, name, company_name, function_id, registration_number, reference_month, status')
         .eq('plant_id', selectedPlant)
-        .eq('client_id', currentPlantObj.client_id)
+        .eq('client_id', finalClientId)
         .eq('reference_month', monthStartDb)
         .order('name')
 
@@ -121,7 +127,7 @@ export default function Lancamentos() {
         .from('equipment')
         .select('id, name, type, quantity')
         .eq('plant_id', selectedPlant)
-        .eq('client_id', currentPlantObj.client_id)
+        .eq('client_id', finalClientId)
         .eq('status', 'Ativo')
         .order('name')
 
@@ -129,14 +135,14 @@ export default function Lancamentos() {
       setEquipment(eqs || [])
 
       // Diário de Lançamentos
-      await fetchDailyLogs(currentPlantObj.client_id, selectedPlant, dateStart, dateEnd)
+      await fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd)
 
       // Dias Não Úteis
       const { data: nwDays, error: nwDaysError } = await supabase
         .from('plant_non_working_days')
         .select('*')
         .eq('plant_id', selectedPlant)
-        .eq('client_id', currentPlantObj.client_id)
+        .eq('client_id', finalClientId)
         .gte('date', format(dateStart, 'yyyy-MM-dd'))
         .lte('date', format(dateEnd, 'yyyy-MM-dd'))
 
@@ -283,7 +289,12 @@ export default function Lancamentos() {
 
   const toggleNonWorkingDay = async (date: string) => {
     const currentPlant = plants.find((p) => p.id === selectedPlant)
-    const clientId = currentPlant?.client_id
+    let clientId = currentPlant?.client_id
+
+    if (!clientId) {
+      const { data: rpcClientId } = await supabase.rpc('get_user_client_id')
+      if (rpcClientId) clientId = rpcClientId
+    }
 
     if (!clientId) {
       toast({
@@ -294,7 +305,6 @@ export default function Lancamentos() {
       return
     }
 
-    const plantName = currentPlant?.name || 'selecionada'
     const existing = nonWorkingDays.find((d) => d.date === date)
 
     if (existing) {
