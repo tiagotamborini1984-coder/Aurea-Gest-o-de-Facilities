@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 interface TrainingStatusCellProps {
   employeeName: string
   statusData: {
-    status: 'Apto' | 'Inapto' | 'Isento' | string
+    status: 'Apto' | 'Inapto' | 'Isento' | 'Função não definida' | string
     details: any[]
   }
 }
@@ -15,11 +15,11 @@ interface TrainingStatusCellProps {
 export function TrainingStatusCell({ employeeName, statusData }: TrainingStatusCellProps) {
   const { status, details } = statusData
 
-  if (status === 'Isento') {
+  if (status === 'Isento' || status === 'Função não definida') {
     return (
       <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200">
         <MinusCircle className="w-3 h-3 mr-1" />
-        Isento
+        {status}
       </Badge>
     )
   }

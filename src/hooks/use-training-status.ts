@@ -49,12 +49,12 @@ export function useTrainingStatus() {
     })
 
     // Calculate status for each currently viewed employee
-    const statusMap: Record<string, 'Apto' | 'Inapto' | 'Isento'> = {}
+    const statusMap: Record<string, 'Apto' | 'Inapto' | 'Isento' | 'Função não definida'> = {}
     const detailsMap: Record<string, any[]> = {}
 
     employees.forEach((emp) => {
       if (!emp.function_id) {
-        statusMap[emp.id] = 'Isento'
+        statusMap[emp.id] = 'Função não definida'
         detailsMap[emp.id] = []
         return
       }

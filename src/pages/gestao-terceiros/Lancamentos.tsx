@@ -88,7 +88,7 @@ export default function Lancamentos() {
         .eq('plant_id', selectedPlant)
         .eq('date', dateStr)
 
-      if (logsError) throw logsError
+      if (logsError && logsError.code !== 'PGRST116') throw logsError
       const fetchedLogs = logs || []
       setDailyLogs(fetchedLogs)
 
@@ -98,7 +98,7 @@ export default function Lancamentos() {
         .eq('plant_id', selectedPlant)
         .eq('date', dateStr)
 
-      if (nwDaysError) throw nwDaysError
+      if (nwDaysError && nwDaysError.code !== 'PGRST116') throw nwDaysError
 
       if (nwDays && nwDays.length > 0) {
         setIsNonWorkingDay(true)
@@ -109,7 +109,11 @@ export default function Lancamentos() {
       }
 
       const staffLogIds = Array.from(
-        new Set(fetchedLogs.filter((l) => l.type === 'staff').map((l) => l.reference_id)),
+        new Set(
+          fetchedLogs
+            .filter((l) => l?.type === 'staff' && l?.reference_id)
+            .map((l) => l.reference_id),
+        ),
       )
       let empsQuery = supabase
         .from('employees')
@@ -121,12 +125,16 @@ export default function Lancamentos() {
       else empsQuery = empsQuery.eq('status', 'Ativo')
       empsQuery = empsQuery.order('name')
 
-      const { data: emps } = await empsQuery
+      const { data: emps, error: empsError } = await empsQuery
+      if (empsError && empsError.code !== 'PGRST116') throw empsError
+
       if (emps) {
-        const sortedEmps = [...emps].sort((a, b) => a.id.localeCompare(b.id))
+        const sortedEmps = [...emps].sort((a, b) => (a.id || '').localeCompare(b.id || ''))
         const uniqueEmpsMap = new Map()
         sortedEmps.forEach((e) => {
-          const key = e.registration_number || e.name
+          const key = e.registration_number
+            ? `reg-${e.registration_number}`
+            : `name-${e.name || ''}-${e.company_name || ''}`
           uniqueEmpsMap.set(key, e)
         })
         const uniqueEmps = Array.from(uniqueEmpsMap.values())
@@ -139,7 +147,11 @@ export default function Lancamentos() {
       }
 
       const equipmentLogIds = Array.from(
-        new Set(fetchedLogs.filter((l) => l.type === 'equipment').map((l) => l.reference_id)),
+        new Set(
+          fetchedLogs
+            .filter((l) => l?.type === 'equipment' && l?.reference_id)
+            .map((l) => l.reference_id),
+        ),
       )
       let eqsQuery = supabase
         .from('equipment')
@@ -151,12 +163,14 @@ export default function Lancamentos() {
       else eqsQuery = eqsQuery.eq('status', 'Ativo')
       eqsQuery = eqsQuery.order('name')
 
-      const { data: eqs } = await eqsQuery
+      const { data: eqs, error: eqsError } = await eqsQuery
+      if (eqsError && eqsError.code !== 'PGRST116') throw eqsError
+
       if (eqs) {
-        const sortedEqs = [...eqs].sort((a, b) => a.id.localeCompare(b.id))
+        const sortedEqs = [...eqs].sort((a, b) => (a.id || '').localeCompare(b.id || ''))
         const uniqueEqsMap = new Map()
         sortedEqs.forEach((e) => {
-          uniqueEqsMap.set(e.name, e)
+          if (e.name) uniqueEqsMap.set(e.name, e)
         })
         setEquipment(Array.from(uniqueEqsMap.values()))
       }
@@ -471,7 +485,9 @@ export default function Lancamentos() {
                                   <TrainingStatusCell
                                     employeeName={emp.name}
                                     statusData={{
-                                      status: trainingStatuses.statusMap?.[emp.id] || 'Isento',
+                                      status:
+                                        trainingStatuses.statusMap?.[emp.id] ||
+                                        (emp.function_id ? 'Isento' : 'Função não definida'),
                                       details: trainingStatuses.detailsMap?.[emp.id] || [],
                                     }}
                                   />
