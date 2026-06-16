@@ -45,7 +45,18 @@ export default function DashboardGestor() {
   const filteredContracted = contracted || []
   const filteredLocations = locations || []
   const filteredGoals = goals || []
-  const filteredEmployees = employees || []
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return []
+    const seen = new Set()
+    return employees.filter((e: any) => {
+      const regNum = e.registration_number?.trim()
+      const name = e.name?.toLowerCase().trim()
+      const key = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [employees])
   const filteredEquipment = equipment || []
 
   const [nonWorkingDays, setNonWorkingDays] = useState<any[]>([])
