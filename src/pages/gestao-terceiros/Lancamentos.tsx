@@ -62,17 +62,11 @@ export default function Lancamentos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlant, referenceMonth])
 
-  const fetchDailyLogs = async (
-    clientId: string,
-    plantId: string,
-    startDate: Date,
-    endDate: Date,
-  ) => {
+  const fetchDailyLogs = async (plantId: string, startDate: Date, endDate: Date) => {
     const { data: logs, error: logsError } = await supabase
       .from('daily_logs')
       .select('*')
       .eq('plant_id', plantId)
-      .eq('client_id', clientId)
       .gte('date', format(startDate, 'yyyy-MM-dd'))
       .lte('date', format(endDate, 'yyyy-MM-dd'))
 
@@ -99,14 +93,8 @@ export default function Lancamentos() {
         return
       }
 
-      let finalClientId = currentPlantObj.client_id
-      if (!finalClientId) {
-        const { data: rpcClientId } = await supabase.rpc('get_user_client_id')
-        if (rpcClientId) finalClientId = rpcClientId
-      }
-
       // 1. Fetch Daily Logs first to optimize joined queries and capture all records with logs
-      const fetchedLogs = await fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd)
+      const fetchedLogs = await fetchDailyLogs(selectedPlant, dateStart, dateEnd)
 
       // 2. Colaboradores: Fetch by reference_month OR if they have daily_logs in the current month
       const staffLogIds = Array.from(
@@ -117,7 +105,6 @@ export default function Lancamentos() {
         .from('employees')
         .select('id, name, company_name, function_id, registration_number, reference_month, status')
         .eq('plant_id', selectedPlant)
-        .eq('client_id', finalClientId)
 
       if (staffLogIds.length > 0) {
         empsQuery = empsQuery.or(
@@ -151,7 +138,6 @@ export default function Lancamentos() {
         .from('equipment')
         .select('id, name, type, quantity')
         .eq('plant_id', selectedPlant)
-        .eq('client_id', finalClientId)
 
       if (equipmentLogIds.length > 0) {
         eqsQuery = eqsQuery.or(`status.eq.Ativo,id.in.(${equipmentLogIds.join(',')})`)
@@ -172,7 +158,6 @@ export default function Lancamentos() {
         .from('plant_non_working_days')
         .select('*')
         .eq('plant_id', selectedPlant)
-        .eq('client_id', finalClientId)
         .gte('date', format(dateStart, 'yyyy-MM-dd'))
         .lte('date', format(dateEnd, 'yyyy-MM-dd'))
 
@@ -259,9 +244,10 @@ export default function Lancamentos() {
       if (status >= 200 && status < 300) {
         // Immediate local state update for fast UI feedback
         setDailyLogs((prev) => {
-          const filtered = prev.filter(
-            (l) => !(l.type === type && l.reference_id === referenceId && l.date?.startsWith(date)),
-          )
+          const filtered = prev.filter((l) => {
+            const logDate = l.date ? l.date.split('T')[0] : ''
+            return !(l.type === type && l.reference_id === referenceId && logDate === date)
+          })
           return [...filtered, data]
         })
 
@@ -270,7 +256,7 @@ export default function Lancamentos() {
         const dateStart = new Date(year, month - 1, 1)
         const dateEnd = new Date(year, month, 0)
 
-        await fetchDailyLogs(finalClientId, selectedPlant, dateStart, dateEnd)
+        await fetchDailyLogs(selectedPlant, dateStart, dateEnd)
 
         toast({
           title: 'Sucesso',
@@ -335,7 +321,10 @@ export default function Lancamentos() {
       return
     }
 
-    const existing = nonWorkingDays.find((d) => d.date?.startsWith(date))
+    const existing = nonWorkingDays.find((d) => {
+      const nwDate = d.date ? d.date.split('T')[0] : ''
+      return nwDate === date
+    })
 
     if (existing) {
       const { error } = await supabase.from('plant_non_working_days').delete().eq('id', existing.id)
@@ -502,7 +491,10 @@ export default function Lancamentos() {
                             </TableHead>
                             {daysInMonth.map((day) => {
                               const dateStr = format(day, 'yyyy-MM-dd')
-                              const isNW = nonWorkingDays.some((d) => d.date?.startsWith(dateStr))
+                              const isNW = nonWorkingDays.some((d) => {
+                                const nwDate = d.date ? d.date.split('T')[0] : ''
+                                return nwDate === dateStr
+                              })
                               const isWknd = isWeekend(day)
                               return (
                                 <TableHead
@@ -553,14 +545,19 @@ export default function Lancamentos() {
                               </TableCell>
                               {daysInMonth.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd')
-                                const isNW = nonWorkingDays.some((d) => d.date?.startsWith(dateStr))
+                                const isNW = nonWorkingDays.some((d) => {
+                                  const nwDate = d.date ? d.date.split('T')[0] : ''
+                                  return nwDate === dateStr
+                                })
                                 const isWknd = isWeekend(day)
-                                const log = dailyLogs.find(
-                                  (l) =>
+                                const log = dailyLogs.find((l) => {
+                                  const logDate = l.date ? l.date.split('T')[0] : ''
+                                  return (
                                     l.type === 'staff' &&
                                     l.reference_id === emp.id &&
-                                    l.date?.startsWith(dateStr),
-                                )
+                                    logDate === dateStr
+                                  )
+                                })
 
                                 return (
                                   <TableCell
@@ -616,7 +613,10 @@ export default function Lancamentos() {
                             </TableHead>
                             {daysInMonth.map((day) => {
                               const dateStr = format(day, 'yyyy-MM-dd')
-                              const isNW = nonWorkingDays.some((d) => d.date?.startsWith(dateStr))
+                              const isNW = nonWorkingDays.some((d) => {
+                                const nwDate = d.date ? d.date.split('T')[0] : ''
+                                return nwDate === dateStr
+                              })
                               const isWknd = isWeekend(day)
                               return (
                                 <TableHead
@@ -658,14 +658,19 @@ export default function Lancamentos() {
                               </TableCell>
                               {daysInMonth.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd')
-                                const isNW = nonWorkingDays.some((d) => d.date?.startsWith(dateStr))
+                                const isNW = nonWorkingDays.some((d) => {
+                                  const nwDate = d.date ? d.date.split('T')[0] : ''
+                                  return nwDate === dateStr
+                                })
                                 const isWknd = isWeekend(day)
-                                const log = dailyLogs.find(
-                                  (l) =>
+                                const log = dailyLogs.find((l) => {
+                                  const logDate = l.date ? l.date.split('T')[0] : ''
+                                  return (
                                     l.type === 'equipment' &&
                                     l.reference_id === eq.id &&
-                                    l.date?.startsWith(dateStr),
-                                )
+                                    logDate === dateStr
+                                  )
+                                })
 
                                 return (
                                   <TableCell
