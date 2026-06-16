@@ -78,6 +78,15 @@ export default function Lancamentos() {
 
   const loadDataForDate = async () => {
     setLoading(true)
+
+    // Reset state
+    setDailyLogs([])
+    setEmployees([])
+    setEquipment([])
+    setTrainingStatuses({ statusMap: {}, detailsMap: {} })
+    setIsNonWorkingDay(false)
+    setNonWorkingDayId(null)
+
     try {
       const currentPlantObj = plants.find((p) => p.id === selectedPlant)
       if (!currentPlantObj) return
@@ -128,25 +137,24 @@ export default function Lancamentos() {
       const { data: emps, error: empsError } = await empsQuery
       if (empsError && empsError.code !== 'PGRST116') throw empsError
 
-      if (emps) {
-        const sortedEmps = [...emps].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''))
+      if (emps && emps.length > 0) {
+        // Guarantee strictly one row per employee by id
         const uniqueEmpsMap = new Map()
-        sortedEmps.forEach((e) => {
-          if (!e) return
-          const key =
-            e.id ||
-            (e.registration_number
-              ? `reg-${e.registration_number}`
-              : `name-${e.name || ''}-${e.company_name || ''}`)
-          uniqueEmpsMap.set(key, e)
+        emps.forEach((e) => {
+          if (e && e.id && !uniqueEmpsMap.has(e.id)) {
+            uniqueEmpsMap.set(e.id, e)
+          }
         })
-        const uniqueEmps = Array.from(uniqueEmpsMap.values())
+        const uniqueEmps = Array.from(uniqueEmpsMap.values()).sort((a, b) =>
+          (a.name || '').localeCompare(b.name || ''),
+        )
 
         setEmployees(uniqueEmps)
         const statuses = await getTrainingStatuses(uniqueEmps, true)
         setTrainingStatuses(statuses || { statusMap: {}, detailsMap: {} })
       } else {
         setEmployees([])
+        setTrainingStatuses({ statusMap: {}, detailsMap: {} })
       }
 
       const equipmentLogIds = Array.from(
@@ -169,15 +177,17 @@ export default function Lancamentos() {
       const { data: eqs, error: eqsError } = await eqsQuery
       if (eqsError && eqsError.code !== 'PGRST116') throw eqsError
 
-      if (eqs) {
-        const sortedEqs = [...eqs].sort((a, b) => (a?.id || '').localeCompare(b?.id || ''))
+      if (eqs && eqs.length > 0) {
         const uniqueEqsMap = new Map()
-        sortedEqs.forEach((e) => {
-          if (!e) return
-          const key = e.id || e.name
-          if (key) uniqueEqsMap.set(key, e)
+        eqs.forEach((e) => {
+          if (e && e.id && !uniqueEqsMap.has(e.id)) {
+            uniqueEqsMap.set(e.id, e)
+          }
         })
-        setEquipment(Array.from(uniqueEqsMap.values()))
+        const uniqueEqs = Array.from(uniqueEqsMap.values()).sort((a, b) =>
+          (a.name || '').localeCompare(b.name || ''),
+        )
+        setEquipment(uniqueEqs)
       } else {
         setEquipment([])
       }

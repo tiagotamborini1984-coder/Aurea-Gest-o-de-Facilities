@@ -3,39 +3,22 @@ import { supabase } from '@/lib/supabase/client'
 
 export function useTrainingStatus() {
   const getTrainingStatuses = useCallback(async (employees: any[], includeDetails = false) => {
-    if (!employees || employees.length === 0) return {}
-
-    // Extract unique registration numbers safely
-    const regNumbers = Array.from(
-      new Set(employees?.map((e) => e?.registration_number).filter(Boolean)),
-    )
-
-    // Fetch all required trainings, and employees matching registration numbers if available
-    const promises: Promise<any>[] = [
-      supabase.from('function_required_trainings').select('*, trainings(*)'),
-    ]
-
-    if (regNumbers.length > 0) {
-      promises.push(
-        supabase
-          .from('employees')
-          .select('id, registration_number')
-          .in('registration_number', regNumbers as string[]),
-      )
+    if (!employees || employees.length === 0) {
+      return includeDetails ? { statusMap: {}, detailsMap: {} } : {}
     }
 
-    const results = await Promise.all(promises)
-    const reqTrainings = results[0]?.data || []
-    const allEmps = results[1]?.data || []
+    const employeeIds = Array.from(new Set(employees.map((e) => e?.id).filter(Boolean)))
 
-    const allEmpIds = allEmps?.map((e: any) => e?.id).filter(Boolean) || []
+    // Fetch required trainings
+    const { data: reqTrainings } = await supabase
+      .from('function_required_trainings')
+      .select('*, trainings(*)')
+
     let allRecords: any[] = []
-
-    if (allEmpIds.length > 0) {
-      // Chunking to avoid URL length limits for the `.in` query
+    if (employeeIds.length > 0) {
       const chunkSize = 100
-      for (let i = 0; i < allEmpIds.length; i += chunkSize) {
-        const chunk = allEmpIds.slice(i, i + chunkSize)
+      for (let i = 0; i < employeeIds.length; i += chunkSize) {
+        const chunk = employeeIds.slice(i, i + chunkSize)
         const { data } = await supabase
           .from('employee_training_records')
           .select('*, trainings(*)')
@@ -46,22 +29,17 @@ export function useTrainingStatus() {
       }
     }
 
-    // Map records by registration number
-    const recordsByReg: Record<string, any[]> = {}
+    const recordsById: Record<string, any[]> = {}
     allRecords.forEach((r) => {
-      if (!r) return
-      const emp = allEmps?.find((e: any) => e?.id === r.employee_id)
-      if (emp && emp.registration_number) {
-        if (!recordsByReg[emp.registration_number]) recordsByReg[emp.registration_number] = []
-        recordsByReg[emp.registration_number].push(r)
-      }
+      if (!r || !r.employee_id) return
+      if (!recordsById[r.employee_id]) recordsById[r.employee_id] = []
+      recordsById[r.employee_id].push(r)
     })
 
-    // Calculate status for each currently viewed employee
     const statusMap: Record<string, 'Apto' | 'Inapto' | 'Isento' | 'Função não definida'> = {}
     const detailsMap: Record<string, any[]> = {}
 
-    employees?.forEach((emp) => {
+    employees.forEach((emp) => {
       if (!emp || !emp.id) return
 
       if (!emp.function_id) {
@@ -77,7 +55,7 @@ export function useTrainingStatus() {
         return
       }
 
-      const myRecords = emp.registration_number ? recordsByReg[emp.registration_number] || [] : []
+      const myRecords = recordsById[emp.id] || []
       let status: 'Apto' | 'Inapto' = 'Apto'
       const details: any[] = []
 
@@ -102,6 +80,7 @@ export function useTrainingStatus() {
           if (validity > 0 && latest?.completion_date) {
             const expDate = new Date(latest.completion_date)
             expDate.setMonth(expDate.getMonth() + validity)
+            expDate.setHours(23, 59, 59, 999)
             if (expDate < new Date()) {
               reqStatus = 'Vencido'
               status = 'Inapto'
