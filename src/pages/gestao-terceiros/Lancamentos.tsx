@@ -113,7 +113,7 @@ export default function Lancamentos() {
       )
       let empsQuery = supabase
         .from('employees')
-        .select('id, name, company_name, function_id, status')
+        .select('id, name, company_name, function_id, status, registration_number')
         .eq('plant_id', selectedPlant)
 
       if (staffLogIds.length > 0)
@@ -123,7 +123,14 @@ export default function Lancamentos() {
 
       const { data: emps } = await empsQuery
       if (emps) {
-        const uniqueEmps = Array.from(new Map(emps.map((e) => [e.id, e])).values())
+        const sortedEmps = [...emps].sort((a, b) => a.id.localeCompare(b.id))
+        const uniqueEmpsMap = new Map()
+        sortedEmps.forEach((e) => {
+          const key = e.registration_number || e.name
+          uniqueEmpsMap.set(key, e)
+        })
+        const uniqueEmps = Array.from(uniqueEmpsMap.values())
+
         setEmployees(uniqueEmps)
         const statuses = await getTrainingStatuses(uniqueEmps, true)
         setTrainingStatuses(statuses || { statusMap: {}, detailsMap: {} })
@@ -146,7 +153,12 @@ export default function Lancamentos() {
 
       const { data: eqs } = await eqsQuery
       if (eqs) {
-        setEquipment(Array.from(new Map(eqs.map((e) => [e.id, e])).values()))
+        const sortedEqs = [...eqs].sort((a, b) => a.id.localeCompare(b.id))
+        const uniqueEqsMap = new Map()
+        sortedEqs.forEach((e) => {
+          uniqueEqsMap.set(e.name, e)
+        })
+        setEquipment(Array.from(uniqueEqsMap.values()))
       }
     } catch (error: any) {
       console.error('Data loading error:', error)
@@ -459,7 +471,7 @@ export default function Lancamentos() {
                                   <TrainingStatusCell
                                     employeeName={emp.name}
                                     statusData={{
-                                      status: trainingStatuses.statusMap?.[emp.id] || 'N/A',
+                                      status: trainingStatuses.statusMap?.[emp.id] || 'Isento',
                                       details: trainingStatuses.detailsMap?.[emp.id] || [],
                                     }}
                                   />

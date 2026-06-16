@@ -49,25 +49,25 @@ export function useTrainingStatus() {
     })
 
     // Calculate status for each currently viewed employee
-    const statusMap: Record<string, 'Concluído' | 'Pendente' | 'Vencido' | 'N/A'> = {}
+    const statusMap: Record<string, 'Apto' | 'Inapto' | 'Isento'> = {}
     const detailsMap: Record<string, any[]> = {}
 
     employees.forEach((emp) => {
       if (!emp.function_id) {
-        statusMap[emp.id] = 'N/A'
+        statusMap[emp.id] = 'Isento'
         detailsMap[emp.id] = []
         return
       }
 
       const reqs = reqTrainings?.filter((rt) => rt.function_id === emp.function_id) || []
       if (reqs.length === 0) {
-        statusMap[emp.id] = 'N/A'
+        statusMap[emp.id] = 'Isento'
         detailsMap[emp.id] = []
         return
       }
 
       const myRecords = emp.registration_number ? recordsByReg[emp.registration_number] || [] : []
-      let status: 'Concluído' | 'Pendente' | 'Vencido' = 'Concluído'
+      let status: 'Apto' | 'Inapto' = 'Apto'
       const details: any[] = []
 
       for (const req of reqs) {
@@ -78,7 +78,7 @@ export function useTrainingStatus() {
 
         if (recordsForReq.length === 0) {
           reqStatus = 'Pendente'
-          if (status !== 'Vencido') status = 'Pendente'
+          status = 'Inapto'
         } else {
           latest = recordsForReq.sort(
             (a, b) => new Date(b.completion_date).getTime() - new Date(a.completion_date).getTime(),
@@ -90,7 +90,7 @@ export function useTrainingStatus() {
             expDate.setMonth(expDate.getMonth() + validity)
             if (expDate < new Date()) {
               reqStatus = 'Vencido'
-              status = 'Vencido'
+              status = 'Inapto'
             }
           }
         }
