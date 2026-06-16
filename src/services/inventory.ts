@@ -55,8 +55,8 @@ export const inventoryService = {
       .select(`
         *,
         requester:profiles!inventory_requests_requester_id_fkey(name),
-        plant:plants!inventory_requests_plant_id_fkey(name),
-        area:maintenance_areas!inventory_requests_area_id_fkey(name),
+        plant:plants!inventory_requests_plant_id_fkey(id, name),
+        area:maintenance_areas!inventory_requests_area_id_fkey(id, name),
         items:inventory_request_items(
           quantity,
           product:inventory_products(name, unit_of_measure)

@@ -1,15 +1,32 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { inventoryService } from '@/services/inventory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Package, AlertTriangle, CheckCircle, TrendingUp } from 'lucide-react'
+import { Package, AlertTriangle, CheckCircle, TrendingUp, Filter } from 'lucide-react'
 import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { DatePickerWithRange } from '@/components/ui/date-range-picker'
+import { DateRange } from 'react-day-picker'
+import { addDays, isWithinInterval, parseISO } from 'date-fns'
 
 export default function DashboardEstoque() {
   const { activeClient } = useAppStore()
   const [requests, setRequests] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: addDays(new Date(), -30),
+    to: new Date(),
+  })
+  const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  const [selectedArea, setSelectedArea] = useState<string>('all')
 
   useEffect(() => {
     if (activeClient) {
@@ -18,8 +35,52 @@ export default function DashboardEstoque() {
     }
   }, [activeClient])
 
+  const plantsList = useMemo(() => {
+    const map = new Map()
+    requests.forEach((r) => {
+      if (r.plant?.id) map.set(r.plant.id, r.plant)
+    })
+    return Array.from(map.values())
+  }, [requests])
+
+  const areasList = useMemo(() => {
+    const map = new Map()
+    requests.forEach((r) => {
+      if (r.area?.id && (selectedPlant === 'all' || r.plant?.id === selectedPlant)) {
+        map.set(r.area.id, r.area)
+      }
+    })
+    return Array.from(map.values())
+  }, [requests, selectedPlant])
+
+  useEffect(() => {
+    setSelectedArea('all')
+  }, [selectedPlant])
+
+  const filteredRequests = useMemo(() => {
+    return requests.filter((req) => {
+      const matchPlant = selectedPlant === 'all' || req.plant?.id === selectedPlant
+      const matchArea = selectedArea === 'all' || req.area?.id === selectedArea
+
+      let matchDate = true
+      if (dateRange?.from && req.created_at) {
+        const reqDate = parseISO(req.created_at)
+        if (dateRange.to) {
+          matchDate = isWithinInterval(reqDate, {
+            start: dateRange.from,
+            end: addDays(dateRange.to, 1),
+          })
+        } else {
+          matchDate = reqDate >= dateRange.from
+        }
+      }
+
+      return matchPlant && matchArea && matchDate
+    })
+  }, [requests, selectedPlant, selectedArea, dateRange])
+
   const lowStockProducts = products.filter((p) => p.current_stock <= p.minimum_stock)
-  const deliveredRequests = requests.filter((r) => r.status === 'Entregue')
+  const deliveredRequests = filteredRequests.filter((r) => r.status === 'Entregue')
 
   const consumptionByAreaMap: Record<string, number> = {}
   deliveredRequests.forEach((req) => {
@@ -41,6 +102,46 @@ export default function DashboardEstoque() {
         <h1 className="text-2xl font-bold text-slate-800">Dashboard de Estoque</h1>
         <p className="text-slate-500">Métricas e acompanhamento de consumo</p>
       </div>
+
+      <Card>
+        <CardContent className="p-4 flex flex-wrap gap-4 items-center bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">Filtros:</span>
+          </div>
+          <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+            <SelectTrigger className="w-[200px] bg-white">
+              <SelectValue placeholder="Todas as Plantas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Plantas</SelectItem>
+              {plantsList.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedArea}
+            onValueChange={setSelectedArea}
+            disabled={selectedPlant === 'all' && areasList.length === 0}
+          >
+            <SelectTrigger className="w-[200px] bg-white">
+              <SelectValue placeholder="Todas as Áreas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Áreas</SelectItem>
+              {areasList.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -82,7 +183,7 @@ export default function DashboardEstoque() {
               <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm text-slate-500">Total de Itens Saídos</p>
+              <p className="text-sm text-slate-500">Itens Consumidos</p>
               <h3 className="text-2xl font-bold">
                 {deliveredRequests.reduce((acc, req) => acc + (req.total_items || 0), 0)}
               </h3>

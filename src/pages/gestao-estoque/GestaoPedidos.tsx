@@ -24,7 +24,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Package } from 'lucide-react'
+import { Package, Filter } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function GestaoPedidos() {
   const { activeClient } = useAppStore()
@@ -34,6 +41,7 @@ export default function GestaoPedidos() {
   const [selectedRequest, setSelectedRequest] = useState<any>(null)
   const [sapNumber, setSapNumber] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('Pendente')
 
   useEffect(() => {
     if (activeClient) {
@@ -46,11 +54,6 @@ export default function GestaoPedidos() {
   }
 
   const handleProcess = async (status: string) => {
-    if (status === 'Entregue' && !sapNumber) {
-      toast.error('Número de Reserva SAP é obrigatório para entrega')
-      return
-    }
-
     setIsProcessing(true)
     try {
       await inventoryService.updateRequestStatus(selectedRequest.id, status, sapNumber, user?.id)
@@ -87,9 +90,24 @@ export default function GestaoPedidos() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Gestão de Pedidos</h1>
-        <p className="text-slate-500">Aprove solicitações e processe saídas de estoque (SAP)</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Gestão de Pedidos</h1>
+          <p className="text-slate-500">Aprove solicitações e processe saídas de estoque (SAP)</p>
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px] bg-white">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Todos">Todos os Status</SelectItem>
+            <SelectItem value="Pendente">Pendentes</SelectItem>
+            <SelectItem value="Aprovado">Aprovados</SelectItem>
+            <SelectItem value="Entregue">Entregues</SelectItem>
+            <SelectItem value="Rejeitado">Rejeitados</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -107,31 +125,34 @@ export default function GestaoPedidos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((req) => (
-                <TableRow key={req.id}>
-                  <TableCell>{format(new Date(req.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
-                  <TableCell className="font-medium">{req.requester?.name}</TableCell>
-                  <TableCell>
-                    <div>{req.plant?.name}</div>
-                    <div className="text-xs text-slate-500">{req.area?.name}</div>
-                  </TableCell>
-                  <TableCell>{req.total_items}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(req.status)} variant="outline">
-                      {req.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-slate-500">
-                    {req.sap_reservation_number || '-'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => openProcessModal(req)}>
-                      Analisar
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {requests.length === 0 && (
+              {requests
+                .filter((req) => statusFilter === 'Todos' || req.status === statusFilter)
+                .map((req) => (
+                  <TableRow key={req.id}>
+                    <TableCell>{format(new Date(req.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
+                    <TableCell className="font-medium">{req.requester?.name}</TableCell>
+                    <TableCell>
+                      <div>{req.plant?.name}</div>
+                      <div className="text-xs text-slate-500">{req.area?.name}</div>
+                    </TableCell>
+                    <TableCell>{req.total_items}</TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(req.status)} variant="outline">
+                        {req.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-slate-500">
+                      {req.sap_reservation_number || '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => openProcessModal(req)}>
+                        Analisar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              {requests.filter((req) => statusFilter === 'Todos' || req.status === statusFilter)
+                .length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     Nenhum pedido encontrado.
@@ -166,12 +187,15 @@ export default function GestaoPedidos() {
 
               {selectedRequest.status !== 'Entregue' && selectedRequest.status !== 'Rejeitado' && (
                 <div className="space-y-2 pt-4 border-t">
-                  <Label>Nº Reserva SAP (Obrigatório para Entrega)</Label>
+                  <Label>Nº Reserva SAP (Opcional)</Label>
                   <Input
                     placeholder="Digite o número SAP"
                     value={sapNumber}
                     onChange={(e) => setSapNumber(e.target.value)}
                   />
+                  <p className="text-xs text-slate-500">
+                    Opcional: Informe se desejar atrelar esta saída a uma reserva no SAP.
+                  </p>
                 </div>
               )}
             </div>
@@ -197,10 +221,7 @@ export default function GestaoPedidos() {
               </>
             )}
             {(selectedRequest?.status === 'Pendente' || selectedRequest?.status === 'Aprovado') && (
-              <Button
-                onClick={() => handleProcess('Entregue')}
-                disabled={isProcessing || !sapNumber}
-              >
+              <Button onClick={() => handleProcess('Entregue')} disabled={isProcessing}>
                 Dar Baixa (Entregar)
               </Button>
             )}

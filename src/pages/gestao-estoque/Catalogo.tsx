@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ShoppingCart, Search, FileText, Plus, Minus, PackageOpen } from 'lucide-react'
+import { ShoppingCart, Search, FileText, Plus, Minus, PackageOpen, Filter } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -48,7 +48,10 @@ export default function Catalogo() {
 
   useEffect(() => {
     if (selectedPlant) {
-      inventoryService.getAreas(selectedPlant).then(setAreas)
+      inventoryService.getAreas(selectedPlant).then((res) => {
+        const uniqueAreas = Array.from(new Map(res.map((a: any) => [a.id, a])).values())
+        setAreas(uniqueAreas)
+      })
     } else {
       setAreas([])
     }
@@ -60,7 +63,8 @@ export default function Catalogo() {
       const prods = await inventoryService.getProducts(activeClient.id)
       setProducts(prods)
       const pts = await inventoryService.getPlants(activeClient.id)
-      setPlants(pts)
+      const uniquePlants = Array.from(new Map(pts.map((p: any) => [p.id, p])).values())
+      setPlants(uniquePlants)
     } catch (err) {
       toast.error('Erro ao carregar catálogo')
     }
@@ -319,7 +323,14 @@ export default function Catalogo() {
             <CardContent className="p-4 pt-0 flex-1">
               <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description}</p>
               <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs font-medium bg-slate-100 px-2 py-1 rounded">
+                <span
+                  className={cn(
+                    'text-xs font-medium px-2 py-1 rounded',
+                    product.current_stock <= product.minimum_stock
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-slate-100 text-slate-700',
+                  )}
+                >
                   Estoque: {product.current_stock} {product.unit_of_measure}
                 </span>
               </div>
