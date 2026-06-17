@@ -79,7 +79,7 @@ export default function Produtos() {
   }
 
   const handleSave = async () => {
-    if (!formData.name) return toast.error('Nome é obrigatório')
+    if (!formData.name.trim()) return toast.error('Nome é obrigatório')
     setIsSaving(true)
     try {
       let imageUrl = editingId ? products.find((p) => p.id === editingId)?.image_url : null
@@ -110,8 +110,8 @@ export default function Produtos() {
       toast.success('Produto salvo com sucesso')
       setFormModalOpen(false)
       loadProducts()
-    } catch (err) {
-      toast.error('Erro ao salvar produto')
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao salvar produto')
     } finally {
       setIsSaving(false)
     }
@@ -123,8 +123,8 @@ export default function Produtos() {
         await inventoryService.deleteProduct(id)
         toast.success('Excluído com sucesso')
         loadProducts()
-      } catch (err) {
-        toast.error('Erro ao excluir')
+      } catch (err: any) {
+        toast.error(err.message || 'Erro ao excluir')
       }
     }
   }
