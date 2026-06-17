@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,8 +19,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 export default function DetalhesRealizada() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const autoPrint = searchParams.get('print') === 'true'
+
   const [execution, setExecution] = useState<any>(null)
   const [answers, setAnswers] = useState<any[]>([])
+  const [clientBrand, setClientBrand] = useState<{
+    logo_url?: string
+    primary_color?: string
+  } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,16 +36,40 @@ export default function DetalhesRealizada() {
     }
   }, [id])
 
+  useEffect(() => {
+    if (autoPrint && !loading && execution) {
+      setTimeout(() => {
+        window.print()
+      }, 800)
+    }
+  }, [loading, execution, autoPrint])
+
   async function fetchExecutionDetails() {
     setLoading(true)
     const { data: execData } = await supabase
       .from('audit_executions')
       .select(`
-      *, audits ( title, scoring_settings ), plants ( name ), profiles ( name )
+      *, 
+      audits ( title, scoring_settings, client_id ), 
+      plants ( name ), 
+      profiles ( name )
     `)
       .eq('id', id)
       .single()
-    if (execData) setExecution(execData)
+
+    if (execData) {
+      setExecution(execData)
+      if (execData.audits?.client_id) {
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('logo_url, primary_color')
+          .eq('id', execData.audits.client_id)
+          .single()
+        if (clientData) {
+          setClientBrand(clientData)
+        }
+      }
+    }
 
     const { data: ansData } = await supabase
       .from('audit_execution_answers')
@@ -104,6 +135,11 @@ export default function DetalhesRealizada() {
     return { label: score.toString(), color: 'bg-blue-100 text-blue-700' }
   }
 
+  const primaryColor = clientBrand?.primary_color || undefined
+  const brandStyle = primaryColor ? { color: primaryColor } : {}
+  const borderBrandStyle = primaryColor ? { borderColor: primaryColor } : {}
+  const bgBrandStyle = primaryColor ? { backgroundColor: primaryColor, color: '#fff' } : {}
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8 bg-white dark:bg-slate-950 min-h-screen print:absolute print:left-0 print:top-0 print:w-full print:bg-white print:z-[9999] print:p-8">
       <div className="flex items-center justify-between print:hidden">
@@ -114,55 +150,83 @@ export default function DetalhesRealizada() {
         >
           <ArrowLeft className="w-4 h-4" /> Voltar
         </Button>
-        <Button onClick={() => window.print()} className="gap-2">
-          <Printer className="w-4 h-4" /> Imprimir Relatório
+        <Button onClick={() => window.print()} className="gap-2" style={bgBrandStyle}>
+          <Printer className="w-4 h-4" /> Imprimir / PDF
         </Button>
       </div>
 
-      <div className="border-b pb-6 print:border-b-2 print:border-black">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-          Relatório de Auditoria: {execution.audits?.title}
-        </h1>
-        <div className="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-slate-400 mt-4">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" />
-            <span className="font-medium text-slate-800 dark:text-slate-200">Planta:</span>{' '}
-            {execution.plants?.name}
-          </div>
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            <span className="font-medium text-slate-800 dark:text-slate-200">Data:</span>{' '}
-            {execution.realization_date
-              ? format(new Date(execution.realization_date + 'T12:00:00Z'), 'dd/MM/yyyy', {
-                  locale: ptBR,
-                })
-              : '-'}
-          </div>
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            <span className="font-medium text-slate-800 dark:text-slate-200">Auditor:</span>{' '}
-            {execution.profiles?.name}
+      <div className="border-b pb-6 print:border-b-2 print:border-black flex flex-col md:flex-row justify-between items-start gap-4">
+        <div>
+          <h1
+            className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2 print:text-black"
+            style={brandStyle}
+          >
+            Relatório de Auditoria: {execution.audits?.title}
+          </h1>
+          <div className="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-slate-400 mt-4 print:text-black">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              <span className="font-medium text-slate-800 dark:text-slate-200 print:text-black">
+                Planta:
+              </span>{' '}
+              {execution.plants?.name}
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              <span className="font-medium text-slate-800 dark:text-slate-200 print:text-black">
+                Data:
+              </span>{' '}
+              {execution.realization_date
+                ? format(new Date(execution.realization_date + 'T12:00:00Z'), 'dd/MM/yyyy', {
+                    locale: ptBR,
+                  })
+                : '-'}
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4" />
+              <span className="font-medium text-slate-800 dark:text-slate-200 print:text-black">
+                Auditor:
+              </span>{' '}
+              {execution.profiles?.name}
+            </div>
           </div>
         </div>
+        {clientBrand?.logo_url && (
+          <img
+            src={clientBrand.logo_url}
+            alt="Logo Cliente"
+            className="max-h-16 object-contain print:max-h-20"
+          />
+        )}
       </div>
 
       <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-lg border flex items-center justify-between print:bg-slate-50 print:border-slate-200 print:break-inside-avoid">
         <div>
-          <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-primary" /> Resumo de Desempenho
+          <h3
+            className="text-lg font-semibold mb-1 flex items-center gap-2 print:text-black"
+            style={brandStyle}
+          >
+            <ClipboardList className="w-5 h-5" /> Resumo de Desempenho
           </h3>
-          <p className="text-slate-500 text-sm">Pontuação final obtida nesta avaliação.</p>
+          <p className="text-slate-500 text-sm print:text-slate-700">
+            Pontuação final obtida nesta avaliação.
+          </p>
         </div>
         <div className="text-right">
-          <div className="text-4xl font-bold text-primary">{percentage}%</div>
-          <div className="text-sm text-slate-500 mt-1">
+          <div className="text-4xl font-bold text-primary print:text-black" style={brandStyle}>
+            {percentage}%
+          </div>
+          <div className="text-sm text-slate-500 mt-1 print:text-slate-700">
             {execution.final_score} de {execution.max_score} pontos
           </div>
         </div>
       </div>
 
       <div className="space-y-6">
-        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2">
+        <h2
+          className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2 print:text-black"
+          style={borderBrandStyle}
+        >
           Itens Avaliados
         </h2>
         <div className="space-y-4">
@@ -174,18 +238,18 @@ export default function DetalhesRealizada() {
                 className="border rounded-lg p-4 bg-white dark:bg-slate-900 shadow-sm print:shadow-none print:border-slate-300 print:break-inside-avoid"
               >
                 <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-base">
+                  <div className="flex-1 w-full">
+                    <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-base print:text-black">
                       {idx + 1}. {ans.audit_actions?.title}
                     </h4>
                     {ans.observations && (
-                      <div className="mt-3 bg-slate-50 dark:bg-slate-800 print:bg-transparent print:border print:border-dashed print:border-slate-300 p-3 rounded text-sm text-slate-700 dark:text-slate-300">
+                      <div className="mt-3 bg-slate-50 dark:bg-slate-800 print:bg-transparent print:border print:border-dashed print:border-slate-300 p-3 rounded text-sm text-slate-700 dark:text-slate-300 print:text-black">
                         <span className="font-semibold block mb-1">Observações:</span>
                         {ans.observations}
                       </div>
                     )}
                     {ans.corrective_assignee_id && (
-                      <div className="mt-3 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 dark:bg-amber-900/20 p-2 rounded print:bg-transparent print:border print:border-amber-200">
+                      <div className="mt-3 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 dark:bg-amber-900/20 p-2 rounded print:bg-transparent print:border print:border-amber-200 print:text-amber-800">
                         <AlertCircle className="w-4 h-4" />
                         <span>
                           Ação Corretiva atribuída para{' '}
@@ -198,10 +262,10 @@ export default function DetalhesRealizada() {
                     )}
                     {(ans.evidence_urls?.length > 0 || ans.evidence_url) && (
                       <div className="mt-4">
-                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 block mb-2 print:hidden">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 block mb-2 print:text-black">
                           Evidências:
                         </span>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:hidden">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-3">
                           {Array.from(
                             new Set(
                               (ans.evidence_urls || []).concat(
@@ -214,39 +278,26 @@ export default function DetalhesRealizada() {
                               href={url}
                               target="_blank"
                               rel="noreferrer"
-                              className="relative aspect-square rounded-md border border-slate-200 overflow-hidden hover:ring-2 hover:ring-primary transition-all group"
+                              className="relative aspect-square rounded-md border border-slate-200 overflow-hidden hover:ring-2 hover:ring-primary transition-all group print:border-slate-300 print:break-inside-avoid"
                             >
-                              {url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                              {url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
                                 <img
                                   src={url}
                                   alt="Evidência"
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover print:object-contain"
                                 />
                               ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-slate-50 dark:bg-slate-800">
+                                <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-slate-50 dark:bg-slate-800 print:bg-white">
                                   <FileImage className="h-6 w-6 text-slate-400 mb-1" />
-                                  <span className="text-[10px] truncate w-full px-1 text-slate-500">
-                                    Documento
+                                  <span className="text-[10px] truncate w-full px-1 text-slate-500 print:text-black">
+                                    Documento Anexado
                                   </span>
                                 </div>
                               )}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors print:hidden" />
                             </a>
                           ))}
                         </div>
-                        <span className="hidden print:inline-flex text-sm text-slate-500 items-center gap-1">
-                          <FileImage className="w-4 h-4" />{' '}
-                          {
-                            Array.from(
-                              new Set(
-                                (ans.evidence_urls || []).concat(
-                                  ans.evidence_url ? [ans.evidence_url] : [],
-                                ),
-                              ),
-                            ).length
-                          }{' '}
-                          evidência(s) anexada(s) eletronicamente.
-                        </span>
                       </div>
                     )}
                   </div>
@@ -256,7 +307,7 @@ export default function DetalhesRealizada() {
                     >
                       {scoreData.label}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-slate-500 print:text-slate-600">
                       Peso: {ans.audit_actions?.weight || 1}
                     </div>
                   </div>
@@ -268,8 +319,14 @@ export default function DetalhesRealizada() {
       </div>
 
       {(execution.participants?.trim() || execution.signatures?.length > 0) && (
-        <div className="mt-12 pt-8 border-t space-y-6 print:break-inside-avoid">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+        <div
+          className="mt-12 pt-8 border-t space-y-6 print:break-inside-avoid print:border-black"
+          style={borderBrandStyle}
+        >
+          <h2
+            className="text-xl font-bold text-slate-800 dark:text-slate-100 print:text-black"
+            style={brandStyle}
+          >
             Participantes e Assinaturas
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -278,16 +335,22 @@ export default function DetalhesRealizada() {
               const url = typeof sig === 'string' ? sig : sig?.url
               return (
                 <div key={i} className="flex flex-col items-center text-center space-y-2">
-                  <div className="h-24 w-full max-w-[250px] border-b border-dashed border-slate-400 flex items-end justify-center pb-2">
+                  <div className="h-24 w-full max-w-[250px] border-b border-dashed border-slate-400 flex items-end justify-center pb-2 print:border-black">
                     {url ? (
-                      <img src={url} alt={`Assinatura`} className="max-h-20 object-contain" />
+                      <img
+                        src={url}
+                        alt={`Assinatura`}
+                        className="max-h-20 object-contain print:max-h-16"
+                      />
                     ) : (
-                      <span className="text-slate-300 italic text-sm mb-2">
+                      <span className="text-slate-300 italic text-sm mb-2 print:text-slate-500">
                         Assinatura não coletada
                       </span>
                     )}
                   </div>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">{p.trim()}</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300 print:text-black">
+                    {p.trim()}
+                  </span>
                 </div>
               )
             })}

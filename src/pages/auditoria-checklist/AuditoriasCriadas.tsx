@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Edit, Play } from 'lucide-react'
+import { Plus, Edit, Play, FileText } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 
 export default function AuditoriasCriadas() {
@@ -21,6 +21,7 @@ export default function AuditoriasCriadas() {
   const { toast } = useToast()
   const [audits, setAudits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [exportingId, setExportingId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchAudits = async () => {
@@ -90,6 +91,41 @@ export default function AuditoriasCriadas() {
     }
   }
 
+  const handleExportTemplate = (auditId: string) => {
+    setExportingId(auditId)
+    // Add a slight delay to simulate client-side generation processing state
+    setTimeout(() => {
+      window.open(`/auditoria-checklist/modelo/${auditId}?print=true`, '_blank')
+      setExportingId(null)
+    }, 800)
+  }
+
+  const exportLatestExecutionPDF = async (auditId: string) => {
+    try {
+      const { data: latestExecution, error } = await supabase
+        .from('audit_executions')
+        .select('id')
+        .eq('audit_id', auditId)
+        .neq('status', 'Pendente')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error || !latestExecution) {
+        toast({
+          title: 'Atenção',
+          description: 'Nenhuma execução concluída encontrada para este modelo de auditoria.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      window.open(`/auditoria-checklist/detalhes/${latestExecution.id}?print=true`, '_blank')
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -139,14 +175,36 @@ export default function AuditoriasCriadas() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Gerar PDF do Modelo"
+                          disabled={exportingId === audit.id}
+                          onClick={() => handleExportTemplate(audit.id)}
+                        >
+                          <FileText
+                            className={`w-4 h-4 mr-1 ${exportingId === audit.id ? 'animate-pulse' : ''}`}
+                          />
+                          {exportingId === audit.id ? 'Gerando...' : 'Modelo'}
+                        </Button>
                         {audit.status !== 'Rascunho' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => startManualExecution(audit)}
-                          >
-                            <Play className="w-4 h-4 mr-1" /> Executar
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Baixar PDF da última execução"
+                              onClick={() => exportLatestExecutionPDF(audit.id)}
+                            >
+                              <FileText className="w-4 h-4 mr-1" /> Execução
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => startManualExecution(audit)}
+                            >
+                              <Play className="w-4 h-4 mr-1" /> Executar
+                            </Button>
+                          </>
                         )}
                         <Button
                           variant="ghost"
