@@ -98,7 +98,8 @@ export const inventoryService = {
       if (error) throw error
       return data
     } else {
-      const { data, error } = await supabase.from('inventory_products').insert([product])
+      const { id, ...insertData } = product
+      const { data, error } = await supabase.from('inventory_products').insert([insertData])
       if (error) throw error
       return data
     }

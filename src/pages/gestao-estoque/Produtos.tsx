@@ -124,13 +124,18 @@ export default function Produtos() {
         )
       }
 
-      await inventoryService.saveProduct({
-        id: editingId,
+      const productPayload: any = {
         client_id: clientId,
         ...formData,
         image_url: imageUrl,
         sds_url: sdsUrl,
-      })
+      }
+
+      if (editingId) {
+        productPayload.id = editingId
+      }
+
+      await inventoryService.saveProduct(productPayload)
       toast.success('Produto salvo com sucesso')
       setFormModalOpen(false)
       loadProducts()
