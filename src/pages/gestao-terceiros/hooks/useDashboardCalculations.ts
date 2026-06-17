@@ -21,8 +21,13 @@ export function useDashboardCalculations(
   nonWorkingDays: any[] = [],
 ) {
   return useMemo(() => {
-    // Normaliza datas para garantir que logs com timestamp sejam considerados corretamente
-    const normalizeDate = (d: string) => d.split('T')[0]
+    // Normaliza datas para garantir que logs com timestamp sejam considerados corretamente e lidar com timezone offsets
+    const normalizeDate = (d: string) => {
+      if (d.includes('T')) {
+        return format(parseISO(d), 'yyyy-MM-dd')
+      }
+      return d
+    }
 
     const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
     const companiesSet = new Set(selectedCompanies)

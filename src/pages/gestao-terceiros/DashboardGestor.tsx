@@ -77,46 +77,50 @@ export default function DashboardGestor() {
   const { filteredEmployees, mappedLogs } = useMemo(() => {
     if (!employees) return { filteredEmployees: [], mappedLogs: logs || [] }
 
-    const uniqueEmpMap = new Map()
-    const idToUniqueKey = new Map()
+    const uniqueEmpGroups = new Map<string, any[]>()
     const logReferenceIds = new Set((logs || []).map((l: any) => l.reference_id))
-
-    employees.forEach((e: any) => {
-      const regNum = e.registration_number?.trim()
-      const name = e.name?.toLowerCase().trim()
-      const key = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
-
-      idToUniqueKey.set(e.id, key)
-    })
 
     employees.forEach((e: any) => {
       if (e.status === 'Inativo' && !logReferenceIds.has(e.id)) return
 
-      const key = idToUniqueKey.get(e.id)
+      const regNum = e.registration_number?.trim()
+      const name = e.name?.toLowerCase().trim()
+      const groupKey = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
 
-      if (!uniqueEmpMap.has(key)) {
-        uniqueEmpMap.set(key, e)
+      if (!uniqueEmpGroups.has(groupKey)) {
+        uniqueEmpGroups.set(groupKey, [])
+      }
+      uniqueEmpGroups.get(groupKey)!.push(e)
+    })
+
+    const finalFilteredEmployees: any[] = []
+    const idToKeptId = new Map<string, string>()
+
+    uniqueEmpGroups.forEach((group) => {
+      const activeMembers = group.filter((e) => e.status === 'Ativo')
+      const inactiveMembers = group.filter((e) => e.status !== 'Ativo')
+
+      if (activeMembers.length > 0) {
+        activeMembers.forEach((am) => finalFilteredEmployees.push(am))
+        const primaryActive = activeMembers[0]
+        inactiveMembers.forEach((im) => {
+          idToKeptId.set(im.id, primaryActive.id)
+        })
       } else {
-        const existing = uniqueEmpMap.get(key)
-        const eHasLog = logReferenceIds.has(e.id)
-        const exHasLog = logReferenceIds.has(existing.id)
-
-        if (eHasLog && !exHasLog) {
-          uniqueEmpMap.set(key, e)
-        } else if (e.status === 'Ativo' && existing.status !== 'Ativo') {
-          uniqueEmpMap.set(key, e)
-        }
+        const memberWithLog =
+          inactiveMembers.find((im) => logReferenceIds.has(im.id)) || inactiveMembers[0]
+        finalFilteredEmployees.push(memberWithLog)
+        inactiveMembers.forEach((im) => {
+          idToKeptId.set(im.id, memberWithLog.id)
+        })
       }
     })
 
-    const finalFilteredEmployees = Array.from(uniqueEmpMap.values())
-
     const processedLogs = (logs || []).map((l: any) => {
       if (l.type === 'staff') {
-        const key = idToUniqueKey.get(l.reference_id)
-        const keptEmp = uniqueEmpMap.get(key)
-        if (keptEmp) {
-          return { ...l, reference_id: keptEmp.id }
+        const keptId = idToKeptId.get(l.reference_id)
+        if (keptId) {
+          return { ...l, reference_id: keptId }
         }
       }
       return l

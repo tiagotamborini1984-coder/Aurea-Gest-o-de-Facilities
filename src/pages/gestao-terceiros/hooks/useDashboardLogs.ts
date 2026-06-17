@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { parseISO, format } from 'date-fns'
 
 export function useDashboardLogs(
   dateFrom: string,
@@ -24,13 +25,15 @@ export function useDashboardLogs(
         .from('plant_non_working_days')
         .select('plant_id, date')
         .gte('date', dateFrom)
-        .lte('date', dateTo)
+        .lte('date', dateTo + 'T23:59:59.999Z')
         .in('plant_id', plantIds)
 
       const nonWorkingMap: Record<string, boolean> = {}
       if (nwdData) {
         nwdData.forEach((nwd) => {
-          const dateKey = nwd.date.split('T')[0]
+          const dateKey = nwd.date.includes('T')
+            ? format(parseISO(nwd.date), 'yyyy-MM-dd')
+            : nwd.date
           nonWorkingMap[`${nwd.plant_id}_${dateKey}`] = true
         })
       }
@@ -45,7 +48,7 @@ export function useDashboardLogs(
           .from('daily_logs')
           .select('*')
           .gte('date', dateFrom)
-          .lte('date', dateTo)
+          .lte('date', dateTo + 'T23:59:59.999Z')
           .in('plant_id', plantIds)
           .range(from, from + step - 1)
 
@@ -62,7 +65,9 @@ export function useDashboardLogs(
       }
 
       const validLogs = allData.filter((log) => {
-        const logDateKey = log.date.split('T')[0]
+        const logDateKey = log.date.includes('T')
+          ? format(parseISO(log.date), 'yyyy-MM-dd')
+          : log.date
         return !nonWorkingMap[`${log.plant_id}_${logDateKey}`]
       })
 

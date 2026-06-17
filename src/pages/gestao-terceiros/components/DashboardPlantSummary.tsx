@@ -188,10 +188,15 @@ export default function DashboardPlantSummary({
               plantStats.map((p: any) => {
                 const isNonWorking =
                   isSingleDay &&
-                  nonWorkingDays.some(
-                    (n: any) =>
-                      n.plant_id === p.id && n.date.split('T')[0] === dateFrom.split('T')[0],
-                  )
+                  nonWorkingDays.some((n: any) => {
+                    const nDate = n.date.includes('T')
+                      ? format(parseISO(n.date), 'yyyy-MM-dd')
+                      : n.date
+                    const dFrom = dateFrom.includes('T')
+                      ? format(parseISO(dateFrom), 'yyyy-MM-dd')
+                      : dateFrom
+                    return n.plant_id === p.id && nDate === dFrom
+                  })
                 return (
                   <TableRow
                     key={p.id}
@@ -220,10 +225,15 @@ export default function DashboardPlantSummary({
               locationStats.map((l: any) => {
                 const isNonWorking =
                   isSingleDay &&
-                  nonWorkingDays.some(
-                    (n: any) =>
-                      n.plant_id === l.plant_id && n.date.split('T')[0] === dateFrom.split('T')[0],
-                  )
+                  nonWorkingDays.some((n: any) => {
+                    const nDate = n.date.includes('T')
+                      ? format(parseISO(n.date), 'yyyy-MM-dd')
+                      : n.date
+                    const dFrom = dateFrom.includes('T')
+                      ? format(parseISO(dateFrom), 'yyyy-MM-dd')
+                      : dateFrom
+                    return n.plant_id === l.plant_id && nDate === dFrom
+                  })
                 return (
                   <TableRow
                     key={l.id}

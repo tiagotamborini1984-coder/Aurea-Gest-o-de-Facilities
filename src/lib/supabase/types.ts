@@ -1078,21 +1078,27 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          location_id: string | null
           name: string
+          plant_id: string | null
         }
         Insert: {
           client_id: string
           created_at?: string
           description?: string | null
           id?: string
+          location_id?: string | null
           name: string
+          plant_id?: string | null
         }
         Update: {
           client_id?: string
           created_at?: string
           description?: string | null
           id?: string
+          location_id?: string | null
           name?: string
+          plant_id?: string | null
         }
         Relationships: [
           {
@@ -1100,6 +1106,20 @@ export type Database = {
             columns: ['client_id']
             isOneToOne: false
             referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'functions_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'functions_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plants'
             referencedColumns: ['id']
           },
         ]
@@ -3286,7 +3306,7 @@ export type Database = {
             Args: {
               p_plant_id: string
               p_reference_month: string
-              p_staff_log_ids: string[]
+              p_staff_log_ids?: string[]
             }
             Returns: {
               company_name: string
@@ -3690,6 +3710,8 @@ export const Constants = {
 //   name: text (not null)
 //   description: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   plant_id: uuid (nullable)
+//   location_id: uuid (nullable)
 // Table: goals_book
 //   id: uuid (not null, default: gen_random_uuid())
 //   client_id: uuid (not null)
@@ -4175,7 +4197,9 @@ export const Constants = {
 //   FOREIGN KEY function_required_trainings_training_id_fkey: FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE
 // Table: functions
 //   FOREIGN KEY functions_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+//   FOREIGN KEY functions_location_id_fkey: FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
 //   PRIMARY KEY functions_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY functions_plant_id_fkey: FOREIGN KEY (plant_id) REFERENCES plants(id) ON DELETE SET NULL
 // Table: goals_book
 //   FOREIGN KEY goals_book_client_id_fkey: FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 //   PRIMARY KEY goals_book_pkey: PRIMARY KEY (id)
@@ -5057,9 +5081,10 @@ export const Constants = {
 //   $function$
 //
 // FUNCTION get_attendance_employees(uuid, text, uuid[])
-//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month text, p_staff_log_ids uuid[])
+//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month text, p_staff_log_ids uuid[] DEFAULT '{}'::uuid[])
 //    RETURNS TABLE(id uuid, name text, company_name text, function_id uuid, status text, registration_number text, reference_month text, created_at timestamp with time zone)
 //    LANGUAGE plpgsql
+//    SECURITY DEFINER
 //   AS $function$
 //   BEGIN
 //     RETURN QUERY
@@ -5073,14 +5098,12 @@ export const Constants = {
 //         e.registration_number,
 //         e.reference_month,
 //         e.created_at,
-//         -- Group duplicates by registration number, name, or id
 //         ROW_NUMBER() OVER (
-//           PARTITION BY COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name)), e.id::TEXT)
+//           PARTITION BY e.plant_id, COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name)), e.id::text)
 //           ORDER BY
-//             -- Priorities for selecting the best duplicate record
-//             CASE WHEN e.id = ANY(p_staff_log_ids) THEN 0 ELSE 1 END,
-//             CASE WHEN e.reference_month = p_reference_month THEN 0 ELSE 1 END,
-//             CASE WHEN e.status = 'Ativo' THEN 0 ELSE 1 END,
+//             CASE WHEN e.id = ANY(p_staff_log_ids) THEN 0 ELSE 1 END ASC,
+//             CASE WHEN e.reference_month = p_reference_month THEN 0 ELSE 1 END ASC,
+//             CASE WHEN e.status = 'Ativo' THEN 0 ELSE 1 END ASC,
 //             e.created_at DESC
 //         ) as rn
 //       FROM public.employees e
@@ -5100,8 +5123,9 @@ export const Constants = {
 //       AND (
 //         re.id = ANY(p_staff_log_ids)
 //         OR re.status = 'Ativo'
-//         OR (re.status = 'Inativo' AND re.reference_month > p_reference_month)
-//       );
+//         OR (re.status = 'Inativo' AND re.reference_month IS NOT NULL AND re.reference_month > p_reference_month)
+//       )
+//     ORDER BY re.name ASC;
 //   END;
 //   $function$
 //
@@ -6186,7 +6210,9 @@ export const Constants = {
 // Table: function_required_trainings
 //   CREATE UNIQUE INDEX function_required_trainings_function_id_training_id_key ON public.function_required_trainings USING btree (function_id, training_id)
 // Table: functions
+//   CREATE INDEX idx_functions_location_id ON public.functions USING btree (location_id)
 //   CREATE INDEX idx_functions_name_client ON public.functions USING btree (lower(TRIM(BOTH FROM name)), client_id)
+//   CREATE INDEX idx_functions_plant_id ON public.functions USING btree (plant_id)
 // Table: locker_occupations
 //   CREATE UNIQUE INDEX one_active_locker_per_collab ON public.locker_occupations USING btree (collaborator_id) WHERE (status = 'Ativo'::text)
 // Table: maintenance_plan_checklist_items

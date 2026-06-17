@@ -91,6 +91,11 @@ export function useCadastrosConfig(
           columns: [
             { header: 'Nome da Função', accessor: 'name' },
             {
+              header: 'Local',
+              accessor: 'location_id',
+              render: (item: any) => locations.find((l) => l.id === item.location_id)?.name || '-',
+            },
+            {
               header: 'Descrição',
               accessor: 'description',
               render: (item: any) => item.description || '-',
@@ -98,6 +103,13 @@ export function useCadastrosConfig(
           ],
           fields: [
             { name: 'name', label: 'Nome da Função', type: 'text' },
+            {
+              name: 'location_id',
+              label: 'Local (Opcional)',
+              type: 'select',
+              options: locationOptions,
+              required: false,
+            },
             { name: 'description', label: 'Descrição', type: 'textarea', required: false },
           ],
         }
