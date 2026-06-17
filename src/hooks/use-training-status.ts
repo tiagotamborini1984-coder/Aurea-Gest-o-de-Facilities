@@ -10,22 +10,66 @@ export function useTrainingStatus() {
 
       const employeeIds = Array.from(new Set(employees.map((e) => e?.id).filter(Boolean)))
 
-      // Fetch required trainings
-      const { data: reqTrainings } = await supabase
-        .from('function_required_trainings')
-        .select('*, trainings(*)')
+      // Fetch required trainings with pagination to avoid 1000 row limits
+      let reqTrainings: any[] = []
+      let hasMoreReqs = true
+      let reqsFrom = 0
+      const reqsLimit = 1000
+
+      while (hasMoreReqs) {
+        const { data, error } = await supabase
+          .from('function_required_trainings')
+          .select('*, trainings(*)')
+          .range(reqsFrom, reqsFrom + reqsLimit - 1)
+
+        if (error) {
+          console.error('Error fetching required trainings:', error)
+          break
+        }
+
+        if (data && data.length > 0) {
+          reqTrainings = reqTrainings.concat(data)
+          reqsFrom += reqsLimit
+          if (data.length < reqsLimit) {
+            hasMoreReqs = false
+          }
+        } else {
+          hasMoreReqs = false
+        }
+      }
 
       let allRecords: any[] = []
       if (employeeIds.length > 0) {
-        const chunkSize = 100
+        const chunkSize = 25 // Reduced chunk size to help with performance and limit issues
         for (let i = 0; i < employeeIds.length; i += chunkSize) {
           const chunk = employeeIds.slice(i, i + chunkSize)
-          const { data } = await supabase
-            .from('employee_training_records')
-            .select('*, trainings(*)')
-            .in('employee_id', chunk)
-          if (data) {
-            allRecords = allRecords.concat(data)
+
+          let hasMore = true
+          let from = 0
+          const limit = 1000
+
+          while (hasMore) {
+            const { data, error } = await supabase
+              .from('employee_training_records')
+              .select('*, trainings(*)')
+              .in('employee_id', chunk)
+              .order('completion_date', { ascending: false, nullsFirst: false })
+              .range(from, from + limit - 1)
+
+            if (error) {
+              console.error('Error fetching training records:', error)
+              break
+            }
+
+            if (data && data.length > 0) {
+              allRecords = allRecords.concat(data)
+              from += limit
+              if (data.length < limit) {
+                hasMore = false
+              }
+            } else {
+              hasMore = false
+            }
           }
         }
       }
@@ -58,39 +102,77 @@ export function useTrainingStatus() {
         }
 
         const myRecords = recordsById[emp.id] || []
-        let status: 'Apto' | 'Inapto' = 'Apto'
+        let employeeStatus: 'Apto' | 'Inapto' = 'Apto'
         const details: any[] = []
 
         for (const req of reqs) {
-          if (!req) continue
+          if (!req || !req.training_id) continue
           const recordsForReq = myRecords.filter((r) => r?.training_id === req.training_id)
 
-          let reqStatus = 'Concluído'
+          let reqStatus = 'Pendente'
           let latest = null
+          let hasValid = false
 
-          if (recordsForReq.length === 0) {
-            reqStatus = 'Pendente'
-            status = 'Inapto'
-          } else {
-            latest = recordsForReq.sort(
-              (a, b) =>
-                new Date(b?.completion_date || 0).getTime() -
-                new Date(a?.completion_date || 0).getTime(),
-            )[0]
+          if (recordsForReq.length > 0) {
+            // Sort records newest first by completion_date
+            recordsForReq.sort((a, b) => {
+              const dateA = a?.completion_date ? new Date(a.completion_date).getTime() : 0
+              const dateB = b?.completion_date ? new Date(b.completion_date).getTime() : 0
+              if (dateB !== dateA) return dateB - dateA
 
-            const validity =
-              latest?.trainings?.validity_months || req?.trainings?.validity_months || 0
-            if (validity > 0 && latest?.completion_date) {
-              const dateStr = latest.completion_date.split('T')[0]
+              const createdA = a?.created_at ? new Date(a.created_at).getTime() : 0
+              const createdB = b?.created_at ? new Date(b.created_at).getTime() : 0
+              return createdB - createdA
+            })
+
+            // Filter out explicitly rejected/inactive
+            const validRecords = recordsForReq.filter(
+              (r) => r.status !== 'Rejeitado' && r.status !== 'Reprovado' && r.status !== 'Inativo',
+            )
+
+            latest = recordsForReq[0] // default to newest record even if rejected for display fallback
+            const mostRecentValid = validRecords[0]
+
+            if (mostRecentValid && mostRecentValid.completion_date) {
+              const validity = Number(
+                mostRecentValid?.trainings?.validity_months || req?.trainings?.validity_months || 0,
+              )
+
+              const dateStr = mostRecentValid.completion_date.split('T')[0]
               const [year, month, day] = dateStr.split('-').map(Number)
               const expDate = new Date(year, month - 1, day)
-              expDate.setMonth(expDate.getMonth() + validity)
+
+              if (validity > 0) {
+                expDate.setMonth(expDate.getMonth() + validity)
+              } else {
+                // Vitalício (doesn't expire)
+                expDate.setFullYear(2099)
+              }
               expDate.setHours(23, 59, 59, 999)
-              if (expDate < evaluationDate) {
+
+              const evalDate = new Date(evaluationDate)
+              evalDate.setHours(0, 0, 0, 0)
+
+              if (expDate >= evalDate) {
+                hasValid = true
+                latest = mostRecentValid // Use the valid record for display
+                reqStatus = 'Concluído'
+              } else {
+                hasValid = false
+                latest = mostRecentValid // Show as expired
                 reqStatus = 'Vencido'
-                status = 'Inapto'
               }
             }
+
+            if (!hasValid) {
+              if (!reqStatus || reqStatus === 'Concluído') {
+                reqStatus = latest?.completion_date ? 'Vencido' : 'Pendente'
+              }
+              employeeStatus = 'Inapto'
+            }
+          } else {
+            reqStatus = 'Pendente'
+            employeeStatus = 'Inapto'
           }
 
           details.push({
@@ -102,7 +184,7 @@ export function useTrainingStatus() {
             validity_months: req.trainings?.validity_months,
           })
         }
-        statusMap[emp.id] = status
+        statusMap[emp.id] = employeeStatus
         detailsMap[emp.id] = details
       })
 

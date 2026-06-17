@@ -3282,6 +3282,23 @@ export type Database = {
               isSetofReturn: true
             }
           }
+        | {
+            Args: {
+              p_plant_id: string
+              p_reference_month: string
+              p_staff_log_ids: string[]
+            }
+            Returns: {
+              company_name: string
+              created_at: string
+              function_id: string
+              id: string
+              name: string
+              reference_month: string
+              registration_number: string
+              status: string
+            }[]
+          }
       get_maintenance_public_options: {
         Args: { p_slug: string }
         Returns: Json
@@ -5039,44 +5056,52 @@ export const Constants = {
 //   END;
 //   $function$
 //
-// FUNCTION get_attendance_employees(uuid, character varying, uuid[])
-//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month character varying, p_staff_log_ids uuid[] DEFAULT '{}'::uuid[])
-//    RETURNS SETOF employees
+// FUNCTION get_attendance_employees(uuid, text, uuid[])
+//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month text, p_staff_log_ids uuid[])
+//    RETURNS TABLE(id uuid, name text, company_name text, function_id uuid, status text, registration_number text, reference_month text, created_at timestamp with time zone)
 //    LANGUAGE plpgsql
 //   AS $function$
 //   BEGIN
 //     RETURN QUERY
-//     SELECT DISTINCT ON (LOWER(TRIM(COALESCE(e.name, e.id::TEXT))))
-//       e.*
-//     FROM public.employees e
-//     WHERE e.plant_id = p_plant_id
-//       AND (e.status = 'Ativo' OR e.id = ANY(p_staff_log_ids))
-//       AND (e.reference_month = p_reference_month OR e.reference_month IS NULL)
-//     ORDER BY LOWER(TRIM(COALESCE(e.name, e.id::TEXT))), e.reference_month DESC NULLS LAST, e.created_at DESC;
-//   END;
-//   $function$
-//
-// FUNCTION get_attendance_employees(uuid, uuid[], text)
-//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_client_id uuid, p_plant_ids uuid[] DEFAULT NULL::uuid[], p_reference_month text DEFAULT NULL::text)
-//    RETURNS SETOF employees
-//    LANGUAGE plpgsql
-//    SECURITY DEFINER
-//   AS $function$
-//   BEGIN
-//       RETURN QUERY
-//       SELECT DISTINCT ON (
-//           e.plant_id,
-//           COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name)))
-//       )
-//           e.*
+//     WITH RankedEmployees AS (
+//       SELECT
+//         e.id,
+//         e.name,
+//         e.company_name,
+//         e.function_id,
+//         e.status,
+//         e.registration_number,
+//         e.reference_month,
+//         e.created_at,
+//         -- Group duplicates by registration number, name, or id
+//         ROW_NUMBER() OVER (
+//           PARTITION BY COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name)), e.id::TEXT)
+//           ORDER BY
+//             -- Priorities for selecting the best duplicate record
+//             CASE WHEN e.id = ANY(p_staff_log_ids) THEN 0 ELSE 1 END,
+//             CASE WHEN e.reference_month = p_reference_month THEN 0 ELSE 1 END,
+//             CASE WHEN e.status = 'Ativo' THEN 0 ELSE 1 END,
+//             e.created_at DESC
+//         ) as rn
 //       FROM public.employees e
-//       WHERE e.client_id = p_client_id
-//         AND (p_plant_ids IS NULL OR e.plant_id = ANY(p_plant_ids))
-//         AND e.status = 'Ativo'
-//       ORDER BY
-//           e.plant_id,
-//           COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name))),
-//           e.updated_at DESC;
+//       WHERE e.plant_id = p_plant_id
+//     )
+//     SELECT
+//       re.id,
+//       re.name,
+//       re.company_name,
+//       re.function_id,
+//       re.status,
+//       re.registration_number,
+//       re.reference_month,
+//       re.created_at
+//     FROM RankedEmployees re
+//     WHERE re.rn = 1
+//       AND (
+//         re.id = ANY(p_staff_log_ids)
+//         OR re.status = 'Ativo'
+//         OR (re.status = 'Inativo' AND re.reference_month > p_reference_month)
+//       );
 //   END;
 //   $function$
 //
@@ -5109,6 +5134,47 @@ export const Constants = {
 //       WHERE e.plant_id = p_plant_id
 //         AND COALESCE(e.status, '') != 'Inativo'
 //       ORDER BY e.id, l.status DESC NULLS LAST;
+//   END;
+//   $function$
+//
+// FUNCTION get_attendance_employees(uuid, uuid[], text)
+//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_client_id uuid, p_plant_ids uuid[] DEFAULT NULL::uuid[], p_reference_month text DEFAULT NULL::text)
+//    RETURNS SETOF employees
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//       RETURN QUERY
+//       SELECT DISTINCT ON (
+//           e.plant_id,
+//           COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name)))
+//       )
+//           e.*
+//       FROM public.employees e
+//       WHERE e.client_id = p_client_id
+//         AND (p_plant_ids IS NULL OR e.plant_id = ANY(p_plant_ids))
+//         AND e.status = 'Ativo'
+//       ORDER BY
+//           e.plant_id,
+//           COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name))),
+//           e.updated_at DESC;
+//   END;
+//   $function$
+//
+// FUNCTION get_attendance_employees(uuid, character varying, uuid[])
+//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month character varying, p_staff_log_ids uuid[] DEFAULT '{}'::uuid[])
+//    RETURNS SETOF employees
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//     RETURN QUERY
+//     SELECT DISTINCT ON (LOWER(TRIM(COALESCE(e.name, e.id::TEXT))))
+//       e.*
+//     FROM public.employees e
+//     WHERE e.plant_id = p_plant_id
+//       AND (e.status = 'Ativo' OR e.id = ANY(p_staff_log_ids))
+//       AND (e.reference_month = p_reference_month OR e.reference_month IS NULL)
+//     ORDER BY LOWER(TRIM(COALESCE(e.name, e.id::TEXT))), e.reference_month DESC NULLS LAST, e.created_at DESC;
 //   END;
 //   $function$
 //

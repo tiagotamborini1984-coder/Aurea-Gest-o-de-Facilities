@@ -135,7 +135,7 @@ export default function Lancamentos() {
         ),
       )
 
-      const refMonth = format(selectedDate, 'yyyy-MM')
+      const refMonth = format(selectedDate, 'yyyy-MM') + '-01'
       let fetchedEmps: any[] = []
 
       // Try using the new RPC for unique employees

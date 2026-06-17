@@ -149,11 +149,11 @@ export default function Cadastros() {
             .select('*')
             .order('created_at', { ascending: false })
 
-          if (config.hasMonthFilter) {
+          if (config.hasMonthFilter && type !== 'colaboradores') {
             q = q.eq('reference_month', `${selectedMonth}-01`)
           }
 
-          if (type === 'colaboradores' || type === 'equipamentos') {
+          if (type === 'equipamentos') {
             q = q.eq('status', 'Ativo')
           }
 
@@ -166,6 +166,47 @@ export default function Cadastros() {
           }
 
           const { data } = await q
+
+          if (type === 'colaboradores' && data) {
+            const refMonth = `${selectedMonth}-01`
+
+            const grouped = new Map<string, any[]>()
+            data.forEach((e: any) => {
+              const key = `${e.plant_id}-${e.registration_number?.trim() || e.name?.toLowerCase().trim() || e.id}`
+              if (!grouped.has(key)) grouped.set(key, [])
+              grouped.get(key)!.push(e)
+            })
+
+            const uniqueEmpsMap = new Map()
+            Array.from(grouped.values()).forEach((group) => {
+              group.sort((a, b) => {
+                const aRefMatch = a.reference_month === refMonth ? 0 : 1
+                const bRefMatch = b.reference_month === refMonth ? 0 : 1
+                if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
+
+                const aActive = a.status === 'Ativo' ? 0 : 1
+                const bActive = b.status === 'Ativo' ? 0 : 1
+                if (aActive !== bActive) return aActive - bActive
+
+                return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+              })
+
+              const best = group[0]
+              if (
+                best.status === 'Ativo' ||
+                (best.status === 'Inativo' &&
+                  best.reference_month &&
+                  best.reference_month > refMonth)
+              ) {
+                uniqueEmpsMap.set(best.id, best)
+              }
+            })
+
+            return Array.from(uniqueEmpsMap.values()).sort((a: any, b: any) =>
+              (a.name || '').localeCompare(b.name || ''),
+            )
+          }
+
           return data
         }}
         onAdd={async (record: any) => {
