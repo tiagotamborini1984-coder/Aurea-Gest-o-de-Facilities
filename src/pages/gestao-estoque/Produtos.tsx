@@ -23,6 +23,13 @@ import { Label } from '@/components/ui/label'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function Produtos() {
   const { activeClient } = useAppStore()
@@ -37,6 +44,9 @@ export default function Produtos() {
     unit_of_measure: 'UN',
     current_stock: 0,
     minimum_stock: 0,
+    fs_code: '',
+    supply_code: '',
+    item_value: 0,
   })
 
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -61,6 +71,9 @@ export default function Produtos() {
         unit_of_measure: prod.unit_of_measure || 'UN',
         current_stock: prod.current_stock || 0,
         minimum_stock: prod.minimum_stock || 0,
+        fs_code: prod.fs_code || '',
+        supply_code: prod.supply_code || '',
+        item_value: prod.item_value || 0,
       })
     } else {
       setEditingId(null)
@@ -71,6 +84,9 @@ export default function Produtos() {
         unit_of_measure: 'UN',
         current_stock: 0,
         minimum_stock: 0,
+        fs_code: '',
+        supply_code: '',
+        item_value: 0,
       })
     }
     setImageFile(null)
@@ -148,7 +164,9 @@ export default function Produtos() {
             <TableHeader>
               <TableRow>
                 <TableHead>Produto</TableHead>
+                <TableHead>Códigos</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead>Valor Unit.</TableHead>
                 <TableHead>Estoque Atual</TableHead>
                 <TableHead>Estoque Mínimo</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -170,7 +188,22 @@ export default function Produtos() {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <div className="text-xs text-slate-500 space-y-1">
+                      <div>
+                        <span className="font-medium">FS:</span> {p.fs_code || '-'}
+                      </div>
+                      <div>
+                        <span className="font-medium">Supply:</span> {p.supply_code || '-'}
+                      </div>
+                    </div>
+                  </TableCell>
                   <TableCell>{p.category}</TableCell>
+                  <TableCell>
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                      p.item_value || 0,
+                    )}
+                  </TableCell>
                   <TableCell>
                     <span
                       className={p.current_stock <= p.minimum_stock ? 'text-red-600 font-bold' : ''}
@@ -191,7 +224,7 @@ export default function Produtos() {
               ))}
               {products.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     Nenhum produto cadastrado.
                   </TableCell>
                 </TableRow>
@@ -215,10 +248,47 @@ export default function Produtos() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Categoria</Label>
+              <Label>Código FS</Label>
               <Input
+                value={formData.fs_code}
+                onChange={(e) => setFormData({ ...formData, fs_code: e.target.value })}
+                placeholder="Ex: FS-1001"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Código Supply</Label>
+              <Input
+                value={formData.supply_code}
+                onChange={(e) => setFormData({ ...formData, supply_code: e.target.value })}
+                placeholder="Ex: SUP-2002"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onValueChange={(val) => setFormData({ ...formData, category: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Limpeza">Limpeza</SelectItem>
+                  <SelectItem value="Manutenção">Manutenção</SelectItem>
+                  <SelectItem value="Equipamentos">Equipamentos</SelectItem>
+                  <SelectItem value="Consumíveis">Consumíveis</SelectItem>
+                  <SelectItem value="Escritório">Escritório</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor do item (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.item_value}
+                onChange={(e) => setFormData({ ...formData, item_value: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">

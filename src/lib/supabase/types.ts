@@ -3673,7 +3673,7 @@ export const Constants = {
 //   created_at: timestamp with time zone (not null, default: now())
 // Table: inventory_products
 //   id: uuid (not null, default: gen_random_uuid())
-//   client_id: uuid (nullable)
+//   client_id: uuid (nullable, default: get_user_client_id())
 //   name: text (not null)
 //   description: text (nullable)
 //   category: text (nullable)
@@ -4452,6 +4452,15 @@ export const Constants = {
 //     USING: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))
 //     WITH CHECK: ((get_user_role() = 'Master'::text) OR (client_id = get_user_client_id()))
 // Table: inventory_products
+//   Policy "authenticated_delete_inventory_products" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: (client_id = get_user_client_id())
+//   Policy "authenticated_insert_inventory_products" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: (client_id = get_user_client_id())
+//   Policy "authenticated_select_inventory_products" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (client_id = get_user_client_id())
+//   Policy "authenticated_update_inventory_products" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (client_id = get_user_client_id())
+//     WITH CHECK: (client_id = get_user_client_id())
 //   Policy "inventory_products_all" (ALL, PERMISSIVE) roles={public}
 //     USING: true
 //   Policy "inventory_products_select" (SELECT, PERMISSIVE) roles={public}
