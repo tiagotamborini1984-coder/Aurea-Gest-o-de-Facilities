@@ -173,7 +173,10 @@ export default function Lancamentos() {
           const uniqueEmpsMap = new Map()
           emps.forEach((e) => {
             if (!e || !e.id) return
-            const key = e.name?.trim().toLowerCase() || e.id
+            const regNum = e.registration_number?.trim()
+            const name = e.name?.toLowerCase().trim()
+            const key = regNum ? regNum : name || e.id
+
             if (!uniqueEmpsMap.has(key)) {
               uniqueEmpsMap.set(key, e)
             } else {

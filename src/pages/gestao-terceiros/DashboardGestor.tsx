@@ -74,24 +74,55 @@ export default function DashboardGestor() {
   const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
 
-  const filteredEmployees = useMemo(() => {
-    if (!employees) return []
-    const seen = new Set()
-    const logReferenceIds = new Set(logs?.map((l: any) => l.reference_id) || [])
+  const { filteredEmployees, mappedLogs } = useMemo(() => {
+    if (!employees) return { filteredEmployees: [], mappedLogs: logs || [] }
 
-    return employees.filter((e: any) => {
-      // Exclui apenas inativos para garantir que todos que trabalharam/estão afastados mas logaram apareçam
-      if (e.status && e.status === 'Inativo') return false
+    const uniqueEmpMap = new Map()
+    const idToUniqueKey = new Map()
+    const logReferenceIds = new Set((logs || []).map((l: any) => l.reference_id))
 
+    employees.forEach((e: any) => {
       const regNum = e.registration_number?.trim()
       const name = e.name?.toLowerCase().trim()
       const key = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
-      const hasLog = logReferenceIds.has(e.id)
 
-      if (seen.has(key) && !hasLog) return false
-      seen.add(key)
-      return true
+      idToUniqueKey.set(e.id, key)
     })
+
+    employees.forEach((e: any) => {
+      if (e.status === 'Inativo' && !logReferenceIds.has(e.id)) return
+
+      const key = idToUniqueKey.get(e.id)
+
+      if (!uniqueEmpMap.has(key)) {
+        uniqueEmpMap.set(key, e)
+      } else {
+        const existing = uniqueEmpMap.get(key)
+        const eHasLog = logReferenceIds.has(e.id)
+        const exHasLog = logReferenceIds.has(existing.id)
+
+        if (eHasLog && !exHasLog) {
+          uniqueEmpMap.set(key, e)
+        } else if (e.status === 'Ativo' && existing.status !== 'Ativo') {
+          uniqueEmpMap.set(key, e)
+        }
+      }
+    })
+
+    const finalFilteredEmployees = Array.from(uniqueEmpMap.values())
+
+    const processedLogs = (logs || []).map((l: any) => {
+      if (l.type === 'staff') {
+        const key = idToUniqueKey.get(l.reference_id)
+        const keptEmp = uniqueEmpMap.get(key)
+        if (keptEmp) {
+          return { ...l, reference_id: keptEmp.id }
+        }
+      }
+      return l
+    })
+
+    return { filteredEmployees: finalFilteredEmployees, mappedLogs: processedLogs }
   }, [employees, logs])
 
   const {
@@ -104,7 +135,7 @@ export default function DashboardGestor() {
     dailyTrend,
     activeLogs,
   } = useDashboardCalculations(
-    logs,
+    mappedLogs,
     monthlyGoals,
     filteredContracted,
     filteredPlants,

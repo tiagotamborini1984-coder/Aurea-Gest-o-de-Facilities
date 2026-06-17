@@ -3234,6 +3234,19 @@ export type Database = {
             }
           }
         | {
+            Args: { p_date: string; p_plant_id: string }
+            Returns: {
+              company_name: string
+              function_id: string
+              id: string
+              location_id: string
+              log_id: string
+              log_status: boolean
+              name: string
+              status: string
+            }[]
+          }
+        | {
             Args: {
               p_plant_id: string
               p_reference_month: string
@@ -5005,6 +5018,23 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION get_attendance_employees(uuid, character varying, uuid[])
+//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month character varying, p_staff_log_ids uuid[] DEFAULT '{}'::uuid[])
+//    RETURNS SETOF employees
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//     RETURN QUERY
+//     SELECT DISTINCT ON (LOWER(TRIM(COALESCE(e.name, e.id::TEXT))))
+//       e.*
+//     FROM public.employees e
+//     WHERE e.plant_id = p_plant_id
+//       AND (e.status = 'Ativo' OR e.id = ANY(p_staff_log_ids))
+//       AND (e.reference_month = p_reference_month OR e.reference_month IS NULL)
+//     ORDER BY LOWER(TRIM(COALESCE(e.name, e.id::TEXT))), e.reference_month DESC NULLS LAST, e.created_at DESC;
+//   END;
+//   $function$
+//
 // FUNCTION get_attendance_employees(uuid, uuid[], text)
 //   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_client_id uuid, p_plant_ids uuid[] DEFAULT NULL::uuid[], p_reference_month text DEFAULT NULL::text)
 //    RETURNS SETOF employees
@@ -5029,20 +5059,35 @@ export const Constants = {
 //   END;
 //   $function$
 //
-// FUNCTION get_attendance_employees(uuid, character varying, uuid[])
-//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_reference_month character varying, p_staff_log_ids uuid[] DEFAULT '{}'::uuid[])
-//    RETURNS SETOF employees
+// FUNCTION get_attendance_employees(uuid, date)
+//   CREATE OR REPLACE FUNCTION public.get_attendance_employees(p_plant_id uuid, p_date date)
+//    RETURNS TABLE(id uuid, name text, company_name text, function_id uuid, location_id uuid, status text, log_status boolean, log_id uuid)
 //    LANGUAGE plpgsql
+//    SECURITY DEFINER
 //   AS $function$
 //   BEGIN
-//     RETURN QUERY
-//     SELECT DISTINCT ON (LOWER(TRIM(COALESCE(e.name, e.id::TEXT))))
-//       e.*
-//     FROM public.employees e
-//     WHERE e.plant_id = p_plant_id
-//       AND (e.status = 'Ativo' OR e.id = ANY(p_staff_log_ids))
-//       AND (e.reference_month = p_reference_month OR e.reference_month IS NULL)
-//     ORDER BY LOWER(TRIM(COALESCE(e.name, e.id::TEXT))), e.reference_month DESC NULLS LAST, e.created_at DESC;
+//       IF NOT public.is_plant_authorized(p_plant_id) THEN
+//           RETURN;
+//       END IF;
+//
+//       RETURN QUERY
+//       SELECT DISTINCT ON (e.id)
+//           e.id,
+//           e.name,
+//           e.company_name,
+//           e.function_id,
+//           e.location_id,
+//           e.status,
+//           l.status as log_status,
+//           l.id as log_id
+//       FROM public.employees e
+//       LEFT JOIN public.daily_logs l
+//           ON l.reference_id = e.id
+//           AND l.type = 'staff'
+//           AND l.date::DATE = p_date
+//       WHERE e.plant_id = p_plant_id
+//         AND COALESCE(e.status, '') != 'Inativo'
+//       ORDER BY e.id, l.status DESC NULLS LAST;
 //   END;
 //   $function$
 //
