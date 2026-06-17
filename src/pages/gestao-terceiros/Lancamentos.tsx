@@ -155,41 +155,49 @@ export default function Lancamentos() {
           'RPC get_attendance_employees failed or not available. Using fallback.',
           rpcError,
         )
-        let empsQuery = supabase
+        const { data: emps, error: empsError } = await supabase
           .from('employees')
           .select(
-            'id, name, company_name, function_id, status, registration_number, reference_month',
+            'id, name, company_name, function_id, status, registration_number, reference_month, created_at',
           )
           .eq('plant_id', selectedPlant)
 
-        if (staffLogIds.length > 0)
-          empsQuery = empsQuery.or(`status.eq.Ativo,id.in.(${staffLogIds.join(',')})`)
-        else empsQuery = empsQuery.eq('status', 'Ativo')
-
-        const { data: emps, error: empsError } = await empsQuery
         if (empsError && empsError.code !== 'PGRST116') throw empsError
 
         if (emps && emps.length > 0) {
-          const uniqueEmpsMap = new Map()
+          const grouped = new Map<string, any[]>()
           emps.forEach((e) => {
             if (!e || !e.id) return
-            const regNum = e.registration_number?.trim()
-            const name = e.name?.toLowerCase().trim()
-            const key = regNum ? regNum : name || e.id
+            const key = e.registration_number?.trim() || e.name?.toLowerCase().trim() || e.id
+            if (!grouped.has(key)) grouped.set(key, [])
+            grouped.get(key)!.push(e)
+          })
 
-            if (!uniqueEmpsMap.has(key)) {
-              uniqueEmpsMap.set(key, e)
-            } else {
-              const existing = uniqueEmpsMap.get(key)
-              if (e.reference_month === refMonth && existing.reference_month !== refMonth) {
-                uniqueEmpsMap.set(key, e)
-              } else if (staffLogIds.includes(e.id) && !staffLogIds.includes(existing.id)) {
-                uniqueEmpsMap.set(key, e)
-              } else if (e.status === 'Ativo' && existing.status !== 'Ativo') {
-                uniqueEmpsMap.set(key, e)
-              } else if (!existing.reference_month && e.reference_month) {
-                uniqueEmpsMap.set(key, e)
-              }
+          const uniqueEmpsMap = new Map()
+          Array.from(grouped.values()).forEach((group) => {
+            group.sort((a, b) => {
+              const aHasLog = staffLogIds.includes(a.id) ? 0 : 1
+              const bHasLog = staffLogIds.includes(b.id) ? 0 : 1
+              if (aHasLog !== bHasLog) return aHasLog - bHasLog
+
+              const aRefMatch = a.reference_month === refMonth ? 0 : 1
+              const bRefMatch = b.reference_month === refMonth ? 0 : 1
+              if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
+
+              const aActive = a.status === 'Ativo' ? 0 : 1
+              const bActive = b.status === 'Ativo' ? 0 : 1
+              if (aActive !== bActive) return aActive - bActive
+
+              return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+            })
+
+            const best = group[0]
+            if (
+              staffLogIds.includes(best.id) ||
+              best.status === 'Ativo' ||
+              (best.status === 'Inativo' && best.reference_month && best.reference_month > refMonth)
+            ) {
+              uniqueEmpsMap.set(best.id, best)
             }
           })
           fetchedEmps = Array.from(uniqueEmpsMap.values())
@@ -200,7 +208,8 @@ export default function Lancamentos() {
         const uniqueEmps = fetchedEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         if (!isActive) return
         setEmployees(uniqueEmps)
-        const statuses = await getTrainingStatuses(uniqueEmps, true)
+        // Evaluate training statuses considering the historical selected date
+        const statuses = await getTrainingStatuses(uniqueEmps, true, selectedDate)
         if (!isActive) return
         setTrainingStatuses(statuses || { statusMap: {}, detailsMap: {} })
       } else {
