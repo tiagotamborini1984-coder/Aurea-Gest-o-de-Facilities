@@ -55,6 +55,10 @@ export function useHasAccess(menuName: string) {
     return true
   }
 
+  if (menuName.startsWith('Gestão de Estoque:') && userMenus.includes('Gestão de Estoque')) {
+    return true
+  }
+
   if (
     menuName.startsWith('Auditoria e Checklist:') &&
     userMenus.includes('Auditoria e Checklist')
@@ -84,6 +88,13 @@ export function useHasAccess(menuName: string) {
   }
 
   if (menuName === 'Cadastros' && userMenus.some((m) => m.startsWith('Cadastros'))) {
+    return true
+  }
+
+  if (
+    menuName === 'Gestão de Estoque' &&
+    userMenus.some((m) => m.startsWith('Gestão de Estoque'))
+  ) {
     return true
   }
 

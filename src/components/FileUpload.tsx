@@ -17,7 +17,8 @@ export function FileUpload({
   existingUrls = [],
   bucket = 'documents',
   multiple = true,
-}: FileUploadProps) {
+  showThumbnails = false,
+}: FileUploadProps & { showThumbnails?: boolean }) {
   const [urls, setUrls] = useState<string[]>(existingUrls)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -167,40 +168,79 @@ export function FileUpload({
             <CheckCircle2 className="h-4 w-4 text-green-500" />
             Anexos enviados ({urls.length})
           </p>
-          {urls.map((url, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between p-3 border border-border rounded-lg bg-card text-sm group hover:border-border/80 transition-colors"
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="bg-muted p-2 rounded-md shrink-0 group-hover:bg-brand-vividBlue/10 transition-colors">
-                  <FileIcon className="h-4 w-4 text-muted-foreground group-hover:text-brand-vividBlue transition-colors" />
-                </div>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate hover:underline font-medium text-foreground/90"
-                  translate="no"
-                  title={url}
+          {showThumbnails ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+              {urls.map((url, i) => (
+                <div
+                  key={i}
+                  className="relative group aspect-square rounded-lg border bg-muted overflow-hidden"
                 >
-                  {formatFileName(url)}
-                </a>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeUrl(url)
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+                  {url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                    <img src={url} alt="Evidência" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
+                      <FileIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-xs truncate w-full px-2" title={formatFileName(url)}>
+                        {formatFileName(url)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      type="button"
+                      className="h-8 shadow-lg gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeUrl(url)
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                      Remover
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <div className="space-y-2">
+              {urls.map((url, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 border border-border rounded-lg bg-card text-sm group hover:border-border/80 transition-colors"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="bg-muted p-2 rounded-md shrink-0 group-hover:bg-brand-vividBlue/10 transition-colors">
+                      <FileIcon className="h-4 w-4 text-muted-foreground group-hover:text-brand-vividBlue transition-colors" />
+                    </div>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate hover:underline font-medium text-foreground/90"
+                      translate="no"
+                      title={url}
+                    >
+                      {formatFileName(url)}
+                    </a>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeUrl(url)
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

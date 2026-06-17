@@ -30,6 +30,7 @@ const AVAILABLE_MODULES = [
   'Organograma e Fluxos',
   'Gestão de Acidentes',
   'Gestão da Manutenção',
+  'Gestão de Estoque',
 ]
 
 export function CreateClientDialog({

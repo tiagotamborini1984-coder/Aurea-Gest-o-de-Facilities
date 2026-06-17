@@ -33,6 +33,7 @@ const MODULES = [
   'Gestão de Lockers',
   'Gestão de Documentos',
   'Gestão de Imóveis',
+  'Gestão de Estoque',
   'Gestão de Encomendas',
   'Book de Metas',
   'Log de Auditoria',

@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { Loader2, Save, CheckCircle, ArrowLeft } from 'lucide-react'
+import { Loader2, Save, CheckCircle, ArrowLeft, Paperclip } from 'lucide-react'
+import { FileUpload } from '@/components/FileUpload'
 import {
   Select,
   SelectContent,
@@ -71,6 +72,7 @@ export default function AuditoriaDetalhes() {
             score: ans.score,
             observations: ans.observations,
             evidence_url: ans.evidence_url,
+            evidence_urls: ans.evidence_urls || [],
             corrective_assignee_id: ans.corrective_assignee_id,
             corrective_due_date: ans.corrective_due_date,
           }
@@ -221,46 +223,98 @@ export default function AuditoriaDetalhes() {
               )}
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nota</Label>
-                  <Select
-                    value={answers[action.id]?.score?.toString() || ''}
-                    onValueChange={(val) => handleAnswerChange(action.id, 'score', parseInt(val))}
-                    disabled={isFinalized}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma nota" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {scoringSettings.map((setting: any) => (
-                        <SelectItem key={setting.score} value={setting.score.toString()}>
-                          {setting.score} - {setting.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nota</Label>
+                    <Select
+                      value={answers[action.id]?.score?.toString() || ''}
+                      onValueChange={(val) => handleAnswerChange(action.id, 'score', parseInt(val))}
+                      disabled={isFinalized}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma nota" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scoringSettings.map((setting: any) => (
+                          <SelectItem key={setting.score} value={setting.score.toString()}>
+                            {setting.score} - {setting.description}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Textarea
+                      placeholder="Detalhes adicionais..."
+                      value={answers[action.id]?.observations || ''}
+                      onChange={(e) =>
+                        handleAnswerChange(action.id, 'observations', e.target.value)
+                      }
+                      disabled={isFinalized}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Link da Evidência</Label>
-                  <Input
-                    type="url"
-                    placeholder="https://..."
-                    value={answers[action.id]?.evidence_url || ''}
-                    onChange={(e) => handleAnswerChange(action.id, 'evidence_url', e.target.value)}
-                    disabled={isFinalized}
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea
-                  placeholder="Detalhes adicionais..."
-                  value={answers[action.id]?.observations || ''}
-                  onChange={(e) => handleAnswerChange(action.id, 'observations', e.target.value)}
-                  disabled={isFinalized}
-                />
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4" />
+                    Evidências (Fotos/Documentos)
+                  </Label>
+                  {isFinalized ? (
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      {Array.from(
+                        new Set(
+                          (answers[action.id]?.evidence_urls || []).concat(
+                            answers[action.id]?.evidence_url
+                              ? [answers[action.id]?.evidence_url]
+                              : [],
+                          ),
+                        ),
+                      ).map((url: string, i: number) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block relative aspect-square rounded-lg border bg-muted overflow-hidden hover:opacity-90 transition-opacity"
+                        >
+                          {url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                            <img src={url} alt="Evidência" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
+                              <span className="text-xs truncate w-full px-2">Ver Arquivo</span>
+                            </div>
+                          )}
+                        </a>
+                      ))}
+                      {!answers[action.id]?.evidence_urls?.length &&
+                        !answers[action.id]?.evidence_url && (
+                          <span className="text-sm text-muted-foreground">Sem evidências</span>
+                        )}
+                    </div>
+                  ) : (
+                    <FileUpload
+                      multiple
+                      showThumbnails
+                      bucket="documents"
+                      existingUrls={Array.from(
+                        new Set(
+                          (answers[action.id]?.evidence_urls || []).concat(
+                            answers[action.id]?.evidence_url
+                              ? [answers[action.id]?.evidence_url]
+                              : [],
+                          ),
+                        ),
+                      )}
+                      onUploadComplete={(urls) => {
+                        handleAnswerChange(action.id, 'evidence_url', null)
+                        handleAnswerChange(action.id, 'evidence_urls', urls)
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

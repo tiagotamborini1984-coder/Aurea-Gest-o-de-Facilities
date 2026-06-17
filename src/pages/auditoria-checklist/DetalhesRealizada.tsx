@@ -196,18 +196,56 @@ export default function DetalhesRealizada() {
                         </span>
                       </div>
                     )}
-                    {ans.evidence_url && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <a
-                          href={ans.evidence_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1.5 text-sm text-primary hover:underline bg-primary/5 px-2.5 py-1.5 rounded-md print:hidden"
-                        >
-                          <FileImage className="w-4 h-4" /> Ver Evidência
-                        </a>
+                    {(ans.evidence_urls?.length > 0 || ans.evidence_url) && (
+                      <div className="mt-4">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 block mb-2 print:hidden">
+                          Evidências:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:hidden">
+                          {Array.from(
+                            new Set(
+                              (ans.evidence_urls || []).concat(
+                                ans.evidence_url ? [ans.evidence_url] : [],
+                              ),
+                            ),
+                          ).map((url: string, i: number) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="relative aspect-square rounded-md border border-slate-200 overflow-hidden hover:ring-2 hover:ring-primary transition-all group"
+                            >
+                              {url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                                <img
+                                  src={url}
+                                  alt="Evidência"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-slate-50 dark:bg-slate-800">
+                                  <FileImage className="h-6 w-6 text-slate-400 mb-1" />
+                                  <span className="text-[10px] truncate w-full px-1 text-slate-500">
+                                    Documento
+                                  </span>
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                            </a>
+                          ))}
+                        </div>
                         <span className="hidden print:inline-flex text-sm text-slate-500 items-center gap-1">
-                          <FileImage className="w-4 h-4" /> Evidência anexada eletronicamente.
+                          <FileImage className="w-4 h-4" />{' '}
+                          {
+                            Array.from(
+                              new Set(
+                                (ans.evidence_urls || []).concat(
+                                  ans.evidence_url ? [ans.evidence_url] : [],
+                                ),
+                              ),
+                            ).length
+                          }{' '}
+                          evidência(s) anexada(s) eletronicamente.
                         </span>
                       </div>
                     )}
