@@ -1146,11 +1146,14 @@ export type Database = {
           created_at: string | null
           current_stock: number | null
           description: string | null
+          fs_code: string | null
           id: string
           image_url: string | null
+          item_value: number | null
           minimum_stock: number | null
           name: string
           sds_url: string | null
+          supply_code: string | null
           unit_of_measure: string | null
           updated_at: string | null
         }
@@ -1160,11 +1163,14 @@ export type Database = {
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
+          fs_code?: string | null
           id?: string
           image_url?: string | null
+          item_value?: number | null
           minimum_stock?: number | null
           name: string
           sds_url?: string | null
+          supply_code?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -1174,11 +1180,14 @@ export type Database = {
           created_at?: string | null
           current_stock?: number | null
           description?: string | null
+          fs_code?: string | null
           id?: string
           image_url?: string | null
+          item_value?: number | null
           minimum_stock?: number | null
           name?: string
           sds_url?: string | null
+          supply_code?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -3684,6 +3693,9 @@ export const Constants = {
 //   minimum_stock: numeric (nullable, default: 0)
 //   created_at: timestamp with time zone (nullable, default: now())
 //   updated_at: timestamp with time zone (nullable, default: now())
+//   fs_code: text (nullable)
+//   supply_code: text (nullable)
+//   item_value: numeric (nullable, default: 0)
 // Table: inventory_request_items
 //   id: uuid (not null, default: gen_random_uuid())
 //   request_id: uuid (nullable)

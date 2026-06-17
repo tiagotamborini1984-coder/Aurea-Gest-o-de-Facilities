@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/select'
 
 export default function Produtos() {
-  const { activeClient } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [products, setProducts] = useState<any[]>([])
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -53,27 +53,30 @@ export default function Produtos() {
   const [sdsFile, setSdsFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const clientId = activeClient?.id || profile?.client_id
+
   useEffect(() => {
-    if (activeClient) loadProducts()
-  }, [activeClient])
+    if (clientId) loadProducts()
+  }, [clientId])
 
   const loadProducts = () => {
-    inventoryService.getProducts(activeClient.id).then(setProducts)
+    if (!clientId) return
+    inventoryService.getProducts(clientId).then(setProducts)
   }
 
-  const openForm = (prod?: any) => {
-    if (prod) {
-      setEditingId(prod.id)
+  const openForm = (selectedProduct?: any) => {
+    if (selectedProduct?.id) {
+      setEditingId(selectedProduct.id)
       setFormData({
-        name: prod.name,
-        category: prod.category || '',
-        description: prod.description || '',
-        unit_of_measure: prod.unit_of_measure || 'UN',
-        current_stock: prod.current_stock || 0,
-        minimum_stock: prod.minimum_stock || 0,
-        fs_code: prod.fs_code || '',
-        supply_code: prod.supply_code || '',
-        item_value: prod.item_value || 0,
+        name: selectedProduct.name || '',
+        category: selectedProduct.category || '',
+        description: selectedProduct.description || '',
+        unit_of_measure: selectedProduct.unit_of_measure || 'UN',
+        current_stock: selectedProduct.current_stock || 0,
+        minimum_stock: selectedProduct.minimum_stock || 0,
+        fs_code: selectedProduct.fs_code || '',
+        supply_code: selectedProduct.supply_code || '',
+        item_value: selectedProduct.item_value || 0,
       })
     } else {
       setEditingId(null)
@@ -95,7 +98,12 @@ export default function Produtos() {
   }
 
   const handleSave = async () => {
+    if (!clientId) {
+      return toast.error('Erro: Cliente não identificado no perfil')
+    }
     if (!formData.name.trim()) return toast.error('Nome é obrigatório')
+    if (formData.item_value < 0) return toast.error('Valor do item não pode ser negativo')
+
     setIsSaving(true)
     try {
       let imageUrl = editingId ? products.find((p) => p.id === editingId)?.image_url : null
@@ -105,20 +113,20 @@ export default function Produtos() {
         imageUrl = await inventoryService.uploadFile(
           'product-images',
           imageFile,
-          `${activeClient.id}/${Date.now()}-${imageFile.name}`,
+          `${clientId}/${Date.now()}-${imageFile.name}`,
         )
       }
       if (sdsFile) {
         sdsUrl = await inventoryService.uploadFile(
           'product-documents',
           sdsFile,
-          `${activeClient.id}/${Date.now()}-${sdsFile.name}`,
+          `${clientId}/${Date.now()}-${sdsFile.name}`,
         )
       }
 
       await inventoryService.saveProduct({
         id: editingId,
-        client_id: activeClient.id,
+        client_id: clientId,
         ...formData,
         image_url: imageUrl,
         sds_url: sdsUrl,
@@ -274,10 +282,12 @@ export default function Produtos() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Limpeza">Limpeza</SelectItem>
+                  <SelectItem value="Jardinagem">Jardinagem</SelectItem>
                   <SelectItem value="Manutenção">Manutenção</SelectItem>
-                  <SelectItem value="Equipamentos">Equipamentos</SelectItem>
-                  <SelectItem value="Consumíveis">Consumíveis</SelectItem>
+                  <SelectItem value="Equipamento">Equipamento</SelectItem>
                   <SelectItem value="Escritório">Escritório</SelectItem>
+                  <SelectItem value="EPI">EPI</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
             </div>

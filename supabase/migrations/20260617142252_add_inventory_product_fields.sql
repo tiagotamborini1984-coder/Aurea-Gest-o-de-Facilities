@@ -1,0 +1,4 @@
+ALTER TABLE public.inventory_products
+ADD COLUMN IF NOT EXISTS fs_code TEXT,
+ADD COLUMN IF NOT EXISTS supply_code TEXT,
+ADD COLUMN IF NOT EXISTS item_value NUMERIC(10, 2) DEFAULT 0;
