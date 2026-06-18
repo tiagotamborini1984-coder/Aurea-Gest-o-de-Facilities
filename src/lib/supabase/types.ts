@@ -1264,6 +1264,7 @@ export type Database = {
           processed_at: string | null
           processed_by: string | null
           requester_id: string | null
+          responsible_name: string | null
           sap_reservation_number: string | null
           status: string | null
           total_items: number | null
@@ -1277,6 +1278,7 @@ export type Database = {
           processed_at?: string | null
           processed_by?: string | null
           requester_id?: string | null
+          responsible_name?: string | null
           sap_reservation_number?: string | null
           status?: string | null
           total_items?: number | null
@@ -1290,6 +1292,7 @@ export type Database = {
           processed_at?: string | null
           processed_by?: string | null
           requester_id?: string | null
+          responsible_name?: string | null
           sap_reservation_number?: string | null
           status?: string | null
           total_items?: number | null

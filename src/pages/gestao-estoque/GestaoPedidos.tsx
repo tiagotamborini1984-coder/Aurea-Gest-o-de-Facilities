@@ -179,6 +179,7 @@ export default function GestaoPedidos() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Nº Pedido</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Requisitante</TableHead>
                 <TableHead>Responsável</TableHead>
@@ -194,6 +195,7 @@ export default function GestaoPedidos() {
                 .filter((req) => statusFilter === 'Todos' || req.status === statusFilter)
                 .map((req) => (
                   <TableRow key={req.id}>
+                    <TableCell className="font-medium">{req.order_number || '-'}</TableCell>
                     <TableCell>{format(new Date(req.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
                     <TableCell className="font-medium">
                       {req.requester?.name || 'Não informado'}
@@ -235,7 +237,7 @@ export default function GestaoPedidos() {
               {requests.filter((req) => statusFilter === 'Todos' || req.status === statusFilter)
                 .length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                     Nenhum pedido encontrado.
                   </TableCell>
                 </TableRow>
@@ -281,6 +283,12 @@ export default function GestaoPedidos() {
           {selectedRequest && (
             <div className="space-y-4 py-4">
               <div className="bg-slate-50 p-3 rounded-md border grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500">Nº Pedido</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {selectedRequest.order_number || '-'}
+                  </p>
+                </div>
                 <div>
                   <p className="text-xs text-slate-500">Requisitante</p>
                   <p className="text-sm font-medium text-slate-800">
