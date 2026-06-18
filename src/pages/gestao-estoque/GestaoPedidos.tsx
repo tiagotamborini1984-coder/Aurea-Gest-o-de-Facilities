@@ -53,7 +53,10 @@ export default function GestaoPedidos() {
   const [sapNumber, setSapNumber] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [reservedQuantities, setReservedQuantities] = useState<Record<string, number>>({})
-  const [statusFilter, setStatusFilter] = useState('Pendente')
+  const [statusFilter, setStatusFilter] = useState('Todos')
+  const [plantFilter, setPlantFilter] = useState('Todas')
+  const [responsibleFilter, setResponsibleFilter] = useState('Todos')
+  const [plants, setPlants] = useState<any[]>([])
   const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -76,12 +79,25 @@ export default function GestaoPedidos() {
   useEffect(() => {
     if (activeClient) {
       loadRequests()
+      inventoryService.getPlants(activeClient.id).then(setPlants)
     }
   }, [activeClient])
 
   const loadRequests = () => {
     inventoryService.getRequests(activeClient.id).then(setRequests)
   }
+
+  const uniqueResponsibles = Array.from(
+    new Set(requests.map((r) => r.responsible_name).filter(Boolean)),
+  ).sort() as string[]
+
+  const filteredRequests = requests.filter((req) => {
+    const matchStatus = statusFilter === 'Todos' || req.status === statusFilter
+    const matchPlant = plantFilter === 'Todas' || req.plant_id === plantFilter
+    const matchResponsible =
+      responsibleFilter === 'Todos' || req.responsible_name === responsibleFilter
+    return matchStatus && matchPlant && matchResponsible
+  })
 
   const handleDelete = async () => {
     if (!deleteRequestId) return
@@ -159,19 +175,51 @@ export default function GestaoPedidos() {
           <h1 className="text-2xl font-bold text-slate-800">Gestão de Pedidos</h1>
           <p className="text-slate-500">Aprove solicitações e processe saídas de estoque (SAP)</p>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px] bg-white">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Todos">Todos os Status</SelectItem>
-            <SelectItem value="Pendente">Pendentes</SelectItem>
-            <SelectItem value="Aprovado">Aprovados</SelectItem>
-            <SelectItem value="Entregue">Entregues</SelectItem>
-            <SelectItem value="Rejeitado">Rejeitados</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Select value={plantFilter} onValueChange={setPlantFilter}>
+            <SelectTrigger className="w-[180px] bg-white">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Planta" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todas">Todas as Plantas</SelectItem>
+              {plants.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+            <SelectTrigger className="w-[180px] bg-white">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Responsável" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todos">Todos os Responsáveis</SelectItem>
+              {uniqueResponsibles.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px] bg-white">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todos">Todos os Status</SelectItem>
+              <SelectItem value="Pendente">Pendentes</SelectItem>
+              <SelectItem value="Aprovado">Aprovados</SelectItem>
+              <SelectItem value="Entregue">Entregues</SelectItem>
+              <SelectItem value="Rejeitado">Rejeitados</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card>
@@ -191,51 +239,48 @@ export default function GestaoPedidos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests
-                .filter((req) => statusFilter === 'Todos' || req.status === statusFilter)
-                .map((req) => (
-                  <TableRow key={req.id}>
-                    <TableCell className="font-medium">{req.order_number || '-'}</TableCell>
-                    <TableCell>{format(new Date(req.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
-                    <TableCell className="font-medium">
-                      {req.requester?.name || 'Não informado'}
-                    </TableCell>
-                    <TableCell>{req.responsible_name || '-'}</TableCell>
-                    <TableCell>
-                      <div>{req.plant?.name}</div>
-                      <div className="text-xs text-slate-500">{req.area?.name}</div>
-                    </TableCell>
-                    <TableCell>{req.total_items}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(req.status)} variant="outline">
-                        {req.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-500">
-                      {req.sap_reservation_number || '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openProcessModal(req)}>
-                          Analisar
+              {filteredRequests.map((req) => (
+                <TableRow key={req.id}>
+                  <TableCell className="font-medium">{req.order_number || '-'}</TableCell>
+                  <TableCell>{format(new Date(req.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
+                  <TableCell className="font-medium">
+                    {req.requester?.name || 'Não informado'}
+                  </TableCell>
+                  <TableCell>{req.responsible_name || '-'}</TableCell>
+                  <TableCell>
+                    <div>{req.plant?.name}</div>
+                    <div className="text-xs text-slate-500">{req.area?.name}</div>
+                  </TableCell>
+                  <TableCell>{req.total_items}</TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(req.status)} variant="outline">
+                      {req.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-slate-500">
+                    {req.sap_reservation_number || '-'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openProcessModal(req)}>
+                        Analisar
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteRequestId(req.id)}
+                          title="Excluir"
+                        >
+                          <Trash className="w-4 h-4" />
                         </Button>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => setDeleteRequestId(req.id)}
-                            title="Excluir"
-                          >
-                            <Trash className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              {requests.filter((req) => statusFilter === 'Todos' || req.status === statusFilter)
-                .length === 0 && (
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredRequests.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                     Nenhum pedido encontrado.

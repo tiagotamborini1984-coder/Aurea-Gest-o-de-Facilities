@@ -1260,6 +1260,7 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           id: string
+          order_number: string | null
           plant_id: string | null
           processed_at: string | null
           processed_by: string | null
@@ -1274,6 +1275,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           id?: string
+          order_number?: string | null
           plant_id?: string | null
           processed_at?: string | null
           processed_by?: string | null
@@ -1288,6 +1290,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           id?: string
+          order_number?: string | null
           plant_id?: string | null
           processed_at?: string | null
           processed_by?: string | null
