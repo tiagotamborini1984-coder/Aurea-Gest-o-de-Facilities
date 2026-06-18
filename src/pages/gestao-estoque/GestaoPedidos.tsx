@@ -180,7 +180,7 @@ export default function GestaoPedidos() {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
-                <TableHead>Solicitante</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead>Planta / Área</TableHead>
                 <TableHead>Itens</TableHead>
                 <TableHead>Status</TableHead>
@@ -194,7 +194,9 @@ export default function GestaoPedidos() {
                 .map((req) => (
                   <TableRow key={req.id}>
                     <TableCell>{format(new Date(req.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
-                    <TableCell className="font-medium">{req.requester?.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {req.requester?.name || 'Não informado'}
+                    </TableCell>
                     <TableCell>
                       <div>{req.plant?.name}</div>
                       <div className="text-xs text-slate-500">{req.area?.name}</div>
@@ -276,13 +278,32 @@ export default function GestaoPedidos() {
 
           {selectedRequest && (
             <div className="space-y-4 py-4">
-              <div className="bg-slate-50 p-3 rounded-md border space-y-1">
-                <p className="text-sm font-medium text-slate-800">
-                  Responsável: {selectedRequest.processed_by_profile?.name || 'Não atribuído'}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Solicitante: {selectedRequest.requester?.name || 'Sistema'}
-                </p>
+              <div className="bg-slate-50 p-3 rounded-md border grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500">Responsável</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {selectedRequest.requester?.name || 'Não informado'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Processado por</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {selectedRequest.processed_by_profile?.name || 'Não atribuído'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Planta / Área</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {selectedRequest.plant?.name}{' '}
+                    {selectedRequest.area ? `- ${selectedRequest.area.name}` : ''}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Data do Pedido</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {format(new Date(selectedRequest.created_at), 'dd/MM/yyyy HH:mm')}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-2 max-h-[300px] overflow-auto border rounded-md">
