@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 export default function Catalogo() {
   const { activeClient } = useAppStore()
