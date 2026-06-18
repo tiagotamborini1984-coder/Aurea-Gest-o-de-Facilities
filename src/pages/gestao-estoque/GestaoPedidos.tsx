@@ -52,6 +52,7 @@ export default function GestaoPedidos() {
   const [selectedRequest, setSelectedRequest] = useState<any>(null)
   const [sapNumber, setSapNumber] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [reservedQuantities, setReservedQuantities] = useState<Record<string, number>>({})
   const [statusFilter, setStatusFilter] = useState('Pendente')
   const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -101,7 +102,18 @@ export default function GestaoPedidos() {
   const handleProcess = async (status: string) => {
     setIsProcessing(true)
     try {
-      await inventoryService.updateRequestStatus(selectedRequest.id, status, sapNumber, user?.id)
+      const itemsToUpdate = selectedRequest.items?.map((item: any) => ({
+        id: item.id,
+        reserved_quantity: reservedQuantities[item.id] || 0,
+      }))
+
+      await inventoryService.updateRequestStatus(
+        selectedRequest.id,
+        status,
+        sapNumber,
+        user?.id,
+        status === 'Aprovado' ? itemsToUpdate : undefined,
+      )
       toast.success('Pedido atualizado com sucesso')
       setProcessModalOpen(false)
       loadRequests()
@@ -115,6 +127,13 @@ export default function GestaoPedidos() {
   const openProcessModal = (req: any) => {
     setSelectedRequest(req)
     setSapNumber(req.sap_reservation_number || '')
+
+    const initialReserved: Record<string, number> = {}
+    req.items?.forEach((item: any) => {
+      initialReserved[item.id] = item.reserved_quantity ?? item.quantity
+    })
+    setReservedQuantities(initialReserved)
+
     setProcessModalOpen(true)
   }
 
@@ -266,20 +285,51 @@ export default function GestaoPedidos() {
                 </p>
               </div>
 
-              <div className="space-y-2 max-h-[200px] overflow-auto">
-                <h4 className="text-sm font-semibold">Itens:</h4>
-                {selectedRequest.items?.map((item: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded">
-                    <Package className="w-4 h-4 text-slate-400" />
-                    <span className="flex-1">{item.product?.name}</span>
-                    <span className="font-medium">
-                      {item.quantity} {item.product?.unit_of_measure}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-2 max-h-[300px] overflow-auto border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead className="w-32 text-center">Qtd Solicitada</TableHead>
+                      <TableHead className="w-32 text-center">Qtd Reservada</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedRequest.items?.map((item: any) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-slate-400" />
+                            <span>{item.product?.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium text-sm text-center">
+                          {item.quantity} {item.product?.unit_of_measure}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="h-8 text-center"
+                            value={reservedQuantities[item.id] ?? ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value)
+                              if (!isNaN(val) && val >= 0) {
+                                setReservedQuantities((prev) => ({ ...prev, [item.id]: val }))
+                              } else if (e.target.value === '') {
+                                setReservedQuantities((prev) => ({ ...prev, [item.id]: 0 }))
+                              }
+                            }}
+                            disabled={selectedRequest.status !== 'Pendente'}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
 
-              {selectedRequest.status !== 'Entregue' && selectedRequest.status !== 'Rejeitado' && (
+              {selectedRequest.status === 'Pendente' && (
                 <div className="space-y-2 pt-4 border-t">
                   <Label>Nº Reserva SAP (Opcional)</Label>
                   <Input
@@ -306,7 +356,8 @@ export default function GestaoPedidos() {
                   Rejeitar
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="default"
+                  className="text-[#FFFFFF]"
                   onClick={() => handleProcess('Aprovado')}
                   disabled={isProcessing}
                 >
@@ -314,14 +365,19 @@ export default function GestaoPedidos() {
                 </Button>
               </>
             )}
-            {(selectedRequest?.status === 'Pendente' || selectedRequest?.status === 'Aprovado') && (
-              <Button onClick={() => handleProcess('Entregue')} disabled={isProcessing}>
-                Dar Baixa (Entregar)
-              </Button>
+            {selectedRequest?.status === 'Aprovado' && (
+              <div className="w-full text-center text-green-600 text-sm font-medium p-2 bg-green-50 rounded border border-green-200">
+                Pedido Aprovado
+              </div>
+            )}
+            {selectedRequest?.status === 'Rejeitado' && (
+              <div className="w-full text-center text-red-600 text-sm font-medium p-2 bg-red-50 rounded border border-red-200">
+                Pedido Rejeitado
+              </div>
             )}
             {selectedRequest?.status === 'Entregue' && (
-              <div className="w-full text-center text-green-600 text-sm font-medium p-2 bg-green-50 rounded">
-                Pedido Finalizado
+              <div className="w-full text-center text-slate-600 text-sm font-medium p-2 bg-slate-50 rounded border">
+                Pedido Entregue
               </div>
             )}
           </DialogFooter>

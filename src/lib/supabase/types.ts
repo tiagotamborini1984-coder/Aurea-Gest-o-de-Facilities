@@ -1164,13 +1164,11 @@ export type Database = {
           category: string | null
           client_id: string | null
           created_at: string | null
-          current_stock: number | null
           description: string | null
           fs_code: string | null
           id: string
           image_url: string | null
           item_value: number | null
-          minimum_stock: number | null
           name: string
           sds_url: string | null
           supply_code: string | null
@@ -1181,13 +1179,11 @@ export type Database = {
           category?: string | null
           client_id?: string | null
           created_at?: string | null
-          current_stock?: number | null
           description?: string | null
           fs_code?: string | null
           id?: string
           image_url?: string | null
           item_value?: number | null
-          minimum_stock?: number | null
           name: string
           sds_url?: string | null
           supply_code?: string | null
@@ -1198,13 +1194,11 @@ export type Database = {
           category?: string | null
           client_id?: string | null
           created_at?: string | null
-          current_stock?: number | null
           description?: string | null
           fs_code?: string | null
           id?: string
           image_url?: string | null
           item_value?: number | null
-          minimum_stock?: number | null
           name?: string
           sds_url?: string | null
           supply_code?: string | null

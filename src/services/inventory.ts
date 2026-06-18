@@ -90,7 +90,9 @@ export const inventoryService = {
         plant:plants!inventory_requests_plant_id_fkey(id, name),
         area:maintenance_areas!inventory_requests_area_id_fkey(id, name),
         items:inventory_request_items(
+          id,
           quantity,
+          reserved_quantity,
           product:inventory_products(name, unit_of_measure)
         )
       `)
@@ -106,6 +108,7 @@ export const inventoryService = {
     status: string,
     sapNumber?: string,
     processedBy?: string,
+    items?: { id: string; reserved_quantity: number }[],
   ) {
     const payload: any = { status, processed_at: new Date().toISOString() }
     if (sapNumber) payload.sap_reservation_number = sapNumber
@@ -118,6 +121,17 @@ export const inventoryService = {
       .select()
 
     if (error) throw error
+
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const { error: itemError } = await supabase
+          .from('inventory_request_items')
+          .update({ reserved_quantity: item.reserved_quantity })
+          .eq('id', item.id)
+        if (itemError) throw itemError
+      }
+    }
+
     return data
   },
 
