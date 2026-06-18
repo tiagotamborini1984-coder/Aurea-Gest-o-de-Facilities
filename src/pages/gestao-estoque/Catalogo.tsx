@@ -39,6 +39,7 @@ export default function Catalogo() {
   const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
   const [selectedPlant, setSelectedPlant] = useState('')
   const [selectedArea, setSelectedArea] = useState('')
+  const [responsibleName, setResponsibleName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
 
@@ -148,6 +149,10 @@ export default function Catalogo() {
       toast.error('Selecione a planta e a área')
       return
     }
+    if (!responsibleName.trim()) {
+      toast.error('Informe o nome do responsável pelo material')
+      return
+    }
     if (!assigneeId) {
       toast.error('Selecione o responsável pelo processamento')
       return
@@ -164,6 +169,7 @@ export default function Catalogo() {
         status: 'Pendente',
         total_items: cart.reduce((acc, item) => acc + item.quantity, 0),
         processed_by: assigneeId,
+        responsible_name: responsibleName.trim(),
       }
       const itemsData = cart.map((item) => ({
         product_id: item.product.id,
@@ -176,6 +182,7 @@ export default function Catalogo() {
       setCartOpen(false)
       setSelectedPlant('')
       setSelectedArea('')
+      setResponsibleName('')
       setAssigneeId('')
     } catch (err) {
       toast.error('Erro ao enviar pedido')
@@ -257,6 +264,15 @@ export default function Catalogo() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Responsável pelo Material *</Label>
+                  <Input
+                    value={responsibleName}
+                    onChange={(e) => setResponsibleName(e.target.value)}
+                    placeholder="Nome do responsável"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
                     Responsável pelo Processamento *
                   </label>
@@ -331,7 +347,13 @@ export default function Catalogo() {
             </div>
             <SheetFooter className="mt-auto pt-4 border-t border-slate-200">
               <Button
-                disabled={cart.length === 0 || !selectedPlant || !selectedArea || isSubmitting}
+                disabled={
+                  cart.length === 0 ||
+                  !selectedPlant ||
+                  !selectedArea ||
+                  !responsibleName.trim() ||
+                  isSubmitting
+                }
                 onClick={submitRequest}
                 className="w-full"
               >
