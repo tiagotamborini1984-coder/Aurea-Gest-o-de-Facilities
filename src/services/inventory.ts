@@ -110,6 +110,17 @@ export const inventoryService = {
     if (error) throw error
   },
 
+  async deleteRequest(requestId: string) {
+    const { error: itemsError } = await supabase
+      .from('inventory_request_items')
+      .delete()
+      .eq('request_id', requestId)
+    if (itemsError) throw itemsError
+
+    const { error } = await supabase.from('inventory_requests').delete().eq('id', requestId)
+    if (error) throw error
+  },
+
   async uploadFile(bucket: string, file: File, fileName: string) {
     const { data, error } = await supabase.storage
       .from(bucket)

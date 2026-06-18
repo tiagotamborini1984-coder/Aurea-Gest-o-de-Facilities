@@ -24,7 +24,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Package, Filter } from 'lucide-react'
+import { Package, Filter, Trash } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Select,
   SelectContent,
@@ -42,6 +53,24 @@ export default function GestaoPedidos() {
   const [sapNumber, setSapNumber] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [statusFilter, setStatusFilter] = useState('Pendente')
+  const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setUserRole(data.role?.toLowerCase() || null)
+        })
+    }
+  }, [user])
+
+  const isAdmin = userRole === 'admin'
 
   useEffect(() => {
     if (activeClient) {
@@ -51,6 +80,22 @@ export default function GestaoPedidos() {
 
   const loadRequests = () => {
     inventoryService.getRequests(activeClient.id).then(setRequests)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteRequestId) return
+    setIsDeleting(true)
+    try {
+      await inventoryService.deleteRequest(deleteRequestId)
+      toast.success('Pedido excluído com sucesso!')
+      loadRequests()
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao excluir pedido')
+    } finally {
+      setIsDeleting(false)
+      setDeleteRequestId(null)
+    }
   }
 
   const handleProcess = async (status: string) => {
@@ -145,9 +190,22 @@ export default function GestaoPedidos() {
                       {req.sap_reservation_number || '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => openProcessModal(req)}>
-                        Analisar
-                      </Button>
+                      <div className="flex justify-end items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openProcessModal(req)}>
+                          Analisar
+                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setDeleteRequestId(req.id)}
+                            title="Excluir"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -163,6 +221,33 @@ export default function GestaoPedidos() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={!!deleteRequestId}
+        onOpenChange={(open) => !open && setDeleteRequestId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Pedido</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Excluindo...' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={processModalOpen} onOpenChange={setProcessModalOpen}>
         <DialogContent className="max-w-md">
