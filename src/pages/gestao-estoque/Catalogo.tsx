@@ -218,36 +218,88 @@ export default function Catalogo() {
             <SheetHeader>
               <SheetTitle>Meu Pedido</SheetTitle>
             </SheetHeader>
-            <div className="flex-1 overflow-auto py-4 space-y-6">
-              <div className="space-y-2 px-1 mb-4">
-                <label className="text-sm font-medium text-slate-700">
-                  Responsável pelo Processamento *
-                </label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={assigneeId}
-                  onChange={(e) => setAssigneeId(e.target.value)}
-                  disabled={!selectedPlant}
-                >
-                  <option value="">
-                    {selectedPlant ? 'Selecione o responsável...' : 'Selecione a planta primeiro'}
-                  </option>
-                  {assignees.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
+            <div className="flex-1 overflow-auto py-4 px-1 flex flex-col gap-6">
+              <div className="space-y-4 pb-6 border-b border-slate-200">
+                <div className="space-y-2">
+                  <Label>Planta / Local *</Label>
+                  <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a planta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plants.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Área / Departamento *</Label>
+                  <Select
+                    value={selectedArea}
+                    onValueChange={setSelectedArea}
+                    disabled={!selectedPlant}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a área" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {areas.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Responsável pelo Processamento *
+                  </label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={assigneeId}
+                    onChange={(e) => setAssigneeId(e.target.value)}
+                    disabled={!selectedPlant}
+                  >
+                    <option value="">
+                      {selectedPlant ? 'Selecione o responsável...' : 'Selecione a planta primeiro'}
                     </option>
-                  ))}
-                </select>
+                    {assignees.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {cart.length === 0 ? (
-                <div className="text-center text-slate-500 py-10">Carrinho vazio</div>
+                <div className="text-center text-slate-500 py-10">Seu carrinho está vazio</div>
               ) : (
                 <div className="space-y-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-semibold text-slate-800 text-sm">Itens do Pedido</h3>
+                    <Button
+                      variant="ghost"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2 text-xs"
+                      onClick={() => {
+                        if (window.confirm('Tem certeza que deseja esvaziar o carrinho?')) {
+                          setCart([])
+                        }
+                      }}
+                    >
+                      Esvaziar carrinho
+                    </Button>
+                  </div>
                   {cart.map((item) => (
                     <div
                       key={item.product.id}
-                      className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"
+                      className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100"
                     >
                       <div className="flex-1">
                         <p className="font-medium text-sm">{item.product.name}</p>
@@ -274,45 +326,6 @@ export default function Catalogo() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-
-              {cart.length > 0 && (
-                <div className="space-y-4 pt-4 border-t border-slate-200">
-                  <div className="space-y-2">
-                    <Label>Planta / Local</Label>
-                    <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a planta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plants.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Área / Departamento</Label>
-                    <Select
-                      value={selectedArea}
-                      onValueChange={setSelectedArea}
-                      disabled={!selectedPlant}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a área" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {areas.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               )}
             </div>
@@ -374,23 +387,28 @@ export default function Catalogo() {
               )}
             </div>
             <CardHeader className="p-4 pb-2">
-              <div className="flex justify-between items-start gap-2">
-                <div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
                   <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
-                  <p className="text-xs text-slate-500 mt-1">{product.category}</p>
+                  {product.sds_url && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-blue-600 hover:text-blue-800 flex-shrink-0"
+                      asChild
+                    >
+                      <a
+                        href={product.sds_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Ver FDS/SDS"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </a>
+                    </Button>
+                  )}
                 </div>
-                {product.sds_url && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-blue-600 hover:text-blue-800"
-                    asChild
-                  >
-                    <a href={product.sds_url} target="_blank" rel="noreferrer" title="Ver FDS/SDS">
-                      <FileText className="w-4 h-4" />
-                    </a>
-                  </Button>
-                )}
+                <p className="text-xs text-slate-500 mt-1">{product.category}</p>
               </div>
             </CardHeader>
             <CardContent className="p-4 pt-0 flex-1">

@@ -1221,18 +1221,21 @@ export type Database = {
           product_id: string | null
           quantity: number
           request_id: string | null
+          reserved_quantity: number | null
         }
         Insert: {
           id?: string
           product_id?: string | null
           quantity: number
           request_id?: string | null
+          reserved_quantity?: number | null
         }
         Update: {
           id?: string
           product_id?: string | null
           quantity?: number
           request_id?: string | null
+          reserved_quantity?: number | null
         }
         Relationships: [
           {
