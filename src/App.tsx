@@ -98,6 +98,7 @@ import MeusPedidosEstoque from './pages/gestao-estoque/MeusPedidos'
 import GestaoPedidosEstoque from './pages/gestao-estoque/GestaoPedidos'
 import ProdutosEstoque from './pages/gestao-estoque/Produtos'
 import DashboardEstoque from './pages/gestao-estoque/Dashboard'
+import AreasEstoque from './pages/gestao-estoque/Areas'
 
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
@@ -232,6 +233,7 @@ const App = () => (
                         element={<GestaoPedidosEstoque />}
                       />
                       <Route path="/gestao-estoque/produtos" element={<ProdutosEstoque />} />
+                      <Route path="/gestao-estoque/areas" element={<AreasEstoque />} />
                       <Route path="/gestao-estoque/dashboard" element={<DashboardEstoque />} />
 
                       {/* Gestão de Encomendas */}

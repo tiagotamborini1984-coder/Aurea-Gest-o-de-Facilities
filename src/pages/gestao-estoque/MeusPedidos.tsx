@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
-import { Package } from 'lucide-react'
+import { Package, Trash2 } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -15,12 +15,26 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/use-toast'
 
 export default function MeusPedidos() {
   const { activeClient } = useAppStore()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [requests, setRequests] = useState<any[]>([])
   const [selectedRequest, setSelectedRequest] = useState<any>(null)
+  const [requestToDelete, setRequestToDelete] = useState<any>(null)
 
   useEffect(() => {
     if (activeClient && user) {
@@ -31,6 +45,28 @@ export default function MeusPedidos() {
   const loadRequests = async () => {
     const all = await inventoryService.getRequests(activeClient.id)
     setRequests(all.filter((r: any) => r.requester_id === user?.id))
+  }
+
+  const handleDelete = async () => {
+    if (!requestToDelete) return
+
+    try {
+      await inventoryService.deleteRequest(requestToDelete.id)
+      setRequests((prev) => prev.filter((r) => r.id !== requestToDelete.id))
+      toast({
+        title: 'Sucesso',
+        description: 'Pedido excluído com sucesso.',
+      })
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o pedido. Verifique se o status já foi alterado.',
+        variant: 'destructive',
+      })
+    } finally {
+      setRequestToDelete(null)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -65,7 +101,7 @@ export default function MeusPedidos() {
                 <TableHead>Itens</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Reserva SAP</TableHead>
-                <TableHead className="text-right">Ação</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -86,12 +122,25 @@ export default function MeusPedidos() {
                     {req.sap_reservation_number || '-'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <button
-                      onClick={() => setSelectedRequest(req)}
-                      className="text-brand-vividBlue hover:underline text-sm"
-                    >
-                      Ver detalhes
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setSelectedRequest(req)}
+                        className="text-brand-vividBlue hover:underline text-sm"
+                      >
+                        Ver detalhes
+                      </button>
+                      {req.status === 'Pendente' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setRequestToDelete(req)}
+                          title="Excluir pedido"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -158,6 +207,29 @@ export default function MeusPedidos() {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!requestToDelete}
+        onOpenChange={(open) => !open && setRequestToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Pedido</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

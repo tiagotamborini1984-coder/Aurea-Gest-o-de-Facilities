@@ -25,7 +25,7 @@ export function useDashboardLogs(
         .from('plant_non_working_days')
         .select('plant_id, date')
         .gte('date', dateFrom)
-        .lte('date', dateTo + 'T23:59:59.999Z')
+        .lte('date', dateTo)
         .in('plant_id', plantIds)
 
       const nonWorkingMap: Record<string, boolean> = {}
@@ -48,7 +48,7 @@ export function useDashboardLogs(
           .from('daily_logs')
           .select('*')
           .gte('date', dateFrom)
-          .lte('date', dateTo + 'T23:59:59.999Z')
+          .lte('date', dateTo)
           .in('plant_id', plantIds)
           .range(from, from + step - 1)
 

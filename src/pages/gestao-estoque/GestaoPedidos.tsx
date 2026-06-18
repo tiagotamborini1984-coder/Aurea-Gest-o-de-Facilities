@@ -257,6 +257,15 @@ export default function GestaoPedidos() {
 
           {selectedRequest && (
             <div className="space-y-4 py-4">
+              <div className="bg-slate-50 p-3 rounded-md border space-y-1">
+                <p className="text-sm font-medium text-slate-800">
+                  Responsável: {selectedRequest.processed_by_profile?.name || 'Não atribuído'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Solicitante: {selectedRequest.requester?.name || 'Sistema'}
+                </p>
+              </div>
+
               <div className="space-y-2 max-h-[200px] overflow-auto">
                 <h4 className="text-sm font-semibold">Itens:</h4>
                 {selectedRequest.items?.map((item: any, i: number) => (

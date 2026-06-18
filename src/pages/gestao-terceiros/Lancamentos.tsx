@@ -364,7 +364,7 @@ export default function Lancamentos() {
 
       const { data, error } = await supabase
         .from('daily_logs')
-        .upsert(payload, { onConflict: 'date,type,reference_id' })
+        .upsert(payload, { onConflict: 'client_id,plant_id,reference_id,date,type' })
         .select()
         .maybeSingle()
 
@@ -388,6 +388,7 @@ export default function Lancamentos() {
   }
 
   const handleSaveChanges = async () => {
+    if (loading) return
     setLoading(true)
     try {
       const currentPlant = plants.find((p) => p.id === selectedPlant)
@@ -415,7 +416,7 @@ export default function Lancamentos() {
       if (logsToUpsert.length > 0) {
         const { error } = await supabase
           .from('daily_logs')
-          .upsert(logsToUpsert, { onConflict: 'date,type,reference_id' })
+          .upsert(logsToUpsert, { onConflict: 'client_id,plant_id,reference_id,date,type' })
 
         if (error) throw error
       }
@@ -435,15 +436,20 @@ export default function Lancamentos() {
   }
 
   const handlePublishDay = async () => {
-    if (dailyLogs.length === 0) return
-    const { error } = await supabase
-      .from('daily_logs')
-      .update({ is_published: true })
-      .eq('plant_id', selectedPlant)
-      .eq('date', dateStr)
-    if (!error) {
-      setDailyLogs((prev) => prev.map((l) => ({ ...l, is_published: true })))
-      toast({ title: 'Sucesso', description: 'Dia finalizado com sucesso!' })
+    if (dailyLogs.length === 0 || loading) return
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('daily_logs')
+        .update({ is_published: true })
+        .eq('plant_id', selectedPlant)
+        .eq('date', dateStr)
+      if (!error) {
+        setDailyLogs((prev) => prev.map((l) => ({ ...l, is_published: true })))
+        toast({ title: 'Sucesso', description: 'Dia finalizado com sucesso!' })
+      }
+    } finally {
+      setLoading(false)
     }
   }
 

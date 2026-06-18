@@ -42,8 +42,6 @@ export default function Produtos() {
     category: '',
     description: '',
     unit_of_measure: 'UN',
-    current_stock: 0,
-    minimum_stock: 0,
     fs_code: '',
     supply_code: '',
     item_value: 0,
@@ -72,8 +70,6 @@ export default function Produtos() {
         category: selectedProduct.category || '',
         description: selectedProduct.description || '',
         unit_of_measure: selectedProduct.unit_of_measure || 'UN',
-        current_stock: selectedProduct.current_stock || 0,
-        minimum_stock: selectedProduct.minimum_stock || 0,
         fs_code: selectedProduct.fs_code || '',
         supply_code: selectedProduct.supply_code || '',
         item_value: selectedProduct.item_value || 0,
@@ -85,8 +81,6 @@ export default function Produtos() {
         category: '',
         description: '',
         unit_of_measure: 'UN',
-        current_stock: 0,
-        minimum_stock: 0,
         fs_code: '',
         supply_code: '',
         item_value: 0,
@@ -180,8 +174,6 @@ export default function Produtos() {
                 <TableHead>Códigos</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead>Valor Unit.</TableHead>
-                <TableHead>Estoque Atual</TableHead>
-                <TableHead>Estoque Mínimo</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -217,14 +209,6 @@ export default function Produtos() {
                       p.item_value || 0,
                     )}
                   </TableCell>
-                  <TableCell>
-                    <span
-                      className={p.current_stock <= p.minimum_stock ? 'text-red-600 font-bold' : ''}
-                    >
-                      {p.current_stock}
-                    </span>
-                  </TableCell>
-                  <TableCell>{p.minimum_stock}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => openForm(p)}>
                       <Edit2 className="w-4 h-4 text-blue-600" />
@@ -237,7 +221,7 @@ export default function Produtos() {
               ))}
               {products.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
                     Nenhum produto cadastrado.
                   </TableCell>
                 </TableRow>
@@ -318,26 +302,6 @@ export default function Produtos() {
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Estoque Atual</Label>
-              <Input
-                type="number"
-                value={formData.current_stock}
-                onChange={(e) =>
-                  setFormData({ ...formData, current_stock: Number(e.target.value) })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Estoque Mínimo</Label>
-              <Input
-                type="number"
-                value={formData.minimum_stock}
-                onChange={(e) =>
-                  setFormData({ ...formData, minimum_stock: Number(e.target.value) })
-                }
               />
             </div>
             <div className="space-y-2">

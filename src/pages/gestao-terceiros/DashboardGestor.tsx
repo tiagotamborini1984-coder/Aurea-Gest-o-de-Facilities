@@ -62,7 +62,7 @@ export default function DashboardGestor() {
         .select('*')
         .eq('client_id', activeClient.id)
         .gte('date', dateFrom)
-        .lte('date', dateTo + 'T23:59:59.999Z')
+        .lte('date', dateTo)
 
       if (data) {
         setNonWorkingDays(data)
@@ -101,8 +101,17 @@ export default function DashboardGestor() {
       const inactiveMembers = group.filter((e) => e.status !== 'Ativo')
 
       if (activeMembers.length > 0) {
-        activeMembers.forEach((am) => finalFilteredEmployees.push(am))
-        const primaryActive = activeMembers[0]
+        // Sort active members to pick a consistent primary one, preferably one with logs
+        const primaryActive =
+          activeMembers.find((am) => logReferenceIds.has(am.id)) || activeMembers[0]
+        finalFilteredEmployees.push(primaryActive)
+
+        activeMembers.forEach((am) => {
+          if (am.id !== primaryActive.id) {
+            idToKeptId.set(am.id, primaryActive.id)
+          }
+        })
+
         inactiveMembers.forEach((im) => {
           idToKeptId.set(im.id, primaryActive.id)
         })
@@ -111,7 +120,9 @@ export default function DashboardGestor() {
           inactiveMembers.find((im) => logReferenceIds.has(im.id)) || inactiveMembers[0]
         finalFilteredEmployees.push(memberWithLog)
         inactiveMembers.forEach((im) => {
-          idToKeptId.set(im.id, memberWithLog.id)
+          if (im.id !== memberWithLog.id) {
+            idToKeptId.set(im.id, memberWithLog.id)
+          }
         })
       }
     })

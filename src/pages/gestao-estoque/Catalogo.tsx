@@ -24,6 +24,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase/client'
 
 export default function Catalogo() {
   const { activeClient } = useAppStore()
@@ -71,16 +72,32 @@ export default function Catalogo() {
     }
   }
 
-  const addToCart = (product: any) => {
+  const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({})
+
+  const getQuantity = (id: string) => selectedQuantities[id] || 1
+
+  const updateSelectedQuantity = (id: string, delta: number) => {
+    setSelectedQuantities((prev) => {
+      const current = prev[id] || 1
+      const next = Math.max(1, current + delta)
+      return { ...prev, [id]: next }
+    })
+  }
+
+  const addToCart = (product: any, qty: number) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
+
       if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
-        )
+        return prev
+          .map((item) =>
+            item.product.id === product.id ? { ...item, quantity: item.quantity + qty } : item,
+          )
+          .filter((item) => item.quantity > 0)
       }
-      return [...prev, { product, quantity: 1 }]
+      return qty > 0 ? [...prev, { product, quantity: qty }] : prev
     })
+    setSelectedQuantities((prev) => ({ ...prev, [product.id]: 1 }))
     toast.success('Adicionado ao carrinho')
   }
 
@@ -98,9 +115,41 @@ export default function Catalogo() {
     )
   }
 
+  const [assigneeId, setAssigneeId] = useState('')
+  const [assignees, setAssignees] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!selectedPlant || !activeClient?.id) {
+      setAssignees([])
+      setAssigneeId('')
+      return
+    }
+
+    const fetchAssignees = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, authorized_plants')
+        .eq('client_id', activeClient.id)
+
+      if (data) {
+        const authorized = data.filter((p) => {
+          if (!p.authorized_plants || !Array.isArray(p.authorized_plants)) return false
+          return p.authorized_plants.includes(selectedPlant)
+        })
+        setAssignees(authorized)
+      }
+    }
+
+    fetchAssignees()
+  }, [selectedPlant, activeClient?.id])
+
   const submitRequest = async () => {
     if (!selectedPlant || !selectedArea) {
       toast.error('Selecione a planta e a área')
+      return
+    }
+    if (!assigneeId) {
+      toast.error('Selecione o responsável pelo processamento')
       return
     }
     if (cart.length === 0) return
@@ -114,6 +163,7 @@ export default function Catalogo() {
         area_id: selectedArea,
         status: 'Pendente',
         total_items: cart.reduce((acc, item) => acc + item.quantity, 0),
+        processed_by: assigneeId,
       }
       const itemsData = cart.map((item) => ({
         product_id: item.product.id,
@@ -126,6 +176,7 @@ export default function Catalogo() {
       setCartOpen(false)
       setSelectedPlant('')
       setSelectedArea('')
+      setAssigneeId('')
     } catch (err) {
       toast.error('Erro ao enviar pedido')
     } finally {
@@ -168,6 +219,27 @@ export default function Catalogo() {
               <SheetTitle>Meu Pedido</SheetTitle>
             </SheetHeader>
             <div className="flex-1 overflow-auto py-4 space-y-6">
+              <div className="space-y-2 px-1 mb-4">
+                <label className="text-sm font-medium text-slate-700">
+                  Responsável pelo Processamento *
+                </label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  disabled={!selectedPlant}
+                >
+                  <option value="">
+                    {selectedPlant ? 'Selecione o responsável...' : 'Selecione a planta primeiro'}
+                  </option>
+                  {assignees.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {cart.length === 0 ? (
                 <div className="text-center text-slate-500 py-10">Carrinho vazio</div>
               ) : (
@@ -323,21 +395,45 @@ export default function Catalogo() {
             </CardHeader>
             <CardContent className="p-4 pt-0 flex-1">
               <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description}</p>
-              <div className="mt-3 flex items-center gap-2">
-                <span
-                  className={cn(
-                    'text-xs font-medium px-2 py-1 rounded',
-                    product.current_stock <= product.minimum_stock
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-slate-100 text-slate-700',
-                  )}
-                >
-                  Estoque: {product.current_stock} {product.unit_of_measure}
-                </span>
-              </div>
             </CardContent>
-            <CardFooter className="p-4 pt-0">
-              <Button onClick={() => addToCart(product)} className="w-full" variant="outline">
+            <CardFooter className="p-4 pt-0 flex flex-col gap-2">
+              <div className="flex items-center justify-between w-full border border-slate-200 rounded-md p-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => updateSelectedQuantity(product.id, -1)}
+                  disabled={getQuantity(product.id) <= 1}
+                >
+                  <Minus className="w-3 h-3" />
+                </Button>
+                <Input
+                  type="number"
+                  min={1}
+                  value={getQuantity(product.id)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1
+                    setSelectedQuantities((prev) => ({
+                      ...prev,
+                      [product.id]: Math.max(1, val),
+                    }))
+                  }}
+                  className="h-8 w-16 text-center text-sm p-0 mx-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => updateSelectedQuantity(product.id, 1)}
+                >
+                  <Plus className="w-3 h-3" />
+                </Button>
+              </div>
+              <Button
+                onClick={() => addToCart(product, getQuantity(product.id))}
+                className="w-full"
+                variant="outline"
+              >
                 Adicionar
               </Button>
             </CardFooter>

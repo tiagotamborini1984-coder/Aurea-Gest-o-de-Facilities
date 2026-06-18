@@ -170,6 +170,7 @@ export function AppSidebar() {
         { title: 'Meus Pedidos', path: '/gestao-estoque/meus-pedidos' },
         { title: 'Gestão de Pedidos', path: '/gestao-estoque/gestao-pedidos' },
         { title: 'Produtos', path: '/gestao-estoque/produtos' },
+        { title: 'Áreas', path: '/gestao-estoque/areas' },
         { title: 'Dashboard', path: '/gestao-estoque/dashboard' },
       ],
     },
@@ -328,6 +329,7 @@ export function AppSidebar() {
               (s: any) =>
                 s.title !== 'Gestão de Pedidos' &&
                 s.title !== 'Produtos' &&
+                s.title !== 'Áreas' &&
                 s.title !== 'Dashboard',
             )
           }

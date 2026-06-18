@@ -3236,33 +3236,6 @@ export type Database = {
       create_package: { Args: { p_payload: Json }; Returns: Json }
       get_attendance_employees:
         | {
-            Args: {
-              p_client_id: string
-              p_plant_ids?: string[]
-              p_reference_month?: string
-            }
-            Returns: {
-              client_id: string
-              company_id: string | null
-              company_name: string
-              created_at: string
-              function_id: string | null
-              id: string
-              location_id: string | null
-              name: string
-              plant_id: string
-              reference_month: string
-              registration_number: string | null
-              status: string
-            }[]
-            SetofOptions: {
-              from: '*'
-              to: 'employees'
-              isOneToOne: false
-              isSetofReturn: true
-            }
-          }
-        | {
             Args: { p_date: string; p_plant_id: string }
             Returns: {
               company_name: string
@@ -3301,23 +3274,6 @@ export type Database = {
               isOneToOne: false
               isSetofReturn: true
             }
-          }
-        | {
-            Args: {
-              p_plant_id: string
-              p_reference_month: string
-              p_staff_log_ids?: string[]
-            }
-            Returns: {
-              company_name: string
-              created_at: string
-              function_id: string
-              id: string
-              name: string
-              reference_month: string
-              registration_number: string
-              status: string
-            }[]
           }
       get_maintenance_public_options: {
         Args: { p_slug: string }

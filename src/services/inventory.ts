@@ -26,6 +26,37 @@ export const inventoryService = {
     return data || []
   },
 
+  async getAreasByClient(clientId: string) {
+    const { data, error } = await supabase
+      .from('maintenance_areas')
+      .select('*, plant:plants!maintenance_areas_plant_id_fkey(name)')
+      .eq('client_id', clientId)
+      .order('name')
+    if (error) throw error
+    return data || []
+  },
+
+  async saveArea(area: any) {
+    if (area.id) {
+      const { data, error } = await supabase
+        .from('maintenance_areas')
+        .update({ name: area.name, plant_id: area.plant_id })
+        .eq('id', area.id)
+      if (error) throw error
+      return data
+    } else {
+      const { id, ...insertData } = area
+      const { data, error } = await supabase.from('maintenance_areas').insert([insertData])
+      if (error) throw error
+      return data
+    }
+  },
+
+  async deleteArea(areaId: string) {
+    const { error } = await supabase.from('maintenance_areas').delete().eq('id', areaId)
+    if (error) throw error
+  },
+
   async submitRequest(requestData: any, items: any[]) {
     const { data: request, error } = await supabase
       .from('inventory_requests')
@@ -55,6 +86,7 @@ export const inventoryService = {
       .select(`
         *,
         requester:profiles!inventory_requests_requester_id_fkey(name),
+        processed_by_profile:profiles!inventory_requests_processed_by_fkey(name),
         plant:plants!inventory_requests_plant_id_fkey(id, name),
         area:maintenance_areas!inventory_requests_area_id_fkey(id, name),
         items:inventory_request_items(
