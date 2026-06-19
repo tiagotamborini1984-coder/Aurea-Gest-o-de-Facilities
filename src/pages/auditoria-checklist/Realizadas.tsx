@@ -56,6 +56,15 @@ export default function AuditoriaRealizadas() {
       setAudits([])
       setLoading(false)
     }
+
+    const onFocus = () => {
+      if (activeClient?.id) {
+        fetchAudits()
+      }
+    }
+
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [activeClient, selectedPlant, dateRange])
 
   const fetchUserRole = async () => {
@@ -92,6 +101,9 @@ export default function AuditoriaRealizadas() {
           ),
           profiles!audit_executions_assignee_id_fkey (
             name
+          ),
+          audit_execution_answers (
+            id
           )
         `)
 
@@ -144,7 +156,9 @@ export default function AuditoriaRealizadas() {
         // should be treated as a candidate for the "Finalized" status
         const hasScoreAndDate = audit.final_score !== null && audit.realization_date !== null
 
-        return isExecutionFinished || isTaskFinished || hasScoreAndDate
+        const hasAnswers = audit.audit_execution_answers && audit.audit_execution_answers.length > 0
+
+        return (isExecutionFinished || isTaskFinished || hasScoreAndDate) && hasAnswers
       })
 
       setAudits(finishedOrTaskCompleted)
