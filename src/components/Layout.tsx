@@ -10,10 +10,17 @@ export default function Layout() {
   const { activeClient } = useAppStore()
 
   useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark')
+
     if (activeClient?.primaryColor) {
       const hsl = hexToHsl(activeClient.primaryColor)
       document.documentElement.style.setProperty('--primary', hsl)
-      document.documentElement.style.setProperty('--sidebar-background', hsl)
+      // Only apply custom sidebar background in light mode
+      if (!isDark) {
+        document.documentElement.style.setProperty('--sidebar-background', hsl)
+      } else {
+        document.documentElement.style.removeProperty('--sidebar-background')
+      }
     } else {
       document.documentElement.style.removeProperty('--primary')
       document.documentElement.style.removeProperty('--sidebar-background')
@@ -27,6 +34,28 @@ export default function Layout() {
       document.documentElement.style.removeProperty('--secondary')
       document.documentElement.style.removeProperty('--sidebar-primary')
     }
+  }, [activeClient])
+
+  // Create an observer to watch for class changes on the html element (dark mode toggle)
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          const isDark = document.documentElement.classList.contains('dark')
+          if (activeClient?.primaryColor) {
+            if (isDark) {
+              document.documentElement.style.removeProperty('--sidebar-background')
+            } else {
+              const hsl = hexToHsl(activeClient.primaryColor)
+              document.documentElement.style.setProperty('--sidebar-background', hsl)
+            }
+          }
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, { attributes: true })
+    return () => observer.disconnect()
   }, [activeClient])
 
   return (

@@ -531,13 +531,13 @@ export default function Lancamentos() {
     <div className="max-w-[1200px] mx-auto space-y-6 pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[#0F4C81]">Lançamentos Diários</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-primary">Lançamentos Diários</h2>
           <p className="text-muted-foreground mt-1">
             Gerencie a presença de terceiros e equipamentos dia a dia.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-2 rounded-lg border shadow-sm">
+        <div className="flex flex-col sm:flex-row items-center gap-3 bg-card p-2 rounded-lg border shadow-sm">
           <div className="flex items-center gap-2 px-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedPlant} onValueChange={setSelectedPlant}>
@@ -554,7 +554,7 @@ export default function Lancamentos() {
             </Select>
           </div>
 
-          <div className="w-[1px] h-6 bg-slate-200 hidden sm:block"></div>
+          <div className="w-[1px] h-6 bg-border hidden sm:block"></div>
 
           <div className="flex items-center gap-1">
             <Button
@@ -608,7 +608,9 @@ export default function Lancamentos() {
       <Card
         className={cn(
           'border-l-4 shadow-sm transition-colors',
-          isNonWorkingDay ? 'border-l-amber-500 bg-amber-50/50' : 'border-l-[#2B95D6]',
+          isNonWorkingDay
+            ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+            : 'border-l-primary',
         )}
       >
         <CardHeader className="pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 space-y-0">
@@ -616,7 +618,7 @@ export default function Lancamentos() {
             <CardTitle className="flex items-center gap-2">
               Diário de {format(selectedDate, 'dd/MM/yyyy')}
               {isNonWorkingDay && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
                   <AlertTriangle className="h-3 w-3" />
                   Dia Não Útil
                 </span>
@@ -654,33 +656,29 @@ export default function Lancamentos() {
                     </>
                   ) : (
                     <>
-                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium shadow-sm">
+                      <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 text-sm font-medium shadow-sm">
                         <Check className="h-4 w-4" />
                         Dia Finalizado
                       </div>
                       <Button
                         variant="outline"
                         onClick={() => setIsEditingPublished(true)}
-                        className="text-amber-700 border-amber-200 hover:bg-amber-50"
+                        className="text-amber-700 border-amber-200 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/40"
                       >
                         Editar Lançamentos
                       </Button>
                     </>
                   )
                 ) : (
-                  <Button
-                    variant="default"
-                    onClick={handlePublishDay}
-                    className="bg-[#0F4C81] hover:bg-[#0F4C81]/90 text-white"
-                  >
+                  <Button variant="default" onClick={handlePublishDay}>
                     <Check className="h-4 w-4 mr-2" />
                     Finalizar Lançamentos
                   </Button>
                 )}
               </div>
             )}
-            <div className="flex items-center gap-3 bg-white border px-3 py-2 rounded-lg shadow-sm">
-              <span className="text-sm font-medium text-slate-700">Dia Não Útil</span>
+            <div className="flex items-center gap-3 bg-card border px-3 py-2 rounded-lg shadow-sm">
+              <span className="text-sm font-medium text-foreground">Dia Não Útil</span>
               <Switch
                 checked={isNonWorkingDay}
                 onCheckedChange={handleToggleNonWorkingDay}
@@ -692,7 +690,7 @@ export default function Lancamentos() {
 
         <CardContent>
           {isEditingPublished && (
-            <div className="bg-amber-100 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 animate-in fade-in zoom-in duration-300">
+            <div className="bg-amber-100 border border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400 px-4 py-3 rounded-lg flex items-center gap-3 mb-6 animate-in fade-in zoom-in duration-300">
               <AlertTriangle className="h-5 w-5 flex-shrink-0" />
               <div>
                 <p className="font-semibold text-sm">Editando dia finalizado</p>
@@ -705,16 +703,16 @@ export default function Lancamentos() {
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="bg-white border p-1 shadow-sm">
+            <TabsList className="bg-muted/50 border p-1 shadow-sm">
               <TabsTrigger
                 value="colaboradores"
-                className="data-[state=active]:bg-slate-100 data-[state=active]:text-[#0F4C81]"
+                className="data-[state=active]:bg-background data-[state=active]:text-primary"
               >
                 Colaboradores
               </TabsTrigger>
               <TabsTrigger
                 value="equipamentos"
-                className="data-[state=active]:bg-slate-100 data-[state=active]:text-[#0F4C81]"
+                className="data-[state=active]:bg-background data-[state=active]:text-primary"
               >
                 Equipamentos
               </TabsTrigger>
@@ -722,20 +720,20 @@ export default function Lancamentos() {
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin mb-4 text-[#2B95D6]" />
+                <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
                 <p>Carregando dados...</p>
               </div>
             ) : (
               <>
                 <TabsContent value="colaboradores" className="m-0 focus-visible:outline-none">
                   {!employees || employees.length === 0 ? (
-                    <div className="text-center py-16 border rounded-lg bg-white shadow-sm">
+                    <div className="text-center py-16 border rounded-lg bg-card shadow-sm">
                       <p className="text-muted-foreground">Nenhum registro encontrado.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
                       <Table>
-                        <TableHeader className="bg-slate-50">
+                        <TableHeader className="bg-muted/50">
                           <TableRow>
                             <TableHead>Colaborador</TableHead>
                             <TableHead>Empresa</TableHead>
@@ -795,13 +793,13 @@ export default function Lancamentos() {
                 </TabsContent>
                 <TabsContent value="equipamentos" className="m-0 focus-visible:outline-none">
                   {!equipment || equipment.length === 0 ? (
-                    <div className="text-center py-16 border rounded-lg bg-white shadow-sm">
+                    <div className="text-center py-16 border rounded-lg bg-card shadow-sm">
                       <p className="text-muted-foreground">Nenhum registro encontrado.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
                       <Table>
-                        <TableHeader className="bg-slate-50">
+                        <TableHeader className="bg-muted/50">
                           <TableRow>
                             <TableHead>Equipamento</TableHead>
                             <TableHead>Tipo</TableHead>
