@@ -64,7 +64,29 @@ export default function AuditoriaRealizadas() {
     }
 
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+
+    // Real-time UI Update listener
+    const channel = supabase
+      .channel('realizadas_audit_executions')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'audit_executions',
+        },
+        () => {
+          if (activeClient?.id) {
+            fetchAudits()
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      supabase.removeChannel(channel)
+    }
   }, [activeClient, selectedPlant, dateRange])
 
   const fetchUserRole = async () => {
@@ -93,7 +115,8 @@ export default function AuditoriaRealizadas() {
           audits!inner (
             title,
             type,
-            client_id
+            client_id,
+            scoring_settings
           ),
           plants!inner (
             id,
@@ -103,7 +126,8 @@ export default function AuditoriaRealizadas() {
             name
           ),
           audit_execution_answers (
-            id
+            id,
+            score
           )
         `)
 
@@ -134,32 +158,66 @@ export default function AuditoriaRealizadas() {
 
       if (error) throw error
 
-      const finishedOrTaskCompleted = (data || []).filter((audit: any) => {
-        const statusLower = audit.status?.toLowerCase() || ''
-        const isExecutionFinished = [
-          'finalizado',
-          'finalizada',
-          'concluido',
-          'concluído',
-          'concluida',
-          'concluída',
-          'realizado',
-          'realizada',
-          'finished',
-          'completed',
-        ].includes(statusLower)
-        const isTaskFinished =
-          audit.tasks?.task_statuses?.is_terminal === true ||
-          audit.tasks?.task_statuses?.name?.toLowerCase() === 'finalizado'
+      // Filter audits considering 'Finalizada' status or task completed
+      const finishedOrTaskCompleted = (data || [])
+        .filter((audit: any) => {
+          const statusLower = audit.status?.toLowerCase() || ''
+          const isExecutionFinished = [
+            'finalizado',
+            'finalizada',
+            'concluido',
+            'concluído',
+            'concluida',
+            'concluída',
+            'realizado',
+            'realizada',
+            'finished',
+            'completed',
+          ].includes(statusLower)
 
-        // As per criteria: Any audit that has a final_score and a realization_date
-        // should be treated as a candidate for the "Finalized" status
-        const hasScoreAndDate = audit.final_score !== null && audit.realization_date !== null
+          const isTaskFinished =
+            audit.tasks?.task_statuses?.is_terminal === true ||
+            audit.tasks?.task_statuses?.name?.toLowerCase() === 'finalizado'
 
-        const hasAnswers = audit.audit_execution_answers && audit.audit_execution_answers.length > 0
+          const hasScoreAndDate = audit.final_score !== null && audit.realization_date !== null
+          const hasAnswers =
+            audit.audit_execution_answers && audit.audit_execution_answers.length > 0
 
-        return (isExecutionFinished || isTaskFinished || hasScoreAndDate) && hasAnswers
-      })
+          return (isExecutionFinished || isTaskFinished || hasScoreAndDate) && hasAnswers
+        })
+        .map((audit: any) => {
+          // Calculate missing scores if needed
+          if (audit.final_score === null && audit.audit_execution_answers?.length > 0) {
+            const computedScore = audit.audit_execution_answers.reduce(
+              (acc: number, curr: any) => acc + (Number(curr.score) || 0),
+              0,
+            )
+
+            let computedMax = audit.max_score || 0
+            if (!computedMax && audit.audits?.scoring_settings) {
+              try {
+                const settings = Array.isArray(audit.audits.scoring_settings)
+                  ? audit.audits.scoring_settings
+                  : JSON.parse(audit.audits.scoring_settings)
+                if (Array.isArray(settings) && settings.length > 0) {
+                  const maxSettingScore = Math.max(
+                    ...settings.map((s: any) => Number(s.score) || 0),
+                  )
+                  computedMax = maxSettingScore * audit.audit_execution_answers.length
+                }
+              } catch (e) {
+                // Ignore parse error
+              }
+            }
+
+            return {
+              ...audit,
+              final_score: computedScore,
+              max_score: computedMax > 0 ? computedMax : computedScore, // fallback
+            }
+          }
+          return audit
+        })
 
       setAudits(finishedOrTaskCompleted)
     } catch (error: any) {

@@ -18,51 +18,9 @@ import {
 } from '@/components/ui/select'
 import { submitAuditExecution } from '@/services/audit'
 
-function PrintButton({ id }: { id: string | undefined }) {
-  const [status, setStatus] = useState<string | null>(null)
+import { PrintLayout } from './components/PrintLayout'
 
-  useEffect(() => {
-    if (!id)
-      return supabase
-        .from('audit_executions')
-        .select('status')
-        .eq('id', id)
-        .single()
-        .then(({ data }) => {
-          if (data) setStatus(data.status)
-        })
-  }, [id])
-
-  const isPending =
-    !status || ['pendente', 'em andamento', 'draft', 'rascunho'].includes(status.toLowerCase())
-
-  if (isPending) return null
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 print:hidden">
-      <Button
-        onClick={() => window.open(`/auditoria-checklist/relatorio/${id}?print=true`, '_blank')}
-        className="shadow-lg gap-2"
-        size="lg"
-      >
-        <Printer className="w-5 h-5" />
-        Imprimir Relatório
-      </Button>
-    </div>
-  )
-}
-
-export default function AuditoriaDetalhesWrapper() {
-  const { id } = useParams()
-  return (
-    <>
-      <PrintButton id={id} />
-      <AuditoriaDetalhes />
-    </>
-  )
-}
-
-function AuditoriaDetalhes() {
+export default function AuditoriaDetalhes() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -74,6 +32,7 @@ function AuditoriaDetalhes() {
   const [actions, setActions] = useState<any[]>([])
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [participants, setParticipants] = useState('')
+  const [clientBrand, setClientBrand] = useState<any>(null)
 
   useEffect(() => {
     fetchData()
@@ -84,7 +43,12 @@ function AuditoriaDetalhes() {
     try {
       const { data: execData, error: execError } = await supabase
         .from('audit_executions')
-        .select('*, audits(*)')
+        .select(`
+          *,
+          audits(*),
+          plants(name),
+          profiles(name)
+        `)
         .eq('id', id)
         .single()
 
@@ -93,6 +57,15 @@ function AuditoriaDetalhes() {
         setExecution(execData)
         setAudit(execData.audits)
         setParticipants(execData.participants || '')
+
+        if (execData.audits?.client_id) {
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('logo_url, primary_color')
+            .eq('id', execData.audits.client_id)
+            .single()
+          setClientBrand(clientData)
+        }
 
         const { data: actionsData, error: actionsError } = await supabase
           .from('audit_actions')
@@ -205,178 +178,199 @@ function AuditoriaDetalhes() {
     (execution.final_score !== null && execution.realization_date !== null)
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 animate-fade-in-up">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{audit?.title}</h1>
-            <p className="text-muted-foreground">
-              {isFinalized ? 'Auditoria Finalizada' : 'Execução de Auditoria'}
-            </p>
+    <>
+      <PrintLayout
+        execution={execution}
+        actions={actions}
+        answersMap={answers}
+        clientBrand={clientBrand}
+      />
+      <div className="p-6 max-w-5xl mx-auto space-y-6 animate-fade-in-up print:hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">{audit?.title}</h1>
+              <p className="text-muted-foreground">
+                {isFinalized ? 'Auditoria Finalizada' : 'Execução de Auditoria'}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {!isFinalized && (
-            <>
-              <Button variant="outline" onClick={() => handleSave(true)} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Salvar como Rascunho
+          <div className="flex items-center gap-2">
+            {isFinalized ? (
+              <Button onClick={() => window.print()} variant="outline" className="gap-2">
+                <Printer className="w-4 h-4" />
+                Imprimir Relatório
               </Button>
-              <Button onClick={() => handleSave(false)} disabled={saving}>
-                {saving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                )}
-                Finalizar Auditoria
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações Gerais</CardTitle>
-          <CardDescription>Preencha os participantes antes de iniciar a avaliação</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label>Participantes</Label>
-            <Input
-              placeholder="Ex: João Silva, Maria Souza"
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              disabled={isFinalized}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Critérios de Avaliação</h2>
-        {actions.map((action, index) => (
-          <Card key={action.id}>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center justify-between">
-                <span>
-                  {index + 1}. {action.title}
-                </span>
-                <span className="text-sm font-normal text-muted-foreground">
-                  Peso: {action.weight}
-                </span>
-              </CardTitle>
-              {action.evidence_required && (
-                <CardDescription className="text-destructive font-medium">
-                  * Evidência obrigatória para este critério
-                </CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Nota</Label>
-                    <Select
-                      value={answers[action.id]?.score?.toString() || ''}
-                      onValueChange={(val) => handleAnswerChange(action.id, 'score', parseInt(val))}
-                      disabled={isFinalized}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma nota" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {scoringSettings.map((setting: any) => (
-                          <SelectItem key={setting.score} value={setting.score.toString()}>
-                            {setting.score} - {setting.description}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Observações</Label>
-                    <Textarea
-                      placeholder="Detalhes adicionais..."
-                      value={answers[action.id]?.observations || ''}
-                      onChange={(e) =>
-                        handleAnswerChange(action.id, 'observations', e.target.value)
-                      }
-                      disabled={isFinalized}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4" />
-                    Evidências (Fotos/Documentos)
-                  </Label>
-                  {isFinalized ? (
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      {Array.from(
-                        new Set(
-                          (answers[action.id]?.evidence_urls || []).concat(
-                            answers[action.id]?.evidence_url
-                              ? [answers[action.id]?.evidence_url]
-                              : [],
-                          ),
-                        ),
-                      ).map((url: string, i: number) => (
-                        <a
-                          key={i}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block relative aspect-square rounded-lg border bg-muted overflow-hidden hover:opacity-90 transition-opacity"
-                        >
-                          {url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                            <img src={url} alt="Evidência" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
-                              <span className="text-xs truncate w-full px-2">Ver Arquivo</span>
-                            </div>
-                          )}
-                        </a>
-                      ))}
-                      {!answers[action.id]?.evidence_urls?.length &&
-                        !answers[action.id]?.evidence_url && (
-                          <span className="text-sm text-muted-foreground">Sem evidências</span>
-                        )}
-                    </div>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => handleSave(true)} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <FileUpload
-                      multiple
-                      showThumbnails
-                      bucket="documents"
-                      existingUrls={Array.from(
-                        new Set(
-                          (answers[action.id]?.evidence_urls || []).concat(
-                            answers[action.id]?.evidence_url
-                              ? [answers[action.id]?.evidence_url]
-                              : [],
-                          ),
-                        ),
-                      )}
-                      onUploadComplete={(urls) => {
-                        handleAnswerChange(action.id, 'evidence_url', null)
-                        handleAnswerChange(action.id, 'evidence_urls', urls)
-                      }}
-                    />
+                    <Save className="h-4 w-4 mr-2" />
                   )}
+                  Salvar como Rascunho
+                </Button>
+                <Button onClick={() => handleSave(false)} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Finalizar Auditoria
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações Gerais</CardTitle>
+            <CardDescription>
+              Preencha os participantes antes de iniciar a avaliação
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label>Participantes</Label>
+              <Input
+                placeholder="Ex: João Silva, Maria Souza"
+                value={participants}
+                onChange={(e) => setParticipants(e.target.value)}
+                disabled={isFinalized}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Critérios de Avaliação</h2>
+          {actions.map((action, index) => (
+            <Card key={action.id}>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>
+                    {index + 1}. {action.title}
+                  </span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    Peso: {action.weight}
+                  </span>
+                </CardTitle>
+                {action.evidence_required && (
+                  <CardDescription className="text-destructive font-medium">
+                    * Evidência obrigatória para este critério
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Nota</Label>
+                      <Select
+                        value={answers[action.id]?.score?.toString() || ''}
+                        onValueChange={(val) =>
+                          handleAnswerChange(action.id, 'score', parseInt(val))
+                        }
+                        disabled={isFinalized}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma nota" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {scoringSettings.map((setting: any) => (
+                            <SelectItem key={setting.score} value={setting.score.toString()}>
+                              {setting.score} - {setting.description}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Observações</Label>
+                      <Textarea
+                        placeholder="Detalhes adicionais..."
+                        value={answers[action.id]?.observations || ''}
+                        onChange={(e) =>
+                          handleAnswerChange(action.id, 'observations', e.target.value)
+                        }
+                        disabled={isFinalized}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Paperclip className="h-4 w-4" />
+                      Evidências (Fotos/Documentos)
+                    </Label>
+                    {isFinalized ? (
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        {Array.from(
+                          new Set(
+                            (answers[action.id]?.evidence_urls || []).concat(
+                              answers[action.id]?.evidence_url
+                                ? [answers[action.id]?.evidence_url]
+                                : [],
+                            ),
+                          ),
+                        ).map((url: string, i: number) => (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block relative aspect-square rounded-lg border bg-muted overflow-hidden hover:opacity-90 transition-opacity"
+                          >
+                            {url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                              <img
+                                src={url}
+                                alt="Evidência"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
+                                <span className="text-xs truncate w-full px-2">Ver Arquivo</span>
+                              </div>
+                            )}
+                          </a>
+                        ))}
+                        {!answers[action.id]?.evidence_urls?.length &&
+                          !answers[action.id]?.evidence_url && (
+                            <span className="text-sm text-muted-foreground">Sem evidências</span>
+                          )}
+                      </div>
+                    ) : (
+                      <FileUpload
+                        multiple
+                        showThumbnails
+                        bucket="documents"
+                        existingUrls={Array.from(
+                          new Set(
+                            (answers[action.id]?.evidence_urls || []).concat(
+                              answers[action.id]?.evidence_url
+                                ? [answers[action.id]?.evidence_url]
+                                : [],
+                            ),
+                          ),
+                        )}
+                        onUploadComplete={(urls) => {
+                          handleAnswerChange(action.id, 'evidence_url', null)
+                          handleAnswerChange(action.id, 'evidence_urls', urls)
+                        }}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

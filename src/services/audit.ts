@@ -31,6 +31,25 @@ export const submitAuditExecution = async (
 
   if (error) throw error
 
+  // Feature: Audit Status Synchronization
+  // Ensure the audit_executions table status is updated to 'Finalizada' immediately upon successful submission
+  if (!isDraft) {
+    const finalScore = answers.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0)
+
+    const { error: updateError } = await supabase
+      .from('audit_executions')
+      .update({
+        status: 'Finalizada',
+        realization_date: new Date().toISOString().split('T')[0],
+        final_score: finalScore,
+      })
+      .eq('id', executionId)
+
+    if (updateError) {
+      console.error('Failed to sync audit execution status:', updateError)
+    }
+  }
+
   return data
 }
 
