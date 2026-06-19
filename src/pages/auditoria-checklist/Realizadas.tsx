@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, Search, Trash2 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, startOfMonth, endOfMonth, endOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { DateRange } from 'react-day-picker'
 
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
+import { useAppStore } from '@/store/AppContext'
+import { DatePickerWithRange } from '@/components/ui/date-range-picker'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -34,16 +37,26 @@ export default function AuditoriaRealizadas() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const { toast } = useToast()
+  const { activeClient, selectedPlant } = useAppStore()
 
   useEffect(() => {
     fetchUserRole()
-    fetchAudits()
   }, [])
+
+  useEffect(() => {
+    if (activeClient?.id) {
+      fetchAudits()
+    } else {
+      setAudits([])
+      setLoading(false)
+    }
+  }, [activeClient, selectedPlant, dateRange])
 
   const fetchUserRole = async () => {
     const { data } = await supabase.rpc('get_user_role')
@@ -53,31 +66,88 @@ export default function AuditoriaRealizadas() {
   const fetchAudits = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('audit_executions')
-        .select(`
+      let query = supabase.from('audit_executions').select(`
           id,
           status,
           realization_date,
           final_score,
           max_score,
-          audits (
-            title,
-            type
+          created_at,
+          task_id,
+          tasks (
+            task_number,
+            task_statuses (
+              name,
+              is_terminal
+            )
           ),
-          plants (
+          audits!inner (
+            title,
+            type,
+            client_id
+          ),
+          plants!inner (
+            id,
             name
           ),
           profiles!audit_executions_assignee_id_fkey (
             name
           )
         `)
-        .eq('status', 'Finalizado')
-        .order('realization_date', { ascending: false })
+
+      if (activeClient?.id) {
+        query = query.eq('audits.client_id', activeClient.id)
+      }
+
+      if (selectedPlant && selectedPlant !== 'all') {
+        query = query.eq('plant_id', selectedPlant)
+      }
+
+      if (dateRange?.from) {
+        const fromDateOnly = format(dateRange.from, 'yyyy-MM-dd')
+        const fromISO = dateRange.from.toISOString()
+
+        if (dateRange.to) {
+          const toDateOnly = format(dateRange.to, 'yyyy-MM-dd')
+          const toISO = endOfDay(dateRange.to).toISOString()
+          const orFilter = `and(realization_date.gte.${fromDateOnly},realization_date.lte.${toDateOnly}),and(realization_date.is.null,created_at.gte.${fromISO},created_at.lte.${toISO})`
+          query = query.or(orFilter)
+        } else {
+          const orFilter = `realization_date.gte.${fromDateOnly},and(realization_date.is.null,created_at.gte.${fromISO})`
+          query = query.or(orFilter)
+        }
+      }
+
+      const { data, error } = await query.order('realization_date', { ascending: false })
 
       if (error) throw error
 
-      setAudits(data || [])
+      const finishedOrTaskCompleted = (data || []).filter((audit: any) => {
+        const statusLower = audit.status?.toLowerCase() || ''
+        const isExecutionFinished = [
+          'finalizado',
+          'finalizada',
+          'concluido',
+          'concluído',
+          'concluida',
+          'concluída',
+          'realizado',
+          'realizada',
+          'finished',
+          'completed',
+        ].includes(statusLower)
+        const isTaskFinished =
+          audit.tasks?.task_statuses?.is_terminal === true ||
+          audit.tasks?.task_statuses?.name?.toLowerCase() === 'finalizado'
+
+        // As per criteria: Any audit that has a final_score and a realization_date
+        // should be treated as a candidate for the "Finalized" status
+        const hasScoreAndDate = audit.final_score !== null && audit.realization_date !== null
+
+        return isExecutionFinished || isTaskFinished || hasScoreAndDate
+      })
+
+      setAudits(finishedOrTaskCompleted)
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -121,7 +191,8 @@ export default function AuditoriaRealizadas() {
     return (
       audit.audits?.title?.toLowerCase().includes(searchLower) ||
       audit.plants?.name?.toLowerCase().includes(searchLower) ||
-      audit.profiles?.name?.toLowerCase().includes(searchLower)
+      audit.profiles?.name?.toLowerCase().includes(searchLower) ||
+      audit.tasks?.task_number?.toLowerCase().includes(searchLower)
     )
   })
 
@@ -138,16 +209,19 @@ export default function AuditoriaRealizadas() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Listagem</CardTitle>
-            <div className="relative w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por título, planta ou auditor..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+              <div className="relative w-72">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por título, planta ou auditor..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -156,17 +230,19 @@ export default function AuditoriaRealizadas() {
             <div className="py-8 text-center text-muted-foreground">Carregando auditorias...</div>
           ) : filteredAudits.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
-              Nenhuma auditoria realizada encontrada.
+              Nenhuma auditoria realizada encontrada para este período.
             </div>
           ) : (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>OS</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead>Planta</TableHead>
                     <TableHead>Auditor</TableHead>
                     <TableHead>Data de Realização</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Pontuação</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -178,6 +254,9 @@ export default function AuditoriaRealizadas() {
 
                     return (
                       <TableRow key={audit.id}>
+                        <TableCell className="font-medium text-muted-foreground">
+                          {audit.tasks?.task_number || '-'}
+                        </TableCell>
                         <TableCell className="font-medium">{audit.audits?.title}</TableCell>
                         <TableCell>{audit.plants?.name}</TableCell>
                         <TableCell>{audit.profiles?.name}</TableCell>
@@ -188,7 +267,35 @@ export default function AuditoriaRealizadas() {
                                 'dd/MM/yyyy',
                                 { locale: ptBR },
                               )
-                            : '-'}
+                            : audit.created_at
+                              ? format(new Date(audit.created_at), 'dd/MM/yyyy', { locale: ptBR })
+                              : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {[
+                            'finalizado',
+                            'finalizada',
+                            'concluido',
+                            'concluído',
+                            'concluida',
+                            'concluída',
+                            'realizado',
+                            'realizada',
+                            'finished',
+                            'completed',
+                          ].includes(audit.status?.toLowerCase() || '') ||
+                          (audit.final_score !== null && audit.realization_date !== null) ? (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                              Finalizada
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="secondary"
+                              className="bg-yellow-500 text-white hover:bg-yellow-600"
+                            >
+                              Em Andamento
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -200,17 +307,38 @@ export default function AuditoriaRealizadas() {
                                   : 'destructive'
                             }
                           >
-                            {audit.final_score} / {audit.max_score} ({scorePercentage.toFixed(1)}%)
+                            {audit.final_score || 0} / {audit.max_score || 0} (
+                            {scorePercentage.toFixed(1)}%)
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon" asChild>
-                              <Link to={`/auditoria-checklist/detalhes/${audit.id}`}>
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">Ver detalhes</span>
-                              </Link>
-                            </Button>
+                            {[
+                              'finalizado',
+                              'finalizada',
+                              'concluido',
+                              'concluído',
+                              'concluida',
+                              'concluída',
+                              'realizado',
+                              'realizada',
+                              'finished',
+                              'completed',
+                            ].includes(audit.status?.toLowerCase() || '') ||
+                            (audit.final_score !== null && audit.realization_date !== null) ? (
+                              <Button variant="ghost" size="icon" asChild title="Ver detalhes">
+                                <Link to={`/auditoria-checklist/detalhes/${audit.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                  <span className="sr-only">Ver detalhes</span>
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button size="sm" asChild>
+                                <Link to={`/auditoria-checklist/detalhes/${audit.id}`}>
+                                  Finalizar
+                                </Link>
+                              </Button>
+                            )}
                             {canDelete && (
                               <Button
                                 variant="ghost"

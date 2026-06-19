@@ -232,7 +232,7 @@ export default function Cadastros() {
                 ? selectedMasterClient
                 : profile.client_id
 
-          const { training_records, ...rest } = record
+          const { training_records, updated_at, created_at, ...rest } = record
           const payload = { ...rest, client_id: targetClientId }
 
           if (type === 'colaboradores' && payload.company_id) {
@@ -299,7 +299,7 @@ export default function Cadastros() {
             }
           }
 
-          const { training_records, ...rest } = record
+          const { training_records, updated_at, created_at, ...rest } = record
           const payload = { ...rest }
 
           if (type === 'colaboradores' && payload.company_id) {

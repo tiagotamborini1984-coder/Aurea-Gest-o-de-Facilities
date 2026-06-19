@@ -914,6 +914,7 @@ export type Database = {
           reference_month: string
           registration_number: string | null
           status: string
+          updated_at: string | null
         }
         Insert: {
           client_id: string
@@ -928,6 +929,7 @@ export type Database = {
           reference_month?: string
           registration_number?: string | null
           status?: string
+          updated_at?: string | null
         }
         Update: {
           client_id?: string
@@ -942,6 +944,7 @@ export type Database = {
           reference_month?: string
           registration_number?: string | null
           status?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -2191,6 +2194,7 @@ export type Database = {
           email: string | null
           function_id: string | null
           id: string
+          is_active: boolean | null
           manager_id: string | null
           name: string
           phone: string | null
@@ -2204,6 +2208,7 @@ export type Database = {
           email?: string | null
           function_id?: string | null
           id?: string
+          is_active?: boolean | null
           manager_id?: string | null
           name: string
           phone?: string | null
@@ -2217,6 +2222,7 @@ export type Database = {
           email?: string | null
           function_id?: string | null
           id?: string
+          is_active?: boolean | null
           manager_id?: string | null
           name?: string
           phone?: string | null
@@ -3270,6 +3276,35 @@ export type Database = {
               reference_month: string
               registration_number: string | null
               status: string
+              updated_at: string | null
+            }[]
+            SetofOptions: {
+              from: '*'
+              to: 'employees'
+              isOneToOne: false
+              isSetofReturn: true
+            }
+          }
+        | {
+            Args: {
+              p_plant_id: string
+              p_reference_month: string
+              p_staff_log_ids?: string[]
+            }
+            Returns: {
+              client_id: string
+              company_id: string | null
+              company_name: string
+              created_at: string
+              function_id: string | null
+              id: string
+              location_id: string | null
+              name: string
+              plant_id: string
+              reference_month: string
+              registration_number: string | null
+              status: string
+              updated_at: string | null
             }[]
             SetofOptions: {
               from: '*'

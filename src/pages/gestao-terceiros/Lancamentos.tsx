@@ -149,18 +149,44 @@ export default function Lancamentos() {
 
       if (!rpcError && rpcEmps) {
         fetchedEmps = rpcEmps
+
+        // Handle historical data gracefully for deleted collaborators
+        const missingLogIds = staffLogIds.filter((id) => !fetchedEmps.some((e) => e.id === id))
+        if (missingLogIds.length > 0) {
+          missingLogIds.forEach((id) => {
+            fetchedEmps.push({
+              id,
+              name: 'Colaborador Excluído',
+              company_name: '-',
+              status: 'Inativo',
+              reference_month: refMonth,
+              is_deleted: true,
+            })
+          })
+        }
       } else {
         // Fallback to standard query if RPC fails or doesn't exist yet
         console.warn(
           'RPC get_attendance_employees failed or not available. Using fallback.',
           rpcError,
         )
-        const { data: emps, error: empsError } = await supabase
+
+        let empsQuery = supabase
           .from('employees')
           .select(
             'id, name, company_name, function_id, status, registration_number, reference_month, created_at',
           )
           .eq('plant_id', selectedPlant)
+
+        if (staffLogIds.length > 0) {
+          empsQuery = empsQuery.or(
+            `and(status.eq.Ativo,reference_month.eq.${refMonth}),id.in.(${staffLogIds.join(',')})`,
+          )
+        } else {
+          empsQuery = empsQuery.eq('status', 'Ativo').eq('reference_month', refMonth)
+        }
+
+        const { data: emps, error: empsError } = await empsQuery
 
         if (empsError && empsError.code !== 'PGRST116') throw empsError
 
@@ -192,17 +218,35 @@ export default function Lancamentos() {
             })
 
             const best = group[0]
-            if (
-              staffLogIds.includes(best.id) ||
-              best.status === 'Ativo' ||
-              (best.status === 'Inativo' && best.reference_month && best.reference_month > refMonth)
-            ) {
+            if (staffLogIds.includes(best.id) || best.status === 'Ativo') {
               uniqueEmpsMap.set(best.id, best)
             }
           })
           fetchedEmps = Array.from(uniqueEmpsMap.values())
         }
       }
+
+      // Ensure historical records reference valid entities to prevent UI crashes
+      const fetchedEmpIds = new Set(fetchedEmps.map((e) => e.id))
+      staffLogIds.forEach((logId) => {
+        if (!fetchedEmpIds.has(logId)) {
+          fetchedEmps.push({
+            id: logId,
+            name: 'Colaborador Removido',
+            company_name: '-',
+            status: 'Excluído',
+            isDeleted: true,
+          })
+        }
+      })
+
+      // Append status for inactive/deleted employees that only appear because they have a historical log
+      fetchedEmps = fetchedEmps.map((e) => {
+        if (e.status && e.status !== 'Ativo' && !e.name.includes('(Removido)')) {
+          return { ...e, name: `${e.name} (Removido)` }
+        }
+        return e
+      })
 
       if (fetchedEmps && fetchedEmps.length > 0) {
         const uniqueEmps = fetchedEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
@@ -235,12 +279,40 @@ export default function Lancamentos() {
       else eqsQuery = eqsQuery.eq('status', 'Ativo')
       eqsQuery = eqsQuery.order('name')
 
+      let fetchedEqs: any[] = []
       const { data: eqs, error: eqsError } = await eqsQuery
       if (eqsError && eqsError.code !== 'PGRST116') throw eqsError
 
       if (eqs && eqs.length > 0) {
+        fetchedEqs = [...eqs]
+      }
+
+      // Ensure historical records reference valid equipment to prevent UI crashes
+      const fetchedEqIds = new Set(fetchedEqs.map((e) => e.id))
+      equipmentLogIds.forEach((logId) => {
+        if (!fetchedEqIds.has(logId)) {
+          fetchedEqs.push({
+            id: logId,
+            name: 'Equipamento Removido',
+            type: 'Desconhecido',
+            quantity: 0,
+            status: 'Inativo',
+            isDeleted: true,
+          })
+        }
+      })
+
+      // Append status for inactive equipment that only appear because they have a historical log
+      fetchedEqs = fetchedEqs.map((e) => {
+        if (e.status && e.status !== 'Ativo' && !e.name.includes('(Removido)')) {
+          return { ...e, name: `${e.name} (Removido)` }
+        }
+        return e
+      })
+
+      if (fetchedEqs.length > 0) {
         const uniqueEqsMap = new Map()
-        eqs.forEach((e) => {
+        fetchedEqs.forEach((e) => {
           if (e && e.id && !uniqueEqsMap.has(e.id)) {
             uniqueEqsMap.set(e.id, e)
           }

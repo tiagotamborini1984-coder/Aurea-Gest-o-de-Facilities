@@ -30,6 +30,7 @@ export const submitAuditExecution = async (
   })
 
   if (error) throw error
+
   return data
 }
 

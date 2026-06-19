@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { Loader2, Save, CheckCircle, ArrowLeft, Paperclip } from 'lucide-react'
+import { Loader2, Save, CheckCircle, ArrowLeft, Paperclip, Printer } from 'lucide-react'
 import { FileUpload } from '@/components/FileUpload'
 import {
   Select,
@@ -18,7 +18,51 @@ import {
 } from '@/components/ui/select'
 import { submitAuditExecution } from '@/services/audit'
 
-export default function AuditoriaDetalhes() {
+function PrintButton({ id }: { id: string | undefined }) {
+  const [status, setStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!id)
+      return supabase
+        .from('audit_executions')
+        .select('status')
+        .eq('id', id)
+        .single()
+        .then(({ data }) => {
+          if (data) setStatus(data.status)
+        })
+  }, [id])
+
+  const isPending =
+    !status || ['pendente', 'em andamento', 'draft', 'rascunho'].includes(status.toLowerCase())
+
+  if (isPending) return null
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 print:hidden">
+      <Button
+        onClick={() => window.open(`/auditoria-checklist/relatorio/${id}?print=true`, '_blank')}
+        className="shadow-lg gap-2"
+        size="lg"
+      >
+        <Printer className="w-5 h-5" />
+        Imprimir Relatório
+      </Button>
+    </div>
+  )
+}
+
+export default function AuditoriaDetalhesWrapper() {
+  const { id } = useParams()
+  return (
+    <>
+      <PrintButton id={id} />
+      <AuditoriaDetalhes />
+    </>
+  )
+}
+
+function AuditoriaDetalhes() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -145,7 +189,20 @@ export default function AuditoriaDetalhes() {
   }
 
   const scoringSettings = audit?.scoring_settings || []
-  const isFinalized = execution.status === 'Finalizado'
+  const isFinalized =
+    [
+      'finalizado',
+      'finalizada',
+      'concluido',
+      'concluído',
+      'concluida',
+      'concluída',
+      'realizado',
+      'realizada',
+      'finished',
+      'completed',
+    ].includes(execution.status?.toLowerCase() || '') ||
+    (execution.final_score !== null && execution.realization_date !== null)
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 animate-fade-in-up">
