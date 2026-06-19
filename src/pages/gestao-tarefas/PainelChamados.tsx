@@ -579,8 +579,8 @@ export default function PainelChamados() {
     <div className="max-w-[1600px] mx-auto space-y-6 pb-12 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="bg-brand-deepBlue/10 p-2.5 rounded-xl border border-brand-deepBlue/20 shadow-sm">
-            <CheckSquare className="h-6 w-6 text-brand-deepBlue" />
+          <div className="bg-brand-deepBlue/10 dark:bg-brand-deepBlue/20 p-2.5 rounded-xl border border-brand-deepBlue/20 dark:border-brand-deepBlue/30 shadow-sm">
+            <CheckSquare className="h-6 w-6 text-brand-deepBlue dark:text-brand-vividBlue" />
           </div>
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
@@ -590,7 +590,7 @@ export default function PainelChamados() {
               Abra chamados, acompanhe SLAs e interaja na linha do tempo.
             </p>
           </div>
-        </div>
+        </div>{' '}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           <Button onClick={handleOpenAdd} variant="tech" className="w-full sm:w-auto h-10">
             <Plus className="w-4 h-4 mr-2" /> Novo Chamado
@@ -599,7 +599,7 @@ export default function PainelChamados() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex bg-slate-100 p-1.5 rounded-xl w-full sm:w-fit border border-slate-200/80 shadow-sm overflow-x-auto no-scrollbar">
+        <div className="flex bg-muted p-1.5 rounded-xl w-full sm:w-fit border border-border/80 shadow-sm overflow-x-auto no-scrollbar">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -607,8 +607,8 @@ export default function PainelChamados() {
               className={cn(
                 'flex items-center gap-2 flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
                 activeTab === t.id
-                  ? 'bg-white text-brand-deepBlue shadow-sm ring-1 ring-slate-200/50'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50',
+                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted-foreground/10',
               )}
             >
               <t.icon className="w-4 h-4" />
@@ -617,9 +617,9 @@ export default function PainelChamados() {
           ))}
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex-1 flex items-center px-3 gap-2 xl:border-r border-gray-200">
-            <Search className="w-5 h-5 text-slate-500" />
+        <div className="flex flex-col xl:flex-row gap-4 bg-card p-3 rounded-xl border border-border shadow-sm">
+          <div className="flex-1 flex items-center px-3 gap-2 xl:border-r border-border">
+            <Search className="w-5 h-5 text-muted-foreground" />
             <Input
               placeholder="Buscar protocolo, nome ou descrição..."
               className="border-0 shadow-none focus-visible:ring-0 px-0 h-10 text-base"
@@ -627,7 +627,7 @@ export default function PainelChamados() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
+          <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-border pl-0 xl:pl-4 pt-3 xl:pt-0">
             <Select value={filterPlant} onValueChange={setFilterPlant}>
               <SelectTrigger className="border-0 shadow-none bg-transparent h-10">
                 <SelectValue placeholder="Plantas" />
@@ -642,12 +642,12 @@ export default function PainelChamados() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full xl:w-64 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0 flex items-center">
+          <div className="w-full xl:w-64 border-t xl:border-t-0 xl:border-l border-border pl-0 xl:pl-4 pt-3 xl:pt-0 flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="w-full justify-between px-3 h-10 font-normal text-slate-600 bg-transparent hover:bg-transparent hover:text-slate-900 border-0 shadow-none focus-visible:ring-0"
+                  className="w-full justify-between px-3 h-10 font-normal text-muted-foreground bg-transparent hover:bg-transparent hover:text-foreground border-0 shadow-none focus-visible:ring-0"
                 >
                   <span className="truncate mr-2">
                     {selectedStatuses.length === taskStatuses.length
@@ -660,7 +660,7 @@ export default function PainelChamados() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-64" align="start">
-                <DropdownMenuLabel className="text-xs text-slate-500 uppercase tracking-wider">
+                <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">
                   Filtrar por Status
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -679,7 +679,7 @@ export default function PainelChamados() {
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className="w-3 h-3 rounded-full shrink-0 shadow-sm border border-slate-200"
+                        className="w-3 h-3 rounded-full shrink-0 shadow-sm border border-border"
                         style={{ backgroundColor: s.color || '#94a3b8' }}
                       ></span>
                       <span className="truncate">{s.name}</span>
@@ -690,7 +690,7 @@ export default function PainelChamados() {
             </DropdownMenu>
           </div>
           {isSuperAdmin && (
-            <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-gray-200 pl-0 xl:pl-4 pt-3 xl:pt-0">
+            <div className="w-full xl:w-56 border-t xl:border-t-0 xl:border-l border-border pl-0 xl:pl-4 pt-3 xl:pt-0">
               <Select value={filterAssignee} onValueChange={setFilterAssignee}>
                 <SelectTrigger className="border-0 shadow-none bg-transparent h-10">
                   <SelectValue placeholder="Responsável" />
@@ -709,19 +709,19 @@ export default function PainelChamados() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50/80 border-b border-gray-200">
+          <TableHeader className="bg-muted/50 border-b border-border">
             <TableRow>
-              <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
-              <TableHead className="font-semibold text-slate-800">Nome</TableHead>
-              <TableHead className="font-semibold text-slate-800">Planta</TableHead>
-              <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
-              <TableHead className="font-semibold text-slate-800">Solicitante</TableHead>
-              <TableHead className="font-semibold text-slate-800">Responsável</TableHead>
-              <TableHead className="font-semibold text-slate-800">Status</TableHead>
-              <TableHead className="font-semibold text-slate-800">SLA</TableHead>
-              <TableHead className="font-semibold text-slate-800 text-right">Ações</TableHead>
+              <TableHead className="font-semibold text-foreground">Protocolo</TableHead>
+              <TableHead className="font-semibold text-foreground">Nome</TableHead>
+              <TableHead className="font-semibold text-foreground">Planta</TableHead>
+              <TableHead className="font-semibold text-foreground">Tipo</TableHead>
+              <TableHead className="font-semibold text-foreground">Solicitante</TableHead>
+              <TableHead className="font-semibold text-foreground">Responsável</TableHead>
+              <TableHead className="font-semibold text-foreground">Status</TableHead>
+              <TableHead className="font-semibold text-foreground">SLA</TableHead>
+              <TableHead className="font-semibold text-foreground text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -733,7 +733,7 @@ export default function PainelChamados() {
               </TableRow>
             ) : filteredTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Nenhum chamado encontrado.
                 </TableCell>
               </TableRow>
@@ -746,15 +746,19 @@ export default function PainelChamados() {
                 const plant = localPlants.find((p) => p.id === task.plant_id)
 
                 return (
-                  <TableRow key={task.id} className="hover:bg-slate-50">
-                    <TableCell className="font-medium text-slate-800">{task.task_number}</TableCell>
-                    <TableCell className="font-medium text-slate-800">
+                  <TableRow key={task.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium text-foreground">
+                      {task.task_number}
+                    </TableCell>
+                    <TableCell className="font-medium text-foreground">
                       {task.title || '-'}
                     </TableCell>
-                    <TableCell className="text-slate-600">{plant?.name || '-'}</TableCell>
-                    <TableCell className="text-slate-600">{type?.name || '-'}</TableCell>
-                    <TableCell className="text-slate-600">{requester?.name || '-'}</TableCell>
-                    <TableCell className="text-slate-600">{assignee?.name || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{plant?.name || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{type?.name || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {requester?.name || '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{assignee?.name || '-'}</TableCell>
                     <TableCell>
                       <Badge
                         className="font-medium text-white border-0 shadow-sm"
@@ -772,7 +776,7 @@ export default function PainelChamados() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setSelectedTask(task)}
-                          className="text-brand-deepBlue hover:bg-brand-deepBlue/10"
+                          className="text-brand-deepBlue dark:text-brand-vividBlue hover:bg-brand-deepBlue/10"
                         >
                           Detalhes
                         </Button>
@@ -781,7 +785,7 @@ export default function PainelChamados() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteClick(task)}
-                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            className="text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-500"
                           >
                             Excluir
                           </Button>
@@ -890,7 +894,7 @@ export default function PainelChamados() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-slate-500 font-normal"
+                        className="w-full justify-start text-muted-foreground font-normal"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Selecionar participantes...
@@ -944,9 +948,9 @@ export default function PainelChamados() {
                         <Badge
                           key={id}
                           variant="secondary"
-                          className="pl-2 pr-1 py-1 flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200"
+                          className="pl-2 pr-1 py-1 flex items-center gap-1 bg-muted text-foreground border border-border"
                         >
-                          <Users className="w-3 h-3 text-slate-400" />
+                          <Users className="w-3 h-3 text-muted-foreground" />
                           {user.name}
                           <button
                             type="button"
@@ -956,7 +960,7 @@ export default function PainelChamados() {
                                 participants_ids: form.participants_ids.filter((pId) => pId !== id),
                               })
                             }
-                            className="ml-1 rounded-full hover:bg-slate-200 p-0.5 text-slate-500 transition-colors"
+                            className="ml-1 rounded-full hover:bg-accent p-0.5 text-muted-foreground transition-colors"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -980,11 +984,11 @@ export default function PainelChamados() {
                     {selectedFiles.map((file, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200"
+                        className="flex items-center justify-between bg-muted p-2.5 rounded-lg border border-border"
                       >
                         <div className="flex items-center gap-2 overflow-hidden">
-                          <Paperclip className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="text-sm font-medium text-slate-700 truncate">
+                          <Paperclip className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium text-foreground truncate">
                             {file.name}
                           </span>
                         </div>
@@ -992,7 +996,7 @@ export default function PainelChamados() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 shrink-0"
                           onClick={() => removeFile(i)}
                         >
                           <X className="w-4 h-4" />
@@ -1022,7 +1026,7 @@ export default function PainelChamados() {
             <DialogTitle>Excluir Tarefa</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Você está prestes a excluir a tarefa <strong>{taskToDelete?.task_number}</strong>.
               Esta ação não pode ser desfeita e registrará uma alteração de status para "Excluída".
             </p>

@@ -72,11 +72,11 @@ export default function DashboardBudget() {
   const chartConfig = {
     budgeted: {
       label: 'Orçado',
-      color: '#1d848a',
+      color: 'hsl(var(--chart-1))',
     },
     realized: {
       label: 'Realizado',
-      color: '#6e932b',
+      color: 'hsl(var(--chart-2))',
     },
   }
 
@@ -128,13 +128,13 @@ export default function DashboardBudget() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-[180px] justify-between bg-white">
+              <Button variant="outline" className="w-full sm:w-[180px] justify-between font-medium">
                 <span className="truncate">
                   {selectedMonths.length === 0
                     ? 'Todos os Meses'
                     : `${selectedMonths.length} selecionado(s)`}
                 </span>
-                <Filter className="ml-2 h-4 w-4 opacity-50" />
+                <Filter className="ml-2 h-4 w-4 opacity-70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end">
@@ -158,13 +158,13 @@ export default function DashboardBudget() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-[200px] justify-between bg-white">
+              <Button variant="outline" className="w-full sm:w-[200px] justify-between font-medium">
                 <span className="truncate">
                   {selectedCostCenters.length === 0
                     ? 'Todos os Centros'
                     : `${selectedCostCenters.length} selecionado(s)`}
                 </span>
-                <Filter className="ml-2 h-4 w-4 opacity-50" />
+                <Filter className="ml-2 h-4 w-4 opacity-70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end">
@@ -193,7 +193,7 @@ export default function DashboardBudget() {
       </div>
 
       {!data ? (
-        <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground bg-white rounded-xl border border-dashed">
+        <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground bg-card rounded-xl border border-dashed">
           <AlertCircle className="h-10 w-10 mb-4 opacity-50" />
           <p className="text-lg font-medium text-center px-4">
             Nenhum dado encontrado para os filtros selecionados
@@ -204,50 +204,90 @@ export default function DashboardBudget() {
         <div className="space-y-6">
           {/* AI Insights */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4 text-primary">
-              <Sparkles className="h-5 w-5 text-blue-600" />{' '}
-              <span className="text-blue-600">Aurea AI Insights</span>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />{' '}
+              <span className="text-blue-600 dark:text-blue-400">Aurea AI Insights</span>
             </h3>
             <div className="grid gap-4 md:grid-cols-3">
-              <Card className="border-l-4 border-l-red-500 shadow-sm rounded-r-xl">
+              {data.insights.critical ? (
+                <Card className="border-l-4 border-l-red-500 shadow-sm rounded-r-xl bg-card">
+                  <CardContent className="pt-6">
+                    <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4" /> Atenção Crítica: Orçamento Estourado
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
+                      O centro de custo {data.insights.critical.cc} excedeu o orçamento em{' '}
+                      {data.insights.critical.pct}%. A conta "{data.insights.critical.account}" é a
+                      que mais gastou.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 hover:bg-accent hover:text-accent-foreground border-border"
+                    >
+                      Revisar Lançamentos <ArrowRight className="ml-2 h-3 w-3" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-l-4 border-l-emerald-500 shadow-sm rounded-r-xl bg-card">
+                  <CardContent className="pt-6">
+                    <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4" /> Orçamento Saudável
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
+                      Nenhum centro de custo estourou o orçamento planejado. Excelente trabalho de
+                      gestão!
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+              {data.insights.warning ? (
+                <Card className="border-l-4 border-l-amber-500 shadow-sm rounded-r-xl bg-card">
+                  <CardContent className="pt-6">
+                    <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4" /> Alerta de Consumo Elevado
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
+                      O centro de custo {data.insights.warning.cc} já consumiu{' '}
+                      {data.insights.warning.pct}% do orçamento planejado para este mês. Fique
+                      atento.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 hover:bg-accent hover:text-accent-foreground border-border"
+                    >
+                      Ajustar Orçamento <ArrowRight className="ml-2 h-3 w-3" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-l-4 border-l-emerald-500 shadow-sm rounded-r-xl bg-card">
+                  <CardContent className="pt-6">
+                    <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4" /> Alertas Limpos
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
+                      Não há centros de custo em zona de risco (acima de 90%) no momento.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+              <Card className="border-l-4 border-l-purple-500 shadow-sm rounded-r-xl bg-card">
                 <CardContent className="pt-6">
-                  <h4 className="text-sm font-semibold text-red-600 flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4" /> Atenção Crítica: Orçamento Estourado
-                  </h4>
-                  <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
-                    O centro de custo {data.insights.critical.cc} excedeu o orçamento em{' '}
-                    {data.insights.critical.pct}%. A conta "{data.insights.critical.account}" é a
-                    que mais gastou.
-                  </p>
-                  <Button variant="outline" size="sm" className="text-xs h-8">
-                    Revisar Lançamentos <ArrowRight className="ml-2 h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-amber-500 shadow-sm rounded-r-xl">
-                <CardContent className="pt-6">
-                  <h4 className="text-sm font-semibold text-amber-600 flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4" /> Alerta de Consumo Elevado
-                  </h4>
-                  <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
-                    O centro de custo {data.insights.warning.cc} já consumiu{' '}
-                    {data.insights.warning.pct}% do orçamento planejado para este mês. Fique atento.
-                  </p>
-                  <Button variant="outline" size="sm" className="text-xs h-8">
-                    Ajustar Orçamento <ArrowRight className="ml-2 h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-purple-500 shadow-sm rounded-r-xl">
-                <CardContent className="pt-6">
-                  <h4 className="text-sm font-semibold text-purple-600 flex items-center gap-2 mb-2">
+                  <h4 className="text-sm font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-2 mb-2">
                     <TrendingUp className="h-4 w-4" /> Aurea AI Forecast (Mês Seguinte)
                   </h4>
                   <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
                     Projeção de gastos para o próximo mês: {formatBRL(data.insights.forecast)}.
                     Baseado no KPI Orçado x Realizado atual.
                   </p>
-                  <Button variant="outline" size="sm" className="text-xs h-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 hover:bg-accent hover:text-accent-foreground border-border"
+                  >
                     Planejar Próximo Mês <ArrowRight className="ml-2 h-3 w-3" />
                   </Button>
                 </CardContent>
@@ -257,64 +297,70 @@ export default function DashboardBudget() {
 
           {/* KPIs */}
           <div className="grid gap-4 md:grid-cols-4 mb-6">
-            <Card className="shadow-sm border-blue-100 bg-blue-50/10">
+            <Card className="shadow-sm border-blue-200/50 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10">
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
-                  <p className="text-sm font-semibold text-blue-600">Total Orçado</p>
-                  <div className="p-1.5 bg-blue-100 rounded-md">
-                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                    Total Orçado
+                  </p>
+                  <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded-md">
+                    <DollarSign className="h-4 w-4 text-blue-700 dark:text-blue-400" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-slate-800">
+                <h3 className="text-2xl font-bold text-foreground">
                   {formatBRL(data.totalBudgeted)}
                 </h3>
               </CardContent>
             </Card>
-            <Card className="shadow-sm border-amber-100 bg-amber-50/10">
+            <Card className="shadow-sm border-amber-200/50 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-900/10">
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
-                  <p className="text-sm font-semibold text-amber-600">Total Realizado</p>
-                  <div className="p-1.5 bg-amber-100 rounded-md">
-                    <TrendingUp className="h-4 w-4 text-amber-600" />
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-500">
+                    Total Realizado
+                  </p>
+                  <div className="p-1.5 bg-amber-100 dark:bg-amber-900/50 rounded-md">
+                    <TrendingUp className="h-4 w-4 text-amber-700 dark:text-amber-500" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-slate-800">
+                <h3 className="text-2xl font-bold text-foreground">
                   {formatBRL(data.totalRealized)}
                 </h3>
               </CardContent>
             </Card>
             <Card
-              className={`shadow-sm ${variance < 0 ? 'border-red-100 bg-red-50/20' : 'border-emerald-100 bg-emerald-50/10'}`}
+              className={`shadow-sm ${variance < 0 ? 'border-red-200/50 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10' : 'border-emerald-200/50 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-900/10'}`}
             >
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
                   <p
-                    className={`text-sm font-semibold ${variance < 0 ? 'text-red-600' : 'text-emerald-600'}`}
+                    className={`text-sm font-semibold ${variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
                   >
                     Diferença (Saldo)
                   </p>
                   <div
-                    className={`p-1.5 rounded-md ${variance < 0 ? 'bg-red-100' : 'bg-emerald-100'}`}
+                    className={`p-1.5 rounded-md ${variance < 0 ? 'bg-red-100 dark:bg-red-900/50' : 'bg-emerald-100 dark:bg-emerald-900/50'}`}
                   >
                     <AlertTriangle
-                      className={`h-4 w-4 ${variance < 0 ? 'text-red-600' : 'text-emerald-600'}`}
+                      className={`h-4 w-4 ${variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
                     />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-slate-800">
+                <h3 className="text-2xl font-bold text-foreground">
                   {variance < 0 && '- '}
                   {formatBRL(Math.abs(variance))}
                 </h3>
               </CardContent>
             </Card>
-            <Card className="shadow-sm">
+            <Card className="shadow-sm bg-card">
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
-                  <p className="text-sm font-semibold text-slate-600">% do Budget Utilizado</p>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    % do Budget Utilizado
+                  </p>
                 </div>
                 <div>
                   <h3
-                    className={`text-2xl font-bold mb-3 ${pctUsed > 100 ? 'text-red-600' : 'text-slate-800'}`}
+                    className={`text-2xl font-bold mb-3 ${pctUsed > 100 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}
                   >
                     {formatPct(pctUsed)}
                   </h3>
@@ -353,13 +399,15 @@ export default function DashboardBudget() {
                         dataKey="name"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: '#64748b' }}
+                        tick={{ fill: 'currentColor' }}
+                        className="text-muted-foreground text-xs"
                       />
                       <YAxis
                         tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: '#64748b' }}
+                        tick={{ fill: 'currentColor' }}
+                        className="text-muted-foreground text-xs"
                       />
                       <ChartTooltip
                         cursor={{ fill: 'rgba(0,0,0,0.05)' }}
@@ -406,13 +454,15 @@ export default function DashboardBudget() {
                         dataKey="name"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 12, fill: '#64748b' }}
+                        tick={{ fontSize: 12, fill: 'currentColor' }}
+                        className="text-muted-foreground text-xs"
                       />
                       <YAxis
                         tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: '#64748b' }}
+                        tick={{ fill: 'currentColor' }}
+                        className="text-muted-foreground text-xs"
                       />
                       <ChartTooltip
                         cursor={{ fill: 'rgba(0,0,0,0.05)' }}

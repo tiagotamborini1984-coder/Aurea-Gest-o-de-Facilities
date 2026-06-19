@@ -479,7 +479,7 @@ export default function RelatoriosTarefas() {
             variant="outline"
             onClick={() => window.print()}
             disabled={tasks.length === 0}
-            className="border-gray-300"
+            className="border-border"
           >
             <Printer className="h-4 w-4 mr-2" /> Imprimir
           </Button>
@@ -489,9 +489,9 @@ export default function RelatoriosTarefas() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm print:hidden">
+      <div className="flex flex-wrap gap-4 bg-card p-4 rounded-xl border border-border shadow-sm print:hidden">
         <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-700">De</Label>
+          <Label className="text-xs font-bold text-foreground">De</Label>
           <Input
             type="date"
             value={dateFrom}
@@ -500,7 +500,7 @@ export default function RelatoriosTarefas() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-700">Até</Label>
+          <Label className="text-xs font-bold text-foreground">Até</Label>
           <Input
             type="date"
             value={dateTo}
@@ -509,7 +509,7 @@ export default function RelatoriosTarefas() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-700">Planta</Label>
+          <Label className="text-xs font-bold text-foreground">Planta</Label>
           <Select value={filterPlant} onValueChange={(v) => updateSearchParam('planta', v)}>
             <SelectTrigger className="h-9 w-[180px]">
               <SelectValue placeholder="Todas" />
@@ -525,7 +525,7 @@ export default function RelatoriosTarefas() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-700">Status</Label>
+          <Label className="text-xs font-bold text-foreground">Status</Label>
           <Select value={filterStatus} onValueChange={(v) => updateSearchParam('status', v)}>
             <SelectTrigger className="h-9 w-[150px]">
               <SelectValue placeholder="Todos" />
@@ -545,7 +545,7 @@ export default function RelatoriosTarefas() {
           (Array.isArray(profile?.accessible_menus) &&
             profile.accessible_menus.includes('Gestão de Tarefas:Filtro Responsável'))) && (
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-700">Responsável</Label>
+            <Label className="text-xs font-bold text-foreground">Responsável</Label>
             <Select value={filterAssignee} onValueChange={(v) => updateSearchParam('assignee', v)}>
               <SelectTrigger className="h-9 w-[180px]">
                 <SelectValue placeholder="Todos" />
@@ -564,7 +564,7 @@ export default function RelatoriosTarefas() {
       </div>
 
       <Tabs defaultValue="lista" className="space-y-6 print:block">
-        <TabsList className="bg-white border border-gray-200 print:hidden h-12 w-full sm:w-auto flex-wrap">
+        <TabsList className="bg-card border border-border print:hidden h-12 w-full sm:w-auto flex-wrap">
           <TabsTrigger
             value="lista"
             className="text-base font-semibold px-6 py-2 flex-1 sm:flex-none"
@@ -580,26 +580,26 @@ export default function RelatoriosTarefas() {
         </TabsList>
 
         <TabsContent value="lista" className="m-0 space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
             <Table className="print:text-xs">
-              <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+              <TableHeader className="bg-muted/50 border-b border-border print:bg-transparent">
                 <TableRow>
-                  <TableHead className="font-semibold text-slate-800 print:text-black">
+                  <TableHead className="font-semibold text-foreground print:text-black">
                     Protocolo
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-800 print:text-black">
+                  <TableHead className="font-semibold text-foreground print:text-black">
                     Abertura
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-800 print:text-black">
+                  <TableHead className="font-semibold text-foreground print:text-black">
                     Tipo / Planta
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-800 print:text-black">
+                  <TableHead className="font-semibold text-foreground print:text-black">
                     Responsável
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-800 print:text-black">
+                  <TableHead className="font-semibold text-foreground print:text-black">
                     Status
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-800 print:text-black">
+                  <TableHead className="font-semibold text-foreground print:text-black">
                     SLA Atual
                   </TableHead>
                 </TableRow>
@@ -613,7 +613,10 @@ export default function RelatoriosTarefas() {
                   </TableRow>
                 ) : tasks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-slate-500 font-medium">
+                    <TableCell
+                      colSpan={6}
+                      className="text-center py-8 text-muted-foreground font-medium"
+                    >
                       Nenhum chamado encontrado no período.
                     </TableCell>
                   </TableRow>
@@ -628,21 +631,21 @@ export default function RelatoriosTarefas() {
                     return (
                       <TableRow
                         key={task.id}
-                        className="hover:bg-slate-50 border-gray-100 print:border-b"
+                        className="hover:bg-muted/50 border-border print:border-b"
                       >
-                        <TableCell className="font-medium text-slate-800">
+                        <TableCell className="font-medium text-foreground">
                           {task.task_number}
                         </TableCell>
-                        <TableCell className="text-slate-600 font-medium">
+                        <TableCell className="text-muted-foreground font-medium">
                           {format(new Date(task.created_at), 'dd/MM/yyyy HH:mm')}
                         </TableCell>
                         <TableCell>
-                          <div className="font-semibold text-slate-800">{type?.name}</div>
-                          <div className="text-[11px] text-slate-500 uppercase font-bold mt-0.5">
+                          <div className="font-semibold text-foreground">{type?.name}</div>
+                          <div className="text-[11px] text-muted-foreground uppercase font-bold mt-0.5">
                             {plant?.name}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-700 font-medium">
+                        <TableCell className="text-foreground font-medium">
                           {assignee?.name}
                         </TableCell>
                         <TableCell>
@@ -686,32 +689,32 @@ export default function RelatoriosTarefas() {
           ) : (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="shadow-sm border-gray-200">
+                <Card className="shadow-sm border-border bg-card">
                   <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
-                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">
                       Total de RCs Criadas
                     </div>
-                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    <div className="text-4xl font-black text-brand-deepBlue dark:text-brand-vividBlue mb-1">
                       {comprasMetrics.countToRC}
                     </div>
-                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
                       Soma total de RCs criadas em todas as plantas no período selecionado.
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-gray-200 flex flex-col">
+                <Card className="shadow-sm border-border bg-card flex flex-col">
                   <CardContent className="p-6 flex flex-col items-center justify-center text-center flex-1">
-                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">
                       Tempo para criação da RC
                     </div>
-                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    <div className="text-4xl font-black text-brand-deepBlue dark:text-brand-vividBlue mb-1">
                       {formatDays(comprasMetrics.avgToRC)}{' '}
-                      <span className="text-lg text-slate-500 font-medium">
+                      <span className="text-lg text-muted-foreground font-medium">
                         {formatUnit(comprasMetrics.avgToRC)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Média de {comprasMetrics.countToRC} chamados
                     </div>
                     <Dialog>
@@ -779,41 +782,41 @@ export default function RelatoriosTarefas() {
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-gray-200">
+                <Card className="shadow-sm border-border bg-card">
                   <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
-                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">
                       Tempo para Criação do Pedido de Compras
                     </div>
-                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    <div className="text-4xl font-black text-brand-deepBlue dark:text-brand-vividBlue mb-1">
                       {formatDays(comprasMetrics.avgToPO)}{' '}
-                      <span className="text-lg text-slate-500 font-medium">
+                      <span className="text-lg text-muted-foreground font-medium">
                         {formatUnit(comprasMetrics.avgToPO)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Média de {comprasMetrics.countToPO} chamados
                     </div>
-                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
                       Tempo médio desde a RC até a data de emissão do Pedido.
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-gray-200">
+                <Card className="shadow-sm border-border bg-card">
                   <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
-                    <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">
                       Tempo de Entrega
                     </div>
-                    <div className="text-4xl font-black text-brand-deepBlue mb-1">
+                    <div className="text-4xl font-black text-brand-deepBlue dark:text-brand-vividBlue mb-1">
                       {formatDays(comprasMetrics.avgToDelivery)}{' '}
-                      <span className="text-lg text-slate-500 font-medium">
+                      <span className="text-lg text-muted-foreground font-medium">
                         {formatUnit(comprasMetrics.avgToDelivery)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Média de {comprasMetrics.countToDelivery} chamados
                     </div>
-                    <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
                       Tempo médio desde a emissão do Pedido até a finalização do chamado.
                     </p>
                   </CardContent>
@@ -823,10 +826,10 @@ export default function RelatoriosTarefas() {
               {plantRanking.length > 0 && (
                 <>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
+                    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden p-6">
                       <div className="mb-6">
-                        <h3 className="font-bold text-slate-800">Volume de RCs por Planta</h3>
-                        <p className="text-xs text-slate-500">
+                        <h3 className="font-bold text-foreground">Volume de RCs por Planta</h3>
+                        <p className="text-xs text-muted-foreground">
                           Quantidade de Requisições de Compra criadas no período selecionado.
                         </p>
                       </div>
@@ -869,22 +872,22 @@ export default function RelatoriosTarefas() {
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
-                      <div className="p-4 border-b border-gray-200 bg-slate-50">
-                        <h3 className="font-bold text-slate-800">Ranking por Planta</h3>
-                        <p className="text-xs text-slate-500">
+                    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
+                      <div className="p-4 border-b border-border bg-muted/50">
+                        <h3 className="font-bold text-foreground">Ranking por Planta</h3>
+                        <p className="text-xs text-muted-foreground">
                           Médias de tempo para criação de RC e Pedido de Compras por unidade.
                         </p>
                       </div>
                       <Table className="print:text-xs">
-                        <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+                        <TableHeader className="bg-muted/50 border-b border-border print:bg-transparent">
                           <TableRow>
-                            <TableHead className="font-semibold text-slate-800">Posição</TableHead>
-                            <TableHead className="font-semibold text-slate-800">Planta</TableHead>
-                            <TableHead className="font-semibold text-slate-800 text-center">
+                            <TableHead className="font-semibold text-foreground">Posição</TableHead>
+                            <TableHead className="font-semibold text-foreground">Planta</TableHead>
+                            <TableHead className="font-semibold text-foreground text-center">
                               Média Criação RC
                             </TableHead>
-                            <TableHead className="font-semibold text-slate-800 text-center">
+                            <TableHead className="font-semibold text-foreground text-center">
                               Média Criação Pedido
                             </TableHead>
                           </TableRow>
@@ -893,12 +896,12 @@ export default function RelatoriosTarefas() {
                           {plantRanking.map((rank, index) => (
                             <TableRow
                               key={rank.plantId}
-                              className="hover:bg-slate-50 border-gray-100 print:border-b"
+                              className="hover:bg-muted/50 border-border print:border-b"
                             >
-                              <TableCell className="font-bold text-slate-500">
+                              <TableCell className="font-bold text-muted-foreground">
                                 {index + 1}º
                               </TableCell>
-                              <TableCell className="font-semibold text-slate-800">
+                              <TableCell className="font-semibold text-foreground">
                                 {rank.plantName}
                               </TableCell>
                               <TableCell className="text-center font-medium">
@@ -918,10 +921,10 @@ export default function RelatoriosTarefas() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
+                  <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden p-6">
                     <div className="mb-6">
-                      <h3 className="font-bold text-slate-800">Tempo Médio em Cadastro</h3>
-                      <p className="text-xs text-slate-500">
+                      <h3 className="font-bold text-foreground">Tempo Médio em Cadastro</h3>
+                      <p className="text-xs text-muted-foreground">
                         Média de tempo que a tarefa permaneceu com o status "Cadastro" por planta.
                       </p>
                     </div>
@@ -971,34 +974,36 @@ export default function RelatoriosTarefas() {
                 </>
               )}
 
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
-                <div className="p-4 border-b border-gray-200 bg-slate-50">
-                  <h3 className="font-bold text-slate-800">Detalhamento dos Chamados de Compras</h3>
-                  <p className="text-xs text-slate-500">
+              <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
+                <div className="p-4 border-b border-border bg-muted/50">
+                  <h3 className="font-bold text-foreground">
+                    Detalhamento dos Chamados de Compras
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
                     Listagem das tarefas consideradas nos cálculos acima.
                   </p>
                 </div>
                 <Table className="print:text-xs">
-                  <TableHeader className="bg-slate-50 border-b border-gray-200 print:bg-transparent">
+                  <TableHeader className="bg-muted/50 border-b border-border print:bg-transparent">
                     <TableRow>
-                      <TableHead className="font-semibold text-slate-800">Protocolo</TableHead>
-                      <TableHead className="font-semibold text-slate-800">Tipo</TableHead>
-                      <TableHead className="font-semibold text-slate-800 text-center">
+                      <TableHead className="font-semibold text-foreground">Protocolo</TableHead>
+                      <TableHead className="font-semibold text-foreground">Tipo</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">
                         RC: T. Bruto
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-800 text-center">
+                      <TableHead className="font-semibold text-foreground text-center">
                         RC: Pausa
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-800 text-center">
+                      <TableHead className="font-semibold text-foreground text-center">
                         RC: T. Efetivo
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-800 text-center">
+                      <TableHead className="font-semibold text-foreground text-center">
                         T. Cadastro
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-800 text-center">
+                      <TableHead className="font-semibold text-foreground text-center">
                         T. Criação Pedido
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-800 text-center">
+                      <TableHead className="font-semibold text-foreground text-center">
                         T. Entrega
                       </TableHead>
                     </TableRow>
@@ -1008,7 +1013,7 @@ export default function RelatoriosTarefas() {
                       <TableRow>
                         <TableCell
                           colSpan={7}
-                          className="text-center py-8 text-slate-500 font-medium"
+                          className="text-center py-8 text-muted-foreground font-medium"
                         >
                           Nenhum chamado de compras encontrado no período.
                         </TableCell>
@@ -1026,15 +1031,15 @@ export default function RelatoriosTarefas() {
                         return (
                           <TableRow
                             key={task.id}
-                            className="hover:bg-slate-50 border-gray-100 print:border-b"
+                            className="hover:bg-muted/50 border-border print:border-b"
                           >
-                            <TableCell className="font-medium text-slate-800">
+                            <TableCell className="font-medium text-foreground">
                               {task.task_number}
                             </TableCell>
-                            <TableCell className="text-slate-600 font-medium">
+                            <TableCell className="text-muted-foreground font-medium">
                               {type?.name}
                             </TableCell>
-                            <TableCell className="text-center font-medium text-slate-500">
+                            <TableCell className="text-center font-medium text-muted-foreground">
                               {grossRC !== null
                                 ? `${formatDays(grossRC)} ${formatUnit(grossRC)}`
                                 : '-'}

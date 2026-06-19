@@ -50,7 +50,11 @@ const getTicketSLA = (ticket: any, currentTime: Date) => {
   if (!ticket.priority?.sla_hours) return null
 
   if (ticket.status?.step === 'Concluído') {
-    return { text: 'Concluído', color: 'text-slate-600 bg-slate-100 border-slate-200' }
+    return {
+      text: 'Concluído',
+      color:
+        'text-slate-600 bg-slate-100 border-slate-200 dark:text-slate-400 dark:bg-slate-900/50 dark:border-slate-800',
+    }
   }
 
   const slaMs = ticket.priority.sla_hours * 60 * 60 * 1000
@@ -72,11 +76,14 @@ const getTicketSLA = (ticket: any, currentTime: Date) => {
 
   const text = isLate ? `Atrasado: ${timeText}` : `Faltam: ${timeText}`
 
-  let color = 'text-emerald-700 bg-emerald-50 border-emerald-200'
+  let color =
+    'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400'
   if (isLate) {
-    color = 'text-red-700 bg-red-50 border-red-200 shadow-sm'
+    color =
+      'text-red-700 bg-red-50 border-red-200 shadow-sm dark:bg-red-950/40 dark:border-red-800 dark:text-red-400'
   } else if (remaining < slaMs * 0.2) {
-    color = 'text-amber-700 bg-amber-50 border-amber-200'
+    color =
+      'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400'
   }
 
   return { text, color, isLate }
@@ -456,10 +463,10 @@ export default function ChamadosManutencao() {
     <div className="p-6 h-full flex flex-col animate-fade-in-up">
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Wrench className="h-8 w-8 text-brand-vividBlue" /> Gestão de Chamados (OS)
           </h1>
-          <p className="text-gray-500 mt-1">Kanban de Ordem de Serviço em tempo real.</p>
+          <p className="text-muted-foreground mt-1">Kanban de Ordem de Serviço em tempo real.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select
@@ -469,7 +476,7 @@ export default function ChamadosManutencao() {
               setSelectedArea('all')
             }}
           >
-            <SelectTrigger className="w-[160px] bg-white">
+            <SelectTrigger className="w-[160px] bg-background">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Plantas" />
             </SelectTrigger>
@@ -483,7 +490,7 @@ export default function ChamadosManutencao() {
             </SelectContent>
           </Select>
           <Select value={selectedArea} onValueChange={setSelectedArea}>
-            <SelectTrigger className="w-[160px] bg-white">
+            <SelectTrigger className="w-[160px] bg-background">
               <MapPin className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Áreas" />
             </SelectTrigger>
@@ -499,7 +506,7 @@ export default function ChamadosManutencao() {
             </SelectContent>
           </Select>
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-[160px] bg-white">
+            <SelectTrigger className="w-[160px] bg-background">
               <Wrench className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
@@ -662,7 +669,7 @@ export default function ChamadosManutencao() {
                 </div>
                 <div className="space-y-2">
                   <Label>Anexos</Label>
-                  <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/50 transition cursor-pointer relative">
                     <input
                       type="file"
                       multiple
@@ -672,8 +679,8 @@ export default function ChamadosManutencao() {
                         setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
                       }
                     />
-                    <Paperclip className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-                    <span className="text-sm text-gray-600">
+                    <Paperclip className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                    <span className="text-sm text-muted-foreground">
                       Clique ou arraste arquivos (Fotos/Documentos)
                     </span>
                   </div>
@@ -682,7 +689,7 @@ export default function ChamadosManutencao() {
                       {files.map((f, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between text-xs bg-gray-100 px-2 py-1 rounded"
+                          className="flex items-center justify-between text-xs bg-muted px-2 py-1 rounded"
                         >
                           <span className="truncate">{f.name}</span>
                           <button
@@ -726,9 +733,9 @@ export default function ChamadosManutencao() {
           return (
             <div
               key={column}
-              className="flex-none w-80 bg-gray-100 rounded-xl p-3 flex flex-col h-full border"
+              className="flex-none w-80 bg-muted/30 rounded-xl p-3 flex flex-col h-full border"
             >
-              <div className="font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm text-gray-700 bg-gray-200/50">
+              <div className="font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm text-foreground bg-muted">
                 {column}
                 <Badge variant="secondary">{colTickets.length}</Badge>
               </div>
@@ -742,7 +749,7 @@ export default function ChamadosManutencao() {
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-gray-500">
+                          <span className="text-xs font-mono font-bold text-muted-foreground">
                             {ticket.ticket_number}
                           </span>
                           {ticket.type && (
@@ -753,7 +760,7 @@ export default function ChamadosManutencao() {
                                 color: '#fff',
                                 borderColor: ticket.type.color || '#e5e7eb',
                               }}
-                              className="text-[10px] px-1.5 h-5 font-semibold tracking-wide"
+                              className="text-[10px] px-1.5 h-5 font-semibold tracking-wide dark:opacity-90"
                             >
                               {ticket.type.name}
                             </Badge>
@@ -761,7 +768,7 @@ export default function ChamadosManutencao() {
                           {ticket.origin === 'Preventiva' && (
                             <Badge
                               variant="outline"
-                              className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] px-1.5 h-5 font-semibold tracking-wide"
+                              className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800 text-[10px] px-1.5 h-5 font-semibold tracking-wide"
                             >
                               Preventiva
                             </Badge>
@@ -802,7 +809,7 @@ export default function ChamadosManutencao() {
                       <p className="text-sm font-medium leading-snug line-clamp-2">
                         {ticket.description}
                       </p>
-                      <div className="text-xs text-gray-500 flex flex-col gap-1.5 mt-2">
+                      <div className="text-xs text-muted-foreground flex flex-col gap-1.5 mt-2">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="h-3 w-3" />
                           <span className="truncate">
@@ -810,8 +817,8 @@ export default function ChamadosManutencao() {
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between mt-1 border-t border-gray-100 pt-2">
-                          <div className="flex items-center gap-1.5 font-medium text-gray-700">
+                        <div className="flex items-center justify-between mt-1 border-t border-border pt-2">
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
                             {ticket.assignee ? (
                               <>
                                 <Avatar className="h-4 w-4">
@@ -824,7 +831,7 @@ export default function ChamadosManutencao() {
                                 </span>
                               </>
                             ) : (
-                              <span className="text-gray-400 italic">Não atribuído</span>
+                              <span className="text-muted-foreground italic">Não atribuído</span>
                             )}
                           </div>
 
@@ -847,7 +854,7 @@ export default function ChamadosManutencao() {
                         </div>
                       </div>
                       {ticket.asset && (
-                        <div className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block mt-1.5">
+                        <div className="text-xs font-mono bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-2 py-1 rounded inline-block mt-1.5">
                           Ativo: {ticket.asset.name}
                         </div>
                       )}
@@ -866,7 +873,7 @@ export default function ChamadosManutencao() {
             <SheetTitle className="flex items-center gap-2">
               OS: {selectedTicket?.ticket_number}
               {selectedTicket?.origin === 'Preventiva' && (
-                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-transparent">
+                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-transparent dark:bg-purple-950 dark:text-purple-300 dark:hover:bg-purple-900">
                   Preventiva
                 </Badge>
               )}
@@ -891,7 +898,7 @@ export default function ChamadosManutencao() {
           {selectedTicket && (
             <div className="mt-6 space-y-4">
               <div>
-                <Label className="text-gray-500">Descrição</Label>
+                <Label className="text-muted-foreground">Descrição</Label>
                 <p className="text-sm font-medium mt-1 whitespace-pre-wrap">
                   {selectedTicket.description}
                 </p>
@@ -902,7 +909,10 @@ export default function ChamadosManutencao() {
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between mb-3">
                     <Label className="text-base font-semibold">Checklist de Preventiva</Label>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                    <Badge
+                      variant="outline"
+                      className="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+                    >
                       {checklistResponses.filter((r) => r.status === 'ok').length} /{' '}
                       {checklistResponses.length} Concluídos
                     </Badge>
@@ -911,7 +921,7 @@ export default function ChamadosManutencao() {
                     {checklistResponses.map((item, index) => (
                       <div
                         key={item.item_id || index}
-                        className="p-3 border rounded-lg bg-gray-50/50"
+                        className="p-3 border rounded-lg bg-muted/30"
                       >
                         <p className="text-sm font-medium mb-3">{item.description}</p>
                         <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -925,13 +935,13 @@ export default function ChamadosManutencao() {
                           >
                             <ToggleGroupItem
                               value="ok"
-                              className="data-[state=on]:bg-green-100 data-[state=on]:text-green-800 text-xs"
+                              className="data-[state=on]:bg-green-100 data-[state=on]:text-green-800 dark:data-[state=on]:bg-green-900/40 dark:data-[state=on]:text-green-400 text-xs"
                             >
                               <Check className="w-3.5 h-3.5 mr-1" /> OK
                             </ToggleGroupItem>
                             <ToggleGroupItem
                               value="fail"
-                              className="data-[state=on]:bg-red-100 data-[state=on]:text-red-800 text-xs"
+                              className="data-[state=on]:bg-red-100 data-[state=on]:text-red-800 dark:data-[state=on]:bg-red-900/40 dark:data-[state=on]:text-red-400 text-xs"
                             >
                               <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Falha
                             </ToggleGroupItem>
@@ -941,7 +951,7 @@ export default function ChamadosManutencao() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-xs h-8 border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800"
+                              className="text-xs h-8 border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950/40"
                               onClick={() => {
                                 setCorrectiveForm({
                                   description: `Falha identificada no item: ${item.description}`,
@@ -963,7 +973,7 @@ export default function ChamadosManutencao() {
 
               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div className="col-span-2">
-                  <Label className="text-gray-500">Planta</Label>
+                  <Label className="text-muted-foreground">Planta</Label>
                   <Select
                     value={editForm.plant_id}
                     onValueChange={(v) =>
@@ -989,7 +999,7 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <Label className="text-gray-500">Área / Local</Label>
+                  <Label className="text-muted-foreground">Área / Local</Label>
                   <Select
                     value={editForm.area_id}
                     onValueChange={(v) =>
@@ -1015,7 +1025,7 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <Label className="text-gray-500">Sublocal</Label>
+                  <Label className="text-muted-foreground">Sublocal</Label>
                   <Select
                     value={editForm.sublocation_id}
                     onValueChange={(v) =>
@@ -1037,7 +1047,7 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <Label className="text-gray-500">Equipamento</Label>
+                  <Label className="text-muted-foreground">Equipamento</Label>
                   <Select
                     value={editForm.asset_id}
                     onValueChange={(v) => setEditForm({ ...editForm, asset_id: v })}
@@ -1057,7 +1067,7 @@ export default function ChamadosManutencao() {
                 </div>
 
                 <div className="col-span-2">
-                  <Label className="text-gray-500">Status</Label>
+                  <Label className="text-muted-foreground">Status</Label>
                   <Select
                     value={editForm.status_id}
                     onValueChange={(v) => setEditForm({ ...editForm, status_id: v })}
@@ -1089,7 +1099,7 @@ export default function ChamadosManutencao() {
                 </div>
 
                 <div>
-                  <Label className="text-gray-500">Tipo de Manutenção</Label>
+                  <Label className="text-muted-foreground">Tipo de Manutenção</Label>
                   <Select
                     value={editForm.type_id}
                     onValueChange={(v) => setEditForm({ ...editForm, type_id: v })}
@@ -1108,7 +1118,7 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-gray-500">Criticidade (SLA)</Label>
+                  <Label className="text-muted-foreground">Criticidade (SLA)</Label>
                   <Select
                     value={editForm.priority_id}
                     onValueChange={(v) => setEditForm({ ...editForm, priority_id: v })}
@@ -1128,7 +1138,7 @@ export default function ChamadosManutencao() {
                 </div>
 
                 <div className="col-span-2">
-                  <Label className="text-gray-500">Manutentor Responsável</Label>
+                  <Label className="text-muted-foreground">Manutentor Responsável</Label>
                   <Select
                     value={editForm.assignee_id}
                     onValueChange={(v) => setEditForm({ ...editForm, assignee_id: v })}
@@ -1150,22 +1160,22 @@ export default function ChamadosManutencao() {
                 </div>
 
                 <div>
-                  <Label className="text-gray-500">Início Planejado</Label>
+                  <Label className="text-muted-foreground">Início Planejado</Label>
                   <Input
                     type="datetime-local"
                     value={editForm.planned_start}
                     onChange={(e) => setEditForm({ ...editForm, planned_start: e.target.value })}
-                    className="mt-1 h-8 text-xs"
+                    className="mt-1 h-8 text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert"
                   />
                 </div>
                 <div>
-                  <Label className="text-gray-500">Fim Planejado</Label>
+                  <Label className="text-muted-foreground">Fim Planejado</Label>
                   <Input
                     type="datetime-local"
                     value={editForm.planned_end}
                     min={editForm.planned_start}
                     onChange={(e) => setEditForm({ ...editForm, planned_end: e.target.value })}
-                    className="mt-1 h-8 text-xs"
+                    className="mt-1 h-8 text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert"
                   />
                 </div>
 
@@ -1173,22 +1183,22 @@ export default function ChamadosManutencao() {
                   selectedTicket.status?.step === 'Concluído') && (
                   <>
                     <div>
-                      <Label className="text-gray-500">Início Realizado</Label>
+                      <Label className="text-muted-foreground">Início Realizado</Label>
                       <Input
                         type="datetime-local"
                         value={editForm.actual_start}
                         onChange={(e) => setEditForm({ ...editForm, actual_start: e.target.value })}
-                        className="mt-1 h-8 text-xs"
+                        className="mt-1 h-8 text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert"
                       />
                     </div>
                     <div>
-                      <Label className="text-gray-500">Fim Realizado</Label>
+                      <Label className="text-muted-foreground">Fim Realizado</Label>
                       <Input
                         type="datetime-local"
                         value={editForm.actual_end}
                         min={editForm.actual_start}
                         onChange={(e) => setEditForm({ ...editForm, actual_end: e.target.value })}
-                        className="mt-1 h-8 text-xs"
+                        className="mt-1 h-8 text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert"
                       />
                     </div>
                   </>
@@ -1206,8 +1216,8 @@ export default function ChamadosManutencao() {
               </div>
 
               {selectedTicket.photos?.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <Label className="text-gray-500 mb-2 block">Anexos / Fotos</Label>
+                <div className="mt-4 pt-4 border-t border-border">
+                  <Label className="text-muted-foreground mb-2 block">Anexos / Fotos</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {selectedTicket.photos.map((url: string, idx: number) => (
                       <a key={idx} href={url} target="_blank" rel="noreferrer">

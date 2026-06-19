@@ -760,27 +760,27 @@ export function TaskDetailsSheet({
       return (
         <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
           <div className="text-center mb-6">
-            <h4 className="font-bold text-xl text-slate-800">Iniciar Auditoria</h4>
-            <p className="text-sm text-slate-500">
+            <h4 className="font-bold text-xl text-foreground">Iniciar Auditoria</h4>
+            <p className="text-sm text-muted-foreground">
               Confirme a data e os participantes antes de começar.
             </p>
           </div>
           <div className="space-y-2">
-            <Label className="text-slate-700">Data de Realização *</Label>
+            <Label className="text-foreground">Data de Realização *</Label>
             <Input
               type="date"
               value={auditRealizationDate}
               onChange={(e) => setAuditRealizationDate(e.target.value)}
-              className="border-slate-200 bg-slate-50 h-12"
+              className="border-input bg-background h-12"
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-slate-700">Participantes (Opcional)</Label>
+            <Label className="text-foreground">Participantes (Opcional)</Label>
             <Input
               value={auditParticipants}
               onChange={(e) => setAuditParticipants(e.target.value)}
               placeholder="Nomes dos participantes separados por vírgula"
-              className="border-slate-200 bg-slate-50 h-12"
+              className="border-input bg-background h-12"
             />
           </div>
           <Button onClick={handleNextStep} className="w-full h-12 mt-6 text-lg" variant="tech">
@@ -797,15 +797,15 @@ export function TaskDetailsSheet({
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-bold text-brand-deepBlue bg-brand-deepBlue/10 px-3 py-1 rounded-full">
+          <span className="text-sm font-bold text-brand-deepBlue dark:text-brand-vividBlue bg-brand-deepBlue/10 px-3 py-1 rounded-full">
             Ação {wizardStep} de {auditActions.length}
           </span>
-          <Badge variant="outline" className="border-slate-200 text-slate-500">
+          <Badge variant="outline" className="border-border text-muted-foreground">
             {auditExecution.audits?.title}
           </Badge>
         </div>
 
-        <h3 className="text-xl font-bold text-slate-800 leading-snug">
+        <h3 className="text-xl font-bold text-foreground leading-snug">
           {action.title}
           {action.evidence_required && (
             <span className="block mt-1 text-red-500 text-xs font-bold tracking-wide">
@@ -816,7 +816,7 @@ export function TaskDetailsSheet({
 
         <div className="space-y-6 pt-2">
           <div>
-            <Label className="mb-3 block text-slate-700">Pontuação (1 a 5) *</Label>
+            <Label className="mb-3 block text-foreground">Pontuação (1 a 5) *</Label>
             <div className="flex gap-2 sm:gap-3">
               {[1, 2, 3, 4, 5].map((score) => (
                 <Button
@@ -827,7 +827,7 @@ export function TaskDetailsSheet({
                     'flex-1 h-14 text-xl font-black rounded-xl transition-all',
                     ans.score === score
                       ? 'bg-brand-deepBlue text-white scale-[1.02] shadow-md border-transparent'
-                      : 'text-slate-600 border-slate-200 hover:border-brand-deepBlue/50 hover:bg-brand-deepBlue/5',
+                      : 'text-muted-foreground border-border hover:border-brand-deepBlue/50 hover:bg-brand-deepBlue/5',
                   )}
                   onClick={() => {
                     setAuditAnswers({
@@ -848,8 +848,8 @@ export function TaskDetailsSheet({
             )}
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <Label className="mb-2 block text-slate-700">
+          <div className="bg-muted/50 p-4 rounded-xl border border-border">
+            <Label className="mb-2 block text-foreground">
               Anexar Evidência {action.evidence_required ? '(Obrigatória)' : '(Opcional)'}
             </Label>
             <div className="relative">
@@ -857,12 +857,12 @@ export function TaskDetailsSheet({
                 type="file"
                 accept="image/*,.pdf"
                 onChange={(e) => handleEvidenceUpload(action.id, e.target.files?.[0])}
-                className="bg-white border-slate-200 cursor-pointer file:cursor-pointer"
+                className="bg-background border-input cursor-pointer file:cursor-pointer"
                 disabled={ans.uploading}
               />
             </div>
             {ans.uploading && (
-              <span className="text-xs text-brand-deepBlue mt-2 flex items-center font-medium">
+              <span className="text-xs text-brand-deepBlue dark:text-brand-vividBlue mt-2 flex items-center font-medium">
                 <Loader2 className="w-3 h-3 animate-spin mr-1" /> Enviando arquivo...
               </span>
             )}
@@ -872,7 +872,7 @@ export function TaskDetailsSheet({
                   href={ans.evidence_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-green-600 text-sm flex items-center font-medium hover:underline bg-green-50 w-fit px-3 py-1.5 rounded-lg border border-green-100"
+                  className="text-green-600 dark:text-green-400 text-sm flex items-center font-medium hover:underline bg-green-500/10 w-fit px-3 py-1.5 rounded-lg border border-green-500/20"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" /> Ver arquivo anexado
                 </a>
@@ -881,7 +881,7 @@ export function TaskDetailsSheet({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleRemoveEvidence(action.id)}
-                  className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                  className="h-8 text-red-500 hover:text-red-700 hover:bg-red-500/10 px-2"
                 >
                   <X className="w-4 h-4 mr-1" />
                   Remover
@@ -891,7 +891,7 @@ export function TaskDetailsSheet({
           </div>
 
           <div>
-            <Label className="mb-2 block text-slate-700">Observações (Opcional)</Label>
+            <Label className="mb-2 block text-foreground">Observações (Opcional)</Label>
             <Textarea
               value={ans.observations || ''}
               onChange={(e) =>
@@ -902,17 +902,17 @@ export function TaskDetailsSheet({
               }
               onBlur={(e) => saveAnswerToDb(action.id, { observations: e.target.value })}
               placeholder="Adicione detalhes ou justificativas sobre esta ação..."
-              className="resize-none h-24 bg-slate-50 border-slate-200"
+              className="resize-none h-24 bg-background border-input"
             />
           </div>
         </div>
 
-        <div className="flex justify-between pt-6 mt-6 border-t border-slate-100">
+        <div className="flex justify-between pt-6 mt-6 border-t border-border">
           <Button
             type="button"
             variant="outline"
             onClick={() => setWizardStep(wizardStep - 1)}
-            className="h-12 px-6 border-slate-200 text-slate-600 hover:bg-slate-50"
+            className="h-12 px-6 border-border text-muted-foreground hover:bg-accent"
           >
             <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
@@ -937,39 +937,44 @@ export function TaskDetailsSheet({
   return (
     <>
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-full p-0 bg-slate-50 border-l border-gray-200">
-          <SheetHeader className="p-6 pb-4 bg-white border-b border-gray-200 shrink-0">
-            <SheetTitle className="text-xl text-slate-800">
+        <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-full p-0 bg-background border-l border-border">
+          <SheetHeader className="p-6 pb-4 bg-card border-b border-border shrink-0">
+            <SheetTitle className="text-xl text-foreground">
               {task?.task_number} {task?.title ? `- ${task.title}` : ''}
             </SheetTitle>
-            <div className="text-sm text-slate-500 mt-1">
+            <div className="text-sm text-muted-foreground mt-1">
               Aberto por{' '}
-              <span className="font-medium text-slate-700">
+              <span className="font-medium text-foreground">
                 {getAssigneeName(task?.requester_id)}
               </span>{' '}
               para{' '}
-              <span className="font-medium text-slate-700">
+              <span className="font-medium text-foreground">
                 {getAssigneeName(task?.assignee_id)}
               </span>
             </div>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-slate-800">Descrição</h4>
+                <h4 className="font-semibold text-foreground">Descrição</h4>
                 {task?.due_date && (
-                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                  <Badge
+                    variant="outline"
+                    className="bg-amber-500/10 text-amber-600 border-amber-500/20"
+                  >
                     Data Limite (SLA): {format(new Date(task.due_date), 'dd/MM/yyyy')}
                   </Badge>
                 )}
               </div>
-              <p className="text-slate-600 text-sm whitespace-pre-wrap">{task?.description}</p>
+              <p className="text-muted-foreground text-sm whitespace-pre-wrap">
+                {task?.description}
+              </p>
 
               {/* Participantes Section */}
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
-                  <h5 className="text-sm font-medium text-slate-700">Participantes</h5>
+                  <h5 className="text-sm font-medium text-foreground">Participantes</h5>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -1007,7 +1012,9 @@ export function TaskDetailsSheet({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {!task?.participants_ids || task.participants_ids.length === 0 ? (
-                    <span className="text-xs text-slate-500">Nenhum participante adicionado.</span>
+                    <span className="text-xs text-muted-foreground">
+                      Nenhum participante adicionado.
+                    </span>
                   ) : (
                     task.participants_ids.map((id: string) => {
                       const user = users.find((u: any) => u.id === id)
@@ -1016,13 +1023,13 @@ export function TaskDetailsSheet({
                         <Badge
                           key={id}
                           variant="secondary"
-                          className="pl-1.5 pr-1 py-0.5 flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                          className="pl-1.5 pr-1 py-0.5 flex items-center gap-1 bg-muted text-foreground hover:bg-accent border border-border"
                         >
-                          <User className="w-3 h-3 text-slate-400" />
+                          <User className="w-3 h-3 text-muted-foreground" />
                           {user.name}
                           <button
                             onClick={() => handleParticipantChange(id, false)}
-                            className="ml-1 rounded-full p-0.5 hover:bg-slate-300 transition-colors text-slate-500"
+                            className="ml-1 rounded-full p-0.5 hover:bg-accent-foreground/20 transition-colors text-muted-foreground"
                             disabled={auditExecution && auditExecution.status === 'Finalizado'}
                           >
                             <X className="w-3 h-3" />
@@ -1035,9 +1042,9 @@ export function TaskDetailsSheet({
               </div>
 
               {/* Anexos Section */}
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
-                  <h5 className="text-sm font-medium text-slate-700">Anexos</h5>
+                  <h5 className="text-sm font-medium text-foreground">Anexos</h5>
                   {canAddAttachment && (
                     <div className="relative">
                       <Input
@@ -1073,7 +1080,7 @@ export function TaskDetailsSheet({
                 </div>
 
                 {attachmentUrls.length === 0 && !isUploadingAttachment ? (
-                  <span className="text-xs text-slate-500">Nenhum anexo adicionado.</span>
+                  <span className="text-xs text-muted-foreground">Nenhum anexo adicionado.</span>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {attachmentUrls.map((url, i) => {
@@ -1085,22 +1092,22 @@ export function TaskDetailsSheet({
                       return (
                         <div
                           key={i}
-                          className="flex items-center p-2 rounded-lg bg-slate-50 border border-slate-200 group"
+                          className="flex items-center p-2 rounded-lg bg-muted/50 border border-border group"
                         >
                           <a
                             href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center flex-1 text-sm text-brand-deepBlue hover:underline"
+                            className="flex items-center flex-1 text-sm text-brand-deepBlue dark:text-brand-vividBlue hover:underline"
                           >
-                            <Paperclip className="w-4 h-4 mr-3 shrink-0 text-slate-400 group-hover:text-brand-deepBlue" />
+                            <Paperclip className="w-4 h-4 mr-3 shrink-0 text-muted-foreground group-hover:text-brand-deepBlue dark:group-hover:text-brand-vividBlue" />
                             <span className="truncate">{fileName}</span>
                           </a>
                           {canDeleteAttachment && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0 ml-2"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 shrink-0 ml-2"
                               onClick={() => handleDeleteAttachment(url)}
                               title="Excluir anexo"
                             >
@@ -1116,9 +1123,9 @@ export function TaskDetailsSheet({
             </div>
 
             {auditExecution && wizardStep >= 0 && (
-              <div className="bg-white p-6 rounded-2xl border border-brand-deepBlue/20 shadow-md relative overflow-hidden">
+              <div className="bg-card p-6 rounded-2xl border border-border shadow-md relative overflow-hidden">
                 {wizardStep > 0 && (
-                  <div className="absolute top-0 left-0 h-1.5 bg-slate-100 w-full">
+                  <div className="absolute top-0 left-0 h-1.5 bg-secondary w-full">
                     <div
                       className="h-full bg-brand-vividBlue transition-all duration-500 ease-in-out"
                       style={{ width: `${(wizardStep / auditActions.length) * 100}%` }}
@@ -1130,53 +1137,56 @@ export function TaskDetailsSheet({
             )}
 
             {auditExecution && auditExecution.status === 'Finalizado' && (
-              <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in">
+              <div className="mt-6 p-6 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in">
                 <div>
-                  <span className="font-bold text-green-900 text-lg flex items-center">
-                    <CheckCircle className="w-5 h-5 mr-2 text-green-600" /> Auditoria Finalizada
+                  <span className="font-bold text-green-600 dark:text-green-400 text-lg flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />{' '}
+                    Auditoria Finalizada
                   </span>
-                  <p className="text-sm text-green-700 mt-1">
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
                     As respostas foram salvas e enviadas com sucesso.
                   </p>
                 </div>
-                <div className="text-right bg-white px-4 py-2 rounded-lg border border-green-100 shadow-sm">
-                  <span className="block text-[10px] text-green-600 font-bold uppercase tracking-wider mb-0.5">
+                <div className="text-right bg-card px-4 py-2 rounded-lg border border-green-500/20 shadow-sm">
+                  <span className="block text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider mb-0.5">
                     Score Obtido
                   </span>
-                  <span className="text-3xl font-black text-green-900">
+                  <span className="text-3xl font-black text-green-600 dark:text-green-400">
                     {auditExecution.final_score}{' '}
-                    <span className="text-lg text-green-700">/ {auditExecution.max_score}</span>
+                    <span className="text-lg text-green-600 dark:text-green-400">
+                      / {auditExecution.max_score}
+                    </span>
                   </span>
                 </div>
               </div>
             )}
 
             <div className="space-y-4 pt-4">
-              <h4 className="font-semibold text-slate-800">Linha do Tempo</h4>
+              <h4 className="font-semibold text-foreground">Linha do Tempo</h4>
               {loading ? (
                 <div className="flex justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
               ) : timeline.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">
+                <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhuma interação registrada.
                 </p>
               ) : (
                 timeline.map((event: any) => (
                   <div key={event.id} className="flex gap-3">
                     <div className="w-8 h-8 rounded-full bg-brand-deepBlue/10 flex items-center justify-center shrink-0">
-                      <User className="w-4 h-4 text-brand-deepBlue" />
+                      <User className="w-4 h-4 text-brand-deepBlue dark:text-brand-vividBlue" />
                     </div>
-                    <div className="flex-1 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+                    <div className="flex-1 bg-card p-3 rounded-xl border border-border shadow-sm">
                       <div className="flex justify-between items-start mb-1">
-                        <span className="font-semibold text-sm text-slate-800">
+                        <span className="font-semibold text-sm text-foreground">
                           {event.user?.name || 'Usuário'}
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           {format(new Date(event.created_at), 'dd/MM HH:mm')}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-700 mt-1 font-medium">{event.content}</p>
+                      <p className="text-sm text-foreground mt-1 font-medium">{event.content}</p>
                     </div>
                   </div>
                 ))
@@ -1184,11 +1194,11 @@ export function TaskDetailsSheet({
             </div>
           </div>
 
-          <div className="p-4 bg-white border-t border-gray-200 space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+          <div className="p-4 bg-card border-t border-border space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                  <span className="text-sm font-semibold text-foreground whitespace-nowrap">
                     Alterar Status:
                   </span>
                   <Select
@@ -1196,7 +1206,7 @@ export function TaskDetailsSheet({
                     onValueChange={handleStatusChange}
                     disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                   >
-                    <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px]">
+                    <SelectTrigger className="bg-background border-input min-w-[140px]">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1217,7 +1227,7 @@ export function TaskDetailsSheet({
 
                 {canDelegate && (
                   <div className="flex items-center gap-4">
-                    <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                    <span className="text-sm font-semibold text-foreground whitespace-nowrap">
                       Delegar para:
                     </span>
                     <Select
@@ -1225,7 +1235,7 @@ export function TaskDetailsSheet({
                       onValueChange={handleDelegate}
                       disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                     >
-                      <SelectTrigger className="bg-slate-50 border-slate-200 min-w-[140px] max-w-[200px]">
+                      <SelectTrigger className="bg-background border-input min-w-[140px] max-w-[200px]">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1242,7 +1252,7 @@ export function TaskDetailsSheet({
               {canDeleteTask && (
                 <Button
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  className="text-red-600 border-red-200 hover:bg-red-500/10 hover:text-red-700 dark:border-red-500/30 dark:hover:text-red-400"
                   onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                 >
@@ -1255,7 +1265,7 @@ export function TaskDetailsSheet({
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Adicione um comentário ou atualização..."
-                className="resize-none h-10 min-h-[44px] bg-slate-50 border-slate-200"
+                className="resize-none h-10 min-h-[44px] bg-background border-input"
               />
               <Button
                 onClick={handleAddComment}
@@ -1280,7 +1290,7 @@ export function TaskDetailsSheet({
             <AlertDialogTitle>Confirmar Envio</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja enviar esta auditoria? Após o envio,{' '}
-              <strong className="text-slate-800">as respostas não poderão ser editadas</strong> e o
+              <strong className="text-foreground">as respostas não poderão ser editadas</strong> e o
               status será alterado para Finalizado.
               <br />
               <br />

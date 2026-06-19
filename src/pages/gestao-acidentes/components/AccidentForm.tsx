@@ -311,7 +311,12 @@ export function AccidentForm({ initialData }: { initialData?: any }) {
                 required
               />
             </div>
-            <Button type="submit">Salvar Dados</Button>
+            <Button
+              type="submit"
+              className="w-full sm:w-auto font-semibold bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background transition-all disabled:opacity-50 disabled:pointer-events-none shadow-sm"
+            >
+              Salvar Dados
+            </Button>
           </form>
         </CardContent>
       </Card>

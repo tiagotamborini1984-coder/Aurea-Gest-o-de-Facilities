@@ -357,13 +357,16 @@ export default function AuditoriaRealizadas() {
                             'completed',
                           ].includes(audit.status?.toLowerCase() || '') ||
                           (audit.final_score !== null && audit.realization_date !== null) ? (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                            <Badge
+                              variant="default"
+                              className="bg-green-600 text-white hover:bg-green-700 border-transparent"
+                            >
                               Finalizada
                             </Badge>
                           ) : (
                             <Badge
                               variant="secondary"
-                              className="bg-yellow-500 text-white hover:bg-yellow-600"
+                              className="bg-yellow-500 text-white hover:bg-yellow-600 border-transparent"
                             >
                               Em Andamento
                             </Badge>
@@ -371,12 +374,12 @@ export default function AuditoriaRealizadas() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={
+                            className={
                               scorePercentage >= 80
-                                ? 'default'
+                                ? 'bg-green-600 text-white hover:bg-green-700 border-transparent'
                                 : scorePercentage >= 50
-                                  ? 'secondary'
-                                  : 'destructive'
+                                  ? 'bg-yellow-500 text-white hover:bg-yellow-600 border-transparent'
+                                  : 'bg-red-600 text-white hover:bg-red-700 border-transparent'
                             }
                           >
                             {audit.final_score || 0} / {audit.max_score || 0} (
@@ -416,7 +419,7 @@ export default function AuditoriaRealizadas() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setDeleteId(audit.id)}
-                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
                                 <Trash2 className="h-4 w-4" />
                                 <span className="sr-only">Excluir</span>

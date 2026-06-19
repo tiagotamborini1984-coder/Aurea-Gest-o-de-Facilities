@@ -138,11 +138,9 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
         const insights = {
           critical: criticalCC
             ? { cc: criticalCC, pct: (maxOver - 100).toFixed(1), account: criticalAcc }
-            : { cc: '1000adm', pct: '1021.7', account: 'IPTU' },
-          warning: warningCC
-            ? { cc: warningCC, pct: warnPct.toFixed(1) }
-            : { cc: '1001adm', pct: '98.1' },
-          forecast: totalRealized > 0 ? totalRealized * 1.05 : 3243970.42,
+            : null,
+          warning: warningCC ? { cc: warningCC, pct: warnPct.toFixed(1) } : null,
+          forecast: totalRealized > 0 ? totalRealized * 1.05 : 0,
         }
 
         setData({

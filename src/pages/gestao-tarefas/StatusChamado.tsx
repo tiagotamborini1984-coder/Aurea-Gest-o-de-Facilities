@@ -59,7 +59,7 @@ export default function StatusChamado() {
               render: (item: any) => (
                 <span className="flex items-center gap-2">
                   <span
-                    className="w-4 h-4 rounded-full border border-gray-200 shadow-sm"
+                    className="w-4 h-4 rounded-full border border-border shadow-sm"
                     style={{ backgroundColor: item.color }}
                   ></span>
                   {item.color}
