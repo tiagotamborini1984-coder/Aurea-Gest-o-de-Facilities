@@ -244,11 +244,11 @@ export default function Lancamentos() {
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in-up">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             <FileText className="h-8 w-8 text-brand-vividBlue" />
             {isReadOnlyProfile ? 'Painel de Lançamentos' : 'Lançamentos (Orçado vs Realizado)'}
           </h1>
-          <p className="text-slate-500 mt-2 text-base">
+          <p className="text-muted-foreground mt-2 text-base">
             {isReadOnlyProfile
               ? 'Visualize os valores previstos e executados por conta em cada centro de custo.'
               : 'Insira os valores previstos e executados ou visualize o consolidado.'}
@@ -256,8 +256,8 @@ export default function Lancamentos() {
         </div>
 
         {profile?.role === 'Master' && (
-          <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm w-full md:w-auto">
-            <Building2 className="h-5 w-5 text-slate-400 ml-2 shrink-0" />
+          <div className="flex items-center gap-3 bg-card p-2 rounded-lg border border-border shadow-sm w-full md:w-auto">
+            <Building2 className="h-5 w-5 text-muted-foreground ml-2 shrink-0" />
             <Select value={selectedClient} onValueChange={setSelectedClient}>
               <SelectTrigger className="w-full md:w-[280px] border-0 shadow-none focus:ring-0 text-base h-10 bg-transparent">
                 <SelectValue placeholder="Selecione um cliente..." />
@@ -274,30 +274,30 @@ export default function Lancamentos() {
         )}
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="pb-5 border-b bg-slate-50/50">
+      <Card className="shadow-sm">
+        <CardHeader className="pb-5 border-b bg-muted/50">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="space-y-3">
-              <Label className="text-slate-700 font-bold text-base">Mês(es) de Referência</Label>
+              <Label className="text-foreground font-bold text-base">Mês(es) de Referência</Label>
               <div className="flex items-center gap-3">
                 <Input
                   type="month"
                   value={tempMonth}
                   onChange={(e) => setTempMonth(e.target.value)}
-                  className="w-[180px] bg-white h-11 text-base border-slate-300"
+                  className="w-[180px] bg-background h-11 text-base border-input"
                 />
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   onClick={addMonth}
                   disabled={!tempMonth || selectedMonths.includes(tempMonth)}
-                  className="bg-white border-slate-300 hover:bg-slate-100 text-slate-700 h-11 px-5"
+                  className="bg-background border-input hover:bg-accent hover:text-accent-foreground h-11 px-5"
                 >
                   Adicionar
                 </Button>
               </div>
               {selectedMonths.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4 p-4 rounded-lg bg-white border border-slate-200 shadow-sm min-h-[60px] items-center">
+                <div className="flex flex-wrap gap-2 mt-4 p-4 rounded-lg bg-background border border-border shadow-sm min-h-[60px] items-center">
                   {selectedMonths.map((m) => {
                     const [year, month] = m.split('-')
                     return (
@@ -322,18 +322,18 @@ export default function Lancamentos() {
             </div>
 
             <div className="space-y-3">
-              <Label className="text-slate-700 font-bold text-base">Centros de Custo</Label>
+              <Label className="text-foreground font-bold text-base">Centros de Custo</Label>
               <Popover open={ccPopoverOpen} onOpenChange={setCcPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={ccPopoverOpen}
-                    className="w-full justify-between bg-white h-auto min-h-[60px] py-3 px-4 border-slate-300 text-base"
+                    className="w-full justify-between bg-background h-auto min-h-[60px] py-3 px-4 border-input text-base"
                   >
                     <div className="flex flex-wrap gap-2 items-center text-left flex-1">
                       {selectedCCs.length === 0 ? (
-                        <span className="text-slate-500 font-normal">
+                        <span className="text-muted-foreground font-normal">
                           Selecione os centros de custo...
                         </span>
                       ) : selectedCCs.length <= 3 ? (
@@ -343,7 +343,7 @@ export default function Lancamentos() {
                             <Badge
                               variant="secondary"
                               key={id}
-                              className="font-normal bg-slate-100 text-slate-800 hover:bg-slate-200 py-1.5 px-3 text-[15px]"
+                              className="font-normal bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 px-3 text-[15px]"
                             >
                               {c.code ? `${c.code} - ` : ''}
                               {c.name}
@@ -353,7 +353,7 @@ export default function Lancamentos() {
                       ) : (
                         <Badge
                           variant="secondary"
-                          className="font-normal bg-slate-100 text-slate-800 py-1.5 px-3 text-[15px]"
+                          className="font-normal bg-secondary text-secondary-foreground py-1.5 px-3 text-[15px]"
                         >
                           {selectedCCs.length} centros selecionados
                         </Badge>
@@ -388,15 +388,15 @@ export default function Lancamentos() {
                                   'mr-4 flex h-5 w-5 items-center justify-center rounded-sm border',
                                   isSelected
                                     ? 'bg-brand-vividBlue border-brand-vividBlue text-white'
-                                    : 'border-slate-300 opacity-50 [&_svg]:invisible',
+                                    : 'border-input opacity-50 [&_svg]:invisible',
                                 )}
                               >
                                 <Check className="h-4 w-4" />
                               </div>
-                              <span className="font-medium text-slate-800">
+                              <span className="font-medium text-foreground">
                                 {cc.code ? `${cc.code} - ` : ''}
                               </span>
-                              <span className="text-slate-600 ml-1">{cc.name}</span>
+                              <span className="text-muted-foreground ml-1">{cc.name}</span>
                             </CommandItem>
                           )
                         })}
@@ -408,18 +408,20 @@ export default function Lancamentos() {
             </div>
 
             <div className="space-y-3">
-              <Label className="text-slate-700 font-bold text-base">Contas Contábeis</Label>
+              <Label className="text-foreground font-bold text-base">Contas Contábeis</Label>
               <Popover open={accPopoverOpen} onOpenChange={setAccPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={accPopoverOpen}
-                    className="w-full justify-between bg-white h-auto min-h-[60px] py-3 px-4 border-slate-300 text-base"
+                    className="w-full justify-between bg-background h-auto min-h-[60px] py-3 px-4 border-input text-base"
                   >
                     <div className="flex flex-wrap gap-2 items-center text-left flex-1">
                       {selectedAccounts.length === 0 ? (
-                        <span className="text-slate-500 font-normal">Todas as contas...</span>
+                        <span className="text-muted-foreground font-normal">
+                          Todas as contas...
+                        </span>
                       ) : selectedAccounts.length <= 3 ? (
                         selectedAccounts.map((id) => {
                           const a = accounts.find((x) => x.id === id)
@@ -427,7 +429,7 @@ export default function Lancamentos() {
                             <Badge
                               variant="secondary"
                               key={id}
-                              className="font-normal bg-slate-100 text-slate-800 hover:bg-slate-200 py-1.5 px-3 text-[15px]"
+                              className="font-normal bg-secondary text-secondary-foreground hover:bg-secondary/80 py-1.5 px-3 text-[15px]"
                             >
                               {a.code ? `${a.code} - ` : ''}
                               {a.name}
@@ -437,7 +439,7 @@ export default function Lancamentos() {
                       ) : (
                         <Badge
                           variant="secondary"
-                          className="font-normal bg-slate-100 text-slate-800 py-1.5 px-3 text-[15px]"
+                          className="font-normal bg-secondary text-secondary-foreground py-1.5 px-3 text-[15px]"
                         >
                           {selectedAccounts.length} contas selecionadas
                         </Badge>
@@ -474,15 +476,15 @@ export default function Lancamentos() {
                                   'mr-4 flex h-5 w-5 items-center justify-center rounded-sm border',
                                   isSelected
                                     ? 'bg-brand-vividBlue border-brand-vividBlue text-white'
-                                    : 'border-slate-300 opacity-50 [&_svg]:invisible',
+                                    : 'border-input opacity-50 [&_svg]:invisible',
                                 )}
                               >
                                 <Check className="h-4 w-4" />
                               </div>
-                              <span className="font-medium text-slate-800">
+                              <span className="font-medium text-foreground">
                                 {acc.code ? `${acc.code} - ` : ''}
                               </span>
-                              <span className="text-slate-600 ml-1">{acc.name}</span>
+                              <span className="text-muted-foreground ml-1">{acc.name}</span>
                             </CommandItem>
                           )
                         })}
@@ -497,13 +499,13 @@ export default function Lancamentos() {
 
         <CardContent className="p-0">
           {!activeClientId ? (
-            <div className="py-20 text-center text-slate-500 bg-slate-50/30">
-              <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <div className="py-20 text-center text-muted-foreground bg-muted/30">
+              <Building2 className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-lg">Selecione um cliente para visualizar os lançamentos.</p>
             </div>
           ) : selectedCCs.length === 0 || selectedMonths.length === 0 ? (
-            <div className="py-20 text-center text-slate-500 bg-slate-50/30">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <div className="py-20 text-center text-muted-foreground bg-muted/30">
+              <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-lg">
                 Selecione ao menos um Mês e um Centro de Custo
                 <br />
@@ -511,23 +513,23 @@ export default function Lancamentos() {
               </p>
             </div>
           ) : loading ? (
-            <div className="py-20 text-center flex justify-center bg-slate-50/30">
+            <div className="py-20 text-center flex justify-center bg-muted/30">
               <Loader2 className="h-10 w-10 animate-spin text-brand-vividBlue" />
             </div>
           ) : accounts.length === 0 ? (
-            <div className="py-20 text-center text-slate-500 bg-slate-50/30">
+            <div className="py-20 text-center text-muted-foreground bg-muted/30">
               <p className="text-lg">Nenhuma conta contábil cadastrada.</p>
             </div>
           ) : (
             <div className="flex flex-col">
               {isMultiSelection && !isReadOnlyProfile && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-5 m-5 rounded-md flex items-start shadow-sm animate-fade-in">
+                <div className="bg-blue-50 dark:bg-blue-950/50 border-l-4 border-blue-500 p-5 m-5 rounded-md flex items-start shadow-sm animate-fade-in">
                   <AlertTriangle className="h-6 w-6 text-blue-600 mr-4 mt-0.5 shrink-0" />
                   <div>
-                    <h3 className="text-blue-900 font-bold text-[17px]">
+                    <h3 className="text-blue-900 dark:text-blue-200 font-bold text-[17px]">
                       Modo de Visualização Consolidada
                     </h3>
-                    <p className="text-blue-800/90 text-[15px] mt-1.5">
+                    <p className="text-blue-800/90 dark:text-blue-300 text-[15px] mt-1.5">
                       Você selecionou múltiplos centros de custo ou meses. A edição de valores está
                       desabilitada para exibir a soma dos valores agregados.
                     </p>
@@ -537,43 +539,43 @@ export default function Lancamentos() {
 
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-200/60 border-b-2 border-slate-300">
-                    <TableHead className="pl-6 font-bold text-slate-800 py-5 text-[15px]">
+                  <TableRow className="bg-muted/60 border-b-2 border-border">
+                    <TableHead className="pl-6 font-bold text-foreground py-5 text-[15px]">
                       Conta Contábil
                     </TableHead>
                     <TableHead className="w-[200px] text-right font-semibold py-5">
-                      <div className="text-slate-800 mb-2 text-[15px] uppercase tracking-wider">
+                      <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
                         Orçado
                       </div>
-                      <div className="text-[15px] font-bold text-slate-800 bg-white px-3 py-1.5 rounded-md shadow-sm border border-slate-300 inline-block">
+                      <div className="text-[15px] font-bold text-foreground bg-background px-3 py-1.5 rounded-md shadow-sm border border-border inline-block">
                         {formatCurrency(totals.budgeted)}
                       </div>
                     </TableHead>
                     <TableHead className="w-[200px] text-right font-semibold py-5">
-                      <div className="text-slate-800 mb-2 text-[15px] uppercase tracking-wider">
+                      <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
                         Realizado
                       </div>
                       <div
                         className={cn(
                           'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
                           totals.realized > totals.budgeted
-                            ? 'text-red-800 bg-red-100 border-red-300'
-                            : 'text-slate-800 bg-white border-slate-300',
+                            ? 'text-red-800 bg-red-100 border-red-300 dark:text-red-200 dark:bg-red-900/30 dark:border-red-800'
+                            : 'text-foreground bg-background border-border',
                         )}
                       >
                         {formatCurrency(totals.realized)}
                       </div>
                     </TableHead>
                     <TableHead className="w-[200px] pr-6 text-right font-semibold py-5">
-                      <div className="text-slate-800 mb-2 text-[15px] uppercase tracking-wider">
+                      <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
                         Diferença
                       </div>
                       <div
                         className={cn(
                           'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
                           totalDifference < 0
-                            ? 'text-red-800 bg-red-100 border-red-300'
-                            : 'text-emerald-800 bg-emerald-100 border-emerald-300',
+                            ? 'text-red-800 bg-red-100 border-red-300 dark:text-red-200 dark:bg-red-900/30 dark:border-red-800'
+                            : 'text-emerald-800 bg-emerald-100 border-emerald-300 dark:text-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800',
                         )}
                       >
                         {formatCurrency(totalDifference)}
@@ -592,22 +594,26 @@ export default function Lancamentos() {
                       <TableRow
                         key={acc.id}
                         className={cn(
-                          'transition-colors border-b border-slate-200',
+                          'transition-colors border-b border-border',
                           isNegative
-                            ? 'bg-red-50 hover:bg-red-100' // Destacando em vermelho a linha
+                            ? 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30' // Destacando em vermelho a linha
                             : idx % 2 === 0
-                              ? 'bg-white hover:bg-slate-50' // Zebra clara
-                              : 'bg-slate-100 hover:bg-slate-200', // Zebra escura
+                              ? 'bg-background hover:bg-muted/50' // Zebra clara
+                              : 'bg-muted/30 hover:bg-muted/70', // Zebra escura
                         )}
                       >
                         <TableCell
                           className={cn(
                             'pl-6 font-medium text-[15px] py-4',
-                            isNegative ? 'text-red-900 font-bold' : 'text-slate-800',
+                            isNegative
+                              ? 'text-red-900 dark:text-red-400 font-bold'
+                              : 'text-foreground',
                           )}
                         >
                           {acc.code && (
-                            <span className="text-slate-500 mr-2 font-normal">{acc.code}</span>
+                            <span className="text-muted-foreground mr-2 font-normal">
+                              {acc.code}
+                            </span>
                           )}
                           {acc.name}
                         </TableCell>
@@ -616,7 +622,9 @@ export default function Lancamentos() {
                             <span
                               className={cn(
                                 'font-mono text-base block py-2',
-                                isNegative ? 'text-red-900/80 font-medium' : 'text-slate-700',
+                                isNegative
+                                  ? 'text-red-900/80 dark:text-red-400/80 font-medium'
+                                  : 'text-muted-foreground',
                               )}
                             >
                               {formatCurrency(budgeted)}
@@ -628,7 +636,7 @@ export default function Lancamentos() {
                               value={entries[acc.id]?.budgeted ?? ''}
                               onChange={(e) => updateEntry(acc.id, 'budgeted', e.target.value)}
                               placeholder="0.00"
-                              className="text-right font-mono text-base h-11 bg-white/70 focus:bg-white shadow-none border-slate-300"
+                              className="text-right font-mono text-base h-11 bg-background/70 focus:bg-background shadow-none border-input"
                             />
                           )}
                         </TableCell>
@@ -637,7 +645,9 @@ export default function Lancamentos() {
                             <span
                               className={cn(
                                 'font-mono text-base block py-2',
-                                isNegative ? 'text-red-700 font-bold' : 'text-slate-700',
+                                isNegative
+                                  ? 'text-red-700 dark:text-red-400 font-bold'
+                                  : 'text-foreground',
                               )}
                             >
                               {formatCurrency(realized)}
@@ -652,8 +662,8 @@ export default function Lancamentos() {
                               className={cn(
                                 'text-right font-mono text-base h-11 shadow-none',
                                 isNegative
-                                  ? 'bg-red-100 border-red-300 text-red-900 font-bold placeholder:text-red-400 focus:bg-red-50 focus:border-red-400'
-                                  : 'bg-white/70 border-slate-300 focus:bg-white',
+                                  ? 'bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-800 text-red-900 dark:text-red-400 font-bold placeholder:text-red-400 dark:placeholder:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/40 focus:border-red-400 dark:focus:border-red-600'
+                                  : 'bg-background/70 border-input focus:bg-background',
                               )}
                             />
                           )}
@@ -663,8 +673,8 @@ export default function Lancamentos() {
                             className={cn(
                               'font-mono text-base block py-2',
                               isNegative
-                                ? 'text-red-700 font-bold'
-                                : 'text-emerald-700 font-semibold',
+                                ? 'text-red-700 dark:text-red-400 font-bold'
+                                : 'text-emerald-700 dark:text-emerald-400 font-semibold',
                             )}
                           >
                             {formatCurrency(difference)}
@@ -682,7 +692,7 @@ export default function Lancamentos() {
           selectedMonths.length > 0 &&
           filteredAccounts.length > 0 &&
           !isReadOnly && (
-            <div className="p-6 bg-slate-50 border-t flex justify-end rounded-b-xl">
+            <div className="p-6 bg-muted/50 border-t border-border flex justify-end rounded-b-xl">
               <Button
                 onClick={handleSave}
                 disabled={saving}
