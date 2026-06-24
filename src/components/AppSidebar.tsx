@@ -311,27 +311,35 @@ export function AppSidebar() {
         } else if (item.title === 'Gestão de Imóveis') {
           filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
         } else if (item.title === 'Gestão de Estoque') {
-          filteredSubItems = item.subItems.filter(
-            (sub: any) =>
-              userMenus.includes('Gestão de Estoque') ||
-              userMenus.includes(`Gestão de Estoque:${sub.title}`) ||
-              role === 'Administrador' ||
-              role === 'Master' ||
-              sub.title === 'Catálogo' ||
-              sub.title === 'Meus Pedidos',
-          )
           if (
-            role !== 'Administrador' &&
-            role !== 'Master' &&
-            !userMenus.includes('Gestão de Estoque:Gestão de Pedidos')
+            !userMenus.includes('Gestão de Estoque') &&
+            !userMenus.some((m: string) => m.startsWith('Gestão de Estoque:'))
           ) {
-            filteredSubItems = filteredSubItems.filter(
-              (s: any) =>
-                s.title !== 'Gestão de Pedidos' &&
-                s.title !== 'Produtos' &&
-                s.title !== 'Áreas' &&
-                s.title !== 'Dashboard',
+            filteredSubItems = []
+          } else {
+            filteredSubItems = item.subItems.filter(
+              (sub: any) =>
+                userMenus.includes('Gestão de Estoque') ||
+                userMenus.includes(`Gestão de Estoque:${sub.title}`) ||
+                role === 'Administrador' ||
+                role === 'Master' ||
+                sub.title === 'Catálogo' ||
+                sub.title === 'Meus Pedidos',
             )
+            if (
+              role !== 'Administrador' &&
+              role !== 'Master' &&
+              !userMenus.includes('Gestão de Estoque') &&
+              !userMenus.includes('Gestão de Estoque:Gestão de Pedidos')
+            ) {
+              filteredSubItems = filteredSubItems.filter(
+                (s: any) =>
+                  s.title !== 'Gestão de Pedidos' &&
+                  s.title !== 'Produtos' &&
+                  s.title !== 'Áreas' &&
+                  s.title !== 'Dashboard',
+              )
+            }
           }
         } else if (item.title === 'Gestão de Lockers') {
           filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []

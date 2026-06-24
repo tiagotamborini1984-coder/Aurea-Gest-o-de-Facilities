@@ -37,6 +37,7 @@ const MAIN_MENUS = [
   'Gestão de Budget',
   'Gestão de Acidentes',
   'Gestão da Manutenção',
+  'Gestão de Estoque',
 ]
 
 const CADASTROS_SUBMENUS = [
@@ -67,6 +68,15 @@ const MANUTENCAO_SUBMENUS = [
   'Planejamento (Agenda)',
   'Manutenção Preventiva',
   'Cadastros',
+]
+
+const ESTOQUE_SUBMENUS = [
+  'Catálogo',
+  'Meus Pedidos',
+  'Gestão de Pedidos',
+  'Produtos',
+  'Áreas',
+  'Dashboard',
 ]
 
 export function CreateUserDialog({
@@ -255,6 +265,14 @@ export function CreateUserDialog({
         next = next.filter((m) => m !== 'Gestão da Manutenção')
         MANUTENCAO_SUBMENUS.forEach((sub) => {
           if (`Gestão da Manutenção:${sub}` !== menu) next.push(`Gestão da Manutenção:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (menu.startsWith('Gestão de Estoque:') && next.includes('Gestão de Estoque')) {
+        next = next.filter((m) => m !== 'Gestão de Estoque')
+        ESTOQUE_SUBMENUS.forEach((sub) => {
+          if (`Gestão de Estoque:${sub}` !== menu) next.push(`Gestão de Estoque:${sub}`)
         })
         return { ...p, accessible_menus: next }
       }
@@ -522,6 +540,29 @@ export function CreateUserDialog({
                             : 'outline'
                         }
                         className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão da Manutenção') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Gestão de Estoque</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {ESTOQUE_SUBMENUS.map((menu) => {
+                    const key = `Gestão de Estoque:${menu}`
+                    return (
+                      <Badge
+                        key={key}
+                        variant={
+                          form.accessible_menus.includes(key) ||
+                          form.accessible_menus.includes('Gestão de Estoque')
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão de Estoque') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}
