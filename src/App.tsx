@@ -123,7 +123,14 @@ const App = () => (
                       <Route path="/admin/clientes" element={<Clientes />} />
                     </Route>
                     <Route element={<AccessGuard />}>
-                      <Route path="/gestao-terceiros" element={<DashboardGestor />} />
+                      <Route
+                        path="/gestao-terceiros"
+                        element={<Navigate to="/gestao-terceiros/dashboard-gestor" replace />}
+                      />
+                      <Route
+                        path="/gestao-terceiros/dashboard-gestor"
+                        element={<DashboardGestor />}
+                      />
                       <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
                       <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
 

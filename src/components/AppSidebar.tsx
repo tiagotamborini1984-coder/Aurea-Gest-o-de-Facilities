@@ -52,7 +52,7 @@ export function AppSidebar() {
       title: 'Gestão de Terceiros',
       icon: Briefcase,
       subItems: [
-        { title: 'Dashboard Gestor', path: '/gestao-terceiros' },
+        { title: 'Dashboard do Gestor', path: '/gestao-terceiros/dashboard-gestor' },
         { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
         { title: 'Treinamentos', path: '/gestao-terceiros/treinamentos' },
         { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
@@ -368,13 +368,19 @@ export function AppSidebar() {
               userMenus.includes(`Auditoria e Checklist:${sub.title}`),
           )
         } else if (item.title === 'Gestão de Terceiros') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
+          filteredSubItems = item.subItems.filter((sub) => {
+            const hasLegacyDashboard =
+              sub.title === 'Dashboard do Gestor' &&
+              (userMenus.includes('Dashboard Gestor') ||
+                userMenus.includes('Gestão de Terceiros:Dashboard Gestor'))
+            return (
               userMenus.includes('Gestão de Terceiros') ||
               userMenus.includes(`Gestão de Terceiros:${sub.title}`) ||
               userMenus.includes(sub.title) ||
-              sub.title === 'Treinamentos',
-          )
+              hasLegacyDashboard ||
+              sub.title === 'Treinamentos'
+            )
+          })
         }
 
         return { ...item, subItems: filteredSubItems }
@@ -412,7 +418,11 @@ export function AppSidebar() {
           {visibleItems.map((item: any) => {
             if (item.subItems) {
               const isSubActive = item.subItems.some((s: any) => {
-                if (s.path === '/gestao-terceiros') return location.pathname === '/gestao-terceiros'
+                if (s.path === '/gestao-terceiros/dashboard-gestor')
+                  return (
+                    location.pathname === '/gestao-terceiros/dashboard-gestor' ||
+                    location.pathname === '/gestao-terceiros'
+                  )
                 return location.pathname === s.path || location.pathname.startsWith(s.path + '/')
               })
 

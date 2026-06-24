@@ -37,7 +37,7 @@ const MAIN_MENUS = [
 ]
 
 const GESTAO_TERCEIROS_SUBMENUS = [
-  'Dashboard Gestor',
+  'Dashboard do Gestor',
   'Lançamentos',
   'Relatórios',
   'BI Dashboard',
@@ -299,6 +299,16 @@ export function CreateUserDialog({
             next = next.filter((m) => m !== legacyKey)
             isLegacyRemoval = true
           }
+          if (legacyKey === 'Dashboard do Gestor') {
+            if (next.includes('Dashboard Gestor')) {
+              next = next.filter((m) => m !== 'Dashboard Gestor')
+              isLegacyRemoval = true
+            }
+            if (next.includes('Gestão de Terceiros:Dashboard Gestor')) {
+              next = next.filter((m) => m !== 'Gestão de Terceiros:Dashboard Gestor')
+              isLegacyRemoval = true
+            }
+          }
         }
         if (!isLegacyRemoval) {
           next.push(menu)
@@ -418,7 +428,10 @@ export function CreateUserDialog({
                     const isChecked =
                       form.accessible_menus.includes(key) ||
                       form.accessible_menus.includes(legacyKey) ||
-                      form.accessible_menus.includes('Gestão de Terceiros')
+                      form.accessible_menus.includes('Gestão de Terceiros') ||
+                      (menu === 'Dashboard do Gestor' &&
+                        (form.accessible_menus.includes('Dashboard Gestor') ||
+                          form.accessible_menus.includes('Gestão de Terceiros:Dashboard Gestor')))
                     return (
                       <Badge
                         key={key}

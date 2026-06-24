@@ -49,6 +49,13 @@ export function useHasAccess(menuName: string) {
     if (userMenus.includes(subName)) {
       return true
     }
+    if (
+      subName === 'Dashboard do Gestor' &&
+      (userMenus.includes('Dashboard Gestor') ||
+        userMenus.includes('Gestão de Terceiros:Dashboard Gestor'))
+    ) {
+      return true
+    }
   }
 
   if (menuName.startsWith('Cadastros:') && userMenus.includes('Cadastros')) {
