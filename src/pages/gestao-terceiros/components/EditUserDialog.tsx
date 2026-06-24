@@ -21,11 +21,7 @@ import { useToast } from '@/hooks/use-toast'
 import { logAudit } from '@/services/audit'
 
 const MAIN_MENUS = [
-  'Dashboard Gestor',
-  'Lançamentos',
-  'Relatórios',
-  'BI Dashboard',
-  'Email Reports',
+  'Gestão de Terceiros',
   'Log de Auditoria',
   'Usuários',
   'Gestão de Imóveis',
@@ -39,6 +35,14 @@ const MAIN_MENUS = [
   'Gestão de Acidentes',
   'Gestão da Manutenção',
   'Gestão de Estoque',
+]
+
+const GESTAO_TERCEIROS_SUBMENUS = [
+  'Dashboard Gestor',
+  'Lançamentos',
+  'Relatórios',
+  'BI Dashboard',
+  'Email Reports',
 ]
 
 const CADASTROS_SUBMENUS = [
@@ -252,6 +256,14 @@ export function EditUserDialog({
         return { ...p, accessible_menus: next }
       }
 
+      if (menu.startsWith('Gestão de Terceiros:') && next.includes('Gestão de Terceiros')) {
+        next = next.filter((m) => m !== 'Gestão de Terceiros')
+        GESTAO_TERCEIROS_SUBMENUS.forEach((sub) => {
+          if (`Gestão de Terceiros:${sub}` !== menu) next.push(`Gestão de Terceiros:${sub}`)
+        })
+        return { ...p, accessible_menus: next }
+      }
+
       if (menu.startsWith('Gestão de Estoque:') && next.includes('Gestão de Estoque')) {
         next = next.filter((m) => m !== 'Gestão de Estoque')
         ESTOQUE_SUBMENUS.forEach((sub) => {
@@ -263,7 +275,17 @@ export function EditUserDialog({
       if (next.includes(menu)) {
         next = next.filter((m) => m !== menu)
       } else {
-        next.push(menu)
+        let isLegacyRemoval = false
+        if (menu.startsWith('Gestão de Terceiros:')) {
+          const legacyKey = menu.split(':')[1]
+          if (next.includes(legacyKey)) {
+            next = next.filter((m) => m !== legacyKey)
+            isLegacyRemoval = true
+          }
+        }
+        if (!isLegacyRemoval) {
+          next.push(menu)
+        }
       }
       return { ...p, accessible_menus: next }
     })
@@ -348,6 +370,29 @@ export function EditUserDialog({
                       {menu}
                     </Badge>
                   ))}
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Submenus de Gestão de Terceiros</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
+                  {GESTAO_TERCEIROS_SUBMENUS.map((menu) => {
+                    const key = `Gestão de Terceiros:${menu}`
+                    const legacyKey = menu
+                    const isChecked =
+                      form.accessible_menus.includes(key) ||
+                      form.accessible_menus.includes(legacyKey) ||
+                      form.accessible_menus.includes('Gestão de Terceiros')
+                    return (
+                      <Badge
+                        key={key}
+                        variant={isChecked ? 'default' : 'outline'}
+                        className={`cursor-pointer hover:bg-slate-200 ${isChecked ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(key)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
                 </div>
               </div>
               <div>

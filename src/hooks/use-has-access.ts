@@ -43,11 +43,23 @@ export function useHasAccess(menuName: string) {
     return true
   }
 
+  // legacy mapping for Gestão de Terceiros submenus
+  if (menuName.startsWith('Gestão de Terceiros:')) {
+    const subName = menuName.split(':')[1]
+    if (userMenus.includes(subName)) {
+      return true
+    }
+  }
+
   if (menuName.startsWith('Cadastros:') && userMenus.includes('Cadastros')) {
     return true
   }
 
   if (menuName.startsWith('Gestão de Tarefas:') && userMenus.includes('Gestão de Tarefas')) {
+    return true
+  }
+
+  if (menuName.startsWith('Gestão de Terceiros:') && userMenus.includes('Gestão de Terceiros')) {
     return true
   }
 
@@ -76,6 +88,13 @@ export function useHasAccess(menuName: string) {
   if (
     menuName === 'Auditoria e Checklist' &&
     userMenus.some((m) => m.startsWith('Auditoria e Checklist'))
+  ) {
+    return true
+  }
+
+  if (
+    menuName === 'Gestão de Terceiros' &&
+    userMenus.some((m) => m.startsWith('Gestão de Terceiros'))
   ) {
     return true
   }

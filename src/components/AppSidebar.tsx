@@ -369,7 +369,11 @@ export function AppSidebar() {
           )
         } else if (item.title === 'Gestão de Terceiros') {
           filteredSubItems = item.subItems.filter(
-            (sub) => userMenus.includes(sub.title) || sub.title === 'Treinamentos',
+            (sub) =>
+              userMenus.includes('Gestão de Terceiros') ||
+              userMenus.includes(`Gestão de Terceiros:${sub.title}`) ||
+              userMenus.includes(sub.title) ||
+              sub.title === 'Treinamentos',
           )
         }
 
