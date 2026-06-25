@@ -116,7 +116,8 @@ export default function Treinamentos() {
     if (!rawUrl) return null
     if (rawUrl.startsWith('http') || rawUrl.startsWith('blob:')) return rawUrl
 
-    let cleanPath = rawUrl.startsWith('/') ? rawUrl.slice(1) : rawUrl
+    let cleanPath = rawUrl.replace(/^documents\//, '')
+    cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
 
     if (!cleanPath.startsWith('trainings/') && !cleanPath.startsWith('training-documents/')) {
       cleanPath = `trainings/${cleanPath}`
@@ -647,7 +648,7 @@ export default function Treinamentos() {
                   <AlertCircle className="w-8 h-8 text-red-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Arquivo não encontrado no servidor
+                  Documento não encontrado no servidor
                 </h3>
                 <p className="text-gray-500 mb-6 text-sm">
                   O documento solicitado não pôde ser localizado em nossos servidores, ou você não

@@ -7,8 +7,10 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
+import { useRef } from 'react'
 import { FileText, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { format, parseISO, isValid } from 'date-fns'
+import { DocumentViewer, DocumentViewerRef } from '@/components/DocumentViewer'
 
 export function TreinamentosList({
   data,
@@ -17,6 +19,8 @@ export function TreinamentosList({
   data: EmployeeWithTrainings[]
   loading: boolean
 }) {
+  const viewerRef = useRef<DocumentViewerRef>(null)
+
   if (loading) {
     return (
       <div className="flex justify-center p-8 text-muted-foreground animate-pulse">
@@ -147,15 +151,16 @@ export function TreinamentosList({
                               )}
 
                               {t.document_url && (
-                                <a
-                                  href={t.document_url}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <button
+                                  type="button"
                                   className="flex items-center gap-1.5 text-xs text-brand-vividBlue hover:text-brand-deepBlue hover:underline bg-brand-deepBlue/5 hover:bg-brand-deepBlue/10 px-2.5 py-1.5 rounded-md transition-colors font-medium"
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    viewerRef.current?.open(t.document_url!)
+                                  }}
                                 >
                                   <FileText className="w-3.5 h-3.5" /> Ver Anexo
-                                </a>
+                                </button>
                               )}
                             </div>
                           </div>
@@ -173,6 +178,7 @@ export function TreinamentosList({
           </CardContent>
         </Card>
       ))}
+      <DocumentViewer ref={viewerRef} />
     </div>
   )
 }

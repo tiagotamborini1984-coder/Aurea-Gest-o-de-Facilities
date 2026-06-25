@@ -120,7 +120,8 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
 
               let docUrl = record?.document_url
               if (docUrl && !docUrl.startsWith('http') && !docUrl.startsWith('blob:')) {
-                let cleanPath = docUrl.startsWith('/') ? docUrl.slice(1) : docUrl
+                let cleanPath = docUrl.replace(/^documents\//, '')
+                cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
 
                 if (
                   !cleanPath.startsWith('trainings/') &&
