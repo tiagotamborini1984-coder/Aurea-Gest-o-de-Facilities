@@ -6,9 +6,6 @@ BEGIN
   ON CONFLICT (id) DO UPDATE SET public = true;
 END $$;
 
--- Enable RLS on storage.objects just to be safe
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
 -- Ensure SELECT policy exists for public users on the 'documents' bucket
 DROP POLICY IF EXISTS "Public users can read documents" ON storage.objects;
 CREATE POLICY "Public users can read documents"
