@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useTrainingStatus } from '@/hooks/use-training-status'
@@ -37,6 +37,7 @@ import {
   FileText,
   Trash2,
 } from 'lucide-react'
+import { DocumentViewer, DocumentViewerRef } from '@/components/DocumentViewer'
 
 export default function Treinamentos() {
   const { activeClient } = useAppStore()
@@ -59,11 +60,7 @@ export default function Treinamentos() {
   const [isUploading, setIsUploading] = useState(false)
 
   // Viewer State
-  const [viewerOpen, setViewerOpen] = useState(false)
-  const [viewerUrl, setViewerUrl] = useState<string | null>(null)
-  const [viewerLoading, setViewerLoading] = useState(false)
-  const [viewerError, setViewerError] = useState(false)
-  const [viewerType, setViewerType] = useState<'image' | 'pdf' | 'other' | null>(null)
+  const viewerRef = useRef<DocumentViewerRef>(null)
 
   useEffect(() => {
     if (activeClient) {
@@ -112,89 +109,9 @@ export default function Treinamentos() {
     setIsLoading(false)
   }
 
-  const resolveDocumentUrl = (rawUrl: string | undefined): string | null => {
-    if (!rawUrl) return null
-    if (rawUrl.startsWith('http') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:'))
-      return rawUrl
-
-    let cleanPath = rawUrl.replace(/^documents\//, '').replace(/^training-documents\//, '')
-    cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
-
-    const isTrainingBucket = cleanPath.match(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i,
-    )
-
-    if (isTrainingBucket) {
-      const { data } = supabase.storage.from('training-documents').getPublicUrl(cleanPath)
-      return data.publicUrl
-    }
-
-    if (!cleanPath.startsWith('trainings/') && !cleanPath.startsWith('training-documents/')) {
-      cleanPath = `trainings/${cleanPath}`
-    }
-
-    const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
-    return data.publicUrl
-  }
-
   const openViewer = async (rawUrl: string | undefined) => {
-    setViewerOpen(true)
-    setViewerLoading(true)
-    setViewerError(false)
-    setViewerUrl(null)
-    setViewerType(null)
-
-    const url = resolveDocumentUrl(rawUrl)
-    if (!url) {
-      setViewerError(true)
-      setViewerLoading(false)
-      return
-    }
-
-    try {
-      const res = await fetch(url, { method: 'HEAD' })
-      if (!res.ok) {
-        setViewerError(true)
-        setViewerLoading(false)
-        import('sonner').then(({ toast }) => {
-          toast.error(
-            'O arquivo físico não foi encontrado no servidor. Por favor, tente anexar o documento novamente.',
-          )
-        })
-        return
-      }
-
-      const contentType = res.headers.get('Content-Type') || ''
-      if (contentType.includes('application/json')) {
-        setViewerError(true)
-        setViewerLoading(false)
-        import('sonner').then(({ toast }) => {
-          toast.error('O arquivo não foi encontrado ou não está acessível no servidor.')
-        })
-        return
-      }
-      if (contentType.includes('pdf') || url.toLowerCase().includes('.pdf')) {
-        setViewerType('pdf')
-      } else if (contentType.includes('image') || url.match(/\.(jpeg|jpg|gif|png)/i)) {
-        setViewerType('image')
-      } else {
-        setViewerType('other')
-      }
-
-      setViewerUrl(url)
-    } catch (err) {
-      console.warn('HEAD request failed, falling back to extension matching', err)
-      if (url.toLowerCase().includes('.pdf')) {
-        setViewerType('pdf')
-        setViewerUrl(url)
-      } else if (url.match(/\.(jpeg|jpg|gif|png)/i)) {
-        setViewerType('image')
-        setViewerUrl(url)
-      } else {
-        setViewerError(true)
-      }
-    } finally {
-      setViewerLoading(false)
+    if (rawUrl) {
+      viewerRef.current?.open(rawUrl)
     }
   }
 
@@ -655,76 +572,7 @@ export default function Treinamentos() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b bg-white z-10 shrink-0">
-            <DialogTitle>Visualizador de Documento</DialogTitle>
-          </DialogHeader>
-
-          <div className="flex-1 bg-slate-100 relative flex flex-col items-center justify-center min-h-[500px] overflow-auto">
-            {viewerLoading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
-                <Loader2 className="w-10 h-10 animate-spin text-brand-vividBlue mb-4" />
-                <p className="text-muted-foreground text-sm font-medium">Carregando documento...</p>
-              </div>
-            )}
-
-            {viewerError && !viewerLoading && (
-              <div className="flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                  <AlertCircle className="w-8 h-8 text-red-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Documento não encontrado no servidor
-                </h3>
-                <p className="text-gray-500 mb-6 text-sm">
-                  O documento solicitado não pôde ser localizado em nossos servidores, ou você não
-                  tem permissão para acessá-lo. Verifique se o arquivo foi enviado corretamente.
-                </p>
-                <Button variant="outline" onClick={() => setViewerOpen(false)}>
-                  Fechar Visualizador
-                </Button>
-              </div>
-            )}
-
-            {!viewerLoading && !viewerError && viewerUrl && (
-              <div className="w-full h-full flex flex-col items-center justify-center">
-                {viewerType === 'pdf' ? (
-                  <iframe
-                    src={`${viewerUrl}#toolbar=0`}
-                    className="w-full h-full min-h-[60vh] border-0 flex-1"
-                    title="Documento PDF"
-                  />
-                ) : viewerType === 'image' ? (
-                  <div className="p-4 w-full h-full flex items-center justify-center">
-                    <img
-                      src={viewerUrl}
-                      alt="Documento de Treinamento"
-                      className="max-w-full max-h-full object-contain rounded shadow-sm bg-white"
-                      onError={() => setViewerError(true)}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-8 bg-white rounded-lg shadow-sm m-4">
-                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-                      <FileText className="w-8 h-8 text-brand-vividBlue" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2">Formato não suportado</h3>
-                    <p className="text-sm text-gray-500 mb-6 text-center max-w-xs">
-                      O formato deste arquivo não pode ser visualizado diretamente no navegador.
-                    </p>
-                    <Button asChild>
-                      <a href={viewerUrl} target="_blank" rel="noopener noreferrer">
-                        Fazer Download do Arquivo
-                      </a>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DocumentViewer ref={viewerRef} />
     </div>
   )
 }
