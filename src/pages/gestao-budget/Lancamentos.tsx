@@ -32,9 +32,49 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  TableHeader as OriginalTableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useSyncExternalStore } from 'react'
+
+let globalLastUpdated: string | null | undefined = undefined
+const listeners = new Set<() => void>()
+
+function setGlobalLastUpdated(val: string | null | undefined) {
+  globalLastUpdated = val
+  listeners.forEach((l) => l())
+}
+
+function useGlobalLastUpdated() {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    () => globalLastUpdated,
+  )
+}
+
+const TableHeader = ({ children, className, ...props }: any) => {
+  const lastUpdated = useGlobalLastUpdated()
+  return (
+    <OriginalTableHeader className={className} {...props}>
+      {lastUpdated !== undefined && (
+        <TableRow className="hover:bg-transparent border-b-0">
+          <TableHead
+            colSpan={100}
+            className="text-right h-auto py-2 text-xs text-muted-foreground font-medium bg-muted/20"
+          >
+            {lastUpdated
+              ? `Última atualização: ${new Date(lastUpdated).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`
+              : 'Sem atualizações'}
+          </TableHead>
+        </TableRow>
+      )}
+      {children}
+    </OriginalTableHeader>
+  )
+}
 import {
   Select,
   SelectContent,
@@ -127,9 +167,44 @@ export default function Lancamentos() {
   useEffect(() => {
     if (!activeClientId || selectedCCs.length === 0 || selectedMonths.length === 0) {
       setEntries({})
+      setGlobalLastUpdated(undefined)
       return
     }
     loadEntries()
+
+    const channel = supabase
+      .channel('budget_entries_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'budget_entries',
+          filter: `client_id=eq.${activeClientId}`,
+        },
+        async () => {
+          const { data } = await supabase
+            .from('budget_entries')
+            // @ts-expect-error
+            .select('updated_at')
+            .eq('client_id', activeClientId)
+            .in('cost_center_id', selectedCCs)
+            // @ts-expect-error
+            .order('updated_at', { ascending: false })
+            .limit(1)
+
+          if (data && data.length > 0) {
+            setGlobalLastUpdated(data[0].updated_at)
+          } else {
+            setGlobalLastUpdated(null)
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [selectedCCs, selectedMonths, activeClientId])
 
   const loadEntries = async () => {
@@ -142,6 +217,22 @@ export default function Lancamentos() {
       .eq('client_id', activeClientId)
       .in('cost_center_id', selectedCCs)
       .in('reference_month', referenceDates)
+
+    const { data: lastUpdatedData } = await supabase
+      .from('budget_entries')
+      // @ts-expect-error
+      .select('updated_at')
+      .eq('client_id', activeClientId)
+      .in('cost_center_id', selectedCCs)
+      // @ts-expect-error
+      .order('updated_at', { ascending: false })
+      .limit(1)
+
+    if (lastUpdatedData && lastUpdatedData.length > 0) {
+      setGlobalLastUpdated(lastUpdatedData[0].updated_at)
+    } else {
+      setGlobalLastUpdated(null)
+    }
 
     const map: Record<string, { budgeted: number; realized: number }> = {}
     if (data) {
