@@ -6,6 +6,7 @@ import { CrudGeneric } from '@/components/gestao-terceiros/CrudGeneric'
 import { Users } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 
 const ALL_MENUS = [
   'Dashboard',
