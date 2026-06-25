@@ -109,6 +109,7 @@ export default function Usuarios() {
       client_id: form.client_id || profile?.client_id,
       accessible_menus: form.accessible_menus || [],
       authorized_plants: form.authorized_plants || [],
+      feature_permissions: form.feature_permissions || {},
       force_password_change: form.force_password_change || false,
     }
 
@@ -133,6 +134,7 @@ export default function Usuarios() {
       role: form.role,
       accessible_menus: form.accessible_menus || [],
       authorized_plants: form.authorized_plants || [],
+      feature_permissions: form.feature_permissions || {},
       force_password_change: form.force_password_change || false,
     }
 
@@ -298,8 +300,31 @@ export default function Usuarios() {
       setForm({ ...form, accessible_menus: [...accModules, ...newMenus] })
     }
 
+    const featurePerms = form.feature_permissions || {}
+    const toggleFeaturePerm = (key: string) => {
+      setForm({ ...form, feature_permissions: { ...featurePerms, [key]: !featurePerms[key] } })
+    }
+
     return (
       <div className="space-y-6 pt-4 border-t border-gray-100 mt-4">
+        <div>
+          <h4 className="text-sm font-semibold text-brand-graphite mb-3">
+            Permissões de Relatórios
+          </h4>
+          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Filtro de Responsável (SLA de Compras)</Label>
+              <p className="text-xs text-muted-foreground">
+                Permitir visualizar filtro de responsável no SLA de Compras
+              </p>
+            </div>
+            <Switch
+              checked={featurePerms.can_view_purchasing_responsible_filter || false}
+              onCheckedChange={() => toggleFeaturePerm('can_view_purchasing_responsible_filter')}
+            />
+          </div>
+        </div>
+
         <div>
           <h4 className="text-sm font-semibold text-brand-graphite mb-3">Plantas Autorizadas</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-40 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-gray-50/30">

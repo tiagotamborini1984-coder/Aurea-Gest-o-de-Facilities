@@ -122,6 +122,7 @@ export function CreateUserDialog({
     client_id: profile?.client_id || '',
     accessible_menus: [] as string[],
     authorized_plants: [] as string[],
+    feature_permissions: {} as any,
     force_password_change: true,
   })
 
@@ -203,6 +204,7 @@ export function CreateUserDialog({
         client_id: profile?.client_id || '',
         accessible_menus: [],
         authorized_plants: [],
+        feature_permissions: {},
         force_password_change: true,
       })
       onSuccess()
@@ -632,29 +634,55 @@ export function CreateUserDialog({
             </div>
           )}
           {['Gestor', 'Operacional'].includes(form.role) && (
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">
-                  Filtro de Responsável (Relatórios de Tarefas)
-                </Label>
-                <p className="text-xs text-slate-500">
-                  Permite visualizar e filtrar tarefas de outros usuários.
-                </p>
+            <>
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">
+                    Filtro de Responsável (Relatórios de Tarefas)
+                  </Label>
+                  <p className="text-xs text-slate-500">
+                    Permite visualizar e filtrar tarefas de outros usuários.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.accessible_menus.includes('Gestão de Tarefas:Filtro Responsável')}
+                  onCheckedChange={(v) => {
+                    setForm((p) => ({
+                      ...p,
+                      accessible_menus: v
+                        ? [...p.accessible_menus, 'Gestão de Tarefas:Filtro Responsável']
+                        : p.accessible_menus.filter(
+                            (m) => m !== 'Gestão de Tarefas:Filtro Responsável',
+                          ),
+                    }))
+                  }}
+                />
               </div>
-              <Switch
-                checked={form.accessible_menus.includes('Gestão de Tarefas:Filtro Responsável')}
-                onCheckedChange={(v) => {
-                  setForm((p) => ({
-                    ...p,
-                    accessible_menus: v
-                      ? [...p.accessible_menus, 'Gestão de Tarefas:Filtro Responsável']
-                      : p.accessible_menus.filter(
-                          (m) => m !== 'Gestão de Tarefas:Filtro Responsável',
-                        ),
-                  }))
-                }}
-              />
-            </div>
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">
+                    Permissões de Relatórios: SLA de Compras
+                  </Label>
+                  <p className="text-xs text-slate-500">
+                    Permitir visualizar filtro de responsável no SLA de Compras
+                  </p>
+                </div>
+                <Switch
+                  checked={
+                    form.feature_permissions?.can_view_purchasing_responsible_filter || false
+                  }
+                  onCheckedChange={(v) => {
+                    setForm((p) => ({
+                      ...p,
+                      feature_permissions: {
+                        ...(p.feature_permissions || {}),
+                        can_view_purchasing_responsible_filter: v,
+                      },
+                    }))
+                  }}
+                />
+              </div>
+            </>
           )}
           {form.role === 'Administrador' && (
             <div className="p-3 bg-brand-vividBlue/5 border border-brand-vividBlue/20 rounded-md text-sm text-brand-vividBlue mt-2">
