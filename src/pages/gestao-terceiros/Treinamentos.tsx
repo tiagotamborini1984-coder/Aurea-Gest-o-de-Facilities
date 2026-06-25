@@ -114,7 +114,8 @@ export default function Treinamentos() {
 
   const resolveDocumentUrl = (rawUrl: string | undefined): string | null => {
     if (!rawUrl) return null
-    if (rawUrl.startsWith('http') || rawUrl.startsWith('blob:')) return rawUrl
+    if (rawUrl.startsWith('http') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:'))
+      return rawUrl
 
     let cleanPath = rawUrl.replace(/^documents\//, '')
     cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
@@ -146,6 +147,11 @@ export default function Treinamentos() {
       if (!res.ok) {
         setViewerError(true)
         setViewerLoading(false)
+        import('sonner').then(({ toast }) => {
+          toast.error(
+            'O arquivo físico não foi encontrado no servidor. Por favor, tente anexar o documento novamente.',
+          )
+        })
         return
       }
 

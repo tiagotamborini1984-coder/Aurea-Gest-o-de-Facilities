@@ -22,31 +22,58 @@ export const DocumentViewer = forwardRef<DocumentViewerRef>((props, ref) => {
       setUrl(null)
       setType(null)
 
+      let finalUrl = docUrl
+      if (
+        docUrl &&
+        !docUrl.startsWith('http') &&
+        !docUrl.startsWith('blob:') &&
+        !docUrl.startsWith('data:')
+      ) {
+        let cleanPath = docUrl.replace(/^documents\//, '')
+        cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
+        if (!cleanPath.startsWith('trainings/') && !cleanPath.startsWith('training-documents/')) {
+          cleanPath = `trainings/${cleanPath}`
+        }
+
+        try {
+          const { supabase } = await import('@/lib/supabase/client')
+          const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
+          finalUrl = data.publicUrl
+        } catch (e) {
+          console.error('Failed to resolve URL via supabase client', e)
+        }
+      }
+
       try {
-        const res = await fetch(docUrl, { method: 'HEAD' })
+        const res = await fetch(finalUrl, { method: 'HEAD' })
         if (!res.ok) {
           setError(true)
           setLoading(false)
+          import('sonner').then(({ toast }) => {
+            toast.error(
+              'O arquivo físico não foi encontrado no servidor. Por favor, tente anexar o documento novamente.',
+            )
+          })
           return
         }
 
         const contentType = res.headers.get('Content-Type') || ''
-        if (contentType.includes('pdf') || docUrl.toLowerCase().includes('.pdf')) {
+        if (contentType.includes('pdf') || finalUrl.toLowerCase().includes('.pdf')) {
           setType('pdf')
-        } else if (contentType.includes('image') || docUrl.match(/\.(jpeg|jpg|gif|png)/i)) {
+        } else if (contentType.includes('image') || finalUrl.match(/\.(jpeg|jpg|gif|png)/i)) {
           setType('image')
         } else {
           setType('other')
         }
-        setUrl(docUrl)
+        setUrl(finalUrl)
       } catch (err) {
         console.warn('HEAD request failed, falling back to extension matching', err)
-        if (docUrl.toLowerCase().includes('.pdf')) {
+        if (finalUrl.toLowerCase().includes('.pdf')) {
           setType('pdf')
-          setUrl(docUrl)
-        } else if (docUrl.match(/\.(jpeg|jpg|gif|png)/i)) {
+          setUrl(finalUrl)
+        } else if (finalUrl.match(/\.(jpeg|jpg|gif|png)/i)) {
           setType('image')
-          setUrl(docUrl)
+          setUrl(finalUrl)
         } else {
           setError(true)
         }
@@ -80,8 +107,8 @@ export const DocumentViewer = forwardRef<DocumentViewerRef>((props, ref) => {
                 Documento não encontrado no servidor
               </h3>
               <p className="text-gray-500 mb-6 text-sm">
-                O documento solicitado não pôde ser localizado em nossos servidores, ou você não tem
-                permissão para acessá-lo. Verifique se o arquivo foi enviado corretamente.
+                O arquivo físico não foi encontrado no servidor. Por favor, tente anexar o documento
+                novamente.
               </p>
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Fechar Visualizador

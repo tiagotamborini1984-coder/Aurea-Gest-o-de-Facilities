@@ -277,16 +277,40 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
               </Label>
               {record.document_url ? (
                 <div className="flex items-center gap-2 h-10 px-3 bg-background border rounded-md">
-                  <a
-                    href={record.document_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 text-sm text-brand-vividBlue hover:text-brand-deepBlue hover:underline truncate flex-1 font-medium"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      let url = record.document_url!
+                      if (
+                        !url.startsWith('http') &&
+                        !url.startsWith('blob:') &&
+                        !url.startsWith('data:')
+                      ) {
+                        let cleanPath = url.replace(/^documents\//, '')
+                        cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
+                        if (
+                          !cleanPath.startsWith('trainings/') &&
+                          !cleanPath.startsWith('training-documents/')
+                        ) {
+                          cleanPath = `trainings/${cleanPath}`
+                        }
+                        import('@/lib/supabase/client').then(({ supabase }) => {
+                          const { data } = supabase.storage
+                            .from('documents')
+                            .getPublicUrl(cleanPath)
+                          window.open(data.publicUrl, '_blank', 'noopener,noreferrer')
+                        })
+                      } else {
+                        window.open(url, '_blank', 'noopener,noreferrer')
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm text-brand-vividBlue hover:text-brand-deepBlue hover:underline truncate flex-1 font-medium bg-transparent border-none text-left p-0"
                     title="Ver documento anexado"
                   >
                     <FileText className="w-4 h-4 shrink-0" />
                     <span className="truncate">Ver Anexo</span>
-                  </a>
+                  </button>
                   <Button
                     type="button"
                     variant="ghost"
