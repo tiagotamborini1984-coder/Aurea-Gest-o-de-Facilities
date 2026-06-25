@@ -95,9 +95,14 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
               if (record) {
                 if (t.validity_months && t.validity_months > 0 && record.completion_date) {
                   // To avoid timezone offset issues on dates like "2024-05-10"
-                  const parsedCompDate = parseISO(record.completion_date.includes('T') ? record.completion_date : `${record.completion_date}T00:00:00`)
+                  const parsedCompDate = parseISO(
+                    record.completion_date.includes('T')
+                      ? record.completion_date
+                      : `${record.completion_date}T00:00:00`,
+                  )
                   if (isValid(parsedCompDate)) {
-                    const expDate = addMonths(parsedCompDate, t.validity_months)                    expirationDate = format(expDate, 'yyyy-MM-dd')
+                    const expDate = addMonths(parsedCompDate, t.validity_months)
+                    expirationDate = format(expDate, 'yyyy-MM-dd')
                     if (isBefore(expDate, new Date())) {
                       status = 'expired'
                     } else {
