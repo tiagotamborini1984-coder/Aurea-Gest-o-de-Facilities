@@ -287,19 +287,32 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                         !url.startsWith('blob:') &&
                         !url.startsWith('data:')
                       ) {
-                        let cleanPath = url.replace(/^documents\//, '')
+                        let cleanPath = url
+                          .replace(/^documents\//, '')
+                          .replace(/^training-documents\//, '')
                         cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
-                        if (
-                          !cleanPath.startsWith('trainings/') &&
-                          !cleanPath.startsWith('training-documents/')
-                        ) {
-                          cleanPath = `trainings/${cleanPath}`
-                        }
+
+                        const isTrainingBucket = cleanPath.match(
+                          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i,
+                        )
                         import('@/lib/supabase/client').then(({ supabase }) => {
-                          const { data } = supabase.storage
-                            .from('documents')
-                            .getPublicUrl(cleanPath)
-                          window.open(data.publicUrl, '_blank', 'noopener,noreferrer')
+                          if (isTrainingBucket) {
+                            const { data } = supabase.storage
+                              .from('training-documents')
+                              .getPublicUrl(cleanPath)
+                            window.open(data.publicUrl, '_blank', 'noopener,noreferrer')
+                          } else {
+                            if (
+                              !cleanPath.startsWith('trainings/') &&
+                              !cleanPath.startsWith('training-documents/')
+                            ) {
+                              cleanPath = `trainings/${cleanPath}`
+                            }
+                            const { data } = supabase.storage
+                              .from('documents')
+                              .getPublicUrl(cleanPath)
+                            window.open(data.publicUrl, '_blank', 'noopener,noreferrer')
+                          }
                         })
                       } else {
                         window.open(url, '_blank', 'noopener,noreferrer')

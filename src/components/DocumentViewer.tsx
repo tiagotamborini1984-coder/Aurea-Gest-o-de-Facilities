@@ -29,16 +29,28 @@ export const DocumentViewer = forwardRef<DocumentViewerRef>((props, ref) => {
         !docUrl.startsWith('blob:') &&
         !docUrl.startsWith('data:')
       ) {
-        let cleanPath = docUrl.replace(/^documents\//, '')
+        let cleanPath = docUrl.replace(/^documents\//, '').replace(/^training-documents\//, '')
         cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
-        if (!cleanPath.startsWith('trainings/') && !cleanPath.startsWith('training-documents/')) {
-          cleanPath = `trainings/${cleanPath}`
-        }
 
         try {
           const { supabase } = await import('@/lib/supabase/client')
-          const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
-          finalUrl = data.publicUrl
+          const isTrainingBucket = cleanPath.match(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i,
+          )
+
+          if (isTrainingBucket) {
+            const { data } = supabase.storage.from('training-documents').getPublicUrl(cleanPath)
+            finalUrl = data.publicUrl
+          } else {
+            if (
+              !cleanPath.startsWith('trainings/') &&
+              !cleanPath.startsWith('training-documents/')
+            ) {
+              cleanPath = `trainings/${cleanPath}`
+            }
+            const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
+            finalUrl = data.publicUrl
+          }
         } catch (e) {
           console.error('Failed to resolve URL via supabase client', e)
         }
@@ -58,6 +70,14 @@ export const DocumentViewer = forwardRef<DocumentViewerRef>((props, ref) => {
         }
 
         const contentType = res.headers.get('Content-Type') || ''
+        if (contentType.includes('application/json')) {
+          setError(true)
+          setLoading(false)
+          import('sonner').then(({ toast }) => {
+            toast.error('O arquivo não foi encontrado ou não está acessível no servidor.')
+          })
+          return
+        }
         if (contentType.includes('pdf') || finalUrl.toLowerCase().includes('.pdf')) {
           setType('pdf')
         } else if (contentType.includes('image') || finalUrl.match(/\.(jpeg|jpg|gif|png)/i)) {

@@ -119,18 +119,37 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
               }
 
               let docUrl = record?.document_url
-              if (docUrl && !docUrl.startsWith('http') && !docUrl.startsWith('blob:')) {
-                let cleanPath = docUrl.replace(/^documents\//, '')
+              if (
+                docUrl &&
+                !docUrl.startsWith('http') &&
+                !docUrl.startsWith('blob:') &&
+                !docUrl.startsWith('data:')
+              ) {
+                let cleanPath = docUrl
+                  .replace(/^documents\//, '')
+                  .replace(/^training-documents\//, '')
                 cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
 
-                if (
-                  !cleanPath.startsWith('trainings/') &&
-                  !cleanPath.startsWith('training-documents/')
-                ) {
-                  cleanPath = `trainings/${cleanPath}`
+                const isTrainingBucket = cleanPath.match(
+                  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i,
+                )
+                if (isTrainingBucket) {
+                  const { data: urlData } = supabase.storage
+                    .from('training-documents')
+                    .getPublicUrl(cleanPath)
+                  docUrl = urlData.publicUrl
+                } else {
+                  if (
+                    !cleanPath.startsWith('trainings/') &&
+                    !cleanPath.startsWith('training-documents/')
+                  ) {
+                    cleanPath = `trainings/${cleanPath}`
+                  }
+                  const { data: urlData } = supabase.storage
+                    .from('documents')
+                    .getPublicUrl(cleanPath)
+                  docUrl = urlData.publicUrl
                 }
-                const { data: urlData } = supabase.storage.from('documents').getPublicUrl(cleanPath)
-                docUrl = urlData.publicUrl
               }
 
               return {

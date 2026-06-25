@@ -117,8 +117,17 @@ export default function Treinamentos() {
     if (rawUrl.startsWith('http') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:'))
       return rawUrl
 
-    let cleanPath = rawUrl.replace(/^documents\//, '')
+    let cleanPath = rawUrl.replace(/^documents\//, '').replace(/^training-documents\//, '')
     cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath
+
+    const isTrainingBucket = cleanPath.match(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i,
+    )
+
+    if (isTrainingBucket) {
+      const { data } = supabase.storage.from('training-documents').getPublicUrl(cleanPath)
+      return data.publicUrl
+    }
 
     if (!cleanPath.startsWith('trainings/') && !cleanPath.startsWith('training-documents/')) {
       cleanPath = `trainings/${cleanPath}`
@@ -156,6 +165,14 @@ export default function Treinamentos() {
       }
 
       const contentType = res.headers.get('Content-Type') || ''
+      if (contentType.includes('application/json')) {
+        setViewerError(true)
+        setViewerLoading(false)
+        import('sonner').then(({ toast }) => {
+          toast.error('O arquivo não foi encontrado ou não está acessível no servidor.')
+        })
+        return
+      }
       if (contentType.includes('pdf') || url.toLowerCase().includes('.pdf')) {
         setViewerType('pdf')
       } else if (contentType.includes('image') || url.match(/\.(jpeg|jpg|gif|png)/i)) {
@@ -236,13 +253,17 @@ export default function Treinamentos() {
       const fileExt = file.name.split('.').pop()
       const fileName = `${selectedEmp.registration_number || selectedEmp.id}_${trainingId}_${Date.now()}.${fileExt}`
 
+      const filePath = `${activeClient?.id}/trainings/${fileName}`
+
       const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(`trainings/${fileName}`, file, { cacheControl: '3600', upsert: false })
+        .from('training-documents')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true })
 
       if (uploadError) throw uploadError
 
-      const filePath = `trainings/${fileName}`
+      const { data: publicUrlData } = supabase.storage
+        .from('training-documents')
+        .getPublicUrl(filePath)
 
       const { data: newRecord, error: insertError } = await supabase
         .from('employee_training_records')
@@ -251,7 +272,7 @@ export default function Treinamentos() {
             client_id: activeClient?.id,
             employee_id: selectedEmp.id,
             training_id: trainingId,
-            document_url: filePath,
+            document_url: publicUrlData.publicUrl,
             completion_date: new Date().toISOString().split('T')[0],
           },
           { onConflict: 'employee_id,training_id' },
