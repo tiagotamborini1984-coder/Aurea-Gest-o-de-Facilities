@@ -80,13 +80,14 @@ export default function Treinamentos() {
   }
 
   const fetchData = async () => {
+    if (!activeClient?.id) return
     setIsLoading(true)
     const referenceMonth = month + '-01'
 
     let q = supabase
       .from('employees')
       .select('*, functions(name)')
-      .eq('client_id', activeClient?.id)
+      .eq('client_id', activeClient.id)
       .eq('reference_month', referenceMonth)
       .eq('status', 'Ativo')
 
@@ -109,22 +110,26 @@ export default function Treinamentos() {
     setIsRecordsLoading(true)
 
     // Fetch required trainings for this function
-    const { data: reqs } = await supabase
-      .from('function_required_trainings')
-      .select('*, trainings(*)')
-      .eq('function_id', emp.function_id)
+    let reqsData: any[] = []
+    if (emp.function_id) {
+      const { data: reqs } = await supabase
+        .from('function_required_trainings')
+        .select('*, trainings(*)')
+        .eq('function_id', emp.function_id)
+      reqsData = reqs || []
+    }
 
-    setReqTrainings(reqs || [])
+    setReqTrainings(reqsData)
 
     // Find all emp ids that share this registration number to get unified history
-    if (emp.registration_number) {
+    if (emp.registration_number && activeClient?.id) {
       const { data: relatedEmps } = await supabase
         .from('employees')
         .select('id')
-        .eq('client_id', activeClient?.id)
+        .eq('client_id', activeClient.id)
         .eq('registration_number', emp.registration_number)
 
-      const ids = relatedEmps?.map((e) => e.id) || [emp.id]
+      const ids = relatedEmps?.length ? relatedEmps.map((e) => e.id) : [emp.id]
 
       const { data: records } = await supabase
         .from('employee_training_records')
@@ -167,20 +172,28 @@ export default function Treinamentos() {
 
       const { data: newRecord, error: insertError } = await supabase
         .from('employee_training_records')
-        .insert({
-          client_id: activeClient?.id,
-          employee_id: selectedEmp.id,
-          training_id: trainingId,
-          document_url: urlData.publicUrl,
-          completion_date: new Date().toISOString().split('T')[0],
-        })
+        .upsert(
+          {
+            client_id: activeClient?.id,
+            employee_id: selectedEmp.id,
+            training_id: trainingId,
+            document_url: urlData.publicUrl,
+            completion_date: new Date().toISOString().split('T')[0],
+          },
+          { onConflict: 'employee_id,training_id' },
+        )
         .select('*, trainings(*)')
         .single()
 
       if (insertError) throw insertError
 
       if (newRecord) {
-        setEmpRecords((prev) => [newRecord, ...prev])
+        setEmpRecords((prev) => {
+          const filtered = prev.filter(
+            (r) => r.training_id !== trainingId || r.employee_id !== selectedEmp.id,
+          )
+          return [newRecord, ...filtered]
+        })
         toast({ title: 'Treinamento anexado com sucesso!' })
         // Refresh master list status in background
         fetchData()
@@ -393,8 +406,11 @@ export default function Treinamentos() {
 
                         if (latest) {
                           trStatus = 'Concluído'
-                          if (req.trainings.validity_months > 0) {
-                            expDate = new Date(latest.completion_date)
+                          if (req.trainings?.validity_months && req.trainings.validity_months > 0) {
+                            const compDateStr = latest.completion_date.includes('T')
+                              ? latest.completion_date
+                              : `${latest.completion_date}T00:00:00`
+                            expDate = new Date(compDateStr)
                             expDate.setMonth(expDate.getMonth() + req.trainings.validity_months)
                             if (expDate < new Date()) trStatus = 'Vencido'
                           }
@@ -407,19 +423,26 @@ export default function Treinamentos() {
                           >
                             <div>
                               <div className="font-medium text-sm text-gray-900">
-                                {req.trainings?.name}
+                                {req.trainings?.name || 'Treinamento Desconhecido'}
                               </div>
-                              <div className="text-xs text-muted-foreground mt-1 flex gap-3">
+                              <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-3">
                                 <span>
                                   Validade:{' '}
-                                  {req.trainings.validity_months
+                                  {req.trainings?.validity_months
                                     ? `${req.trainings.validity_months} meses`
                                     : 'Vitalício'}
                                 </span>
-                                {latest && (
+                                {latest && latest.completion_date && (
                                   <span>
                                     Última realização:{' '}
-                                    {format(new Date(latest.completion_date), 'dd/MM/yyyy')}
+                                    {format(
+                                      new Date(
+                                        latest.completion_date.includes('T')
+                                          ? latest.completion_date
+                                          : `${latest.completion_date}T00:00:00`,
+                                      ),
+                                      'dd/MM/yyyy',
+                                    )}
                                   </span>
                                 )}
                                 {expDate && (
@@ -487,27 +510,38 @@ export default function Treinamentos() {
                           {empRecords.map((record) => (
                             <TableRow key={record.id}>
                               <TableCell className="font-medium text-sm">
-                                {record.trainings?.name}
+                                {record.trainings?.name || 'Desconhecido'}
                               </TableCell>
                               <TableCell className="text-sm">
-                                {format(new Date(record.completion_date), 'dd/MM/yyyy')}
+                                {record.completion_date
+                                  ? format(
+                                      new Date(
+                                        record.completion_date.includes('T')
+                                          ? record.completion_date
+                                          : `${record.completion_date}T00:00:00`,
+                                      ),
+                                      'dd/MM/yyyy',
+                                    )
+                                  : '-'}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    asChild
-                                    className="h-8 w-8 text-brand-deepBlue hover:bg-blue-50"
-                                  >
-                                    <a
-                                      href={record.document_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
+                                  {record.document_url && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      asChild
+                                      className="h-8 w-8 text-brand-deepBlue hover:bg-blue-50"
                                     >
-                                      <FileText className="w-4 h-4" />
-                                    </a>
-                                  </Button>
+                                      <a
+                                        href={record.document_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <FileText className="w-4 h-4" />
+                                      </a>
+                                    </Button>
+                                  )}{' '}
                                   <Button
                                     variant="ghost"
                                     size="icon"
