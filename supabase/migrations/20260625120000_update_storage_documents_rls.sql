@@ -5,8 +5,6 @@ BEGIN
   ON CONFLICT (id) DO UPDATE SET public = true;
 END $$;
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Authenticated users can read documents" ON storage.objects;
 CREATE POLICY "Authenticated users can read documents" ON storage.objects
   FOR SELECT TO authenticated USING (bucket_id = 'documents');
