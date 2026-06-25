@@ -21,6 +21,32 @@ import { submitAuditExecution } from '@/services/audit'
 import { PrintLayout } from './components/PrintLayout'
 
 export default function AuditoriaDetalhes() {
+  const [canPrint, setCanPrint] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: any) => setCanPrint(e.detail)
+    window.addEventListener('audit-loaded', handler)
+    return () => window.removeEventListener('audit-loaded', handler)
+  }, [])
+
+  return (
+    <div className="flex flex-col h-full w-full">
+      {canPrint && (
+        <div className="flex justify-end mb-4 print:hidden">
+          <Button onClick={() => window.print()} variant="default" className="gap-2 shadow-sm">
+            <Printer className="w-4 h-4" />
+            Imprimir Relatório
+          </Button>
+        </div>
+      )}
+      <div className="flex-1 min-h-0">
+        <AuditoriaDetalhesInner />
+      </div>
+    </div>
+  )
+}
+
+function AuditoriaDetalhesInner() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -95,8 +121,12 @@ export default function AuditoriaDetalhes() {
           }
         })
         setAnswers(ansMap)
+        window.dispatchEvent(new CustomEvent('audit-loaded', { detail: true }))
+      } else {
+        window.dispatchEvent(new CustomEvent('audit-loaded', { detail: false }))
       }
     } catch (err: any) {
+      window.dispatchEvent(new CustomEvent('audit-loaded', { detail: false }))
       toast({
         title: 'Erro ao carregar auditoria',
         description: err.message,

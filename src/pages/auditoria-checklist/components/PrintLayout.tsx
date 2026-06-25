@@ -1,8 +1,10 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { MapPin, Calendar, User, ClipboardList, AlertCircle, FileImage } from 'lucide-react'
+import { MapPin, Calendar, User, ClipboardList, FileImage, MessageSquare } from 'lucide-react'
 
 export function PrintLayout({ execution, actions, answersMap, clientBrand }: any) {
+  if (!execution) return null
+
   const scoringSettings = execution.audits?.scoring_settings || []
   const percentage = execution.max_score
     ? Math.round((execution.final_score / execution.max_score) * 100)
@@ -15,9 +17,13 @@ export function PrintLayout({ execution, actions, answersMap, clientBrand }: any
   }
 
   const primaryColor = clientBrand?.primary_color || '#1e293b'
+  const signatures = execution.signatures || []
 
   return (
-    <div className="hidden print:block bg-white text-black w-full">
+    <div
+      id="print-layout-container"
+      className="hidden print:block bg-white text-black w-full font-sans"
+    >
       {/* Header */}
       <div
         className="border-b-2 pb-6 flex justify-between items-start gap-4 mb-8"
@@ -45,6 +51,12 @@ export function PrintLayout({ execution, actions, answersMap, clientBrand }: any
               <User className="w-4 h-4" />
               <span className="font-medium">Auditor:</span> {execution.profiles?.name || '-'}
             </div>
+            {execution.participants && (
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                <span className="font-medium">Participantes:</span> {execution.participants}
+              </div>
+            )}
           </div>
         </div>
         {clientBrand?.logo_url && (
@@ -54,7 +66,7 @@ export function PrintLayout({ execution, actions, answersMap, clientBrand }: any
 
       {/* Summary */}
       {execution.final_score !== null && execution.max_score !== null && (
-        <div className="bg-slate-50 border border-slate-200 p-6 rounded-lg flex items-center justify-between print-break-inside-avoid mb-8">
+        <div className="bg-slate-50 border border-slate-200 p-6 rounded-lg flex items-center justify-between break-inside-avoid mb-8">
           <div>
             <h3 className="text-lg font-semibold mb-1 flex items-center gap-2 text-black">
               <ClipboardList className="w-5 h-5" /> Resumo de Desempenho
@@ -92,110 +104,78 @@ export function PrintLayout({ execution, actions, answersMap, clientBrand }: any
             return (
               <div
                 key={action.id}
-                className="border border-slate-300 rounded-lg p-4 bg-white print-break-inside-avoid"
+                className="border border-slate-300 rounded-lg p-4 bg-white break-inside-avoid"
               >
                 <div className="flex flex-row items-start justify-between gap-4">
                   <div className="flex-1 w-full">
-                    <h4 className="font-semibold text-black text-base">
+                    <h4 className="font-semibold text-black text-base mb-2">
                       {idx + 1}. {action.title}
                     </h4>
-                    {ans.observations && (
-                      <div className="mt-3 border border-dashed border-slate-300 p-3 rounded text-sm text-black">
-                        <span className="font-semibold block mb-1">Observações:</span>
-                        {ans.observations}
-                      </div>
-                    )}
-                    {ans.corrective_assignee_id && (
-                      <div className="mt-3 flex items-center gap-2 text-sm border border-slate-300 p-2 rounded">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>
-                          Ação Corretiva atribuída até{' '}
-                          {ans.corrective_due_date
-                            ? format(new Date(ans.corrective_due_date), 'dd/MM/yyyy')
-                            : '-'}
-                        </span>
-                      </div>
-                    )}
-                    {evidenceUrls.length > 0 && (
-                      <div className="mt-4">
-                        <span className="text-sm font-semibold text-black block mb-2">
-                          Evidências:
-                        </span>
-                        <div className="grid grid-cols-3 gap-3">
-                          {evidenceUrls.map((url, i) => (
-                            <div
-                              key={i}
-                              className="relative aspect-video rounded-md border border-slate-300 overflow-hidden print-break-inside-avoid"
-                            >
-                              {url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                <img
-                                  src={url}
-                                  alt="Evidência"
-                                  className="w-full h-full object-contain"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-white">
-                                  <FileImage className="h-6 w-6 text-slate-400 mb-1" />
-                                  <span className="text-[10px] truncate w-full px-1 text-black">
-                                    Documento Anexado
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2 min-w-[120px]">
-                    <div className="px-3 py-1 rounded-full text-sm font-medium border border-slate-300 bg-transparent text-black">
-                      {label}
+                    <div className="text-sm font-medium text-slate-800">
+                      Resposta: <span className="font-bold">{label}</span>
                     </div>
-                    <div className="text-xs text-slate-600">Peso: {action.weight || 1}</div>
+                    {ans.observations && (
+                      <div className="mt-2 text-sm text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex items-start gap-2">
+                        <MessageSquare className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                        <span>{ans.observations}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
+                {evidenceUrls.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-2 text-sm font-semibold mb-2">
+                      <FileImage className="w-4 h-4" />
+                      Evidências
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {evidenceUrls.map((url, i) => (
+                        <div
+                          key={i}
+                          className="w-32 h-32 border border-slate-200 rounded overflow-hidden"
+                        >
+                          <img
+                            src={url}
+                            alt={`Evidência ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Participants & Signatures */}
-      {(execution.participants?.trim() ||
-        (execution.signatures && execution.signatures.length > 0)) && (
-        <div className="mt-12 pt-8 border-t border-black space-y-6 print-break-inside-avoid">
-          <h2 className="text-xl font-bold text-black" style={{ color: primaryColor }}>
-            Participantes e Assinaturas
+      {/* Signatures */}
+      {signatures && signatures.length > 0 && (
+        <div className="mt-12 break-inside-avoid">
+          <h2
+            className="text-xl font-bold border-b pb-2 text-black mb-6"
+            style={{ borderColor: 'black' }}
+          >
+            Assinaturas
           </h2>
-          {execution.participants && (
-            <p className="text-black mb-4">
-              <strong>Participantes informados:</strong> {execution.participants}
-            </p>
-          )}
-
-          {execution.signatures && execution.signatures.length > 0 && (
-            <div className="grid grid-cols-3 gap-8 mt-6">
-              {execution.signatures.map((sig: any, i: number) => {
-                const url = typeof sig === 'string' ? sig : sig?.url || sig?.signature
-                const name = sig?.name || `Assinatura ${i + 1}`
-                return (
-                  <div key={i} className="flex flex-col items-center text-center space-y-2">
-                    <div className="h-24 w-full max-w-[200px] border-b border-dashed border-black flex items-end justify-center pb-2">
-                      {url ? (
-                        <img src={url} alt={`Assinatura`} className="max-h-20 object-contain" />
-                      ) : (
-                        <span className="text-slate-500 italic text-sm mb-2">
-                          Assinatura não coletada
-                        </span>
-                      )}
-                    </div>
-                    <span className="font-medium text-black">{name}</span>
-                    {sig?.role && <span className="text-xs text-slate-600">{sig.role}</span>}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-8">
+            {signatures.map((sig: any, index: number) => (
+              <div key={index} className="flex flex-col items-center justify-center p-4">
+                {sig.signature && (
+                  <img
+                    src={sig.signature}
+                    alt={`Assinatura de ${sig.name}`}
+                    className="max-h-24 object-contain mb-2"
+                  />
+                )}
+                <div className="w-full border-t border-black text-center pt-2">
+                  <p className="font-semibold text-sm">{sig.name}</p>
+                  {sig.role && <p className="text-xs text-slate-600">{sig.role}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
