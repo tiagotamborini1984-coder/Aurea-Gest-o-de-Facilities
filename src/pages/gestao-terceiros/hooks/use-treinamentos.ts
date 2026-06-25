@@ -126,10 +126,13 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
                 if (cleanPath.includes('storage/v1/object/public/')) {
                   docUrl = `${supabaseUrl}/${cleanPath}`
                 } else {
-                  if (!cleanPath.startsWith('training-documents/')) {
-                    cleanPath = `training-documents/${cleanPath}`
+                  if (
+                    !cleanPath.startsWith('trainings/') &&
+                    !cleanPath.startsWith('training-documents/')
+                  ) {
+                    cleanPath = `trainings/${cleanPath}`
                   }
-                  docUrl = `${supabaseUrl}/storage/v1/object/public/${cleanPath}`
+                  docUrl = `${supabaseUrl}/storage/v1/object/public/documents/${cleanPath}`
                 }
               }
 
