@@ -116,18 +116,14 @@ export default function Treinamentos() {
     if (!rawUrl) return null
     if (rawUrl.startsWith('http') || rawUrl.startsWith('blob:')) return rawUrl
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
     let cleanPath = rawUrl.startsWith('/') ? rawUrl.slice(1) : rawUrl
-
-    if (cleanPath.includes('storage/v1/object/public/')) {
-      return `${supabaseUrl}/${cleanPath}`
-    }
 
     if (!cleanPath.startsWith('trainings/') && !cleanPath.startsWith('training-documents/')) {
       cleanPath = `trainings/${cleanPath}`
     }
 
-    return `${supabaseUrl}/storage/v1/object/public/documents/${cleanPath}`
+    const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
+    return data.publicUrl
   }
 
   const openViewer = async (rawUrl: string | undefined) => {
@@ -239,9 +235,7 @@ export default function Treinamentos() {
 
       if (uploadError) throw uploadError
 
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(`trainings/${fileName}`)
+      const filePath = `trainings/${fileName}`
 
       const { data: newRecord, error: insertError } = await supabase
         .from('employee_training_records')
@@ -250,7 +244,7 @@ export default function Treinamentos() {
             client_id: activeClient?.id,
             employee_id: selectedEmp.id,
             training_id: trainingId,
-            document_url: urlData.publicUrl,
+            document_url: filePath,
             completion_date: new Date().toISOString().split('T')[0],
           },
           { onConflict: 'employee_id,training_id' },
@@ -652,10 +646,12 @@ export default function Treinamentos() {
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
                   <AlertCircle className="w-8 h-8 text-red-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Arquivo não encontrado</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Arquivo não encontrado no servidor
+                </h3>
                 <p className="text-gray-500 mb-6 text-sm">
                   O documento solicitado não pôde ser localizado em nossos servidores, ou você não
-                  tem permissão para acessá-lo.
+                  tem permissão para acessá-lo. Verifique se o arquivo foi enviado corretamente.
                 </p>
                 <Button variant="outline" onClick={() => setViewerOpen(false)}>
                   Fechar Visualizador
