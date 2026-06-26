@@ -7,7 +7,28 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { Loader2, Save, CheckCircle, ArrowLeft, Paperclip, Printer } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import {
+  Loader2,
+  Save,
+  CheckCircle,
+  ArrowLeft,
+  Paperclip,
+  Printer,
+  CalendarDays,
+  History,
+  ClipboardList,
+  Info,
+} from 'lucide-react'
 import { FileUpload } from '@/components/FileUpload'
 import {
   Select,
@@ -17,8 +38,67 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { submitAuditExecution } from '@/services/audit'
+import { format, parseISO, addDays, addWeeks, addMonths, addYears } from 'date-fns'
 
 import { PrintLayout } from './components/PrintLayout'
+
+function calculateNextDate(frequency: string, baseDateStr: string | null) {
+  if (!baseDateStr) return null
+  const baseDate = parseISO(baseDateStr)
+  switch (frequency?.toLowerCase()) {
+    case 'diária':
+    case 'diaria':
+      return addDays(baseDate, 1)
+    case 'semanal':
+      return addWeeks(baseDate, 1)
+    case 'mensal':
+      return addMonths(baseDate, 1)
+    case 'bimestral':
+      return addMonths(baseDate, 2)
+    case 'trimestral':
+      return addMonths(baseDate, 3)
+    case 'semestral':
+      return addMonths(baseDate, 6)
+    case 'anual':
+      return addYears(baseDate, 1)
+    default:
+      return null
+  }
+}
+
+function getStatusBadge(status: string) {
+  const s = status?.toLowerCase() || ''
+  if (
+    [
+      'finalizado',
+      'finalizada',
+      'concluído',
+      'concluida',
+      'concluido',
+      'realizado',
+      'realizada',
+      'completed',
+      'finished',
+    ].includes(s)
+  ) {
+    return <Badge className="bg-green-500">Concluído</Badge>
+  }
+  if (['pendente', 'pending'].includes(s)) {
+    return (
+      <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+        Pendente
+      </Badge>
+    )
+  }
+  if (['em andamento', 'rascunho', 'in progress'].includes(s)) {
+    return (
+      <Badge variant="secondary" className="text-blue-600">
+        Em Andamento
+      </Badge>
+    )
+  }
+  return <Badge variant="secondary">{status || 'Pendente'}</Badge>
+}
 
 export default function AuditoriaDetalhes() {
   const [canPrint, setCanPrint] = useState(false)
@@ -59,6 +139,7 @@ function AuditoriaDetalhesInner() {
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [participants, setParticipants] = useState('')
   const [clientBrand, setClientBrand] = useState<any>(null)
+  const [history, setHistory] = useState<any[]>([])
 
   useEffect(() => {
     fetchData()
@@ -121,6 +202,24 @@ function AuditoriaDetalhesInner() {
           }
         })
         setAnswers(ansMap)
+
+        // Fetch execution history for this audit
+        const { data: histData } = await supabase
+          .from('audit_executions')
+          .select(`
+            id,
+            status,
+            realization_date,
+            final_score,
+            max_score,
+            created_at,
+            tasks ( task_number, due_date )
+          `)
+          .eq('audit_id', execData.audit_id)
+          .order('created_at', { ascending: false })
+
+        if (histData) setHistory(histData)
+
         window.dispatchEvent(new CustomEvent('audit-loaded', { detail: true }))
       } else {
         window.dispatchEvent(new CustomEvent('audit-loaded', { detail: false }))
@@ -205,6 +304,44 @@ function AuditoriaDetalhesInner() {
     ].includes(execution.status?.toLowerCase() || '') ||
     (execution.final_score !== null && execution.realization_date !== null)
 
+  // Derived calculations for the History & Schedule tab
+  const completedHistory = history.filter(
+    (h) =>
+      [
+        'finalizado',
+        'concluído',
+        'concluida',
+        'realizada',
+        'realizado',
+        'concluido',
+        'completed',
+        'finished',
+      ].includes(h.status?.toLowerCase() || '') || h.realization_date,
+  )
+  const lastExecutionData = completedHistory[0]
+
+  const pendingWithDueDate = history.find(
+    (h) =>
+      ![
+        'finalizado',
+        'concluído',
+        'concluida',
+        'realizada',
+        'realizado',
+        'concluido',
+        'completed',
+        'finished',
+      ].includes(h.status?.toLowerCase() || '') && h.tasks?.due_date,
+  )
+
+  let nextScheduledDate = null
+  if (pendingWithDueDate?.tasks?.due_date) {
+    nextScheduledDate = pendingWithDueDate.tasks.due_date
+  } else if (audit?.frequency && audit?.frequency !== 'Única') {
+    const baseDate = lastExecutionData?.realization_date || audit.start_date
+    nextScheduledDate = calculateNextDate(audit.frequency, baseDate)?.toISOString()
+  }
+
   return (
     <>
       <PrintLayout
@@ -255,149 +392,278 @@ function AuditoriaDetalhesInner() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações Gerais</CardTitle>
-            <CardDescription>
-              Preencha os participantes antes de iniciar a avaliação
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label>Participantes</Label>
-              <Input
-                placeholder="Ex: João Silva, Maria Souza"
-                value={participants}
-                onChange={(e) => setParticipants(e.target.value)}
-                disabled={isFinalized}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="checklist" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="checklist" className="gap-2">
+              <ClipboardList className="w-4 h-4" /> Checklist
+            </TabsTrigger>
+            <TabsTrigger value="historico" className="gap-2">
+              <History className="w-4 h-4" /> Histórico & Agendamento
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Critérios de Avaliação</h2>
-          {actions.map((action, index) => (
-            <Card key={action.id}>
+          <TabsContent value="checklist" className="space-y-6">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span>
-                    {index + 1}. {action.title}
-                  </span>
-                  <span className="text-sm font-normal text-muted-foreground">
-                    Peso: {action.weight}
-                  </span>
-                </CardTitle>
-                {action.evidence_required && (
-                  <CardDescription className="text-destructive font-medium">
-                    * Evidência obrigatória para este critério
-                  </CardDescription>
-                )}
+                <CardTitle>Informações Gerais</CardTitle>
+                <CardDescription>
+                  Preencha os participantes antes de iniciar a avaliação
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Nota</Label>
-                      <Select
-                        value={answers[action.id]?.score?.toString() || ''}
-                        onValueChange={(val) =>
-                          handleAnswerChange(action.id, 'score', parseInt(val))
-                        }
-                        disabled={isFinalized}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma nota" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {scoringSettings.map((setting: any) => (
-                            <SelectItem key={setting.score} value={setting.score.toString()}>
-                              {setting.score} - {setting.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Observações</Label>
-                      <Textarea
-                        placeholder="Detalhes adicionais..."
-                        value={answers[action.id]?.observations || ''}
-                        onChange={(e) =>
-                          handleAnswerChange(action.id, 'observations', e.target.value)
-                        }
-                        disabled={isFinalized}
-                      />
-                    </div>
-                  </div>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label>Participantes</Label>
+                  <Input
+                    placeholder="Ex: João Silva, Maria Souza"
+                    value={participants}
+                    onChange={(e) => setParticipants(e.target.value)}
+                    disabled={isFinalized}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Paperclip className="h-4 w-4" />
-                      Evidências (Fotos/Documentos)
-                    </Label>
-                    {isFinalized ? (
-                      <div className="grid grid-cols-2 gap-4 mt-2">
-                        {Array.from(
-                          new Set(
-                            (answers[action.id]?.evidence_urls || []).concat(
-                              answers[action.id]?.evidence_url
-                                ? [answers[action.id]?.evidence_url]
-                                : [],
-                            ),
-                          ),
-                        ).map((url: string, i: number) => (
-                          <a
-                            key={i}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block relative aspect-square rounded-lg border bg-muted overflow-hidden hover:opacity-90 transition-opacity"
-                          >
-                            {url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                              <img
-                                src={url}
-                                alt="Evidência"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
-                                <span className="text-xs truncate w-full px-2">Ver Arquivo</span>
-                              </div>
-                            )}
-                          </a>
-                        ))}
-                        {!answers[action.id]?.evidence_urls?.length &&
-                          !answers[action.id]?.evidence_url && (
-                            <span className="text-sm text-muted-foreground">Sem evidências</span>
-                          )}
-                      </div>
-                    ) : (
-                      <FileUpload
-                        multiple
-                        showThumbnails
-                        bucket="documents"
-                        existingUrls={Array.from(
-                          new Set(
-                            (answers[action.id]?.evidence_urls || []).concat(
-                              answers[action.id]?.evidence_url
-                                ? [answers[action.id]?.evidence_url]
-                                : [],
-                            ),
-                          ),
-                        )}
-                        onUploadComplete={(urls) => {
-                          handleAnswerChange(action.id, 'evidence_url', null)
-                          handleAnswerChange(action.id, 'evidence_urls', urls)
-                        }}
-                      />
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">Critérios de Avaliação</h2>
+              {actions.map((action, index) => (
+                <Card key={action.id}>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <span>
+                        {index + 1}. {action.title}
+                      </span>
+                      <span className="text-sm font-normal text-muted-foreground">
+                        Peso: {action.weight}
+                      </span>
+                    </CardTitle>
+                    {action.evidence_required && (
+                      <CardDescription className="text-destructive font-medium">
+                        * Evidência obrigatória para este critério
+                      </CardDescription>
                     )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Nota</Label>
+                          <Select
+                            value={answers[action.id]?.score?.toString() || ''}
+                            onValueChange={(val) =>
+                              handleAnswerChange(action.id, 'score', parseInt(val))
+                            }
+                            disabled={isFinalized}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma nota" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {scoringSettings.map((setting: any) => (
+                                <SelectItem key={setting.score} value={setting.score.toString()}>
+                                  {setting.score} - {setting.description}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Observações</Label>
+                          <Textarea
+                            placeholder="Detalhes adicionais..."
+                            value={answers[action.id]?.observations || ''}
+                            onChange={(e) =>
+                              handleAnswerChange(action.id, 'observations', e.target.value)
+                            }
+                            disabled={isFinalized}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Paperclip className="h-4 w-4" />
+                          Evidências (Fotos/Documentos)
+                        </Label>
+                        {isFinalized ? (
+                          <div className="grid grid-cols-2 gap-4 mt-2">
+                            {Array.from(
+                              new Set(
+                                (answers[action.id]?.evidence_urls || []).concat(
+                                  answers[action.id]?.evidence_url
+                                    ? [answers[action.id]?.evidence_url]
+                                    : [],
+                                ),
+                              ),
+                            ).map((url: string, i: number) => (
+                              <a
+                                key={i}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block relative aspect-square rounded-lg border bg-muted overflow-hidden hover:opacity-90 transition-opacity"
+                              >
+                                {url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                  <img
+                                    src={url}
+                                    alt="Evidência"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
+                                    <span className="text-xs truncate w-full px-2">
+                                      Ver Arquivo
+                                    </span>
+                                  </div>
+                                )}
+                              </a>
+                            ))}
+                            {!answers[action.id]?.evidence_urls?.length &&
+                              !answers[action.id]?.evidence_url && (
+                                <span className="text-sm text-muted-foreground">
+                                  Sem evidências
+                                </span>
+                              )}
+                          </div>
+                        ) : (
+                          <FileUpload
+                            multiple
+                            showThumbnails
+                            bucket="documents"
+                            existingUrls={Array.from(
+                              new Set(
+                                (answers[action.id]?.evidence_urls || []).concat(
+                                  answers[action.id]?.evidence_url
+                                    ? [answers[action.id]?.evidence_url]
+                                    : [],
+                                ),
+                              ),
+                            )}
+                            onUploadComplete={(urls) => {
+                              handleAnswerChange(action.id, 'evidence_url', null)
+                              handleAnswerChange(action.id, 'evidence_urls', urls)
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="historico" className="space-y-6 animate-fade-in-up">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                  Resumo do Agendamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Frequência</p>
+                    <p className="text-base font-semibold">{audit?.frequency || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Data de Início</p>
+                    <p className="text-base font-semibold">
+                      {audit?.start_date ? format(parseISO(audit.start_date), 'dd/MM/yyyy') : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Última Auditoria</p>
+                    <p className="text-base font-semibold">
+                      {lastExecutionData?.realization_date
+                        ? format(parseISO(lastExecutionData.realization_date), 'dd/MM/yyyy')
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Próxima Agendada</p>
+                    <p className="text-base font-semibold">
+                      {nextScheduledDate ? format(parseISO(nextScheduledDate), 'dd/MM/yyyy') : '-'}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <History className="w-5 h-5 text-primary" />
+                  Histórico de Execuções
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {history.length === 0 ? (
+                  <div className="flex items-center justify-center p-6 text-muted-foreground gap-2">
+                    <Info className="w-5 h-5" />
+                    Nenhum histórico de execução encontrado para esta auditoria.
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tarefa</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Data de Realização</TableHead>
+                          <TableHead>Pontuação</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {history.map((h) => {
+                          const isCompleted =
+                            [
+                              'finalizado',
+                              'concluído',
+                              'concluida',
+                              'concluido',
+                              'realizado',
+                              'realizada',
+                              'completed',
+                              'finished',
+                            ].includes(h.status?.toLowerCase() || '') || h.realization_date
+
+                          let scoreDisplay = '-'
+                          if (isCompleted) {
+                            if (h.final_score !== null && h.max_score !== null) {
+                              scoreDisplay = `${h.final_score} / ${h.max_score}`
+                            } else {
+                              scoreDisplay = 'Processando'
+                            }
+                          }
+
+                          return (
+                            <TableRow
+                              key={h.id}
+                              className="cursor-pointer hover:bg-muted/50 transition-colors"
+                              onClick={() => navigate(`/auditoria-checklist/detalhes/${h.id}`)}
+                            >
+                              <TableCell className="font-medium text-primary hover:underline">
+                                {h.tasks?.task_number || '-'}
+                              </TableCell>
+                              <TableCell>{getStatusBadge(h.status)}</TableCell>
+                              <TableCell>
+                                {h.realization_date
+                                  ? format(parseISO(h.realization_date), 'dd/MM/yyyy')
+                                  : '-'}
+                              </TableCell>
+                              <TableCell className="font-medium">{scoreDisplay}</TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   )
