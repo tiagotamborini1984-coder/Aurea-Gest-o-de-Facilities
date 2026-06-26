@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { parseISO, eachDayOfInterval, format } from 'date-fns'
+import { parseISO, eachDayOfInterval, format, eachMonthOfInterval } from 'date-fns'
 
 export function useDashboardCalculations(
   logs: any[],
@@ -158,7 +158,32 @@ export function useDashboardCalculations(
       })
     })
 
-    const contratado = globalDays > 0 ? totalContractedSum / globalDays : 0
+    let contratado = 0
+
+    if (activeTab === 'equipamentos') {
+      const monthsInPeriod = eachMonthOfInterval({
+        start: parseISO(dateFrom),
+        end: parseISO(dateTo),
+      }).map((d) => format(d, 'yyyy-MM-01'))
+
+      let totalEquipContractedForPeriod = 0
+
+      monthsInPeriod.forEach((monthDate) => {
+        validPlants.forEach((pid) => {
+          const pCont = getApplicableContracted(pid, 'equipamento', monthDate).reduce(
+            (sum, c) => sum + c.quantity,
+            0,
+          )
+          totalEquipContractedForPeriod += pCont
+        })
+      })
+
+      contratado =
+        monthsInPeriod.length > 0 ? totalEquipContractedForPeriod / monthsInPeriod.length : 0
+    } else {
+      contratado = globalDays > 0 ? totalContractedSum / globalDays : 0
+    }
+
     const avgPresente = globalDays > 0 ? totalPresentCount / globalDays : 0
     const avgAusente = globalDays > 0 ? totalAbsentCount / globalDays : 0
     const avgLancado = globalDays > 0 ? totalLancadoCount / globalDays : 0
@@ -167,6 +192,12 @@ export function useDashboardCalculations(
       contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
 
     const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
+
+    const formatContratadoPrecision = (num: number) => {
+      if (Number.isInteger(num)) return num.toString()
+      const val = num.toFixed(2)
+      return val.replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')
+    }
 
     const plantStats = plants
       .filter((p) => validPlants.includes(p.id))
@@ -179,21 +210,38 @@ export function useDashboardCalculations(
         const pPres = pDays > 0 ? pValidLogs.filter((l) => l.status).length / pDays : 0
         const pAbs = pDays > 0 ? pValidLogs.filter((l) => !l.status).length / pDays : 0
 
-        let sumContratado = 0
-        pValidDates.forEach((date) => {
-          sumContratado += getApplicableContracted(plant.id, typeCont, date, (c) => {
-            if (selectedCompanies.length > 0 && c.type === 'colaborador') {
-              const validCompanyIds = new Set(
-                employees
-                  .filter((e) => companiesSet.has(e.company_name) && e.company_id)
-                  .map((e) => e.company_id),
-              )
-              if (c.company_id && !validCompanyIds.has(c.company_id)) return false
-            }
-            return true
-          }).reduce((sum, c) => sum + c.quantity, 0)
-        })
-        const pCont = pDays > 0 ? Math.round(sumContratado / pDays) : 0
+        let pCont = 0
+        if (typeCont === 'equipamento') {
+          const monthsInPeriod = eachMonthOfInterval({
+            start: parseISO(dateFrom),
+            end: parseISO(dateTo),
+          }).map((d) => format(d, 'yyyy-MM-01'))
+
+          let sumContratado = 0
+          monthsInPeriod.forEach((monthDate) => {
+            sumContratado += getApplicableContracted(plant.id, typeCont, monthDate).reduce(
+              (sum, c) => sum + c.quantity,
+              0,
+            )
+          })
+          pCont = monthsInPeriod.length > 0 ? Math.round(sumContratado / monthsInPeriod.length) : 0
+        } else {
+          let sumContratado = 0
+          pValidDates.forEach((date) => {
+            sumContratado += getApplicableContracted(plant.id, typeCont, date, (c) => {
+              if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+                const validCompanyIds = new Set(
+                  employees
+                    .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                    .map((e) => e.company_id),
+                )
+                if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+              }
+              return true
+            }).reduce((sum, c) => sum + c.quantity, 0)
+          })
+          pCont = pDays > 0 ? Math.round(sumContratado / pDays) : 0
+        }
 
         const dailyTrend = Array.from(pValidDates)
           .sort()
@@ -257,18 +305,40 @@ export function useDashboardCalculations(
         const lPres = lDays > 0 ? lLogs.filter((l) => l.status).length / lDays : 0
         const lAbs = lDays > 0 ? lLogs.filter((l) => !l.status).length / lDays : 0
 
-        let sumLocationContratado = 0
-        if (pValidDates) {
-          pValidDates.forEach((date) => {
+        let lCont = 0
+        if (typeCont === 'equipamento') {
+          const monthsInPeriod = eachMonthOfInterval({
+            start: parseISO(dateFrom),
+            end: parseISO(dateTo),
+          }).map((d) => format(d, 'yyyy-MM-01'))
+
+          let sumLocationContratado = 0
+          monthsInPeriod.forEach((monthDate) => {
             sumLocationContratado += getApplicableContracted(
               plantId,
               typeCont,
-              date,
+              monthDate,
               (c) => c.location_id === loc.id,
             ).reduce((sum, c) => sum + c.quantity, 0)
           })
+          lCont =
+            monthsInPeriod.length > 0
+              ? Math.round(sumLocationContratado / monthsInPeriod.length)
+              : 0
+        } else {
+          let sumLocationContratado = 0
+          if (pValidDates) {
+            pValidDates.forEach((date) => {
+              sumLocationContratado += getApplicableContracted(
+                plantId,
+                typeCont,
+                date,
+                (c) => c.location_id === loc.id,
+              ).reduce((sum, c) => sum + c.quantity, 0)
+            })
+          }
+          lCont = lDays > 0 ? Math.round(sumLocationContratado / lDays) : 0
         }
-        const lCont = lDays > 0 ? Math.round(sumLocationContratado / lDays) : 0
 
         const dailyTrend = Array.from(pValidDates || [])
           .sort()
@@ -321,24 +391,28 @@ export function useDashboardCalculations(
               const plantId = eq.plant_id
               const pValidDates = plantValidDatesMap[plantId]
 
+              const monthsInPeriod = eachMonthOfInterval({
+                start: parseISO(dateFrom),
+                end: parseISO(dateTo),
+              }).map((d) => format(d, 'yyyy-MM-01'))
+
               let sumEqContratado = 0
-              if (pValidDates) {
-                pValidDates.forEach((date) => {
-                  const eqRecords = getApplicableContracted(
-                    plantId,
-                    'equipamento',
-                    date,
-                    (c) => c.equipment_id === eq.id,
-                  )
-                  sumEqContratado +=
-                    eqRecords.length > 0
-                      ? eqRecords.reduce((sum, c) => sum + c.quantity, 0)
-                      : eq.quantity
-                })
-              }
+              monthsInPeriod.forEach((monthDate) => {
+                const eqRecords = getApplicableContracted(
+                  plantId,
+                  'equipamento',
+                  monthDate,
+                  (c) => c.equipment_id === eq.id,
+                )
+                sumEqContratado +=
+                  eqRecords.length > 0
+                    ? eqRecords.reduce((sum, c) => sum + c.quantity, 0)
+                    : eq.quantity
+              })
+
               const eqCont =
-                pValidDates && pValidDates.size > 0
-                  ? Math.round(sumEqContratado / pValidDates.size)
+                monthsInPeriod.length > 0
+                  ? Math.round(sumEqContratado / monthsInPeriod.length)
                   : eq.quantity
 
               const eqLogs = processedLogs
@@ -522,7 +596,10 @@ export function useDashboardCalculations(
         lancado: formatStr(avgLancado),
         presente: formatStr(avgPresente),
         ausente: formatStr(avgAusente),
-        contratado: formatStr(contratado),
+        contratado:
+          activeTab === 'equipamentos'
+            ? formatContratadoPrecision(contratado)
+            : formatStr(contratado),
         absenteismo,
         excludedDaysCount,
         locationStats,
