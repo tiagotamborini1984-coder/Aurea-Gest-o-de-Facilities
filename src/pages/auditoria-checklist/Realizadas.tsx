@@ -127,7 +127,10 @@ export default function AuditoriaRealizadas() {
           ),
           audit_execution_answers (
             id,
-            score
+            score,
+            audit_actions (
+              weight
+            )
           )
         `)
 
@@ -193,7 +196,7 @@ export default function AuditoriaRealizadas() {
               audit.final_score !== null
                 ? audit.final_score
                 : audit.audit_execution_answers.reduce((acc: number, curr: any) => {
-                    const weight = Number(curr.audit_actions?.weight) || 1
+                    const weight = curr.audit_actions ? Number(curr.audit_actions.weight) || 1 : 1
                     return acc + (Number(curr.score) || 0) * weight
                   }, 0)
 
