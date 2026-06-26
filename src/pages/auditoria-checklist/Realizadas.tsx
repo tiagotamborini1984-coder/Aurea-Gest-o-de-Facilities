@@ -180,10 +180,8 @@ export default function AuditoriaRealizadas() {
             audit.tasks?.task_statuses?.name?.toLowerCase() === 'finalizado'
 
           const hasScoreAndDate = audit.final_score !== null && audit.realization_date !== null
-          const hasAnswers =
-            audit.audit_execution_answers && audit.audit_execution_answers.length > 0
 
-          return (isExecutionFinished || isTaskFinished || hasScoreAndDate) && hasAnswers
+          return isExecutionFinished || isTaskFinished || hasScoreAndDate
         })
         .map((audit: any) => {
           // Calculate missing scores if needed

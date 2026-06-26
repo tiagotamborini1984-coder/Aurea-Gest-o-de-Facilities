@@ -160,11 +160,18 @@ export default function DashboardMetricsCards({
           </div>
           <div>
             <p className="text-[10px] lg:text-xs font-medium text-amber-500 uppercase tracking-wider">
-              Média Contratado
+              {activeTab === 'colaboradores'
+                ? 'Média Contratada'
+                : 'Média Contratada de Equipamentos'}
             </p>
-            <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
-              {metrics.contratado}
-            </p>
+            <div className="flex items-baseline mt-0.5">
+              <p className="text-xl lg:text-2xl font-bold text-foreground">{metrics.contratado}</p>
+              {activeTab === 'equipamentos' && (
+                <span className="text-[10px] lg:text-xs font-normal text-muted-foreground ml-1.5">
+                  Equipamentos
+                </span>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
