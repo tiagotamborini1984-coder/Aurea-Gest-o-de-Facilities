@@ -185,11 +185,17 @@ export default function AuditoriaRealizadas() {
         })
         .map((audit: any) => {
           // Calculate missing scores if needed
-          if (audit.final_score === null && audit.audit_execution_answers?.length > 0) {
-            const computedScore = audit.audit_execution_answers.reduce(
-              (acc: number, curr: any) => acc + (Number(curr.score) || 0),
-              0,
-            )
+          if (
+            (audit.final_score === null || audit.max_score === null || audit.max_score === 0) &&
+            audit.audit_execution_answers?.length > 0
+          ) {
+            const computedScore =
+              audit.final_score !== null
+                ? audit.final_score
+                : audit.audit_execution_answers.reduce(
+                    (acc: number, curr: any) => acc + (Number(curr.score) || 0),
+                    0,
+                  )
 
             let computedMax = audit.max_score || 0
             if (!computedMax && audit.audits?.scoring_settings) {
@@ -211,7 +217,7 @@ export default function AuditoriaRealizadas() {
             return {
               ...audit,
               final_score: computedScore,
-              max_score: computedMax > 0 ? computedMax : computedScore, // fallback
+              max_score: computedMax > 0 ? computedMax : Math.max(computedScore, 1), // fallback
             }
           }
           return audit
