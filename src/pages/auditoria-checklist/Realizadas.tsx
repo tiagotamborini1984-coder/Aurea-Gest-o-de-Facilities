@@ -192,10 +192,10 @@ export default function AuditoriaRealizadas() {
             const computedScore =
               audit.final_score !== null
                 ? audit.final_score
-                : audit.audit_execution_answers.reduce(
-                    (acc: number, curr: any) => acc + (Number(curr.score) || 0),
-                    0,
-                  )
+                : audit.audit_execution_answers.reduce((acc: number, curr: any) => {
+                    const weight = Number(curr.audit_actions?.weight) || 1
+                    return acc + (Number(curr.score) || 0) * weight
+                  }, 0)
 
             let computedMax = audit.max_score || 0
             if (!computedMax && audit.audits?.scoring_settings) {
