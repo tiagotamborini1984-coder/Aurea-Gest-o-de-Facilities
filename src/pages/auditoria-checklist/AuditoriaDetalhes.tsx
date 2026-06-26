@@ -203,7 +203,7 @@ function AuditoriaDetalhesInner() {
         })
         setAnswers(ansMap)
 
-        // Fetch execution history for this audit
+        // Fetch execution history for this audit (plant specific)
         const { data: histData } = await supabase
           .from('audit_executions')
           .select(`
@@ -216,6 +216,7 @@ function AuditoriaDetalhesInner() {
             tasks ( task_number, due_date )
           `)
           .eq('audit_id', execData.audit_id)
+          .eq('plant_id', execData.plant_id)
           .order('created_at', { ascending: false })
 
         if (histData) setHistory(histData)
@@ -305,19 +306,29 @@ function AuditoriaDetalhesInner() {
     (execution.final_score !== null && execution.realization_date !== null)
 
   // Derived calculations for the History & Schedule tab
-  const completedHistory = history.filter(
-    (h) =>
-      [
-        'finalizado',
-        'concluído',
-        'concluida',
-        'realizada',
-        'realizado',
-        'concluido',
-        'completed',
-        'finished',
-      ].includes(h.status?.toLowerCase() || '') || h.realization_date,
-  )
+  const completedHistory = history
+    .filter(
+      (h) =>
+        [
+          'finalizado',
+          'concluído',
+          'concluida',
+          'realizada',
+          'realizado',
+          'concluido',
+          'completed',
+          'finished',
+        ].includes(h.status?.toLowerCase() || '') || h.realization_date,
+    )
+    .sort((a, b) => {
+      const dateA = a.realization_date
+        ? new Date(a.realization_date).getTime()
+        : new Date(a.created_at).getTime()
+      const dateB = b.realization_date
+        ? new Date(b.realization_date).getTime()
+        : new Date(b.created_at).getTime()
+      return dateB - dateA
+    })
   const lastExecutionData = completedHistory[0]
 
   const pendingWithDueDate = history.find(
@@ -601,7 +612,7 @@ function AuditoriaDetalhesInner() {
                 {history.length === 0 ? (
                   <div className="flex items-center justify-center p-6 text-muted-foreground gap-2">
                     <Info className="w-5 h-5" />
-                    Nenhum histórico de execução encontrado para esta auditoria.
+                    Nenhum histórico encontrado para esta planta.
                   </div>
                 ) : (
                   <div className="rounded-md border">
