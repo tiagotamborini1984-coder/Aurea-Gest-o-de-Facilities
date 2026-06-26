@@ -152,10 +152,8 @@ function AuditoriaDetalhesInner() {
     setSaving(true)
     try {
       const formattedAnswers = Object.entries(answers).map(([action_id, val]) => ({
-        value: {
-          action_id,
-          ...val,
-        },
+        action_id,
+        ...val,
       }))
 
       await submitAuditExecution(id, formattedAnswers, participants, isDraft)
