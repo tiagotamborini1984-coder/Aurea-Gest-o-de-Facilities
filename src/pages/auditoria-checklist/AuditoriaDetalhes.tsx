@@ -51,6 +51,8 @@ function calculateNextDate(frequency: string, baseDateStr: string | null) {
       return addDays(baseDate, 1)
     case 'semanal':
       return addWeeks(baseDate, 1)
+    case 'quinzenal':
+      return addDays(baseDate, 15)
     case 'mensal':
       return addMonths(baseDate, 1)
     case 'bimestral':

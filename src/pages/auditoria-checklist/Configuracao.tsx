@@ -186,6 +186,7 @@ export default function AuditoriaConfig() {
                 <SelectItem value="Única">Única</SelectItem>
                 <SelectItem value="Diária">Diária</SelectItem>
                 <SelectItem value="Semanal">Semanal</SelectItem>
+                <SelectItem value="Quinzenal">Quinzenal</SelectItem>
                 <SelectItem value="Mensal">Mensal</SelectItem>
                 <SelectItem value="Semestral">Semestral</SelectItem>
                 <SelectItem value="Anual">Anual</SelectItem>
