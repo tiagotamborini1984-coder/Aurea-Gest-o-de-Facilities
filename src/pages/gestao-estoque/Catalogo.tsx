@@ -5,7 +5,16 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ShoppingCart, Search, FileText, Plus, Minus, PackageOpen, Filter } from 'lucide-react'
+import {
+  ShoppingCart,
+  Search,
+  FileText,
+  Plus,
+  Minus,
+  PackageOpen,
+  Filter,
+  ExternalLink,
+} from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -14,6 +23,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -23,7 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 
 export default function Catalogo() {
@@ -317,17 +327,24 @@ export default function Catalogo() {
                       key={item.product.id}
                       className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100"
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{item.product.name}</p>
-                        <p className="text-xs text-slate-500">{item.product.category}</p>
-                      </div>
+                        <p className="text-xs text-slate-500">
+                          {formatCurrency(item.product.item_value)}{' '}
+                          {item.product.unit_of_measure ? `/ ${item.product.unit_of_measure}` : ''}
+                        </p>
+                        <p className="text-xs font-medium text-slate-700 mt-0.5">
+                          Subtotal: {formatCurrency((item.product.item_value ?? 0) * item.quantity)}
+                        </p>
+                      </div>{' '}
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-7 w-7 shrink-0"
                           onClick={() => updateQuantity(item.product.id, -1)}
                         >
+                          {' '}
                           <Minus className="w-3 h-3" />
                         </Button>
                         <span className="w-6 text-center text-sm">{item.quantity}</span>
@@ -345,7 +362,20 @@ export default function Catalogo() {
                 </div>
               )}
             </div>
-            <SheetFooter className="mt-auto pt-4 border-t border-slate-200">
+            <SheetFooter className="mt-auto pt-4 border-t border-slate-200 gap-3">
+              {cart.length > 0 && (
+                <div className="flex justify-between items-center w-full px-1 pb-2">
+                  <span className="text-sm font-medium text-slate-600">Total do Pedido</span>
+                  <span className="text-lg font-bold text-slate-900">
+                    {formatCurrency(
+                      cart.reduce(
+                        (acc, item) => acc + (item.product.item_value ?? 0) * item.quantity,
+                        0,
+                      ),
+                    )}
+                  </span>
+                </div>
+              )}
               <Button
                 disabled={
                   cart.length === 0 ||
@@ -412,22 +442,22 @@ export default function Catalogo() {
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
-                  {product.sds_url && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-blue-600 hover:text-blue-800 flex-shrink-0"
-                      asChild
-                    >
-                      <a
-                        href={product.sds_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Ver FDS/SDS"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                      </a>
-                    </Button>
+                  {product.sds_url && product.sds_url.trim() !== '' && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-blue-600 hover:text-blue-800 hover:bg-blue-50 flex-shrink-0"
+                          asChild
+                        >
+                          <a href={product.sds_url} target="_blank" rel="noreferrer">
+                            <FileText className="w-4 h-4" />
+                          </a>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Ver FDS/SDS</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">{product.category}</p>
@@ -435,6 +465,11 @@ export default function Catalogo() {
             </CardHeader>
             <CardContent className="p-4 pt-0 flex-1">
               <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description}</p>
+              <p className="text-base font-semibold text-slate-800 mt-2">
+                {product.item_value != null
+                  ? formatCurrency(product.item_value)
+                  : 'Valor não informado'}
+              </p>
             </CardContent>
             <CardFooter className="p-4 pt-0 flex flex-col gap-2">
               <div className="flex items-center justify-between w-full border border-slate-200 rounded-md p-1">
@@ -476,6 +511,24 @@ export default function Catalogo() {
               >
                 Adicionar
               </Button>
+              {product.sds_url && product.sds_url.trim() !== '' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    'w-full text-blue-700 border-blue-200 bg-blue-50/50',
+                    'hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300',
+                    'transition-colors duration-200',
+                  )}
+                  asChild
+                >
+                  <a href={product.sds_url} target="_blank" rel="noreferrer">
+                    <FileText className="w-3.5 h-3.5 mr-1.5" />
+                    Ver FDS
+                    <ExternalLink className="w-3 h-3 ml-1.5 text-blue-400" />
+                  </a>
+                </Button>
+              )}
             </CardFooter>
           </Card>
         ))}

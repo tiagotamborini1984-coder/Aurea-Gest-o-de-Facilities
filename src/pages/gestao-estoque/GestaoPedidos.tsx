@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Package, Filter, Trash } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 import {
   AlertDialog,
@@ -382,7 +383,14 @@ export default function GestaoPedidos() {
                         <TableCell className="text-sm">
                           <div className="flex items-center gap-2">
                             <Package className="w-4 h-4 text-slate-400" />
-                            <span>{item.product?.name}</span>
+                            <div>
+                              <span>{item.product?.name}</span>
+                              <p className="text-xs text-slate-500">
+                                {item.product?.item_value != null
+                                  ? formatCurrency(item.product.item_value)
+                                  : 'Valor não informado'}
+                              </p>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="font-medium text-sm text-center">
@@ -410,6 +418,21 @@ export default function GestaoPedidos() {
                   </TableBody>
                 </Table>
               </div>
+
+              {selectedRequest.items && selectedRequest.items.length > 0 && (
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-sm font-semibold text-slate-700">Total do Pedido</span>
+                  <span className="text-lg font-bold text-slate-900">
+                    {formatCurrency(
+                      selectedRequest.items.reduce(
+                        (acc: number, item: any) =>
+                          acc + (item.product?.item_value ?? 0) * item.quantity,
+                        0,
+                      ),
+                    )}
+                  </span>
+                </div>
+              )}
 
               {selectedRequest.status === 'Pendente' && (
                 <div className="space-y-2 pt-4 border-t">

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
+import { formatCurrency } from '@/lib/utils'
 
 export default function MeusPedidos() {
   const { activeClient } = useAppStore()
@@ -196,12 +197,34 @@ export default function MeusPedidos() {
                           <p className="font-medium text-sm">{item.product?.name}</p>
                           <p className="text-xs text-slate-500">
                             Qtd: {item.quantity} {item.product?.unit_of_measure}
+                            {item.product?.item_value != null && (
+                              <> · {formatCurrency(item.product.item_value)}</>
+                            )}
                           </p>
                         </div>
                       </div>
+                      {item.product?.item_value != null && (
+                        <span className="text-sm font-semibold text-slate-700">
+                          {formatCurrency(item.product.item_value * item.quantity)}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
+                {selectedRequest.items?.some((item: any) => item.product?.item_value != null) && (
+                  <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                    <span className="font-semibold text-slate-700">Total do Pedido</span>
+                    <span className="text-lg font-bold text-slate-900">
+                      {formatCurrency(
+                        selectedRequest.items.reduce(
+                          (acc: number, item: any) =>
+                            acc + (item.product?.item_value ?? 0) * item.quantity,
+                          0,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

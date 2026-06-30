@@ -12,3 +12,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Add any other utility functions here
+
+export function formatCurrency(value: number | null | undefined): string {
+  const num = value ?? 0
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(num)
+}
