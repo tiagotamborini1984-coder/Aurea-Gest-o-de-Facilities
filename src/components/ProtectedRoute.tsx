@@ -7,10 +7,10 @@ import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 
 export function ProtectedRoute() {
-  const { user, loading } = useAuth()
+  const { user, loading, refreshing } = useAuth()
   const { toast } = useToast()
 
-  if (loading) {
+  if (loading || refreshing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-brand-vividBlue" />
