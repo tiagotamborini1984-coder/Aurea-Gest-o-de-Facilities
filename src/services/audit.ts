@@ -34,6 +34,57 @@ export const submitAuditExecution = async (
   return data
 }
 
+export const cloneAudit = async (auditId: string, userId: string) => {
+  const { audit, actions, assignments } = await getAuditConfig(auditId)
+
+  const { data: newAudit, error: auditError } = await supabase
+    .from('audits')
+    .insert({
+      client_id: audit.client_id,
+      title: `[Cópia] ${audit.title}`,
+      type: audit.type,
+      frequency: audit.frequency,
+      start_date: audit.start_date,
+      status: 'Rascunho',
+      scoring_settings: audit.scoring_settings,
+      sla_days: audit.sla_days,
+      advance_notice_days: audit.advance_notice_days,
+    })
+    .select()
+    .single()
+
+  if (auditError) throw auditError
+
+  if (actions && actions.length > 0) {
+    const clonedActions = actions.map((a) => ({
+      audit_id: newAudit.id,
+      title: a.title,
+      weight: a.weight,
+      order_index: a.order_index,
+      evidence_required: a.evidence_required,
+      comments_required: a.comments_required,
+    }))
+    const { error: actionsError } = await supabase.from('audit_actions').insert(clonedActions)
+    if (actionsError) throw actionsError
+  }
+
+  if (assignments && assignments.length > 0) {
+    const clonedAssignments = assignments.map((a) => ({
+      audit_id: newAudit.id,
+      plant_id: a.plant_id,
+      assignee_id: a.assignee_id,
+    }))
+    const { error: assignmentsError } = await supabase
+      .from('audit_assignments')
+      .insert(clonedAssignments)
+    if (assignmentsError) throw assignmentsError
+  }
+
+  await logAudit(audit.client_id, userId, 'clone_audit', `Audit cloned: ${audit.title}`)
+
+  return newAudit.id
+}
+
 export const getAuditConfig = async (auditId: string) => {
   const { data: audit, error: auditError } = await supabase
     .from('audits')

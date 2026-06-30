@@ -12,8 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Edit, Play, FileText } from 'lucide-react'
+import { Plus, Edit, Play, FileText, Copy } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
+import { cloneAudit } from '@/services/audit'
 
 export default function AuditoriasCriadas() {
   const navigate = useNavigate()
@@ -22,6 +23,23 @@ export default function AuditoriasCriadas() {
   const [audits, setAudits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [exportingId, setExportingId] = useState<string | null>(null)
+  const [cloningId, setCloningId] = useState<string | null>(null)
+
+  const handleClone = async (audit: any) => {
+    setCloningId(audit.id)
+    try {
+      const newAuditId = await cloneAudit(audit.id, user?.id || '')
+      toast({
+        title: 'Sucesso',
+        description: 'Auditoria clonada com sucesso! Redirecionando para edição...',
+      })
+      navigate(`/auditoria-checklist/configuracao/${newAuditId}`)
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setCloningId(null)
+    }
+  }
 
   useEffect(() => {
     const fetchAudits = async () => {
@@ -209,6 +227,18 @@ export default function AuditoriasCriadas() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Clonar Auditoria"
+                          disabled={cloningId === audit.id}
+                          onClick={() => handleClone(audit)}
+                        >
+                          <Copy
+                            className={`w-4 h-4 ${cloningId === audit.id ? 'animate-pulse' : ''}`}
+                          />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Editar"
                           onClick={() => navigate(`/auditoria-checklist/configuracao/${audit.id}`)}
                         >
                           <Edit className="w-4 h-4" />
