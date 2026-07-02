@@ -17,6 +17,51 @@ export const inventoryService = {
     return data || []
   },
 
+  async getPlantInventoryValue(clientId: string) {
+    const { data, error } = await supabase
+      .from('inventory_requests')
+      .select(`
+        id,
+        plant_id,
+        plant:plants!inventory_requests_plant_id_fkey(id, name, code, city),
+        items:inventory_request_items(
+          quantity,
+          product:inventory_products(item_value)
+        )
+      `)
+      .eq('client_id', clientId)
+
+    if (error) throw error
+
+    const { data: plants, error: plantsError } = await supabase
+      .from('plants')
+      .select('id, name, code, city')
+      .eq('client_id', clientId)
+
+    if (plantsError) throw plantsError
+
+    const valueMap: Record<string, number> = {}
+    ;(plants || []).forEach((p) => {
+      valueMap[p.id] = 0
+    })
+
+    ;(data || []).forEach((req: any) => {
+      const plantId = req.plant?.id || req.plant_id
+      if (!plantId) return
+      const itemsTotal = (req.items || []).reduce((sum: number, item: any) => {
+        const quantity = Number(item.quantity) || 0
+        const itemValue = Number(item.product?.item_value) || 0
+        return sum + quantity * itemValue
+      }, 0)
+      valueMap[plantId] = (valueMap[plantId] || 0) + itemsTotal
+    })
+
+    return (plants || []).map((p) => ({
+      ...p,
+      totalValue: valueMap[p.id] || 0,
+    }))
+  },
+
   async getAreas(plantId: string) {
     const { data, error } = await supabase
       .from('maintenance_areas')

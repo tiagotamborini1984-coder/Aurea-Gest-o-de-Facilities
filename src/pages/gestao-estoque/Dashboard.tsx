@@ -2,7 +2,15 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { inventoryService } from '@/services/inventory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Package, AlertTriangle, CheckCircle, TrendingUp, Filter } from 'lucide-react'
+import {
+  Package,
+  AlertTriangle,
+  CheckCircle,
+  TrendingUp,
+  Filter,
+  DollarSign,
+  Building2,
+} from 'lucide-react'
 import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
 import {
@@ -20,6 +28,7 @@ export default function DashboardEstoque() {
   const { activeClient } = useAppStore()
   const [requests, setRequests] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
+  const [plantsValue, setPlantsValue] = useState<any[]>([])
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: addDays(new Date(), -30),
@@ -32,6 +41,7 @@ export default function DashboardEstoque() {
     if (activeClient) {
       inventoryService.getRequests(activeClient.id).then(setRequests)
       inventoryService.getProducts(activeClient.id).then(setProducts)
+      inventoryService.getPlantInventoryValue(activeClient.id).then(setPlantsValue)
     }
   }, [activeClient])
 
@@ -191,6 +201,52 @@ export default function DashboardEstoque() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-emerald-600" />
+            Valor por Planta
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3 max-h-[350px] overflow-auto">
+            {plantsValue.length === 0 && (
+              <div className="text-center py-10 text-slate-500">
+                Nenhuma planta cadastrada para este cliente.
+              </div>
+            )}
+            {plantsValue.map((p) => (
+              <div
+                key={p.id}
+                className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100/70 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800">{p.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {p.code ? `${p.code}` : ''}
+                      {p.city ? `${p.code ? ' · ' : ''}${p.city}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-emerald-700">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(p.totalValue || 0)}
+                  </p>
+                  <p className="text-xs text-slate-500">Valor Total</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
