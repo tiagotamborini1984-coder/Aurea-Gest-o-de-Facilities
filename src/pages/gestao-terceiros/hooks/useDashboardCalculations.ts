@@ -64,9 +64,12 @@ export function useDashboardCalculations(
     const activeLogs = filteredLogs.filter((l) => {
       if (l.type !== typeLog) return false
       if (typeLog === 'staff') {
-        return validEmpIds.has(l.reference_id)
+        if (selectedCompanies.length > 0) {
+          return validEmpIds.has(l.reference_id)
+        }
+        return true
       } else if (typeLog === 'equipment') {
-        return validEqIds.has(l.reference_id)
+        return true
       }
       return true
     })
@@ -441,25 +444,44 @@ export function useDashboardCalculations(
     const collaboratorStats =
       activeTab !== 'colaboradores'
         ? []
-        : employees
-            .filter((e) => selectedCompanies.length === 0 || companiesSet.has(e.company_name))
-            .map((emp) => {
-              const empLogs = activeLogs
-                .filter(
-                  (l) => l.reference_id === emp.id && plantValidDatesMap[l.plant_id]?.has(l.date),
-                )
-                .sort((a, b) => a.date.localeCompare(b.date))
-              return {
-                id: emp.id,
-                name: emp.name,
-                function_id: emp.function_id,
-                location: locations.find((l) => l.id === emp.location_id)?.name || 'N/A',
-                presencas: empLogs.filter((l) => l.status).length,
-                faltas: empLogs.filter((l) => !l.status).length,
-                history: empLogs.map((log) => ({ date: log.date, status: log.status })),
-              }
-            })
-            .filter((c) => c.history.length > 0)
+        : (() => {
+            const empMap = new Map<string, any>()
+            employees
+              .filter((e) => selectedCompanies.length === 0 || companiesSet.has(e.company_name))
+              .forEach((emp) => {
+                const empLogs = activeLogs
+                  .filter(
+                    (l) => l.reference_id === emp.id && plantValidDatesMap[l.plant_id]?.has(l.date),
+                  )
+                  .sort((a, b) => a.date.localeCompare(b.date))
+                if (empLogs.length === 0) return
+
+                const regNum = emp.registration_number?.trim()
+                const name = emp.name?.toLowerCase().trim()
+                const gKey = `${regNum || name || emp.id}-${emp.plant_id}`
+
+                if (!empMap.has(gKey)) {
+                  empMap.set(gKey, {
+                    id: emp.id,
+                    name: emp.name,
+                    function_id: emp.function_id,
+                    location: locations.find((l) => l.id === emp.location_id)?.name || 'N/A',
+                    presencas: empLogs.filter((l) => l.status).length,
+                    faltas: empLogs.filter((l) => !l.status).length,
+                    history: empLogs.map((log) => ({ date: log.date, status: log.status })),
+                  })
+                } else {
+                  const ex = empMap.get(gKey)
+                  ex.presencas += empLogs.filter((l) => l.status).length
+                  ex.faltas += empLogs.filter((l) => !l.status).length
+                  ex.history = [
+                    ...ex.history,
+                    ...empLogs.map((log) => ({ date: log.date, status: log.status })),
+                  ].sort((a: any, b: any) => a.date.localeCompare(b.date))
+                }
+              })
+            return Array.from(empMap.values())
+          })()
 
     const dailyTrend = Array.from(allValidDatesSet)
       .sort()
@@ -515,12 +537,7 @@ export function useDashboardCalculations(
           totalEquipContractedSum += eCont
 
           const ePres = processedLogs.filter(
-            (l) =>
-              l.type === 'equipment' &&
-              l.plant_id === pid &&
-              l.date === date &&
-              l.status &&
-              validEqIds.has(l.reference_id),
+            (l) => l.type === 'equipment' && l.plant_id === pid && l.date === date && l.status,
           ).length
           totalEquipPresentCount += ePres
         }

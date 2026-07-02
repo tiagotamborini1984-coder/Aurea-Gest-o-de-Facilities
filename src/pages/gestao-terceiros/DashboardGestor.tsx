@@ -74,8 +74,8 @@ export default function DashboardGestor() {
   const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
 
-  const { filteredEmployees, mappedLogs } = useMemo(() => {
-    if (!employees) return { filteredEmployees: [], mappedLogs: logs || [] }
+  const { filteredEmployees } = useMemo(() => {
+    if (!employees) return { filteredEmployees: [] }
 
     const uniqueEmpGroups = new Map<string, any[]>()
     const logReferenceIds = new Set((logs || []).map((l: any) => l.reference_id))
@@ -94,7 +94,6 @@ export default function DashboardGestor() {
     })
 
     const finalFilteredEmployees: any[] = []
-    const idToKeptId = new Map<string, string>()
 
     uniqueEmpGroups.forEach((group) => {
       const activeMembers = group.filter((e) => e.status === 'Ativo')
@@ -105,39 +104,14 @@ export default function DashboardGestor() {
         const primaryActive =
           activeMembers.find((am) => logReferenceIds.has(am.id)) || activeMembers[0]
         finalFilteredEmployees.push(primaryActive)
-
-        activeMembers.forEach((am) => {
-          if (am.id !== primaryActive.id) {
-            idToKeptId.set(am.id, primaryActive.id)
-          }
-        })
-
-        inactiveMembers.forEach((im) => {
-          idToKeptId.set(im.id, primaryActive.id)
-        })
       } else {
         const memberWithLog =
           inactiveMembers.find((im) => logReferenceIds.has(im.id)) || inactiveMembers[0]
         finalFilteredEmployees.push(memberWithLog)
-        inactiveMembers.forEach((im) => {
-          if (im.id !== memberWithLog.id) {
-            idToKeptId.set(im.id, memberWithLog.id)
-          }
-        })
       }
     })
 
-    const processedLogs = (logs || []).map((l: any) => {
-      if (l.type === 'staff') {
-        const keptId = idToKeptId.get(l.reference_id)
-        if (keptId) {
-          return { ...l, reference_id: keptId }
-        }
-      }
-      return l
-    })
-
-    return { filteredEmployees: finalFilteredEmployees, mappedLogs: processedLogs }
+    return { filteredEmployees: finalFilteredEmployees }
   }, [employees, logs])
 
   const {
@@ -150,12 +124,12 @@ export default function DashboardGestor() {
     dailyTrend,
     activeLogs,
   } = useDashboardCalculations(
-    mappedLogs,
+    logs,
     monthlyGoals,
     filteredContracted,
     filteredPlants,
     filteredLocations,
-    filteredEmployees,
+    employees,
     filteredEquipment,
     filteredGoals,
     selectedPlants,
@@ -216,7 +190,7 @@ export default function DashboardGestor() {
             metrics={metrics}
             activeTab={activeTab}
             logs={activeLogs}
-            employees={filteredEmployees}
+            employees={employees}
             equipment={filteredEquipment}
             selectedPlants={selectedPlants}
             selectedCompanies={selectedCompanies}
