@@ -36,6 +36,14 @@ import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 
+const CATEGORY_TABS = ['Limpeza', 'Higiene'] as const
+type CategoryTab = (typeof CATEGORY_TABS)[number]
+
+const EMPTY_STATE_MESSAGES: Record<CategoryTab, string> = {
+  Limpeza: 'Nenhum produto de limpeza cadastrado.',
+  Higiene: 'Nenhum produto de higiene cadastrado.',
+}
+
 export default function Catalogo() {
   const { activeClient } = useAppStore()
   const { user } = useAuth()
@@ -44,7 +52,7 @@ export default function Catalogo() {
   const [areas, setAreas] = useState<any[]>([])
 
   const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState('Produtos de Limpeza e Higiene')
+  const [activeCategory, setActiveCategory] = useState<string>('Limpeza')
 
   const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
   const [selectedPlant, setSelectedPlant] = useState('')
@@ -201,20 +209,12 @@ export default function Catalogo() {
     }
   }
 
-  const categories = Array.from(
-    new Set(products.map((p) => p.category).filter(Boolean)),
-  ) as string[]
-
-  const tabCategories = [
-    'Produtos de Limpeza e Higiene',
-    ...categories.filter((c) => c !== 'Produtos de Limpeza e Higiene'),
-  ]
-
-  const filtered = products.filter((p) => {
-    const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    const mCat = p.category === activeCategory
-    return mSearch && mCat
-  })
+  const getFilteredProducts = (category: string) =>
+    products.filter((p) => {
+      const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
+      const mCat = p.category === category
+      return mSearch && mCat
+    })
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -349,7 +349,6 @@ export default function Catalogo() {
                           className="h-7 w-7 shrink-0"
                           onClick={() => updateQuantity(item.product.id, -1)}
                         >
-                          {' '}
                           <Minus className="w-3 h-3" />
                         </Button>
                         <span className="w-6 text-center text-sm">{item.quantity}</span>
@@ -411,23 +410,19 @@ export default function Catalogo() {
 
       <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
         <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1 bg-slate-100">
-          {tabCategories.map((cat) => (
+          {CATEGORY_TABS.map((cat) => (
             <TabsTrigger
               key={cat}
               value={cat}
               className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-slate-600 rounded-md"
             >
-              {cat}
+              {cat === 'Limpeza' ? 'Produtos de Limpeza' : 'Produtos de Higiene'}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {tabCategories.map((cat) => {
-          const tabFiltered = products.filter((p) => {
-            const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
-            const mCat = p.category === cat
-            return mSearch && mCat
-          })
+        {CATEGORY_TABS.map((cat) => {
+          const tabFiltered = getFilteredProducts(cat)
           return (
             <TabsContent key={cat} value={cat} className="mt-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -556,7 +551,7 @@ export default function Catalogo() {
                 ))}
                 {tabFiltered.length === 0 && (
                   <div className="col-span-full py-12 text-center text-slate-500">
-                    Nenhum produto disponível nesta categoria.
+                    {EMPTY_STATE_MESSAGES[cat]}
                   </div>
                 )}
               </div>
