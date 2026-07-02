@@ -34,10 +34,7 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     })
 
-    const {
-      data: { user },
-      error: authError,
-    } = await userClient.auth.getUser()
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: profile, error: profileError } = await userClient
@@ -65,14 +62,7 @@ Deno.serve(async (req: Request) => {
 
     if (rows.length === 0) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'File is empty or has no data rows',
-          inserted: 0,
-          skipped: 0,
-          total: 0,
-          errors: [],
-        }),
+        JSON.stringify({ success: false, error: 'File is empty or has no data rows', inserted: 0, skipped: 0, total: 0, errors: [] }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -88,44 +78,19 @@ Deno.serve(async (req: Request) => {
       }
 
       const category = getField(row, ['category', 'categoria', 'Category']) || null
-      const description =
-        getField(row, ['description', 'descricao', 'descrição', 'Description']) || null
+      const description = getField(row, ['description', 'descricao', 'descrição', 'Description']) || null
       const fsCode = getField(row, ['fs_code', 'codigo_fs', 'código_fs', 'FS']) || null
-      const supplyCode =
-        getField(row, ['supply_code', 'codigo_supply', 'código_supply', 'Supply']) || null
-      const unitOfMeasure =
-        getField(row, ['unit_of_measure', 'unidade', 'unidade_medida', 'Un']) || null
-      const itemValueStr = getField(row, [
-        'item_value',
-        'valor',
-        'valor_unitario',
-        'valor_unitário',
-        'Value',
-      ])
+      const supplyCode = getField(row, ['supply_code', 'codigo_supply', 'código_supply', 'Supply']) || null
+      const unitOfMeasure = getField(row, ['unit_of_measure', 'unidade', 'unidade_medida', 'Un']) || null
+      const itemValueStr = getField(row, ['item_value', 'valor', 'valor_unitario', 'valor_unitário', 'Value'])
       const itemValue = itemValueStr ? parseFloat(itemValueStr.replace(',', '.')) || 0 : 0
 
-      products.push({
-        client_id: clientId,
-        name,
-        category,
-        description,
-        fs_code: fsCode,
-        supply_code: supplyCode,
-        unit_of_measure: unitOfMeasure,
-        item_value: itemValue,
-      })
+      products.push({ client_id: clientId, name, category, description, fs_code: fsCode, supply_code: supplyCode, unit_of_measure: unitOfMeasure, item_value: itemValue })
     })
 
     if (products.length === 0) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'No valid products found',
-          inserted: 0,
-          skipped: 0,
-          total: rows.length,
-          errors,
-        }),
+        JSON.stringify({ success: false, error: 'No valid products found', inserted: 0, skipped: 0, total: rows.length, errors }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -136,9 +101,7 @@ Deno.serve(async (req: Request) => {
       .eq('client_id', clientId)
 
     const existingNames = new Set((existing || []).map((p: any) => p.name.toLowerCase()))
-    const existingCodes = new Set(
-      (existing || []).filter((p: any) => p.supply_code).map((p: any) => p.supply_code),
-    )
+    const existingCodes = new Set((existing || []).filter((p: any) => p.supply_code).map((p: any) => p.supply_code))
 
     const newProducts = products.filter((p) => {
       if (p.supply_code && existingCodes.has(p.supply_code)) return false
@@ -185,14 +148,7 @@ Deno.serve(async (req: Request) => {
     )
   } catch (error: any) {
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        inserted: 0,
-        skipped: 0,
-        total: 0,
-        errors: [],
-      }),
+      JSON.stringify({ success: false, error: error.message, inserted: 0, skipped: 0, total: 0, errors: [] }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
