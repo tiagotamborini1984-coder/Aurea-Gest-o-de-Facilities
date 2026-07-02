@@ -36,9 +36,10 @@ interface ImportProductsDialogProps {
 }
 
 const TEMPLATE_CSV =
-  'name,category,description,fs_code,supply_code,unit_of_measure,item_value\n' +
-  'Detergente Multiuso,Limpeza,Detergente neutro para limpeza geral,FS-001,SUP-001,UN,15.50\n' +
-  'Lampada LED 10W,Manutencao,Lampada LED branca 10W E27,FS-002,SUP-002,UN,8.90'
+  'name,category,description,unit_of_measure,item_value,fs_code,supply_code\n' +
+  'Detergente Multiuso,Limpeza,Detergente neutro para limpeza geral,UN,15.50,FS-001,SUP-001\n' +
+  'Lampada LED 10W,Manutencao,Lampada LED branca 10W E27,UN,8.90,FS-002,SUP-002\n' +
+  'Martelo,Ferramentas,Martelo cabo de madeira 27mm,UN,25.00,FS-003,SUP-003'
 
 export function ImportProductsDialog({
   open,
@@ -92,14 +93,19 @@ export function ImportProductsDialog({
   const handleImport = async () => {
     if (!file) return
     setIsProcessing(true)
+    setResult(null)
     try {
       const res = await inventoryService.importProducts(file)
       setResult(res)
       if (res.success && res.inserted > 0) {
-        toast.success(`${res.inserted} produto(s) importado(s) com sucesso!`)
+        const msg =
+          res.skipped > 0
+            ? `${res.inserted} produto(s) importado(s). ${res.skipped} ignorado(s) (duplicados).`
+            : `${res.inserted} produto(s) importado(s) com sucesso!`
+        toast.success(msg)
         onImportComplete()
       } else if (res.success && res.inserted === 0) {
-        toast.info('Nenhum produto novo para importar')
+        toast.info('Nenhum produto novo para importar. Todos já existem no catálogo.')
       } else {
         toast.error(res.error || 'Erro ao importar produtos')
       }
@@ -138,6 +144,7 @@ export function ImportProductsDialog({
                 dragActive
                   ? 'border-brand-vividBlue bg-brand-vividBlue/5'
                   : 'border-slate-300 hover:border-brand-vividBlue/50 hover:bg-slate-50',
+                isProcessing && 'opacity-50 pointer-events-none',
               )}
               onClick={() => !isProcessing && inputRef.current?.click()}
               onDragOver={(e) => {
@@ -175,6 +182,15 @@ export function ImportProductsDialog({
               />
             </div>
 
+            {isProcessing && (
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-600 bg-blue-50 rounded-lg p-3">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span>
+                  Processando importação... Isso pode levar alguns instantes para arquivos grandes.
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <Button
                 variant="link"
@@ -185,7 +201,7 @@ export function ImportProductsDialog({
                 <Download className="w-3.5 h-3.5 mr-1" />
                 Baixar template
               </Button>
-              {file && (
+              {file && !isProcessing && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -204,10 +220,14 @@ export function ImportProductsDialog({
                 <span className="font-mono">name</span> (obrigatório),{' '}
                 <span className="font-mono">category</span>,{' '}
                 <span className="font-mono">description</span>,{' '}
-                <span className="font-mono">fs_code</span>,{' '}
-                <span className="font-mono">supply_code</span>,{' '}
                 <span className="font-mono">unit_of_measure</span>,{' '}
-                <span className="font-mono">item_value</span>
+                <span className="font-mono">item_value</span>,{' '}
+                <span className="font-mono">fs_code</span>,{' '}
+                <span className="font-mono">supply_code</span>
+              </p>
+              <p className="mt-2 text-slate-500">
+                Produtos com o mesmo <span className="font-mono">supply_code</span> ou{' '}
+                <span className="font-mono">name</span> serão ignorados automaticamente.
               </p>
             </div>
           </div>
@@ -232,15 +252,18 @@ export function ImportProductsDialog({
                   </div>
                 </div>
                 {result.errors.length > 0 && (
-                  <div className="mt-4 w-full max-h-32 overflow-auto bg-red-50 rounded-lg p-3 text-left">
-                    {result.errors.slice(0, 10).map((err, i) => (
-                      <p key={i} className="text-xs text-red-600">
-                        {err}
+                  <div className="mt-4 w-full max-h-40 overflow-auto bg-red-50 rounded-lg p-3 text-left border border-red-100">
+                    <p className="text-xs font-semibold text-red-700 mb-2">
+                      Detalhes dos erros ({result.errors.length}):
+                    </p>
+                    {result.errors.slice(0, 50).map((err, i) => (
+                      <p key={i} className="text-xs text-red-600 mb-1">
+                        • {err}
                       </p>
                     ))}
-                    {result.errors.length > 10 && (
+                    {result.errors.length > 50 && (
                       <p className="text-xs text-red-500 mt-1">
-                        ... e mais {result.errors.length - 10} erro(s)
+                        ... e mais {result.errors.length - 50} erro(s)
                       </p>
                     )}
                   </div>
@@ -251,6 +274,15 @@ export function ImportProductsDialog({
                 <AlertCircle className="w-14 h-14 text-red-500 mb-3" />
                 <p className="text-lg font-semibold text-slate-800">Falha na importação</p>
                 <p className="text-sm text-slate-500 mt-1">{result.error}</p>
+                {result.errors.length > 0 && (
+                  <div className="mt-4 w-full max-h-32 overflow-auto bg-red-50 rounded-lg p-3 text-left">
+                    {result.errors.slice(0, 20).map((err, i) => (
+                      <p key={i} className="text-xs text-red-600 mb-1">
+                        • {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

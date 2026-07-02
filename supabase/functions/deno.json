@@ -9,6 +9,6 @@
     "process-preventive-maintenance": 3,
     "handle-subscription-webhook": 1,
     "maintenance-ai-advisor": 1,
-    "import-products": 1
+    "import-products": 2
   }
 }
