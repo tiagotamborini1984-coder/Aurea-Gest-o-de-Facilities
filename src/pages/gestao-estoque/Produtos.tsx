@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit2, Trash2, Tag } from 'lucide-react'
+import { Plus, Edit2, Trash2, Tag, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { normalizeIncludes } from '@/lib/string-utils'
 import { CategoryManagerDialog } from '@/components/gestao-estoque/CategoryManagerDialog'
 
 export default function Produtos() {
@@ -53,6 +54,7 @@ export default function Produtos() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [sdsFile, setSdsFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [search, setSearch] = useState('')
 
   const clientId = activeClient?.id || profile?.client_id
 
@@ -163,9 +165,19 @@ export default function Produtos() {
     }
   }
 
+  const filteredProducts = products.filter((p) => {
+    if (!search.trim()) return true
+    return (
+      normalizeIncludes(p.name, search) ||
+      normalizeIncludes(p.supply_code, search) ||
+      normalizeIncludes(p.fs_code, search) ||
+      normalizeIncludes(p.category, search)
+    )
+  })
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Cadastro de Produtos</h1>
           <p className="text-slate-500">Gerencie os itens do estoque</p>
@@ -182,6 +194,16 @@ export default function Produtos() {
         </div>
       </div>
 
+      <div className="relative w-full">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Input
+          placeholder="Buscar por nome, código FS, código Supply ou categoria..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -195,7 +217,7 @@ export default function Produtos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((p) => (
+              {filteredProducts.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -217,7 +239,7 @@ export default function Produtos() {
                       </div>
                       <div>
                         <span className="font-medium">Supply:</span> {p.supply_code || '-'}
-                      </div>
+                      </div>{' '}
                     </div>
                   </TableCell>
                   <TableCell>{p.category}</TableCell>
@@ -236,10 +258,12 @@ export default function Produtos() {
                   </TableCell>
                 </TableRow>
               ))}
-              {products.length === 0 && (
+              {filteredProducts.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                    Nenhum produto cadastrado.
+                    {search.trim()
+                      ? 'Nenhum produto encontrado para a busca.'
+                      : 'Nenhum produto cadastrado.'}
                   </TableCell>
                 </TableRow>
               )}

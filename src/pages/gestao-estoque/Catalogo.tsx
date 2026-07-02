@@ -34,6 +34,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
+import { normalizeMatch, normalizeIncludes } from '@/lib/string-utils'
 import { supabase } from '@/lib/supabase/client'
 
 const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado nesta categoria.'
@@ -214,8 +215,8 @@ export default function Catalogo() {
 
   const getFilteredProducts = (category: string) =>
     products.filter((p) => {
-      const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
-      const mCat = p.category === category
+      const mSearch = normalizeIncludes(p.name, search)
+      const mCat = normalizeMatch(p.category, category)
       return mSearch && mCat
     })
 
