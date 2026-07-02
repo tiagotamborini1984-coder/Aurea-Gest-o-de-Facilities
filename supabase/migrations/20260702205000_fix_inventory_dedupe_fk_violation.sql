@@ -10,10 +10,10 @@ UPDATE public.inventory_products SET fs_code = NULL WHERE fs_code = '';
 -- Step 1: Repoint inventory_request_items for (client_id, supply_code) duplicates
 -- =============================================================
 DO $$
+DECLARE
+  keeper_id uuid;
+  loser_id uuid;
 BEGIN
-  -- For each group of duplicate (client_id, supply_code) where supply_code IS NOT NULL,
-  -- pick the keeper (most recently created) and repoint all child references
-  -- from the losers to the keeper.
   FOR keeper_id, loser_id IN
     SELECT
       keeper.id AS keeper_id,
@@ -35,6 +35,9 @@ END $$;
 -- Step 2: Repoint inventory_request_items for (client_id, fs_code) duplicates
 -- =============================================================
 DO $$
+DECLARE
+  keeper_id uuid;
+  loser_id uuid;
 BEGIN
   FOR keeper_id, loser_id IN
     SELECT
@@ -85,6 +88,3 @@ ON public.inventory_products (client_id, supply_code);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_products_client_fs_code
 ON public.inventory_products (client_id, fs_code);
-
-CREATE UNIQUE INDEX IF NOT EXISTS inventory_products_client_supply_code_key
-ON public.inventory_products (client_id, supply_code);

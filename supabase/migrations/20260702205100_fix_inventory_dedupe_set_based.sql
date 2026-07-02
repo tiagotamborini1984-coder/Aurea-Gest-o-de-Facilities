@@ -11,7 +11,7 @@ UPDATE public.inventory_products SET fs_code = NULL WHERE fs_code = '';
 -- Keeper = row with MAX(created_at) per group
 -- =============================================================
 WITH dupes AS (
-  SELECT id,
+  SELECT id, client_id, supply_code,
     ROW_NUMBER() OVER (
       PARTITION BY client_id, supply_code
       ORDER BY created_at DESC, id DESC
@@ -50,7 +50,7 @@ WHERE id IN (SELECT id FROM dupes WHERE rn > 1);
 -- Step 3: Repoint inventory_request_items for (client_id, fs_code) duplicates
 -- =============================================================
 WITH dupes AS (
-  SELECT id,
+  SELECT id, client_id, fs_code,
     ROW_NUMBER() OVER (
       PARTITION BY client_id, fs_code
       ORDER BY created_at DESC, id DESC
