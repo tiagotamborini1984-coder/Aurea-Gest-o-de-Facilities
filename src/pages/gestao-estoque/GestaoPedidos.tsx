@@ -385,7 +385,22 @@ export default function GestaoPedidos() {
                             <Package className="w-4 h-4 text-slate-400" />
                             <div>
                               <span>{item.product?.name}</span>
-                              <p className="text-xs text-slate-500">
+                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                {item.product?.fs_code && (
+                                  <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                    FS: {item.product.fs_code}
+                                  </span>
+                                )}
+                                {item.product?.supply_code && (
+                                  <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
+                                    Supply: {item.product.supply_code}
+                                  </span>
+                                )}
+                                {!item.product?.fs_code && !item.product?.supply_code && (
+                                  <span className="text-[10px] text-slate-400">Sem códigos</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
                                 {item.product?.item_value != null
                                   ? formatCurrency(item.product.item_value)
                                   : 'Valor não informado'}
