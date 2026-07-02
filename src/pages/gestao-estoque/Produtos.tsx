@@ -285,6 +285,13 @@ export default function Produtos() {
                   </TableCell>
                 </TableRow>
               )}
+              {filteredProducts.length > 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-right text-xs text-slate-400 py-2">
+                    {filteredProducts.length} produto(s) listado(s)
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

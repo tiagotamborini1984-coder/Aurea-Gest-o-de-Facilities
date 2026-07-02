@@ -7,6 +7,7 @@ export const inventoryService = {
       .select('*')
       .eq('client_id', clientId)
       .order('name')
+      .limit(10000)
     if (error) throw error
     return data
   },
