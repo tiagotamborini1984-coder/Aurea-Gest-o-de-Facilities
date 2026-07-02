@@ -83,7 +83,8 @@ export default function Catalogo() {
       const catNames = cats.map((c: any) => c.name)
       if (catNames.length > 0) {
         setCategories(catNames)
-        if (!catNames.includes(activeCategory)) {
+        const found = catNames.some((c: string) => normalizeMatch(c, activeCategory))
+        if (!found) {
           setActiveCategory(catNames[0])
         }
       }

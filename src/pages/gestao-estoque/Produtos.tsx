@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { normalizeIncludes } from '@/lib/string-utils'
+import { normalizeIncludes, normalizeMatch } from '@/lib/string-utils'
 import { CategoryManagerDialog } from '@/components/gestao-estoque/CategoryManagerDialog'
 
 export default function Produtos() {
@@ -55,6 +55,7 @@ export default function Produtos() {
   const [sdsFile, setSdsFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
 
   const clientId = activeClient?.id || profile?.client_id
 
@@ -166,12 +167,14 @@ export default function Produtos() {
   }
 
   const filteredProducts = products.filter((p) => {
-    if (!search.trim()) return true
+    const mCategory = categoryFilter === 'all' || normalizeMatch(p.category, categoryFilter)
+    if (!search.trim()) return mCategory
     return (
-      normalizeIncludes(p.name, search) ||
-      normalizeIncludes(p.supply_code, search) ||
-      normalizeIncludes(p.fs_code, search) ||
-      normalizeIncludes(p.category, search)
+      mCategory &&
+      (normalizeIncludes(p.name, search) ||
+        normalizeIncludes(p.supply_code, search) ||
+        normalizeIncludes(p.fs_code, search) ||
+        normalizeIncludes(p.category, search))
     )
   })
 
@@ -194,14 +197,29 @@ export default function Produtos() {
         </div>
       </div>
 
-      <div className="relative w-full">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Buscar por nome, código FS, código Supply ou categoria..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-3 w-full">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Buscar por nome, código FS, código Supply ou categoria..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-full sm:w-[220px]">
+            <SelectValue placeholder="Filtrar por categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as categorias</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id} value={cat.name}>
+                {cat.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
