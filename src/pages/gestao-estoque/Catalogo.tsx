@@ -12,7 +12,6 @@ import {
   Plus,
   Minus,
   PackageOpen,
-  Filter,
   ExternalLink,
 } from 'lucide-react'
 import {
@@ -31,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -44,7 +44,7 @@ export default function Catalogo() {
   const [areas, setAreas] = useState<any[]>([])
 
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('all')
+  const [activeCategory, setActiveCategory] = useState('Produtos de Limpeza e Higiene')
 
   const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
   const [selectedPlant, setSelectedPlant] = useState('')
@@ -201,13 +201,18 @@ export default function Catalogo() {
     }
   }
 
-  const categories = [
-    'all',
-    ...Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
+  const categories = Array.from(
+    new Set(products.map((p) => p.category).filter(Boolean)),
+  ) as string[]
+
+  const tabCategories = [
+    'Produtos de Limpeza e Higiene',
+    ...categories.filter((c) => c !== 'Produtos de Limpeza e Higiene'),
   ]
+
   const filtered = products.filter((p) => {
     const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    const mCat = category === 'all' || p.category === category
+    const mCat = p.category === activeCategory
     return mSearch && mCat
   })
 
@@ -394,150 +399,171 @@ export default function Catalogo() {
         </Sheet>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Buscar produtos..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-[200px]">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c === 'all' ? 'Todas' : c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="relative w-full">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Input
+          placeholder="Buscar produtos..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filtered.map((product) => (
-          <Card
-            key={product.id}
-            className="overflow-hidden flex flex-col hover:border-brand-vividBlue transition-colors"
-          >
-            <div className="aspect-square bg-slate-100 relative">
-              {product.image_url ? (
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  <PackageOpen className="w-16 h-16" />
-                </div>
-              )}
-            </div>
-            <CardHeader className="p-4 pb-2">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
-                  {product.sds_url && product.sds_url.trim() !== '' && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+      <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
+        <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1 bg-slate-100">
+          {tabCategories.map((cat) => (
+            <TabsTrigger
+              key={cat}
+              value={cat}
+              className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-slate-600 rounded-md"
+            >
+              {cat}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {tabCategories.map((cat) => {
+          const tabFiltered = products.filter((p) => {
+            const mSearch = p.name.toLowerCase().includes(search.toLowerCase())
+            const mCat = p.category === cat
+            return mSearch && mCat
+          })
+          return (
+            <TabsContent key={cat} value={cat} className="mt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {tabFiltered.map((product) => (
+                  <Card
+                    key={product.id}
+                    className="overflow-hidden flex flex-col hover:border-brand-vividBlue transition-colors"
+                  >
+                    <div className="aspect-square bg-slate-100 relative">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                          <PackageOpen className="w-16 h-16" />
+                        </div>
+                      )}
+                    </div>
+                    <CardHeader className="p-4 pb-2">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-base leading-tight">{product.name}</CardTitle>
+                          {product.sds_url && product.sds_url.trim() !== '' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-blue-600 hover:text-blue-800 hover:bg-blue-50 flex-shrink-0"
+                                  asChild
+                                >
+                                  <a href={product.sds_url} target="_blank" rel="noreferrer">
+                                    <FileText className="w-4 h-4" />
+                                  </a>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver FDS/SDS</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">{product.category}</p>
+                        {product.fs_code && (
+                          <p className="text-xs text-slate-400 mt-0.5">FS: {product.fs_code}</p>
+                        )}
+                        {product.supply_code && (
+                          <p className="text-xs text-slate-400">Supply: {product.supply_code}</p>
+                        )}
+                        {product.unit_of_measure && (
+                          <p className="text-xs text-slate-400">Un: {product.unit_of_measure}</p>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0 flex-1">
+                      <p className="text-sm text-slate-600 line-clamp-2 mt-2">
+                        {product.description}
+                      </p>
+                      <p className="text-base font-semibold text-slate-800 mt-2">
+                        {product.item_value != null
+                          ? formatCurrency(product.item_value)
+                          : 'Valor não informado'}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0 flex flex-col gap-2">
+                      <div className="flex items-center justify-between w-full border border-slate-200 rounded-md p-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-blue-600 hover:text-blue-800 hover:bg-blue-50 flex-shrink-0"
+                          className="h-8 w-8"
+                          onClick={() => updateSelectedQuantity(product.id, -1)}
+                          disabled={getQuantity(product.id) <= 1}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={getQuantity(product.id)}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1
+                            setSelectedQuantities((prev) => ({
+                              ...prev,
+                              [product.id]: Math.max(1, val),
+                            }))
+                          }}
+                          className="h-8 w-16 text-center text-sm p-0 mx-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => updateSelectedQuantity(product.id, 1)}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <Button
+                        onClick={() => addToCart(product, getQuantity(product.id))}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        Adicionar
+                      </Button>
+                      {product.sds_url && product.sds_url.trim() !== '' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            'w-full text-blue-700 border-blue-200 bg-blue-50/50',
+                            'hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300',
+                            'transition-colors duration-200',
+                          )}
                           asChild
                         >
                           <a href={product.sds_url} target="_blank" rel="noreferrer">
-                            <FileText className="w-4 h-4" />
+                            <FileText className="w-3.5 h-3.5 mr-1.5" />
+                            Ver FDS
+                            <ExternalLink className="w-3 h-3 ml-1.5 text-blue-400" />
                           </a>
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Ver FDS/SDS</TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-1">{product.category}</p>
+                      )}
+                    </CardFooter>
+                  </Card>
+                ))}
+                {tabFiltered.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-slate-500">
+                    Nenhum produto disponível nesta categoria.
+                  </div>
+                )}
               </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 flex-1">
-              <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description}</p>
-              <p className="text-base font-semibold text-slate-800 mt-2">
-                {product.item_value != null
-                  ? formatCurrency(product.item_value)
-                  : 'Valor não informado'}
-              </p>
-            </CardContent>
-            <CardFooter className="p-4 pt-0 flex flex-col gap-2">
-              <div className="flex items-center justify-between w-full border border-slate-200 rounded-md p-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => updateSelectedQuantity(product.id, -1)}
-                  disabled={getQuantity(product.id) <= 1}
-                >
-                  <Minus className="w-3 h-3" />
-                </Button>
-                <Input
-                  type="number"
-                  min={1}
-                  value={getQuantity(product.id)}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 1
-                    setSelectedQuantities((prev) => ({
-                      ...prev,
-                      [product.id]: Math.max(1, val),
-                    }))
-                  }}
-                  className="h-8 w-16 text-center text-sm p-0 mx-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => updateSelectedQuantity(product.id, 1)}
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-              <Button
-                onClick={() => addToCart(product, getQuantity(product.id))}
-                className="w-full"
-                variant="outline"
-              >
-                Adicionar
-              </Button>
-              {product.sds_url && product.sds_url.trim() !== '' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    'w-full text-blue-700 border-blue-200 bg-blue-50/50',
-                    'hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300',
-                    'transition-colors duration-200',
-                  )}
-                  asChild
-                >
-                  <a href={product.sds_url} target="_blank" rel="noreferrer">
-                    <FileText className="w-3.5 h-3.5 mr-1.5" />
-                    Ver FDS
-                    <ExternalLink className="w-3 h-3 ml-1.5 text-blue-400" />
-                  </a>
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full py-12 text-center text-slate-500">
-            Nenhum produto encontrado.
-          </div>
-        )}
-      </div>
+            </TabsContent>
+          )
+        })}
+      </Tabs>
     </div>
   )
 }
