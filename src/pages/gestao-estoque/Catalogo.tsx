@@ -36,13 +36,16 @@ import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 
-const CATEGORY_TABS = ['Limpeza', 'Higiene'] as const
+const CATEGORY_TABS = ['Limpeza', 'Higiene', 'Escritório'] as const
 type CategoryTab = (typeof CATEGORY_TABS)[number]
 
-const EMPTY_STATE_MESSAGES: Record<CategoryTab, string> = {
-  Limpeza: 'Nenhum produto de limpeza cadastrado.',
-  Higiene: 'Nenhum produto de higiene cadastrado.',
+const TAB_LABELS: Record<CategoryTab, string> = {
+  Limpeza: 'Produtos de Limpeza',
+  Higiene: 'Produtos de Higiene',
+  Escritório: 'Produtos de Escritório',
 }
+
+const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado nesta categoria.'
 
 export default function Catalogo() {
   const { activeClient } = useAppStore()
@@ -416,7 +419,7 @@ export default function Catalogo() {
               value={cat}
               className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-slate-600 rounded-md"
             >
-              {cat === 'Limpeza' ? 'Produtos de Limpeza' : 'Produtos de Higiene'}
+              {TAB_LABELS[cat]}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -549,11 +552,6 @@ export default function Catalogo() {
                     </CardFooter>
                   </Card>
                 ))}
-                {tabFiltered.length === 0 && (
-                  <div className="col-span-full py-12 text-center text-slate-500">
-                    {EMPTY_STATE_MESSAGES[cat]}
-                  </div>
-                )}
               </div>
             </TabsContent>
           )
