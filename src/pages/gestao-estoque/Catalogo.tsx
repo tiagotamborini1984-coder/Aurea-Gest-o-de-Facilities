@@ -13,6 +13,7 @@ import {
   Minus,
   PackageOpen,
   ExternalLink,
+  Upload,
 } from 'lucide-react'
 import {
   Sheet,
@@ -36,6 +37,7 @@ import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
 import { normalizeMatch, normalizeIncludes } from '@/lib/string-utils'
 import { supabase } from '@/lib/supabase/client'
+import { ImportProductsDialog } from '@/components/gestao-estoque/ImportProductsDialog'
 
 const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado nesta categoria.'
 
@@ -56,6 +58,7 @@ export default function Catalogo() {
   const [responsibleName, setResponsibleName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     if (activeClient) {
@@ -229,179 +232,196 @@ export default function Catalogo() {
           <p className="text-slate-500">Solicite materiais e itens de estoque</p>
         </div>
 
-        <Sheet open={cartOpen} onOpenChange={setCartOpen}>
-          <SheetTrigger asChild>
-            <Button className="relative">
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Carrinho
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {cart.length}
-                </span>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="flex flex-col h-full w-[400px] sm:w-[540px]">
-            <SheetHeader>
-              <SheetTitle>Meu Pedido</SheetTitle>
-            </SheetHeader>
-            <div className="flex-1 overflow-auto py-4 px-1 flex flex-col gap-6">
-              <div className="space-y-4 pb-6 border-b border-slate-200">
-                <div className="space-y-2">
-                  <Label>Planta / Local *</Label>
-                  <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a planta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plants.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Área / Departamento *</Label>
-                  <Select
-                    value={selectedArea}
-                    onValueChange={setSelectedArea}
-                    disabled={!selectedPlant}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a área" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {areas.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Responsável pelo Material *</Label>
-                  <Input
-                    value={responsibleName}
-                    onChange={(e) => setResponsibleName(e.target.value)}
-                    placeholder="Nome do responsável"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Responsável pelo Processamento *
-                  </label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={assigneeId}
-                    onChange={(e) => setAssigneeId(e.target.value)}
-                    disabled={!selectedPlant}
-                  >
-                    <option value="">
-                      {selectedPlant ? 'Selecione o responsável...' : 'Selecione a planta primeiro'}
-                    </option>
-                    {assignees.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {cart.length === 0 ? (
-                <div className="text-center text-slate-500 py-10">Seu carrinho está vazio</div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-semibold text-slate-800 text-sm">Itens do Pedido</h3>
-                    <Button
-                      variant="ghost"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2 text-xs"
-                      onClick={() => {
-                        if (window.confirm('Tem certeza que deseja esvaziar o carrinho?')) {
-                          setCart([])
-                        }
-                      }}
-                    >
-                      Esvaziar carrinho
-                    </Button>
-                  </div>
-                  {cart.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{item.product.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {formatCurrency(item.product.item_value)}{' '}
-                          {item.product.unit_of_measure ? `/ ${item.product.unit_of_measure}` : ''}
-                        </p>
-                        <p className="text-xs font-medium text-slate-700 mt-0.5">
-                          Subtotal: {formatCurrency((item.product.item_value ?? 0) * item.quantity)}
-                        </p>
-                      </div>{' '}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={() => updateQuantity(item.product.id, -1)}
-                        >
-                          <Minus className="w-3 h-3" />
-                        </Button>
-                        <span className="w-6 text-center text-sm">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateQuantity(item.product.id, 1)}
-                        >
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <SheetFooter className="mt-auto pt-4 border-t border-slate-200 gap-3">
-              {cart.length > 0 && (
-                <div className="flex justify-between items-center w-full px-1 pb-2">
-                  <span className="text-sm font-medium text-slate-600">Total do Pedido</span>
-                  <span className="text-lg font-bold text-slate-900">
-                    {formatCurrency(
-                      cart.reduce(
-                        (acc, item) => acc + (item.product.item_value ?? 0) * item.quantity,
-                        0,
-                      ),
-                    )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Importar
+          </Button>
+          <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+            <SheetTrigger asChild>
+              <Button className="relative">
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Carrinho
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {cart.length}
                   </span>
-                </div>
-              )}
-              <Button
-                disabled={
-                  cart.length === 0 ||
-                  !selectedPlant ||
-                  !selectedArea ||
-                  !responsibleName.trim() ||
-                  isSubmitting
-                }
-                onClick={submitRequest}
-                className="w-full"
-              >
-                {isSubmitting ? 'Enviando...' : 'Confirmar Pedido'}
+                )}
               </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
+            </SheetTrigger>
+            <SheetContent className="flex flex-col h-full w-[400px] sm:w-[540px]">
+              <SheetHeader>
+                <SheetTitle>Meu Pedido</SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-auto py-4 px-1 flex flex-col gap-6">
+                <div className="space-y-4 pb-6 border-b border-slate-200">
+                  <div className="space-y-2">
+                    <Label>Planta / Local *</Label>
+                    <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a planta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plants.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Área / Departamento *</Label>
+                    <Select
+                      value={selectedArea}
+                      onValueChange={setSelectedArea}
+                      disabled={!selectedPlant}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a área" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {areas.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Responsável pelo Material *</Label>
+                    <Input
+                      value={responsibleName}
+                      onChange={(e) => setResponsibleName(e.target.value)}
+                      placeholder="Nome do responsável"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      Responsável pelo Processamento *
+                    </label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={assigneeId}
+                      onChange={(e) => setAssigneeId(e.target.value)}
+                      disabled={!selectedPlant}
+                    >
+                      <option value="">
+                        {selectedPlant
+                          ? 'Selecione o responsável...'
+                          : 'Selecione a planta primeiro'}
+                      </option>
+                      {assignees.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {cart.length === 0 ? (
+                  <div className="text-center text-slate-500 py-10">Seu carrinho está vazio</div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-semibold text-slate-800 text-sm">Itens do Pedido</h3>
+                      <Button
+                        variant="ghost"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2 text-xs"
+                        onClick={() => {
+                          if (window.confirm('Tem certeza que deseja esvaziar o carrinho?')) {
+                            setCart([])
+                          }
+                        }}
+                      >
+                        Esvaziar carrinho
+                      </Button>
+                    </div>
+                    {cart.map((item) => (
+                      <div
+                        key={item.product.id}
+                        className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{item.product.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {formatCurrency(item.product.item_value)}{' '}
+                            {item.product.unit_of_measure
+                              ? `/ ${item.product.unit_of_measure}`
+                              : ''}
+                          </p>
+                          <p className="text-xs font-medium text-slate-700 mt-0.5">
+                            Subtotal:{' '}
+                            {formatCurrency((item.product.item_value ?? 0) * item.quantity)}
+                          </p>
+                        </div>{' '}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => updateQuantity(item.product.id, -1)}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <span className="w-6 text-center text-sm">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateQuantity(item.product.id, 1)}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <SheetFooter className="mt-auto pt-4 border-t border-slate-200 gap-3">
+                {cart.length > 0 && (
+                  <div className="flex justify-between items-center w-full px-1 pb-2">
+                    <span className="text-sm font-medium text-slate-600">Total do Pedido</span>
+                    <span className="text-lg font-bold text-slate-900">
+                      {formatCurrency(
+                        cart.reduce(
+                          (acc, item) => acc + (item.product.item_value ?? 0) * item.quantity,
+                          0,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                )}
+                <Button
+                  disabled={
+                    cart.length === 0 ||
+                    !selectedPlant ||
+                    !selectedArea ||
+                    !responsibleName.trim() ||
+                    isSubmitting
+                  }
+                  onClick={submitRequest}
+                  className="w-full"
+                >
+                  {isSubmitting ? 'Enviando...' : 'Confirmar Pedido'}
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
+
+      <ImportProductsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImportComplete={loadData}
+      />
 
       <div className="relative w-full">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

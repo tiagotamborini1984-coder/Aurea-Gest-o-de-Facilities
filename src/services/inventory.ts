@@ -279,4 +279,23 @@ export const inventoryService = {
     if (error) throw error
     return count || 0
   },
+
+  async importProducts(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data, error } = await supabase.functions.invoke('import-products', {
+      body: formData,
+    })
+
+    if (error) throw error
+    return data as {
+      success: boolean
+      inserted: number
+      skipped: number
+      total: number
+      errors: string[]
+      error?: string
+    }
+  },
 }
