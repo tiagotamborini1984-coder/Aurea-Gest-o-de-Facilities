@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -7,6 +7,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -37,10 +38,52 @@ interface ImportProductsDialogProps {
 }
 
 const TEMPLATE_CSV =
-  'name,category,description,unit_of_measure,item_value,fs_code,supply_code\n' +
-  'Detergente Multiuso,Limpeza,Detergente neutro para limpeza geral,UN,15.50,FS-001,SUP-001\n' +
-  'Lampada LED 10W,Manutencao,Lampada LED branca 10W E27,UN,8.90,FS-002,SUP-002\n' +
-  'Martelo,Ferramentas,Martelo cabo de madeira 27mm,UN,25.00,FS-003,SUP-003'
+  'name,description,category,unit_of_measure,item_value,fs_code,supply_code,sds_url,image_url\n' +
+  'Detergente Multiuso,Detergente neutro para limpeza geral,Limpeza,UN,15.50,FS-001,SUP-001,,\n' +
+  'Lampada LED 10W,Lampada LED branca 10W E27,Manutencao,UN,8.90,FS-002,SUP-002,,\n' +
+  'Martelo,Martelo cabo de madeira 27mm,Ferramentas,UN,25.00,FS-003,SUP-003,,\n'
+
+const REQUIRED_HEADERS = ['name', 'nome']
+
+function detectDelimiter(text: string): string {
+  const firstLine = text.split('\n')[0] || ''
+  const semicolons = (firstLine.match(/;/g) || []).length
+  const commas = (firstLine.match(/,/g) || []).length
+  return semicolons > commas ? ';' : ','
+}
+
+function parseCsvHeaders(text: string, delimiter: string): string[] {
+  const firstLine = text.split('\n')[0] || ''
+  return firstLine.split(delimiter).map((h) =>
+    h
+      .trim()
+      .toLowerCase()
+      .replace(/^["']|["']$/g, ''),
+  )
+}
+
+function validateCsvFile(file: File): Promise<string | null> {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      if (!text || text.trim() === '') {
+        resolve('Arquivo vazio')
+        return
+      }
+      const delimiter = detectDelimiter(text)
+      const headers = parseCsvHeaders(text, delimiter)
+      const hasName = headers.some((h) => REQUIRED_HEADERS.includes(h))
+      if (!hasName) {
+        resolve(`Coluna "name" não encontrada. Colunas detectadas: ${headers.join(', ')}`)
+        return
+      }
+      resolve(null)
+    }
+    reader.onerror = () => resolve('Erro ao ler arquivo')
+    reader.readAsText(file.slice(0, 8192), 'utf-8')
+  })
+}
 
 export function ImportProductsDialog({
   open,
@@ -51,15 +94,30 @@ export function ImportProductsDialog({
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [validationWarning, setValidationWarning] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (progressTimer.current) clearInterval(progressTimer.current)
+    }
+  }, [])
 
   const reset = useCallback(() => {
     setFile(null)
     setIsProcessing(false)
     setResult(null)
+    setProgress(0)
+    setValidationWarning(null)
+    if (progressTimer.current) {
+      clearInterval(progressTimer.current)
+      progressTimer.current = null
+    }
   }, [])
 
-  const handleFileSelect = (selectedFile: File | undefined) => {
+  const handleFileSelect = async (selectedFile: File | undefined) => {
     if (!selectedFile) return
     const validTypes = ['.csv', '.xlsx', '.xls']
     const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase()
@@ -73,6 +131,15 @@ export function ImportProductsDialog({
     }
     setFile(selectedFile)
     setResult(null)
+    setValidationWarning(null)
+
+    if (ext === '.csv') {
+      const warning = await validateCsvFile(selectedFile)
+      if (warning) {
+        setValidationWarning(warning)
+        toast.warning('Aviso: ' + warning)
+      }
+    }
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -82,7 +149,9 @@ export function ImportProductsDialog({
   }
 
   const downloadTemplate = () => {
-    const blob = new Blob(['\uFEFF' + TEMPLATE_CSV], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['\uFEFF' + TEMPLATE_CSV], {
+      type: 'text/csv;charset=utf-8;',
+    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -95,8 +164,15 @@ export function ImportProductsDialog({
     if (!file) return
     setIsProcessing(true)
     setResult(null)
+    setProgress(0)
+
+    progressTimer.current = setInterval(() => {
+      setProgress((prev) => Math.min(prev + Math.random() * 8, 90))
+    }, 400)
+
     try {
       const res = await inventoryService.importProducts(file)
+      setProgress(100)
       setResult(res)
       if (res.success && (res.inserted > 0 || res.updated > 0)) {
         const parts: string[] = []
@@ -122,9 +198,12 @@ export function ImportProductsDialog({
         errors: [],
         error: err.message,
       })
-
       toast.error(err.message || 'Erro ao importar produtos')
     } finally {
+      if (progressTimer.current) {
+        clearInterval(progressTimer.current)
+        progressTimer.current = null
+      }
       setIsProcessing(false)
     }
   }
@@ -187,12 +266,23 @@ export function ImportProductsDialog({
               />
             </div>
 
+            {validationWarning && (
+              <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-lg p-3 border border-amber-200">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{validationWarning}</span>
+              </div>
+            )}
+
             {isProcessing && (
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-600 bg-blue-50 rounded-lg p-3">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span>
-                  Processando importação... Isso pode levar alguns instantes para arquivos grandes.
-                </span>
+              <div className="space-y-2 bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span>Processando importação... {progress.toFixed(0)}%</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+                <p className="text-xs text-slate-500">
+                  Isso pode levar alguns instantes para arquivos grandes.
+                </p>
               </div>
             )}
 
@@ -204,13 +294,16 @@ export function ImportProductsDialog({
                 className="text-brand-vividBlue p-0 h-auto"
               >
                 <Download className="w-3.5 h-3.5 mr-1" />
-                Baixar template
+                Baixar template CSV
               </Button>
               {file && !isProcessing && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setFile(null)}
+                  onClick={() => {
+                    setFile(null)
+                    setValidationWarning(null)
+                  }}
                   className="text-slate-500"
                 >
                   <X className="w-3.5 h-3.5 mr-1" />
@@ -223,16 +316,19 @@ export function ImportProductsDialog({
               <p className="font-semibold text-slate-700 mb-1">Colunas esperadas:</p>
               <p>
                 <span className="font-mono">name</span> (obrigatório),{' '}
-                <span className="font-mono">category</span>,{' '}
                 <span className="font-mono">description</span>,{' '}
+                <span className="font-mono">category</span>,{' '}
                 <span className="font-mono">unit_of_measure</span>,{' '}
                 <span className="font-mono">item_value</span>,{' '}
                 <span className="font-mono">fs_code</span>,{' '}
-                <span className="font-mono">supply_code</span>
+                <span className="font-mono">supply_code</span>,{' '}
+                <span className="font-mono">sds_url</span>,{' '}
+                <span className="font-mono">image_url</span>
               </p>
               <p className="mt-2 text-slate-500">
                 Produtos com o mesmo <span className="font-mono">supply_code</span> ou{' '}
-                <span className="font-mono">name</span> serão ignorados automaticamente.
+                <span className="font-mono">fs_code</span> serão atualizados automaticamente. CSV
+                com separador ponto e vírgula (;) é suportado.
               </p>
             </div>
           </div>
