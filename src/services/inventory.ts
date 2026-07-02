@@ -138,7 +138,7 @@ export const inventoryService = {
           id,
           quantity,
           reserved_quantity,
-          product:inventory_products(name, unit_of_measure, item_value)
+          product:inventory_products(name, unit_of_measure, item_value, fs_code, supply_code)
         )
       `)
       .eq('client_id', clientId)

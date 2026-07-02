@@ -194,7 +194,14 @@ export default function MeusPedidos() {
                       <div className="flex items-center gap-3">
                         <Package className="w-4 h-4 text-slate-400" />
                         <div>
-                          <p className="font-medium text-sm">{item.product?.name}</p>
+                          <p className="font-medium text-sm">
+                            {item.product?.name}
+                            <span className="text-xs text-slate-500 font-normal ml-1">
+                              {' '}
+                              (FS: {item.product?.fs_code || '-'} | Supply:{' '}
+                              {item.product?.supply_code || '-'})
+                            </span>
+                          </p>
                           <p className="text-xs text-slate-500">
                             Qtd: {item.quantity} {item.product?.unit_of_measure}
                             {item.product?.item_value != null && (
