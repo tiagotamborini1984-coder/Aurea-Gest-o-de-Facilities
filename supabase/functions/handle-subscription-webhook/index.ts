@@ -39,10 +39,7 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const urlSlug =
-      company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') +
-      '-' +
-      Math.floor(Math.random() * 1000)
+    const urlSlug = company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 1000)
 
     // Insert client
     const { data: newClient, error: clientError } = await supabaseClient
@@ -55,7 +52,7 @@ Deno.serve(async (req: Request) => {
         plan_type: plan || 'Profissional',
         subscription_id: subscription_id,
         modules: ['Gestão de Terceiros', 'Gestão de Manutenção'], // Default base modules
-        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       })
       .select()
       .single()
@@ -75,7 +72,7 @@ Deno.serve(async (req: Request) => {
     }
 
     let finalUserId = userData?.user?.id
-
+    
     // Fallback if user already existed
     if (!finalUserId) {
       const { data: existingUsers } = await supabaseClient.auth.admin.listUsers()
@@ -85,7 +82,7 @@ Deno.serve(async (req: Request) => {
 
     if (finalUserId) {
       // Wait for trigger to fire and insert the operational profile
-      await new Promise((r) => setTimeout(r, 800))
+      await new Promise(r => setTimeout(r, 800));
 
       const { error: profileError } = await supabaseClient
         .from('profiles')
@@ -96,20 +93,21 @@ Deno.serve(async (req: Request) => {
         .eq('id', finalUserId)
 
       if (profileError) {
-        // Fallback if trigger didn't insert
-        await supabaseClient.from('profiles').insert({
-          id: finalUserId,
-          email: email,
-          name: 'Admin ' + company_name,
-          role: 'Administrador',
-          client_id: newClient.id,
-        })
+         // Fallback if trigger didn't insert
+         await supabaseClient.from('profiles').insert({
+           id: finalUserId,
+           email: email,
+           name: 'Admin ' + company_name,
+           role: 'Administrador',
+           client_id: newClient.id
+         })
       }
     }
 
     return new Response(JSON.stringify({ success: true, client_id: newClient.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
   } catch (error: any) {
     console.error('Webhook Error:', error)
     return new Response(JSON.stringify({ error: error.message }), {
