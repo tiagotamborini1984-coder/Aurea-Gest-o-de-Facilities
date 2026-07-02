@@ -36,21 +36,13 @@ import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 
-const CATEGORY_TABS = ['Limpeza', 'Higiene', 'Escritório'] as const
-type CategoryTab = (typeof CATEGORY_TABS)[number]
-
-const TAB_LABELS: Record<CategoryTab, string> = {
-  Limpeza: 'Produtos de Limpeza',
-  Higiene: 'Produtos de Higiene',
-  Escritório: 'Produtos de Escritório',
-}
-
 const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado nesta categoria.'
 
 export default function Catalogo() {
   const { activeClient } = useAppStore()
   const { user } = useAuth()
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>(['Limpeza'])
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
 
@@ -86,6 +78,14 @@ export default function Catalogo() {
     try {
       const prods = await inventoryService.getProducts(activeClient.id)
       setProducts(prods)
+      const cats = await inventoryService.getCategories(activeClient.id)
+      const catNames = cats.map((c: any) => c.name)
+      if (catNames.length > 0) {
+        setCategories(catNames)
+        if (!catNames.includes(activeCategory)) {
+          setActiveCategory(catNames[0])
+        }
+      }
       const pts = await inventoryService.getPlants(activeClient.id)
       const uniquePlants = Array.from(new Map(pts.map((p: any) => [p.id, p])).values())
       setPlants(uniquePlants)
@@ -413,18 +413,18 @@ export default function Catalogo() {
 
       <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
         <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1 bg-slate-100">
-          {CATEGORY_TABS.map((cat) => (
+          {categories.map((cat) => (
             <TabsTrigger
               key={cat}
               value={cat}
               className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-slate-600 rounded-md"
             >
-              {TAB_LABELS[cat]}
+              {cat}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {CATEGORY_TABS.map((cat) => {
+        {categories.map((cat) => {
           const tabFiltered = getFilteredProducts(cat)
           return (
             <TabsContent key={cat} value={cat} className="mt-6">

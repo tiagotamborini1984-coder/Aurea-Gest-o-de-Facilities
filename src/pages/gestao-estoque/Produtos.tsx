@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -30,10 +30,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { CategoryManagerDialog } from '@/components/gestao-estoque/CategoryManagerDialog'
 
 export default function Produtos() {
   const { activeClient, profile } = useAppStore()
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -54,12 +57,20 @@ export default function Produtos() {
   const clientId = activeClient?.id || profile?.client_id
 
   useEffect(() => {
-    if (clientId) loadProducts()
+    if (clientId) {
+      loadProducts()
+      loadCategories()
+    }
   }, [clientId])
 
   const loadProducts = () => {
     if (!clientId) return
     inventoryService.getProducts(clientId).then(setProducts)
+  }
+
+  const loadCategories = () => {
+    if (!clientId) return
+    inventoryService.getCategories(clientId).then(setCategories)
   }
 
   const openForm = (selectedProduct?: any) => {
@@ -159,10 +170,16 @@ export default function Produtos() {
           <h1 className="text-2xl font-bold text-slate-800">Cadastro de Produtos</h1>
           <p className="text-slate-500">Gerencie os itens do estoque</p>
         </div>
-        <Button onClick={() => openForm()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Produto
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCategoryModalOpen(true)}>
+            <Tag className="w-4 h-4 mr-2" />
+            Gerenciar Categorias
+          </Button>
+          <Button onClick={() => openForm()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Produto
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -270,13 +287,11 @@ export default function Produtos() {
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Limpeza">Limpeza</SelectItem>
-                  <SelectItem value="Jardinagem">Jardinagem</SelectItem>
-                  <SelectItem value="Manutenção">Manutenção</SelectItem>
-                  <SelectItem value="Equipamento">Equipamento</SelectItem>
-                  <SelectItem value="Escritório">Escritório</SelectItem>
-                  <SelectItem value="EPI">EPI</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -331,6 +346,13 @@ export default function Produtos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CategoryManagerDialog
+        open={categoryModalOpen}
+        onOpenChange={setCategoryModalOpen}
+        clientId={clientId}
+        onCategoriesChanged={loadCategories}
+      />
     </div>
   )
 }

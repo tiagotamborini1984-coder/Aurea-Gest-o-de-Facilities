@@ -220,4 +220,62 @@ export const inventoryService = {
     const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(data.path)
     return publicUrl.publicUrl
   },
+
+  async getCategories(clientId: string) {
+    const { data, error } = await (supabase as any)
+      .from('inventory_categories')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('name')
+    if (error) throw error
+    return data || []
+  },
+
+  async saveCategory(category: any) {
+    if (category.id) {
+      const { data, error } = await (supabase as any)
+        .from('inventory_categories')
+        .update({ name: category.name })
+        .eq('id', category.id)
+        .select()
+        .single()
+      if (error) throw error
+      if (category.oldName && category.oldName !== category.name) {
+        const { error: prodError } = await supabase
+          .from('inventory_products')
+          .update({ category: category.name })
+          .eq('client_id', category.client_id)
+          .eq('category', category.oldName)
+        if (prodError) throw prodError
+      }
+      return data
+    } else {
+      const { id, oldName, ...insertData } = category
+      const { data, error } = await (supabase as any)
+        .from('inventory_categories')
+        .insert([insertData])
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
+  },
+
+  async deleteCategory(categoryId: string) {
+    const { error } = await (supabase as any)
+      .from('inventory_categories')
+      .delete()
+      .eq('id', categoryId)
+    if (error) throw error
+  },
+
+  async getCategoryProductCount(clientId: string, categoryName: string) {
+    const { count, error } = await supabase
+      .from('inventory_products')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('category', categoryName)
+    if (error) throw error
+    return count || 0
+  },
 }
