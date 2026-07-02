@@ -51,10 +51,7 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     })
 
-    const {
-      data: { user },
-      error: authError,
-    } = await userClient.auth.getUser()
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: profile, error: profileError } = await userClient
@@ -82,14 +79,7 @@ Deno.serve(async (req: Request) => {
 
     if (rows.length === 0) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'File is empty or has no data rows',
-          inserted: 0,
-          skipped: 0,
-          total: 0,
-          errors: [],
-        }),
+        JSON.stringify({ success: false, error: 'File is empty or has no data rows', inserted: 0, skipped: 0, total: 0, errors: [] }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -101,66 +91,33 @@ Deno.serve(async (req: Request) => {
       const lineNumber = index + 2
       const name = getField(row, ['name', 'nome', 'Name', 'Nome'])
       if (!name) {
-        errors.push({
-          row: lineNumber,
-          field: 'name',
-          message: `Linha ${lineNumber}: Coluna 'name' ausente ou vazia`,
-        })
+        errors.push({ row: lineNumber, field: 'name', message: `Linha ${lineNumber}: Coluna 'name' ausente ou vazia` })
         return
       }
 
       const category = getField(row, ['category', 'categoria', 'Category']) || null
-      const description =
-        getField(row, ['description', 'descricao', 'descrição', 'Description']) || null
+      const description = getField(row, ['description', 'descricao', 'descrição', 'Description']) || null
       const fsCode = getField(row, ['fs_code', 'codigo_fs', 'código_fs', 'FS']) || null
-      const supplyCode =
-        getField(row, ['supply_code', 'codigo_supply', 'código_supply', 'Supply']) || null
-      const unitOfMeasure =
-        getField(row, ['unit_of_measure', 'unidade', 'unidade_medida', 'Un']) || null
-      const itemValueStr = getField(row, [
-        'item_value',
-        'valor',
-        'valor_unitario',
-        'valor_unitário',
-        'Value',
-      ])
+      const supplyCode = getField(row, ['supply_code', 'codigo_supply', 'código_supply', 'Supply']) || null
+      const unitOfMeasure = getField(row, ['unit_of_measure', 'unidade', 'unidade_medida', 'Un']) || null
+      const itemValueStr = getField(row, ['item_value', 'valor', 'valor_unitario', 'valor_unitário', 'Value'])
       let itemValue = 0
       if (itemValueStr) {
         const parsed = parseFloat(itemValueStr.replace(/[^\d.,-]/g, '').replace(',', '.')) || 0
         if (isNaN(parsed)) {
-          errors.push({
-            row: lineNumber,
-            field: 'item_value',
-            message: `Linha ${lineNumber}: Valor inválido para 'item_value' ("${itemValueStr}")`,
-          })
+          errors.push({ row: lineNumber, field: 'item_value', message: `Linha ${lineNumber}: Valor inválido para 'item_value' ("${itemValueStr}")` })
         } else {
           itemValue = parsed
         }
       }
 
-      products.push({
-        client_id: clientId,
-        name,
-        category,
-        description,
-        fs_code: fsCode,
-        supply_code: supplyCode,
-        unit_of_measure: unitOfMeasure,
-        item_value: itemValue,
-      })
+      products.push({ client_id: clientId, name, category, description, fs_code: fsCode, supply_code: supplyCode, unit_of_measure: unitOfMeasure, item_value: itemValue })
     })
 
     if (products.length === 0) {
       const errorMessages = errors.map((e) => e.message)
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'No valid products found',
-          inserted: 0,
-          skipped: 0,
-          total: rows.length,
-          errors: errorMessages,
-        }),
+        JSON.stringify({ success: false, error: 'No valid products found', inserted: 0, skipped: 0, total: rows.length, errors: errorMessages }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -171,9 +128,7 @@ Deno.serve(async (req: Request) => {
       .eq('client_id', clientId)
 
     const existingNames = new Set((existing || []).map((p: any) => p.name.toLowerCase()))
-    const existingCodes = new Set(
-      (existing || []).filter((p: any) => p.supply_code).map((p: any) => p.supply_code),
-    )
+    const existingCodes = new Set((existing || []).filter((p: any) => p.supply_code).map((p: any) => p.supply_code))
 
     const newProducts = products.filter((p) => {
       if (p.supply_code && existingCodes.has(p.supply_code)) return false
@@ -200,11 +155,7 @@ Deno.serve(async (req: Request) => {
       const catInserts = Array.from(newCategories).map((name) => ({ client_id: clientId, name }))
       const { error: catError } = await userClient.from('inventory_categories').insert(catInserts)
       if (catError) {
-        errors.push({
-          row: 0,
-          field: 'category',
-          message: `Aviso: Algumas categorias podem não ter sido criadas (${catError.message})`,
-        })
+        errors.push({ row: 0, field: 'category', message: `Aviso: Algumas categorias podem não ter sido criadas (${catError.message})` })
       }
     }
 
@@ -218,11 +169,7 @@ Deno.serve(async (req: Request) => {
         .select('id')
 
       if (insertError) {
-        errors.push({
-          row: 0,
-          field: 'batch',
-          message: `Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}`,
-        })
+        errors.push({ row: 0, field: 'batch', message: `Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}` })
       } else {
         inserted += insertData?.length || 0
       }
@@ -230,25 +177,12 @@ Deno.serve(async (req: Request) => {
 
     const errorMessages = errors.map((e) => e.message)
     return new Response(
-      JSON.stringify({
-        success: true,
-        inserted,
-        skipped,
-        total: products.length,
-        errors: errorMessages,
-      }),
+      JSON.stringify({ success: true, inserted, skipped, total: products.length, errors: errorMessages }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error: any) {
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        inserted: 0,
-        skipped: 0,
-        total: 0,
-        errors: [],
-      }),
+      JSON.stringify({ success: false, error: error.message, inserted: 0, skipped: 0, total: 0, errors: [] }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
