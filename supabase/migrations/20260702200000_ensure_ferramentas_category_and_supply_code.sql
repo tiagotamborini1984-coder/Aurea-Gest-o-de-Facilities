@@ -67,4 +67,4 @@ DROP POLICY IF EXISTS "authenticated_delete_inventory_categories" ON public.inve
 CREATE POLICY "authenticated_delete_inventory_categories" ON public.inventory_categories
   FOR DELETE TO authenticated USING (client_id = public.get_user_client_id());
 
-RAISE NOTICE 'Ferramentas category and supply_code migration completed successfully';
+-- Migration completed successfully
