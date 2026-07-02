@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 interface ImportResult {
   success: boolean
   inserted: number
+  updated: number
   skipped: number
   total: number
   errors: string[]
@@ -97,14 +98,16 @@ export function ImportProductsDialog({
     try {
       const res = await inventoryService.importProducts(file)
       setResult(res)
-      if (res.success && res.inserted > 0) {
-        const msg =
-          res.skipped > 0
-            ? `${res.inserted} produto(s) importado(s). ${res.skipped} ignorado(s) (duplicados).`
-            : `${res.inserted} produto(s) importado(s) com sucesso!`
-        toast.success(msg)
+      if (res.success && (res.inserted > 0 || res.updated > 0)) {
+        const parts: string[] = []
+        if (res.inserted > 0) parts.push(`${res.inserted} importado(s)`)
+        if (res.updated > 0) parts.push(`${res.updated} atualizado(s)`)
+        if (res.skipped > 0) parts.push(`${res.skipped} ignorado(s)`)
+        toast.success(
+          parts.join(', ') + (res.errors.length > 0 ? ` (${res.errors.length} erro(s))` : ''),
+        )
         onImportComplete()
-      } else if (res.success && res.inserted === 0) {
+      } else if (res.success && res.inserted === 0 && res.updated === 0) {
         toast.info('Nenhum produto novo para importar. Todos já existem no catálogo.')
       } else {
         toast.error(res.error || 'Erro ao importar produtos')
@@ -113,11 +116,13 @@ export function ImportProductsDialog({
       setResult({
         success: false,
         inserted: 0,
+        updated: 0,
         skipped: 0,
         total: 0,
         errors: [],
         error: err.message,
       })
+
       toast.error(err.message || 'Erro ao importar produtos')
     } finally {
       setIsProcessing(false)
@@ -237,10 +242,14 @@ export function ImportProductsDialog({
               <div className="flex flex-col items-center text-center py-4">
                 <CheckCircle2 className="w-14 h-14 text-green-500 mb-3" />
                 <p className="text-lg font-semibold text-slate-800">Importação concluída!</p>
-                <div className="mt-4 grid grid-cols-3 gap-3 w-full">
+                <div className="mt-4 grid grid-cols-4 gap-3 w-full">
                   <div className="bg-green-50 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-green-700">{result.inserted}</p>
                     <p className="text-xs text-green-600">Importados</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-700">{result.updated}</p>
+                    <p className="text-xs text-blue-600">Atualizados</p>
                   </div>
                   <div className="bg-amber-50 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-amber-700">{result.skipped}</p>
@@ -251,6 +260,7 @@ export function ImportProductsDialog({
                     <p className="text-xs text-red-600">Erros</p>
                   </div>
                 </div>
+
                 {result.errors.length > 0 && (
                   <div className="mt-4 w-full max-h-40 overflow-auto bg-red-50 rounded-lg p-3 text-left border border-red-100">
                     <p className="text-xs font-semibold text-red-700 mb-2">

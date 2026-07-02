@@ -292,6 +292,7 @@ export const inventoryService = {
     return data as {
       success: boolean
       inserted: number
+      updated: number
       skipped: number
       total: number
       errors: string[]

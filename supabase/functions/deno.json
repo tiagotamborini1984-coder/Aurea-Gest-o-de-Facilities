@@ -1,6 +1,6 @@
 {
   "_versions": {
-    "create-user": 6,
+    "create-user": 7,
     "email-reports": 2,
     "package-notifications": 2,
     "update-user-password": 2,
@@ -9,6 +9,6 @@
     "process-preventive-maintenance": 3,
     "handle-subscription-webhook": 1,
     "maintenance-ai-advisor": 1,
-    "import-products": 2
+    "import-products": 3
   }
 }

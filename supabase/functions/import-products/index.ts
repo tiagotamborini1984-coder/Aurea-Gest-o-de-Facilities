@@ -18,6 +18,34 @@ function getField(row: Record<string, any>, keys: string[]): string {
   return ''
 }
 
+function parseItemValue(valueStr: string): { value: number; error?: string } {
+  if (!valueStr) return { value: 0 }
+  const cleaned = valueStr.trim().replace(/[^\d.,-]/g, '')
+  if (!cleaned) return { value: 0 }
+
+  const hasComma = cleaned.includes(',')
+  const hasDot = cleaned.includes('.')
+
+  let normalized: string
+  if (hasComma && hasDot) {
+    if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+      normalized = cleaned.replace(/\./g, '').replace(',', '.')
+    } else {
+      normalized = cleaned.replace(/,/g, '')
+    }
+  } else if (hasComma) {
+    normalized = cleaned.replace(',', '.')
+  } else {
+    normalized = cleaned
+  }
+
+  const parsed = parseFloat(normalized)
+  if (isNaN(parsed)) {
+    return { value: 0, error: `Valor inválido: "${valueStr}"` }
+  }
+  return { value: parsed }
+}
+
 interface ParsedProduct {
   client_id: string
   name: string
@@ -27,12 +55,7 @@ interface ParsedProduct {
   supply_code: string | null
   unit_of_measure: string | null
   item_value: number
-}
-
-interface ImportError {
-  row: number
-  field: string
-  message: string
+  row_number: number
 }
 
 Deno.serve(async (req: Request) => {
@@ -51,7 +74,10 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     })
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await userClient.auth.getUser()
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: profile, error: profileError } = await userClient
@@ -70,7 +96,7 @@ Deno.serve(async (req: Request) => {
     if (!file || !(file instanceof File)) throw new Error('No file provided')
 
     const fileBuffer = await file.arrayBuffer()
-    const workbook = XLSX.read(fileBuffer, { type: 'array' })
+    const workbook = XLSX.read(fileBuffer, { type: 'array', codepage: 65001 })
     const sheetName = workbook.SheetNames[0]
     if (!sheetName) throw new Error('No sheets found in file')
 
@@ -79,64 +105,111 @@ Deno.serve(async (req: Request) => {
 
     if (rows.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'File is empty or has no data rows', inserted: 0, skipped: 0, total: 0, errors: [] }),
+        JSON.stringify({
+          success: false,
+          error: 'File is empty or has no data rows',
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          total: 0,
+          errors: [],
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
 
     const products: ParsedProduct[] = []
-    const errors: ImportError[] = []
+    const errors: string[] = []
 
     rows.forEach((row, index) => {
-      const lineNumber = index + 2
+      const rowNumber = index + 2
       const name = getField(row, ['name', 'nome', 'Name', 'Nome'])
       if (!name) {
-        errors.push({ row: lineNumber, field: 'name', message: `Linha ${lineNumber}: Coluna 'name' ausente ou vazia` })
+        errors.push(`Linha ${rowNumber}: Coluna 'name' ausente ou vazia`)
         return
       }
 
       const category = getField(row, ['category', 'categoria', 'Category']) || null
-      const description = getField(row, ['description', 'descricao', 'descrição', 'Description']) || null
+      const description =
+        getField(row, ['description', 'descricao', 'descrição', 'Description']) || null
       const fsCode = getField(row, ['fs_code', 'codigo_fs', 'código_fs', 'FS']) || null
-      const supplyCode = getField(row, ['supply_code', 'codigo_supply', 'código_supply', 'Supply']) || null
-      const unitOfMeasure = getField(row, ['unit_of_measure', 'unidade', 'unidade_medida', 'Un']) || null
-      const itemValueStr = getField(row, ['item_value', 'valor', 'valor_unitario', 'valor_unitário', 'Value'])
+      const supplyCode =
+        getField(row, ['supply_code', 'codigo_supply', 'código_supply', 'Supply']) || null
+      const unitOfMeasure =
+        getField(row, ['unit_of_measure', 'unidade', 'unidade_medida', 'Un']) || null
+      const itemValueStr = getField(row, [
+        'item_value',
+        'valor',
+        'valor_unitario',
+        'valor_unitário',
+        'Value',
+      ])
+
       let itemValue = 0
       if (itemValueStr) {
-        const parsed = parseFloat(itemValueStr.replace(/[^\d.,-]/g, '').replace(',', '.')) || 0
-        if (isNaN(parsed)) {
-          errors.push({ row: lineNumber, field: 'item_value', message: `Linha ${lineNumber}: Valor inválido para 'item_value' ("${itemValueStr}")` })
-        } else {
-          itemValue = parsed
+        const parsed = parseItemValue(itemValueStr)
+        if (parsed.error) {
+          errors.push(`Linha ${rowNumber}: ${parsed.error}`)
         }
+        itemValue = parsed.value
       }
 
-      products.push({ client_id: clientId, name, category, description, fs_code: fsCode, supply_code: supplyCode, unit_of_measure: unitOfMeasure, item_value: itemValue })
+      products.push({
+        client_id: clientId,
+        name,
+        category,
+        description,
+        fs_code: fsCode,
+        supply_code: supplyCode,
+        unit_of_measure: unitOfMeasure,
+        item_value: itemValue,
+        row_number: rowNumber,
+      })
     })
 
     if (products.length === 0) {
-      const errorMessages = errors.map((e) => e.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'No valid products found', inserted: 0, skipped: 0, total: rows.length, errors: errorMessages }),
+        JSON.stringify({
+          success: false,
+          error: 'No valid products found',
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          total: rows.length,
+          errors,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
 
     const { data: existing } = await userClient
       .from('inventory_products')
-      .select('name, supply_code')
+      .select('id, name, supply_code')
       .eq('client_id', clientId)
 
-    const existingNames = new Set((existing || []).map((p: any) => p.name.toLowerCase()))
-    const existingCodes = new Set((existing || []).filter((p: any) => p.supply_code).map((p: any) => p.supply_code))
+    const existingBySupplyCode = new Map<string, string>()
+    const existingNames = new Set<string>()
 
-    const newProducts = products.filter((p) => {
-      if (p.supply_code && existingCodes.has(p.supply_code)) return false
-      if (existingNames.has(p.name.toLowerCase())) return false
-      return true
-    })
+    for (const p of existing || []) {
+      if (p.supply_code) {
+        existingBySupplyCode.set(p.supply_code, p.id)
+      }
+      existingNames.add(p.name.toLowerCase())
+    }
 
-    const skipped = products.length - newProducts.length
+    const toUpsert: ParsedProduct[] = []
+    const toInsert: ParsedProduct[] = []
+    let skipped = 0
+
+    for (const product of products) {
+      if (product.supply_code) {
+        toUpsert.push(product)
+      } else if (existingNames.has(product.name.toLowerCase())) {
+        skipped++
+      } else {
+        toInsert.push(product)
+      }
+    }
 
     const { data: existingCats } = await userClient
       .from('inventory_categories')
@@ -145,44 +218,98 @@ Deno.serve(async (req: Request) => {
 
     const existingCatNames = new Set((existingCats || []).map((c: any) => c.name.toLowerCase()))
     const newCategories = new Set<string>()
-    products.forEach((p) => {
+    for (const p of products) {
       if (p.category && !existingCatNames.has(p.category.toLowerCase())) {
         newCategories.add(p.category)
       }
-    })
+    }
 
     if (newCategories.size > 0) {
       const catInserts = Array.from(newCategories).map((name) => ({ client_id: clientId, name }))
-      const { error: catError } = await userClient.from('inventory_categories').insert(catInserts)
+      const { error: catError } = await userClient
+        .from('inventory_categories')
+        .upsert(catInserts, { onConflict: 'client_id,name' })
       if (catError) {
-        errors.push({ row: 0, field: 'category', message: `Aviso: Algumas categorias podem não ter sido criadas (${catError.message})` })
+        errors.push(`Aviso: Algumas categorias podem não ter sido criadas (${catError.message})`)
       }
     }
 
     let inserted = 0
+    let updated = 0
     const batchSize = 100
-    for (let i = 0; i < newProducts.length; i += batchSize) {
-      const batch = newProducts.slice(i, i + batchSize)
+
+    const stripMeta = (p: ParsedProduct) => {
+      const { row_number, ...rest } = p
+      return rest
+    }
+
+    for (let i = 0; i < toUpsert.length; i += batchSize) {
+      const batchSlice = toUpsert.slice(i, i + batchSize)
+      const batch = batchSlice.map(stripMeta)
+      const firstRow = batchSlice[0]?.row_number ?? 0
+      const lastRow = batchSlice[batchSlice.length - 1]?.row_number ?? 0
+      const batchExistingCount = batchSlice.filter(
+        (p) => p.supply_code && existingBySupplyCode.has(p.supply_code),
+      ).length
+
+      const { data: upsertData, error: upsertError } = await userClient
+        .from('inventory_products')
+        .upsert(batch, { onConflict: 'client_id,supply_code' })
+        .select('id, supply_code')
+
+      if (upsertError) {
+        errors.push(`Linha ${firstRow}-${lastRow}: ${upsertError.message}`)
+      } else if (upsertData) {
+        updated += batchExistingCount
+        inserted += upsertData.length - batchExistingCount
+        for (const item of upsertData) {
+          if (item.supply_code) {
+            existingBySupplyCode.set(item.supply_code, item.id)
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < toInsert.length; i += batchSize) {
+      const batchSlice = toInsert.slice(i, i + batchSize)
+      const batch = batchSlice.map(stripMeta)
+      const firstRow = batchSlice[0]?.row_number ?? 0
+      const lastRow = batchSlice[batchSlice.length - 1]?.row_number ?? 0
+
       const { data: insertData, error: insertError } = await userClient
         .from('inventory_products')
         .insert(batch)
         .select('id')
 
       if (insertError) {
-        errors.push({ row: 0, field: 'batch', message: `Erro ao inserir lote ${Math.floor(i / batchSize) + 1}: ${insertError.message}` })
+        errors.push(`Linha ${firstRow}-${lastRow}: ${insertError.message}`)
       } else {
         inserted += insertData?.length || 0
       }
     }
 
-    const errorMessages = errors.map((e) => e.message)
     return new Response(
-      JSON.stringify({ success: true, inserted, skipped, total: products.length, errors: errorMessages }),
+      JSON.stringify({
+        success: true,
+        inserted,
+        updated,
+        skipped,
+        total: products.length,
+        errors,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error: any) {
     return new Response(
-      JSON.stringify({ success: false, error: error.message, inserted: 0, skipped: 0, total: 0, errors: [] }),
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        inserted: 0,
+        updated: 0,
+        skipped: 0,
+        total: 0,
+        errors: [],
+      }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
