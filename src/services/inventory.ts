@@ -183,16 +183,45 @@ export const inventoryService = {
 
   async saveProduct(product: any) {
     if (product.id) {
+      const { id, created_at, updated_at, client_id, ...updateData } = product
       const { data, error } = await supabase
         .from('inventory_products')
-        .update(product)
-        .eq('id', product.id)
-      if (error) throw error
+        .update({
+          ...updateData,
+          item_value: Number(updateData.item_value) || 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+      if (error) {
+        if (error.code === '23505') {
+          const field = error.message.includes('supply_code')
+            ? 'Código Supply'
+            : error.message.includes('fs_code')
+              ? 'Código FS'
+              : 'código'
+          throw new Error(`Já existe um produto com este ${field}. Use um código único.`)
+        }
+        throw error
+      }
       return data
     } else {
-      const { id, ...insertData } = product
-      const { data, error } = await supabase.from('inventory_products').insert([insertData])
-      if (error) throw error
+      const { id, created_at, updated_at, ...insertData } = product
+      const { data, error } = await supabase
+        .from('inventory_products')
+        .insert([{ ...insertData, item_value: Number(insertData.item_value) || 0 }])
+        .select()
+      if (error) {
+        if (error.code === '23505') {
+          const field = error.message.includes('supply_code')
+            ? 'Código Supply'
+            : error.message.includes('fs_code')
+              ? 'Código FS'
+              : 'código'
+          throw new Error(`Já existe um produto com este ${field}. Use um código único.`)
+        }
+        throw error
+      }
       return data
     }
   },

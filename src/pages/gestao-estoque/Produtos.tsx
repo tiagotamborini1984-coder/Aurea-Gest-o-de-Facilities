@@ -41,7 +41,15 @@ export default function Produtos() {
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string
+    category: string
+    description: string
+    unit_of_measure: string
+    fs_code: string
+    supply_code: string
+    item_value: string | number
+  }>({
     name: '',
     category: '',
     description: '',
@@ -86,7 +94,7 @@ export default function Produtos() {
         unit_of_measure: selectedProduct.unit_of_measure || 'UN',
         fs_code: selectedProduct.fs_code || '',
         supply_code: selectedProduct.supply_code || '',
-        item_value: selectedProduct.item_value || 0,
+        item_value: selectedProduct.item_value ?? 0,
       })
     } else {
       setEditingId(null)
@@ -105,12 +113,22 @@ export default function Produtos() {
     setFormModalOpen(true)
   }
 
+  const parseNumericValue = (value: string | number): number => {
+    if (typeof value === 'number') return value
+    if (!value) return 0
+    const normalized = String(value).replace(/\./g, '').replace(',', '.')
+    const parsed = parseFloat(normalized)
+    return isNaN(parsed) ? 0 : parsed
+  }
+
   const handleSave = async () => {
     if (!clientId) {
       return toast.error('Erro: Cliente não identificado no perfil')
     }
     if (!formData.name.trim()) return toast.error('Nome é obrigatório')
-    if (formData.item_value < 0) return toast.error('Valor do item não pode ser negativo')
+
+    const parsedItemValue = parseNumericValue(formData.item_value)
+    if (parsedItemValue < 0) return toast.error('Valor do item não pode ser negativo')
 
     setIsSaving(true)
     try {
@@ -134,7 +152,13 @@ export default function Produtos() {
 
       const productPayload: any = {
         client_id: clientId,
-        ...formData,
+        name: formData.name.trim(),
+        category: formData.category || null,
+        description: formData.description || null,
+        unit_of_measure: formData.unit_of_measure || 'UN',
+        fs_code: formData.fs_code?.trim() || null,
+        supply_code: formData.supply_code?.trim() || null,
+        item_value: parsedItemValue,
         image_url: imageUrl,
         sds_url: sdsUrl,
       }
@@ -144,11 +168,12 @@ export default function Produtos() {
       }
 
       await inventoryService.saveProduct(productPayload)
-      toast.success('Produto salvo com sucesso')
+      toast.success(editingId ? 'Produto atualizado com sucesso' : 'Produto criado com sucesso')
       setFormModalOpen(false)
       loadProducts()
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar produto')
+      const message = err?.message || err?.error || 'Erro ao salvar produto'
+      toast.error(message)
     } finally {
       setIsSaving(false)
     }
@@ -347,11 +372,14 @@ export default function Produtos() {
             <div className="space-y-2">
               <Label>Valor do item (R$)</Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={formData.item_value}
-                onChange={(e) => setFormData({ ...formData, item_value: Number(e.target.value) })}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9.,]/g, '')
+                  setFormData({ ...formData, item_value: val as any })
+                }}
               />
             </div>
             <div className="space-y-2">
