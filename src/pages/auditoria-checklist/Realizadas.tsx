@@ -32,6 +32,40 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+const TERMINAL_AUDIT_STATUSES = [
+  'finalizado',
+  'finalizada',
+  'concluido',
+  'concluído',
+  'concluida',
+  'concluída',
+  'realizado',
+  'realizada',
+  'finished',
+  'completed',
+  'done',
+  'closed',
+  'fechado',
+  'fechada',
+  'aprovado',
+  'aprovada',
+]
+
+const PENDING_STATUSES = ['pendente', 'pending', 'rascunho', 'draft', '']
+
+function isAuditExecutionFinished(audit: any): boolean {
+  const statusLower = audit.status?.toLowerCase() || ''
+  if (TERMINAL_AUDIT_STATUSES.includes(statusLower)) return true
+  if (audit.tasks?.task_statuses?.is_terminal === true) return true
+  if (TERMINAL_AUDIT_STATUSES.includes(audit.tasks?.task_statuses?.name?.toLowerCase() || ''))
+    return true
+  if (audit.final_score !== null && audit.realization_date !== null) return true
+  const isNotPending = !PENDING_STATUSES.includes(statusLower)
+  const hasAnswers = audit.audit_execution_answers?.length > 0
+  if (isNotPending && hasAnswers && audit.final_score !== null) return true
+  return false
+}
+
 export default function AuditoriaRealizadas() {
   const [audits, setAudits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -118,7 +152,7 @@ export default function AuditoriaRealizadas() {
             client_id,
             scoring_settings
           ),
-          plants!inner (
+          plants (
             id,
             name
           ),
@@ -157,35 +191,16 @@ export default function AuditoriaRealizadas() {
         }
       }
 
-      const { data, error } = await query.order('realization_date', { ascending: false })
+      const { data, error } = await query.order('realization_date', {
+        ascending: false,
+        nullsFirst: false,
+      })
 
       if (error) throw error
 
-      // Filter audits considering 'Finalizada' status or task completed
+      // Filter audits considering terminal status, task completion, or score data
       const finishedOrTaskCompleted = (data || [])
-        .filter((audit: any) => {
-          const statusLower = audit.status?.toLowerCase() || ''
-          const isExecutionFinished = [
-            'finalizado',
-            'finalizada',
-            'concluido',
-            'concluído',
-            'concluida',
-            'concluída',
-            'realizado',
-            'realizada',
-            'finished',
-            'completed',
-          ].includes(statusLower)
-
-          const isTaskFinished =
-            audit.tasks?.task_statuses?.is_terminal === true ||
-            audit.tasks?.task_statuses?.name?.toLowerCase() === 'finalizado'
-
-          const hasScoreAndDate = audit.final_score !== null && audit.realization_date !== null
-
-          return isExecutionFinished || isTaskFinished || hasScoreAndDate
-        })
+        .filter((audit: any) => isAuditExecutionFinished(audit))
         .map((audit: any) => {
           // Calculate missing scores if needed
           if (
@@ -351,19 +366,7 @@ export default function AuditoriaRealizadas() {
                               : '-'}
                         </TableCell>
                         <TableCell>
-                          {[
-                            'finalizado',
-                            'finalizada',
-                            'concluido',
-                            'concluído',
-                            'concluida',
-                            'concluída',
-                            'realizado',
-                            'realizada',
-                            'finished',
-                            'completed',
-                          ].includes(audit.status?.toLowerCase() || '') ||
-                          (audit.final_score !== null && audit.realization_date !== null) ? (
+                          {isAuditExecutionFinished(audit) ? (
                             <Badge
                               variant="default"
                               className="bg-green-600 text-white hover:bg-green-700 border-transparent"
@@ -395,19 +398,7 @@ export default function AuditoriaRealizadas() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {[
-                              'finalizado',
-                              'finalizada',
-                              'concluido',
-                              'concluído',
-                              'concluida',
-                              'concluída',
-                              'realizado',
-                              'realizada',
-                              'finished',
-                              'completed',
-                            ].includes(audit.status?.toLowerCase() || '') ||
-                            (audit.final_score !== null && audit.realization_date !== null) ? (
+                            {isAuditExecutionFinished(audit) ? (
                               <Button variant="ghost" size="icon" asChild title="Ver detalhes">
                                 <Link to={`/auditoria-checklist/detalhes/${audit.id}`}>
                                   <Eye className="h-4 w-4" />
