@@ -283,18 +283,6 @@ function AuditoriaDetalhesInner() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!execution) {
-    return <div className="p-6">Auditoria não encontrada.</div>
-  }
-
   const scoringSettings = audit?.scoring_settings || []
   const isFinalized =
     [
@@ -308,8 +296,8 @@ function AuditoriaDetalhesInner() {
       'realizada',
       'finished',
       'completed',
-    ].includes(execution.status?.toLowerCase() || '') ||
-    (execution.final_score !== null && execution.realization_date !== null)
+    ].includes(execution?.status?.toLowerCase() || '') ||
+    (execution?.final_score !== null && execution?.realization_date !== null)
 
   const totalPages = Math.max(1, Math.ceil(actions.length / ITEMS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -317,6 +305,18 @@ function AuditoriaDetalhesInner() {
     const start = (safeCurrentPage - 1) * ITEMS_PER_PAGE
     return actions.slice(start, start + ITEMS_PER_PAGE)
   }, [actions, safeCurrentPage])
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!execution) {
+    return <div className="p-6">Auditoria não encontrada.</div>
+  }
 
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
 
