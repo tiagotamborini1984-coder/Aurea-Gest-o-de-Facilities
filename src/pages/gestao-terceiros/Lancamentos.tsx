@@ -206,11 +206,9 @@ export default function Lancamentos() {
           .eq('plant_id', selectedPlant)
 
         if (staffLogIds.length > 0) {
-          empsQuery = empsQuery.or(
-            `and(status.eq.Ativo,reference_month.eq.${refMonth}),id.in.(${staffLogIds.join(',')})`,
-          )
+          empsQuery = empsQuery.or(`status.eq.Ativo,id.in.(${staffLogIds.join(',')})`)
         } else {
-          empsQuery = empsQuery.eq('status', 'Ativo').eq('reference_month', refMonth)
+          empsQuery = empsQuery.eq('status', 'Ativo')
         }
 
         const { data: emps, error: empsError } = await empsQuery
