@@ -23,6 +23,7 @@ export function useHasAccess(menuName: string) {
       'Gestão de Acidentes',
       'Gestão de Documentos',
       'Gestão de Ferramentas',
+      'Gestão de EPIs',
     ]
   }
 

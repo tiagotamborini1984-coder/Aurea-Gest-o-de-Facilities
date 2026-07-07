@@ -21,6 +21,7 @@ import {
   ClipboardList,
   FileText,
   Hammer,
+  HardHat,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -150,6 +151,11 @@ export function AppSidebar() {
       title: 'Gestão de Ferramentas',
       icon: Hammer,
       path: '/gestao-ferramentas',
+    },
+    {
+      title: 'Gestão de EPIs',
+      icon: HardHat,
+      path: '/gestao-epis',
     },
     {
       title: 'Gestão de Documentos',
@@ -403,8 +409,8 @@ export function AppSidebar() {
       if (
         activeClient &&
         !item.subItems &&
-        item.title === 'Gestão de Ferramentas' &&
-        !activeClient.modules?.includes('Gestão de Ferramentas')
+        (item.title === 'Gestão de Ferramentas' || item.title === 'Gestão de EPIs') &&
+        !activeClient.modules?.includes(item.title)
       ) {
         return false
       }

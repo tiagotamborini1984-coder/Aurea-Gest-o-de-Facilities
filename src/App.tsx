@@ -96,6 +96,9 @@ import CadastrosManutencao from './pages/gestao-manutencao/Cadastros'
 // Gestão de Ferramentas
 import DashboardFerramentas from './pages/gestao-ferramentas/Dashboard'
 
+// Gestão de EPIs
+import GestaoEPIs from './pages/gestao-epis/Dashboard'
+
 // Gestão de Estoque
 import CatalogoEstoque from './pages/gestao-estoque/Catalogo'
 import MeusPedidosEstoque from './pages/gestao-estoque/MeusPedidos'
@@ -253,6 +256,9 @@ const App = () => (
 
                       {/* Gestão de Ferramentas */}
                       <Route path="/gestao-ferramentas" element={<DashboardFerramentas />} />
+
+                      {/* Gestão de EPIs */}
+                      <Route path="/gestao-epis" element={<GestaoEPIs />} />
 
                       {/* Gestão de Encomendas */}
                       <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />
