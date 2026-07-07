@@ -23,7 +23,6 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
 
   const fetchTasks = async () => {
     if (!activeClient) return
-    // @ts-expect-error - accident_id added via migration
     const { data } = await supabase
       .from('tasks')
       .select(
