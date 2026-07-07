@@ -39,10 +39,12 @@ import { supabase } from '@/lib/supabase/client'
 import { TrainingStatusCell } from '@/components/gestao-terceiros/TrainingStatusCell'
 import { useTrainingStatus } from '@/hooks/use-training-status'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store/AppContext'
 
 export default function Lancamentos() {
   const { toast } = useToast()
   const { getTrainingStatuses } = useTrainingStatus()
+  const { profile } = useAppStore()
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [plants, setPlants] = useState<any[]>([])
@@ -69,14 +71,41 @@ export default function Lancamentos() {
 
   useEffect(() => {
     const fetchPlants = async () => {
-      const { data } = await supabase.from('plants').select('id, name, client_id').order('name')
-      if (data && data.length > 0) {
-        setPlants(data)
-        setSelectedPlant(data[0].id)
+      if (!profile) return
+
+      const isAdmin = profile.role === 'Master' || profile.role === 'Administrador'
+      let plantList: any[] = []
+
+      if (isAdmin) {
+        let query = supabase.from('plants').select('id, name, client_id').order('name')
+        if (profile.role === 'Administrador' && profile.client_id) {
+          query = query.eq('client_id', profile.client_id)
+        }
+        const { data } = await query
+        plantList = data || []
+      } else {
+        const { data: plantIds } = await supabase.rpc('get_user_authorized_plants')
+        const ids = (plantIds as string[]) || []
+        if (ids.length > 0 && profile.client_id) {
+          const { data } = await supabase
+            .from('plants')
+            .select('id, name, client_id')
+            .eq('client_id', profile.client_id)
+            .in('id', ids)
+            .order('name')
+          plantList = data || []
+        }
+      }
+
+      setPlants(plantList)
+      if (plantList.length > 0) {
+        setSelectedPlant(plantList[0].id)
+      } else {
+        setSelectedPlant('')
       }
     }
     fetchPlants()
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     let isActive = true
@@ -612,9 +641,17 @@ export default function Lancamentos() {
         <div className="flex flex-col sm:flex-row items-center gap-3 bg-card p-2 rounded-lg border shadow-sm">
           <div className="flex items-center gap-2 px-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+            <Select
+              value={selectedPlant}
+              onValueChange={setSelectedPlant}
+              disabled={plants.length === 0}
+            >
               <SelectTrigger className="w-[180px] border-0 bg-transparent focus:ring-0 shadow-none h-8 p-0 font-medium">
-                <SelectValue placeholder="Selecione a planta" />
+                <SelectValue
+                  placeholder={
+                    plants.length === 0 ? 'Sem plantas autorizadas' : 'Selecione a planta'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {plants.map((p) => (
@@ -790,7 +827,15 @@ export default function Lancamentos() {
               </TabsTrigger>
             </TabsList>
 
-            {loading ? (
+            {plants.length === 0 && profile ? (
+              <div className="text-center py-16 border rounded-lg bg-card shadow-sm">
+                <Building2 className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-muted-foreground font-medium">Nenhuma planta autorizada</p>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Contate um administrador para obter acesso às plantas.
+                </p>
+              </div>
+            ) : loading ? (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
                 <p>Carregando dados...</p>
