@@ -28,6 +28,7 @@ import {
   ChevronDown,
   Users,
   UserCheck,
+  CalendarClock,
 } from 'lucide-react'
 import {
   Select,
@@ -53,6 +54,9 @@ import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { format } from 'date-fns'
 
 function SLACountdown({
   task,
@@ -188,6 +192,7 @@ export default function PainelChamados() {
     title: string
     description: string
     participants_ids: string[]
+    custom_due_date: string
   }>({
     plant_id: '',
     type_id: '',
@@ -195,6 +200,7 @@ export default function PainelChamados() {
     title: '',
     description: '',
     participants_ids: [],
+    custom_due_date: '',
   })
 
   const effectiveClientId = isMaster ? selectedMasterClient : profile?.client_id
@@ -339,6 +345,7 @@ export default function PainelChamados() {
       title: '',
       description: '',
       participants_ids: [],
+      custom_due_date: '',
     })
     setSelectedFiles([])
     setIsModalOpen(true)
@@ -358,6 +365,29 @@ export default function PainelChamados() {
     e.preventDefault()
     if (!form.plant_id || !form.type_id || !form.assignee_id || !form.title || !form.description)
       return
+
+    const selectedType = taskTypes.find((t) => t.id === form.type_id)
+    const isPersonal = selectedType?.name.toLowerCase() === 'tarefas pessoais'
+
+    if (isPersonal) {
+      if (!form.custom_due_date) {
+        toast({
+          title: 'Prazo obrigatório',
+          description: 'Para Tarefas Pessoais, é necessário definir um prazo de conclusão.',
+          variant: 'destructive',
+        })
+        return
+      }
+      if (new Date(form.custom_due_date) <= new Date()) {
+        toast({
+          title: 'Prazo inválido',
+          description: 'O prazo de conclusão deve ser uma data e horário futuros.',
+          variant: 'destructive',
+        })
+        return
+      }
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -465,6 +495,9 @@ export default function PainelChamados() {
             attachment_urls,
             status_updated_at: new Date().toISOString(),
             participants_ids: form.participants_ids,
+            ...(isPersonal && form.custom_due_date
+              ? { due_date: new Date(form.custom_due_date).toISOString() }
+              : {}),
           } as any)
           .select()
           .single()
@@ -474,7 +507,10 @@ export default function PainelChamados() {
         await supabase.from('task_timeline').insert({
           task_id: newTask.id,
           user_id: profile.id,
-          content: `Chamado aberto.`,
+          content:
+            isPersonal && form.custom_due_date
+              ? `Chamado aberto. Prazo de conclusão definido manualmente: ${format(new Date(form.custom_due_date), "dd/MM/yyyy 'às' HH:mm")}.`
+              : `Chamado aberto.`,
           action_type: 'comment',
         })
 
@@ -625,6 +661,10 @@ export default function PainelChamados() {
 
     return matchPlant && matchStatus && matchAssignee && matchSearch && matchTab
   })
+
+  const isPersonalTask = form.type_id
+    ? taskTypes.find((t) => t.id === form.type_id)?.name.toLowerCase() === 'tarefas pessoais'
+    : false
 
   const tabs = [
     ...(showTodos ? [{ id: 'todos', label: 'Todos', icon: ListFilter }] : []),
@@ -933,7 +973,7 @@ export default function PainelChamados() {
                 <Label>Tipo de Chamado *</Label>
                 <Select
                   value={form.type_id || undefined}
-                  onValueChange={(v) => setForm({ ...form, type_id: v })}
+                  onValueChange={(v) => setForm({ ...form, type_id: v, custom_due_date: '' })}
                   required
                 >
                   <SelectTrigger>
@@ -950,6 +990,64 @@ export default function PainelChamados() {
                   </SelectContent>
                 </Select>
               </div>
+              {isPersonalTask && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Prazo de Conclusão (SLA) *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !form.custom_due_date && 'text-muted-foreground',
+                        )}
+                      >
+                        <CalendarClock className="mr-2 h-4 w-4" />
+                        {form.custom_due_date
+                          ? format(new Date(form.custom_due_date), "dd/MM/yyyy 'às' HH:mm")
+                          : 'Selecione a data e hora do prazo'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.custom_due_date ? new Date(form.custom_due_date) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const now = new Date()
+                            date.setHours(now.getHours(), now.getMinutes(), 0, 0)
+                            setForm({ ...form, custom_due_date: date.toISOString() })
+                          }
+                        }}
+                        disabled={(date) => {
+                          const today = new Date()
+                          today.setHours(0, 0, 0, 0)
+                          return date < today
+                        }}
+                      />
+                      <div className="p-3 border-t border-border">
+                        <Label className="text-xs text-muted-foreground mb-2 block">Horário</Label>
+                        <Input
+                          type="time"
+                          value={
+                            form.custom_due_date
+                              ? format(new Date(form.custom_due_date), 'HH:mm')
+                              : ''
+                          }
+                          onChange={(e) => {
+                            const [hours, minutes] = e.target.value.split(':').map(Number)
+                            const date = form.custom_due_date
+                              ? new Date(form.custom_due_date)
+                              : new Date()
+                            date.setHours(hours || 0, minutes || 0, 0, 0)
+                            setForm({ ...form, custom_due_date: date.toISOString() })
+                          }}
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
               <div className="space-y-2 sm:col-span-2">
                 <Label>Responsável (Atribuir a) *</Label>
                 <Select
