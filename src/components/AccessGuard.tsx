@@ -43,6 +43,7 @@ const routeMenuMap: Record<string, string> = {
   '/organograma/cadastros': 'Organograma e Fluxos:Cadastros',
   '/organograma/fluxogramas': 'Organograma e Fluxos:Fluxogramas',
   '/gestao-ferramentas': 'Gestão de Ferramentas',
+  '/gestao-epis': 'Gestão de EPIs',
 }
 
 const moduleRouteMap: Record<string, string> = {

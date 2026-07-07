@@ -44,6 +44,7 @@ Deno.serve(async (req: Request) => {
       accessible_menus,
       authorized_plants,
       force_password_change,
+      feature_permissions,
     } = body
 
     const finalClientId =
@@ -77,6 +78,7 @@ Deno.serve(async (req: Request) => {
         accessible_menus,
         authorized_plants,
         force_password_change,
+        feature_permissions: feature_permissions || {},
       })
       .eq('id', userData.user.id)
 
