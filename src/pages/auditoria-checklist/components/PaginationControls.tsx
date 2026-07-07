@@ -28,16 +28,30 @@ export function PaginationControls({
     } else if (parsed > totalPages) {
       onPageChange(totalPages)
       setInputValue(String(totalPages))
-    } else {
+    } else if (parsed !== currentPage) {
       onPageChange(parsed)
+    } else {
+      setInputValue(String(currentPage))
     }
-  }, [inputValue, totalPages, onPageChange])
+  }, [inputValue, totalPages, currentPage, onPageChange])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleJump()
+      e.currentTarget.blur()
     }
+  }
+
+  const handleBlur = () => {
+    if (inputValue !== String(currentPage)) {
+      handleJump()
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '')
+    setInputValue(val)
   }
 
   const handlePrev = () => {
@@ -58,39 +72,40 @@ export function PaginationControls({
           size="icon"
           onClick={handlePrev}
           disabled={currentPage <= 1}
-          className="h-8 w-8"
+          className="h-8 w-8 shrink-0"
+          aria-label="Voltar para página anterior"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-          Página {currentPage} de {totalPages}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+            Página
+          </span>
+          <Input
+            type="text"
+            value={inputValue}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            className="w-14 h-8 text-center px-1"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-label={`Ir para página, de 1 a ${totalPages}`}
+            maxLength={4}
+          />
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+            de {totalPages}
+          </span>
+        </div>
         <Button
           variant="outline"
           size="icon"
           onClick={handleNext}
           disabled={currentPage >= totalPages}
-          className="h-8 w-8"
+          className="h-8 w-8 shrink-0"
+          aria-label="Avançar para próxima página"
         >
           <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-muted-foreground whitespace-nowrap">Ir para página:</label>
-        <Input
-          type="number"
-          min={1}
-          max={totalPages}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-20 h-8 text-center"
-          inputMode="numeric"
-          pattern="[0-9]*"
-        />
-        <Button variant="outline" size="sm" onClick={handleJump} className="h-8">
-          Ir
         </Button>
       </div>
     </div>
