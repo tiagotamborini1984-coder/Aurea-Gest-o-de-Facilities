@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { format, subDays, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Filter,
+  X,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,6 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
 import { TrainingStatusCell } from '@/components/gestao-terceiros/TrainingStatusCell'
@@ -57,6 +60,8 @@ export default function Lancamentos() {
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [isEditingPublished, setIsEditingPublished] = useState(false)
   const [dirtyLogs, setDirtyLogs] = useState<Set<string>>(new Set())
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+  const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set())
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
 
@@ -94,6 +99,7 @@ export default function Lancamentos() {
     setNonWorkingDayId(null)
     setIsEditingPublished(false)
     setDirtyLogs(new Set())
+    setSelectedCompanies(new Set())
 
     try {
       const currentPlantObj = plants.find((p) => p.id === selectedPlant)
@@ -125,6 +131,15 @@ export default function Lancamentos() {
       } else {
         setIsNonWorkingDay(false)
         setNonWorkingDayId(null)
+      }
+
+      const { data: compsData } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('client_id', currentPlantObj.client_id)
+        .order('name')
+      if (isActive && compsData) {
+        setCompanies(compsData)
       }
 
       const staffLogIds = Array.from(
@@ -525,6 +540,24 @@ export default function Lancamentos() {
     }
   }
 
+  const filteredEmployees = useMemo(() => {
+    if (selectedCompanies.size === 0) return employees
+    const selectedNames = companies.filter((c) => selectedCompanies.has(c.id)).map((c) => c.name)
+    return employees.filter((emp) => {
+      if (emp.company_id && selectedCompanies.has(emp.company_id)) return true
+      return selectedNames.includes(emp.company_name)
+    })
+  }, [employees, selectedCompanies, companies])
+
+  const toggleCompanyFilter = (companyId: string) => {
+    setSelectedCompanies((prev) => {
+      const next = new Set(prev)
+      if (next.has(companyId)) next.delete(companyId)
+      else next.add(companyId)
+      return next
+    })
+  }
+
   const isDayPublished = dailyLogs?.length > 0 && dailyLogs.every((l) => l?.is_published)
 
   return (
@@ -730,19 +763,101 @@ export default function Lancamentos() {
                     <div className="text-center py-16 border rounded-lg bg-card shadow-sm">
                       <p className="text-muted-foreground">Nenhum registro encontrado.</p>
                     </div>
+                  ) : filteredEmployees.length === 0 ? (
+                    <div className="text-center py-16 border rounded-lg bg-card shadow-sm">
+                      <Filter className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">
+                        Nenhum resultado encontrado para o filtro de empresa selecionado.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => setSelectedCompanies(new Set())}
+                      >
+                        Limpar filtro
+                      </Button>
+                    </div>
                   ) : (
                     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader className="bg-muted/50">
                           <TableRow>
                             <TableHead>Colaborador</TableHead>
-                            <TableHead>Empresa</TableHead>
+                            <TableHead className="w-[220px]">
+                              <div className="flex items-center gap-1">
+                                Empresa
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        'h-6 w-6',
+                                        selectedCompanies.size > 0 && 'text-primary bg-primary/10',
+                                      )}
+                                    >
+                                      <Filter className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-56 p-0" align="start">
+                                    <div className="p-2 border-b">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm font-semibold">
+                                          Filtrar empresas
+                                        </span>
+                                        {selectedCompanies.size > 0 && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 text-xs px-2"
+                                            onClick={() => setSelectedCompanies(new Set())}
+                                          >
+                                            Limpar
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="max-h-60 overflow-y-auto p-1">
+                                      {companies.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground p-2">
+                                          Nenhuma empresa cadastrada.
+                                        </p>
+                                      ) : (
+                                        companies.map((comp) => (
+                                          <label
+                                            key={comp.id}
+                                            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
+                                          >
+                                            <Checkbox
+                                              checked={selectedCompanies.has(comp.id)}
+                                              onCheckedChange={() => toggleCompanyFilter(comp.id)}
+                                            />
+                                            <span className="truncate">{comp.name}</span>
+                                          </label>
+                                        ))
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {selectedCompanies.size > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => setSelectedCompanies(new Set())}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableHead>
                             <TableHead className="text-center">Status Treinamentos</TableHead>
                             <TableHead className="text-right w-[140px]">Presente</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {employees.map((emp) => {
+                          {filteredEmployees.map((emp) => {
                             if (!emp || !emp.id) return null
                             const log = dailyLogs?.find(
                               (l) => l?.type === 'staff' && l?.reference_id === emp.id,
