@@ -28,21 +28,21 @@ export default function GestaoEPIs() {
     if (!clientId)
       return supabase
         .from('plants')
-        .select('id, name')
+        .select('id, name, code')
         .eq('client_id', clientId)
         .order('name')
-        .then(({ data }) => {
-          if (!data) return
+        .then(({ data, error }) => {
+          if (error || !data) return
           let filtered = data
           if (
             profile &&
             profile.role !== 'Master' &&
             profile.role !== 'Administrador' &&
-            (profile as any).authorized_plants &&
-            Array.isArray((profile as any).authorized_plants) &&
-            (profile as any).authorized_plants.length > 0
+            profile.authorized_plants &&
+            Array.isArray(profile.authorized_plants) &&
+            profile.authorized_plants.length > 0
           ) {
-            const auth = (profile as any).authorized_plants as string[]
+            const auth = profile.authorized_plants as string[]
             filtered = data.filter((p: any) => auth.includes(p.id))
           }
           setPlants(filtered)
@@ -52,7 +52,7 @@ export default function GestaoEPIs() {
             setSelectedPlant('all')
           }
         })
-  }, [clientId, profile, setSelectedPlant])
+  }, [clientId, profile, selectedPlant, setSelectedPlant])
 
   useEffect(() => {
     const end = new Date()
