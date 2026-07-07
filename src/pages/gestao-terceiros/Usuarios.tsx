@@ -35,6 +35,7 @@ const ALL_MODULES = [
   'Gestão de Imóveis',
   'Gestão de Encomendas',
   'Gestão de Estoque',
+  'Gestão de Ferramentas',
   'BI',
 ]
 
