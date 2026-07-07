@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   CheckSquare,
   Plus,
@@ -26,7 +27,9 @@ import {
   Paperclip,
   ChevronDown,
   Users,
+  UserCheck,
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -173,6 +176,12 @@ export default function PainelChamados() {
   const [deleteJustification, setDeleteJustification] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
 
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+  const [isBulkDelegateOpen, setIsBulkDelegateOpen] = useState(false)
+  const [bulkAssigneeSearch, setBulkAssigneeSearch] = useState('')
+  const [bulkAssigneeId, setBulkAssigneeId] = useState('')
+  const [isBulkDelegating, setIsBulkDelegating] = useState(false)
+
   const [form, setForm] = useState<{
     plant_id: string
     type_id: string
@@ -208,6 +217,7 @@ export default function PainelChamados() {
   const loadData = async () => {
     if (!effectiveClientId) return
     setLoading(true)
+    setSelectedTaskIds(new Set())
 
     try {
       let tRes, sRes, uRes, nwdRes, pRes
@@ -551,6 +561,55 @@ export default function PainelChamados() {
     }
   }
 
+  const handleBulkDelegate = async () => {
+    if (!bulkAssigneeId || selectedTaskIds.size === 0 || !profile) return
+    setIsBulkDelegating(true)
+    try {
+      const assignee = users.find((u) => u.id === bulkAssigneeId)
+      const taskIds = Array.from(selectedTaskIds)
+
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ assignee_id: bulkAssigneeId })
+        .in('id', taskIds)
+
+      if (updateError) throw updateError
+
+      const timelineEntries = taskIds.map((taskId) => ({
+        task_id: taskId,
+        user_id: profile.id,
+        content: `Tarefa delegada em massa para ${assignee?.name || 'usuário'}`,
+        action_type: 'delegation',
+      }))
+
+      const { error: timelineError } = await supabase.from('task_timeline').insert(timelineEntries)
+
+      if (timelineError) throw timelineError
+
+      toast({
+        title: 'Delegação concluída!',
+        description: `${taskIds.length} tarefa(s) foram delegadas com sucesso para ${assignee?.name || 'usuário'}`,
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+
+      setIsBulkDelegateOpen(false)
+      setBulkAssigneeId('')
+      setBulkAssigneeSearch('')
+      setSelectedTaskIds(new Set())
+      loadData()
+    } catch (err: any) {
+      toast({ title: 'Erro ao delegar tarefas', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsBulkDelegating(false)
+    }
+  }
+
+  const filteredBulkUsers = users.filter(
+    (u) =>
+      (effectiveClientId === 'all' || u.client_id === effectiveClientId) &&
+      u.name?.toLowerCase().includes(bulkAssigneeSearch.toLowerCase()),
+  )
+
   const filteredTasks = tasks.filter((t) => {
     const matchPlant = filterPlant === 'all' || t.plant_id === filterPlant
     const matchStatus = selectedStatuses.includes(t.status_id)
@@ -713,6 +772,22 @@ export default function PainelChamados() {
         <Table>
           <TableHeader className="bg-muted/50 border-b border-border">
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={
+                    filteredTasks.length > 0 &&
+                    filteredTasks.every((t) => selectedTaskIds.has(t.id))
+                  }
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedTaskIds(new Set(filteredTasks.map((t) => t.id)))
+                    } else {
+                      setSelectedTaskIds(new Set())
+                    }
+                  }}
+                  aria-label="Selecionar todos"
+                />
+              </TableHead>
               <TableHead className="font-semibold text-foreground">Protocolo</TableHead>
               <TableHead className="font-semibold text-foreground">Nome</TableHead>
               <TableHead className="font-semibold text-foreground">Planta</TableHead>
@@ -727,13 +802,13 @@ export default function PainelChamados() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />
+                <TableCell colSpan={10} className="text-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-deepBlue" />{' '}
                 </TableCell>
               </TableRow>
             ) : filteredTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   Nenhum chamado encontrado.
                 </TableCell>
               </TableRow>
@@ -746,7 +821,27 @@ export default function PainelChamados() {
                 const plant = localPlants.find((p) => p.id === task.plant_id)
 
                 return (
-                  <TableRow key={task.id} className="hover:bg-muted/50">
+                  <TableRow
+                    key={task.id}
+                    className={cn(
+                      'hover:bg-muted/50',
+                      selectedTaskIds.has(task.id) && 'bg-primary/5',
+                    )}
+                  >
+                    <TableCell className="w-[40px]">
+                      <Checkbox
+                        checked={selectedTaskIds.has(task.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedTaskIds((prev) => {
+                            const next = new Set(prev)
+                            if (checked) next.add(task.id)
+                            else next.delete(task.id)
+                            return next
+                          })
+                        }}
+                        aria-label="Selecionar tarefa"
+                      />
+                    </TableCell>
                     <TableCell className="font-medium text-foreground">
                       {task.task_number}
                     </TableCell>
@@ -1049,6 +1144,96 @@ export default function PainelChamados() {
             <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
               {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Confirmar
               Exclusão
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {selectedTaskIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
+          <div className="flex items-center gap-3 bg-card border border-border shadow-lg rounded-xl px-5 py-3">
+            <span className="text-sm font-semibold text-foreground whitespace-nowrap">
+              {selectedTaskIds.size}{' '}
+              {selectedTaskIds.size === 1 ? 'tarefa selecionada' : 'tarefas selecionadas'}
+            </span>
+            <div className="w-px h-6 bg-border" />
+            <Button variant="tech" size="sm" onClick={() => setIsBulkDelegateOpen(true)}>
+              <UserCheck className="w-4 h-4 mr-2" /> Delegar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSelectedTaskIds(new Set())}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={isBulkDelegateOpen} onOpenChange={setIsBulkDelegateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delegar Tarefas em Massa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              {selectedTaskIds.size}{' '}
+              {selectedTaskIds.size === 1 ? 'tarefa será delegada' : 'tarefas serão delegadas'} para
+              o usuário selecionado.
+            </p>
+            <div className="space-y-2">
+              <Label>Buscar Responsável *</Label>
+              <Input
+                placeholder="Buscar por nome..."
+                value={bulkAssigneeSearch}
+                onChange={(e) => setBulkAssigneeSearch(e.target.value)}
+              />
+            </div>
+            <div className="max-h-[250px] overflow-y-auto space-y-1 border border-border rounded-lg p-1">
+              {filteredBulkUsers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum usuário encontrado.
+                </p>
+              ) : (
+                filteredBulkUsers.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setBulkAssigneeId(u.id)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
+                      bulkAssigneeId === u.id
+                        ? 'bg-brand-deepBlue/10 border border-brand-deepBlue/30'
+                        : 'hover:bg-muted border border-transparent',
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-brand-deepBlue/10 flex items-center justify-center shrink-0">
+                      <UserCheck className="w-4 h-4 text-brand-deepBlue dark:text-brand-vividBlue" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{u.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                    </div>
+                    {bulkAssigneeId === u.id && (
+                      <CheckSquare className="w-4 h-4 text-brand-deepBlue dark:text-brand-vividBlue shrink-0" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setIsBulkDelegateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="tech"
+              onClick={handleBulkDelegate}
+              disabled={!bulkAssigneeId || isBulkDelegating}
+            >
+              {isBulkDelegating ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <UserCheck className="w-4 h-4 mr-2" />
+              )}
+              Confirmar Delegação
             </Button>
           </div>
         </DialogContent>
