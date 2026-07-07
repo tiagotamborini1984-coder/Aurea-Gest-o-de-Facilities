@@ -1,13 +1,14 @@
 import { supabase } from '@/lib/supabase/client'
 
 export const inventoryService = {
-  async getProducts(clientId: string) {
-    const { data, error } = await supabase
-      .from('inventory_products')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('name')
-      .limit(10000)
+  async getProducts(clientId: string, includeInactive = false) {
+    let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
+
+    if (!includeInactive) {
+      query = query.eq('is_active', true)
+    }
+
+    const { data, error } = await query.order('name').limit(10000)
     if (error) throw error
     return data
   },
@@ -226,8 +227,11 @@ export const inventoryService = {
     }
   },
 
-  async deleteProduct(productId: string) {
-    const { error } = await supabase.from('inventory_products').delete().eq('id', productId)
+  async archiveProduct(productId: string) {
+    const { error } = await supabase
+      .from('inventory_products')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', productId)
     if (error) throw error
   },
 

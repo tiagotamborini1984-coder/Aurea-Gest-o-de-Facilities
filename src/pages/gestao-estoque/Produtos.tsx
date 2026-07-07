@@ -20,8 +20,18 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit2, Trash2, Tag, Search } from 'lucide-react'
+import { Plus, Edit2, Archive, Tag, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -64,6 +74,7 @@ export default function Produtos() {
   const [isSaving, setIsSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [archiveTarget, setArchiveTarget] = useState<string | null>(null)
 
   const clientId = activeClient?.id || profile?.client_id
 
@@ -179,15 +190,16 @@ export default function Produtos() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir?')) {
-      try {
-        await inventoryService.deleteProduct(id)
-        toast.success('Excluído com sucesso')
-        loadProducts()
-      } catch (err: any) {
-        toast.error(err.message || 'Erro ao excluir')
-      }
+  const handleArchive = async () => {
+    if (!archiveTarget) return
+    try {
+      await inventoryService.archiveProduct(archiveTarget)
+      toast.success('Produto arquivado com sucesso')
+      setArchiveTarget(null)
+      loadProducts()
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao arquivar produto')
+      setArchiveTarget(null)
     }
   }
 
@@ -295,8 +307,8 @@ export default function Produtos() {
                     <Button variant="ghost" size="icon" onClick={() => openForm(p)}>
                       <Edit2 className="w-4 h-4 text-blue-600" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                    <Button variant="ghost" size="icon" onClick={() => setArchiveTarget(p.id)}>
+                      <Archive className="w-4 h-4 text-amber-600" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -430,6 +442,22 @@ export default function Produtos() {
         clientId={clientId}
         onCategoriesChanged={loadCategories}
       />
+
+      <AlertDialog open={!!archiveTarget} onOpenChange={(open) => !open && setArchiveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Arquivar Produto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este produto possui histórico de movimentações. Ele será removido da lista ativa, mas
+              os dados históricos serão preservados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
