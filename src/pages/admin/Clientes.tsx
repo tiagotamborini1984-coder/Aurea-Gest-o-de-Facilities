@@ -177,6 +177,25 @@ export default function Clientes() {
                     }}
                   />
                 </div>
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-sm font-medium">Gestão de EPIs</p>
+                    <p className="text-xs text-slate-500">
+                      Habilita o módulo de gestão de EPIs para este cliente
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.modules.includes('Gestão de EPIs')}
+                    onCheckedChange={(checked) => {
+                      setFormData({
+                        ...formData,
+                        modules: checked
+                          ? [...formData.modules, 'Gestão de EPIs']
+                          : formData.modules.filter((m) => m !== 'Gestão de EPIs'),
+                      })
+                    }}
+                  />
+                </div>
               </div>
               <div className="col-span-2 space-y-2 mt-2">
                 <label className="text-sm font-medium border-b pb-1 block">Módulos Ativos</label>
