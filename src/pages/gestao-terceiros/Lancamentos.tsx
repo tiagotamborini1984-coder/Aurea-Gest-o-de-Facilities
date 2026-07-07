@@ -201,7 +201,7 @@ export default function Lancamentos() {
         let empsQuery = supabase
           .from('employees')
           .select(
-            'id, name, company_name, function_id, status, registration_number, reference_month, created_at',
+            'id, name, company_name, company_id, function_id, status, registration_number, reference_month, location_id, created_at',
           )
           .eq('plant_id', selectedPlant)
 
@@ -562,10 +562,24 @@ export default function Lancamentos() {
       })
     }
     if (selectedLocations.size > 0) {
-      result = result.filter((emp) => emp.location_id && selectedLocations.has(emp.location_id))
+      result = result.filter((emp) => {
+        if (!emp.location_id) return selectedLocations.has('__none__')
+        return selectedLocations.has(emp.location_id)
+      })
     }
     return result
   }, [employees, selectedCompanies, companies, selectedLocations])
+
+  const datasetLocations = useMemo(() => {
+    const locationIdsInUse = new Set(
+      employees.filter((e) => e.location_id).map((e) => e.location_id),
+    )
+    const hasNullLocation = employees.some((e) => !e.location_id)
+    return {
+      locations: locations.filter((l) => locationIdsInUse.has(l.id)),
+      hasNullLocation,
+    }
+  }, [employees, locations])
 
   const toggleCompanyFilter = (companyId: string) => {
     setSelectedCompanies((prev) => {
@@ -917,23 +931,39 @@ export default function Lancamentos() {
                                       </div>
                                     </div>
                                     <div className="max-h-60 overflow-y-auto p-1">
-                                      {locations.length === 0 ? (
+                                      {datasetLocations.locations.length === 0 &&
+                                      !datasetLocations.hasNullLocation ? (
                                         <p className="text-xs text-muted-foreground p-2">
                                           Nenhum local cadastrado.
                                         </p>
                                       ) : (
-                                        locations.map((loc) => (
-                                          <label
-                                            key={loc.id}
-                                            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
-                                          >
-                                            <Checkbox
-                                              checked={selectedLocations.has(loc.id)}
-                                              onCheckedChange={() => toggleLocationFilter(loc.id)}
-                                            />
-                                            <span className="truncate">{loc.name}</span>
-                                          </label>
-                                        ))
+                                        <>
+                                          {datasetLocations.locations.map((loc) => (
+                                            <label
+                                              key={loc.id}
+                                              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
+                                            >
+                                              <Checkbox
+                                                checked={selectedLocations.has(loc.id)}
+                                                onCheckedChange={() => toggleLocationFilter(loc.id)}
+                                              />
+                                              <span className="truncate">{loc.name}</span>
+                                            </label>
+                                          ))}
+                                          {datasetLocations.hasNullLocation && (
+                                            <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm">
+                                              <Checkbox
+                                                checked={selectedLocations.has('__none__')}
+                                                onCheckedChange={() =>
+                                                  toggleLocationFilter('__none__')
+                                                }
+                                              />
+                                              <span className="truncate text-muted-foreground italic">
+                                                Não informado
+                                              </span>
+                                            </label>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   </PopoverContent>
