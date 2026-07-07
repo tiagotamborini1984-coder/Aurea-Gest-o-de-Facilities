@@ -34,18 +34,25 @@ export default function GestaoEPIs() {
         .then(({ data }) => {
           if (!data) return
           let filtered = data
-          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
-            const auth = (profile as any).authorized_plants || []
+          if (
+            profile &&
+            profile.role !== 'Master' &&
+            profile.role !== 'Administrador' &&
+            (profile as any).authorized_plants &&
+            Array.isArray((profile as any).authorized_plants) &&
+            (profile as any).authorized_plants.length > 0
+          ) {
+            const auth = (profile as any).authorized_plants as string[]
             filtered = data.filter((p: any) => auth.includes(p.id))
           }
           setPlants(filtered)
           if (filtered.length === 1) {
             setSelectedPlant(filtered[0].id)
-          } else if (!selectedPlant) {
+          } else if (!selectedPlant || selectedPlant === 'all') {
             setSelectedPlant('all')
           }
         })
-  }, [clientId, profile, setSelectedPlant, selectedPlant])
+  }, [clientId, profile, setSelectedPlant])
 
   useEffect(() => {
     const end = new Date()
