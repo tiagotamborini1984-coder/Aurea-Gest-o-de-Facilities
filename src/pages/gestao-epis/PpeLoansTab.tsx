@@ -11,6 +11,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Loader2, Undo2, AlertCircle, RefreshCw, HandCoins } from 'lucide-react'
+import { Plus, Loader2, Undo2, AlertCircle, RefreshCw, HandCoins, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { ppeService } from '@/services/ppe'
 import { toast } from 'sonner'
@@ -36,20 +46,20 @@ export function PpeLoansTab() {
   const { activeClient, profile, selectedPlant } = useAppStore()
   const [loans, setLoans] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
-  const [collaborators, setCollaborators] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     ppe_id: '',
     person_type: 'collaborator',
-    collaborator_id: '',
-    visitor_name: '',
+    person_name: '',
     quantity: '1',
   })
 
   const clientId = activeClient?.id || profile?.client_id
+  const isAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
 
   useEffect(() => {
     if (!clientId) {
@@ -97,15 +107,6 @@ export function PpeLoansTab() {
         if (!cancelled) toast.warning('Não foi possível carregar a lista de EPIs disponíveis.')
       })
 
-    ppeService
-      .getCollaborators(clientId)
-      .then((data) => {
-        if (!cancelled) setCollaborators(data)
-      })
-      .catch(() => {
-        if (!cancelled) toast.warning('Não foi possível carregar a lista de colaboradores.')
-      })
-
     return () => {
       cancelled = true
       clearTimeout(timeoutId)
@@ -115,10 +116,7 @@ export function PpeLoansTab() {
   const handleSave = async () => {
     if (!clientId || !activeClient) return
     if (!formData.ppe_id) return toast.error('Selecione um EPI')
-    if (formData.person_type === 'collaborator' && !formData.collaborator_id)
-      return toast.error('Selecione um colaborador')
-    if (formData.person_type === 'visitor' && !formData.visitor_name.trim())
-      return toast.error('Informe o nome do visitante')
+    if (!formData.person_name.trim()) return toast.error('Informe o nome da pessoa')
     const qty = Number(formData.quantity) || 1
     if (qty < 1) return toast.error('Quantidade inválida')
 
@@ -135,8 +133,7 @@ export function PpeLoansTab() {
         plant_id: selectedItem.plant_id,
         ppe_id: formData.ppe_id,
         person_type: formData.person_type,
-        collaborator_id: formData.person_type === 'collaborator' ? formData.collaborator_id : null,
-        visitor_name: formData.person_type === 'visitor' ? formData.visitor_name : null,
+        person_name: formData.person_name.trim(),
         quantity: qty,
         status: 'Emprestado',
       })
@@ -145,8 +142,7 @@ export function PpeLoansTab() {
       setFormData({
         ppe_id: '',
         person_type: 'collaborator',
-        collaborator_id: '',
-        visitor_name: '',
+        person_name: '',
         quantity: '1',
       })
       setLoans(await ppeService.getLoans(clientId, selectedPlant))
@@ -174,6 +170,23 @@ export function PpeLoansTab() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao devolver')
     }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    try {
+      await ppeService.deleteLoan(deleteId)
+      toast.success('Registro de empréstimo excluído')
+      setLoans(await ppeService.getLoans(clientId, selectedPlant))
+      setItems(
+        (await ppeService.getItems(clientId, selectedPlant)).filter(
+          (i: any) => i.current_stock > 0,
+        ),
+      )
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao excluir')
+    }
+    setDeleteId(null)
   }
 
   if (loading)
@@ -237,9 +250,7 @@ export function PpeLoansTab() {
                     <TableCell className="font-medium">{loan.ppe?.name || '-'}</TableCell>
                     <TableCell>{loan.ppe?.ca_number || '-'}</TableCell>
                     <TableCell>
-                      {loan.person_type === 'collaborator'
-                        ? loan.collaborator?.name || '-'
-                        : loan.visitor_name}
+                      {loan.person_name || loan.visitor_name || loan.collaborator?.name || '-'}
                     </TableCell>
                     <TableCell className="text-center">{loan.quantity}</TableCell>
                     <TableCell>{new Date(loan.loan_date).toLocaleDateString('pt-BR')}</TableCell>
@@ -251,11 +262,18 @@ export function PpeLoansTab() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {loan.status === 'Emprestado' && (
-                        <Button variant="outline" size="sm" onClick={() => handleReturn(loan.id)}>
-                          <Undo2 className="h-4 w-4 mr-1" /> Devolver
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        {loan.status === 'Emprestado' && (
+                          <Button variant="outline" size="sm" onClick={() => handleReturn(loan.id)}>
+                            <Undo2 className="h-4 w-4 mr-1" /> Devolver
+                          </Button>
+                        )}
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteId(loan.id)}>
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -293,14 +311,7 @@ export function PpeLoansTab() {
               <Label>Tipo de Pessoa *</Label>
               <Select
                 value={formData.person_type}
-                onValueChange={(v) =>
-                  setFormData({
-                    ...formData,
-                    person_type: v,
-                    collaborator_id: '',
-                    visitor_name: '',
-                  })
-                }
+                onValueChange={(v) => setFormData({ ...formData, person_type: v, person_name: '' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -311,34 +322,18 @@ export function PpeLoansTab() {
                 </SelectContent>
               </Select>
             </div>
-            {formData.person_type === 'collaborator' ? (
-              <div className="space-y-2">
-                <Label>Colaborador *</Label>
-                <Select
-                  value={formData.collaborator_id}
-                  onValueChange={(v) => setFormData({ ...formData, collaborator_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o colaborador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {collaborators.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Nome do Visitante *</Label>
-                <Input
-                  value={formData.visitor_name}
-                  onChange={(e) => setFormData({ ...formData, visitor_name: e.target.value })}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>
+                {formData.person_type === 'collaborator'
+                  ? 'Nome do Colaborador *'
+                  : 'Nome do Visitante *'}
+              </Label>
+              <Input
+                value={formData.person_name}
+                onChange={(e) => setFormData({ ...formData, person_name: e.target.value })}
+                placeholder="Digite o nome"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Quantidade *</Label>
               <Input
@@ -359,6 +354,24 @@ export function PpeLoansTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro de empréstimo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza de que deseja excluir este registro de empréstimo? Esta ação não pode ser
+              desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

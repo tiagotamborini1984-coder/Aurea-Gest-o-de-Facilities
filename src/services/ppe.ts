@@ -81,6 +81,11 @@ export const ppeService = {
     return data
   },
 
+  async deleteLoan(loanId: string) {
+    const { error } = await (supabase as any).from('ppe_loans').delete().eq('id', loanId)
+    if (error) throw error
+  },
+
   async getCollaborators(clientId: string) {
     const { data, error } = await supabase
       .from('org_collaborators')
