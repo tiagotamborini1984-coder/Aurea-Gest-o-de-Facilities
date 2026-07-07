@@ -22,6 +22,7 @@ export function useHasAccess(menuName: string) {
       'Book de Metas',
       'Gestão de Acidentes',
       'Gestão de Documentos',
+      'Gestão de Ferramentas',
     ]
   }
 

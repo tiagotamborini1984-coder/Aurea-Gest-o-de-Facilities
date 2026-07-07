@@ -93,6 +93,9 @@ import PlanejamentoManutencao from './pages/gestao-manutencao/Planejamento'
 import PreventivasManutencao from './pages/gestao-manutencao/Preventivas'
 import CadastrosManutencao from './pages/gestao-manutencao/Cadastros'
 
+// Gestão de Ferramentas
+import DashboardFerramentas from './pages/gestao-ferramentas/Dashboard'
+
 // Gestão de Estoque
 import CatalogoEstoque from './pages/gestao-estoque/Catalogo'
 import MeusPedidosEstoque from './pages/gestao-estoque/MeusPedidos'
@@ -247,6 +250,9 @@ const App = () => (
                       <Route path="/gestao-estoque/produtos" element={<ProdutosEstoque />} />
                       <Route path="/gestao-estoque/areas" element={<AreasEstoque />} />
                       <Route path="/gestao-estoque/dashboard" element={<DashboardEstoque />} />
+
+                      {/* Gestão de Ferramentas */}
+                      <Route path="/gestao-ferramentas" element={<DashboardFerramentas />} />
 
                       {/* Gestão de Encomendas */}
                       <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />

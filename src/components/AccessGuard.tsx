@@ -28,6 +28,7 @@ const routeMenuMap: Record<string, string> = {
   '/organograma/dashboard': 'Organograma e Fluxos:Organograma',
   '/organograma/cadastros': 'Organograma e Fluxos:Cadastros',
   '/organograma/fluxogramas': 'Organograma e Fluxos:Fluxogramas',
+  '/gestao-ferramentas': 'Gestão de Ferramentas',
 }
 
 export function AccessGuard() {

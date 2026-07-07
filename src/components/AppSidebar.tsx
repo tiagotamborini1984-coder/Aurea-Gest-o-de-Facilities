@@ -20,6 +20,7 @@ import {
   PieChart,
   ClipboardList,
   FileText,
+  Hammer,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -146,6 +147,11 @@ export function AppSidebar() {
       ],
     },
     {
+      title: 'Gestão de Ferramentas',
+      icon: Hammer,
+      path: '/gestao-ferramentas',
+    },
+    {
       title: 'Gestão de Documentos',
       icon: FileText,
       path: '/gestao-documentos',
@@ -245,7 +251,8 @@ export function AppSidebar() {
         item.title !== 'Usuários' &&
         item.title !== 'Cadastros' &&
         item.title !== 'Gestão de Clientes' &&
-        item.title !== 'Gestão de Imóveis'
+        item.title !== 'Gestão de Imóveis' &&
+        item.title !== 'Gestão de Ferramentas'
       ) {
         const hasModule = activeClient?.modules?.includes(item.title)
         if (!hasModule) return null
@@ -272,6 +279,7 @@ export function AppSidebar() {
           'Gestão da Manutenção',
           'Treinamentos',
           'Gestão de Documentos',
+          'Gestão de Ferramentas',
         ]
       }
 
