@@ -80,6 +80,7 @@ export function TaskDetailsSheet({
 
   const [wizardStep, setWizardStep] = useState<number>(-1)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [pageInput, setPageInput] = useState('')
 
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null)
   const [poDateDialogOpen, setPoDateDialogOpen] = useState(false)
@@ -95,6 +96,46 @@ export function TaskDetailsSheet({
       setAuditAnswers({})
     }
   }, [isOpen, task])
+
+  useEffect(() => {
+    if (wizardStep > 0) {
+      setPageInput(String(wizardStep))
+    }
+  }, [wizardStep])
+
+  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '')
+    setPageInput(val)
+  }
+
+  const handlePageJump = () => {
+    const parsed = parseInt(pageInput, 10)
+    if (isNaN(parsed) || parsed < 1) {
+      setWizardStep(1)
+      setPageInput('1')
+    } else if (parsed > auditActions.length) {
+      setWizardStep(auditActions.length)
+      setPageInput(String(auditActions.length))
+    } else if (parsed !== wizardStep) {
+      setWizardStep(parsed)
+    } else {
+      setPageInput(String(wizardStep))
+    }
+  }
+
+  const handlePageKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handlePageJump()
+      e.currentTarget.blur()
+    }
+  }
+
+  const handlePageBlur = () => {
+    if (pageInput !== String(wizardStep)) {
+      handlePageJump()
+    }
+  }
 
   const loadTimeline = async () => {
     setLoading(true)
@@ -907,24 +948,49 @@ export function TaskDetailsSheet({
           </div>
         </div>
 
-        <div className="flex justify-between pt-6 mt-6 border-t border-border">
+        <div className="flex justify-between items-center pt-6 mt-6 border-t border-border gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={() => setWizardStep(wizardStep - 1)}
-            className="h-12 px-6 border-border text-muted-foreground hover:bg-accent"
+            className="h-12 px-4 sm:px-6 border-border text-muted-foreground hover:bg-accent"
           >
             <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+              Página
+            </span>
+            <Input
+              type="text"
+              value={pageInput}
+              onChange={handlePageInputChange}
+              onKeyDown={handlePageKeyDown}
+              onBlur={handlePageBlur}
+              className="w-14 h-9 text-center px-1 bg-background border-input"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              aria-label={`Ir para página, de 1 a ${auditActions.length}`}
+            />
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+              de {auditActions.length}
+            </span>
+          </div>
           {wizardStep < auditActions.length ? (
-            <Button type="button" variant="tech" onClick={handleNextStep} className="h-12 px-8">
+            <Button
+              type="button"
+              variant="tech"
+              onClick={handleNextStep}
+              className="h-12 px-4 sm:px-8"
+            >
               Próximo <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           ) : (
             <Button
               type="button"
               onClick={() => setShowConfirm(true)}
-              className="h-12 px-8 bg-green-600 hover:bg-green-700 text-white shadow-md"
+              className="h-12 px-4 sm:px-8 bg-green-600 hover:bg-green-700 text-white shadow-md"
             >
               Enviar Auditoria <CheckCircle className="w-4 h-4 ml-2" />
             </Button>
