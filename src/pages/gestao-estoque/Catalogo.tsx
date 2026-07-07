@@ -225,12 +225,31 @@ export default function Catalogo() {
       return mSearch && mCat
     })
 
-  const handlePrintCatalog = () => {
+  const handlePrintCatalog = async () => {
     const filtered = getFilteredProducts(activeCategory)
     if (filtered.length === 0) {
       toast.error('Não há itens para exibir nesta categoria.')
       return
     }
+
+    const imageUrls = filtered
+      .map((p) => p.image_url)
+      .filter((url): url is string => !!url && url.trim() !== '')
+
+    if (imageUrls.length > 0) {
+      await Promise.all(
+        imageUrls.map(
+          (url) =>
+            new Promise<void>((resolve) => {
+              const img = new Image()
+              img.onload = () => resolve()
+              img.onerror = () => resolve()
+              img.src = url
+            }),
+        ),
+      )
+    }
+
     window.print()
   }
 
@@ -615,62 +634,77 @@ export default function Catalogo() {
         })}
       </Tabs>
 
-      <div className="hidden print:block w-full text-black">
-        <div className="mb-6 pb-4 border-b-2 border-slate-400">
-          <h1 className="text-xl font-bold text-slate-900">{activeClient?.name || ''}</h1>
-          <h2 className="text-base font-semibold text-slate-700">
-            Catálogo de Produtos — {activeCategory}
-          </h2>
-          <p className="text-xs text-slate-500">
-            Gerado em {new Date().toLocaleDateString('pt-BR')} às{' '}
-            {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </p>
+      <div className="hidden print:block w-full bg-white text-black">
+        <div className="mb-6 pb-4 border-b-2 border-black">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-bold text-black">{activeClient?.name || ''}</h1>
+              <h2 className="text-lg font-semibold text-black mt-1">
+                Catálogo de Produtos — {activeCategory}
+              </h2>
+              <p className="text-xs text-black mt-1">
+                Gerado em {new Date().toLocaleDateString('pt-BR')} às{' '}
+                {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+            {activeClient?.logo && (
+              <img
+                src={activeClient.logo}
+                alt={activeClient.name}
+                className="max-h-16 object-contain"
+              />
+            )}
+          </div>
         </div>
-        <table className="w-full border-collapse text-xs text-black">
-          <thead>
-            <tr className="bg-slate-200">
-              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">Nome</th>
-              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
-                Descrição
-              </th>
-              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
-                Código FS
-              </th>
-              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
-                Código Supply
-              </th>
-              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
-                Unidade
-              </th>
-              <th className="border border-slate-400 px-2 py-1.5 text-right font-semibold">
-                Valor
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {getFilteredProducts(activeCategory).map((product) => (
-              <tr key={product.id} className="break-inside-avoid">
-                <td className="border border-slate-400 px-2 py-1.5 font-medium">{product.name}</td>
-                <td className="border border-slate-400 px-2 py-1.5 text-slate-600">
-                  {product.description || '-'}
-                </td>
-                <td className="border border-slate-400 px-2 py-1.5">{product.fs_code || '-'}</td>
-                <td className="border border-slate-400 px-2 py-1.5">
-                  {product.supply_code || '-'}
-                </td>
-                <td className="border border-slate-400 px-2 py-1.5">
-                  {product.unit_of_measure || '-'}
-                </td>
-                <td className="border border-slate-400 px-2 py-1.5 text-right">
-                  {product.item_value != null ? formatCurrency(product.item_value) : '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="text-xs text-slate-500 mt-4">
-          Total de itens: {getFilteredProducts(activeCategory).length}
-        </p>
+
+        <div className="grid grid-cols-2 gap-3 print-grid-catalog">
+          {getFilteredProducts(activeCategory).map((product) => {
+            const code = product.fs_code || product.supply_code || '—'
+            return (
+              <div
+                key={product.id}
+                className="border border-black rounded-md overflow-hidden break-inside-avoid flex flex-col bg-white"
+              >
+                <div className="h-36 bg-white flex items-center justify-center border-b border-black overflow-hidden">
+                  {product.image_url && product.image_url.trim() !== '' ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-gray-400">
+                      <PackageOpen className="w-12 h-12" />
+                      <span className="text-[10px] mt-1">Sem Imagem</span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-2 flex flex-col gap-0.5">
+                  <p className="font-bold text-xs text-black leading-tight line-clamp-2">
+                    {product.name}
+                  </p>
+                  {code !== '—' && (
+                    <p className="text-[10px] text-black font-medium">Código: {code}</p>
+                  )}
+                  {product.unit_of_measure && (
+                    <p className="text-[10px] text-black">Un: {product.unit_of_measure}</p>
+                  )}
+                  <p className="text-xs font-semibold text-black mt-0.5">
+                    {product.item_value != null ? formatCurrency(product.item_value) : ''}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 pt-2 border-t border-black flex justify-between text-[10px] text-black">
+          <span>Total de itens: {getFilteredProducts(activeCategory).length}</span>
+          <span>
+            {activeClient?.name || ''} — Catálogo {activeCategory} —{' '}
+            {new Date().toLocaleDateString('pt-BR')}
+          </span>
+        </div>
       </div>
     </div>
   )
