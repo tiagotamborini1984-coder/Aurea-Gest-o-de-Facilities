@@ -46,16 +46,19 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
-import { supabase } from '@/lib/supabase/client'
 import { ppeService } from '@/services/ppe'
 import { toast } from 'sonner'
 
 const LOAD_TIMEOUT = 10000
 
-export function PpeLoansTab() {
+interface PpeLoansTabProps {
+  plantId: string
+  plants: { id: string; name: string }[]
+}
+
+export function PpeLoansTab({ plantId, plants }: PpeLoansTabProps) {
   const { activeClient, profile } = useAppStore()
   const [loans, setLoans] = useState<any[]>([])
-  const [plants, setPlants] = useState<any[]>([])
   const [formItems, setFormItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -102,7 +105,7 @@ export function PpeLoansTab() {
     }, LOAD_TIMEOUT)
 
     ppeService
-      .getLoans(clientId, startDate, endDate)
+      .getLoans(clientId, startDate, endDate, plantId)
       .then((data) => {
         if (!cancelled) {
           setLoans(data)
@@ -124,24 +127,7 @@ export function PpeLoansTab() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [clientId, profile, startDate, endDate])
-
-  useEffect(() => {
-    if (!clientId)
-      return supabase
-        .from('plants')
-        .select('id, name')
-        .eq('client_id', clientId)
-        .then(({ data }) => {
-          if (!data) return
-          let filtered = data
-          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
-            const auth = profile.authorized_plants || []
-            filtered = data.filter((p) => auth.includes(p.id))
-          }
-          setPlants(filtered)
-        })
-  }, [clientId, profile])
+  }, [clientId, profile, startDate, endDate, plantId])
 
   useEffect(() => {
     if (!clientId || !formPlantId) {
@@ -155,7 +141,7 @@ export function PpeLoansTab() {
   }, [formPlantId, clientId])
 
   const openForm = () => {
-    setFormPlantId('')
+    setFormPlantId(plantId !== 'all' ? plantId : '')
     setFormData({ ppe_id: '', person_type: 'collaborator', person_name: '', quantity: '1' })
     setIsOpen(true)
   }
@@ -187,7 +173,7 @@ export function PpeLoansTab() {
       })
       toast.success('Empréstimo registrado!')
       setIsOpen(false)
-      setLoans(await ppeService.getLoans(clientId, startDate, endDate))
+      setLoans(await ppeService.getLoans(clientId, startDate, endDate, plantId))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao registrar empréstimo')
     }
@@ -198,7 +184,7 @@ export function PpeLoansTab() {
     try {
       await ppeService.returnLoan(loanId)
       toast.success('Item devolvido com sucesso!')
-      setLoans(await ppeService.getLoans(clientId, startDate, endDate))
+      setLoans(await ppeService.getLoans(clientId, startDate, endDate, plantId))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao devolver')
     }
@@ -209,7 +195,7 @@ export function PpeLoansTab() {
     try {
       await ppeService.deleteLoan(deleteId)
       toast.success('Registro de empréstimo excluído')
-      setLoans(await ppeService.getLoans(clientId, startDate, endDate))
+      setLoans(await ppeService.getLoans(clientId, startDate, endDate, plantId))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao excluir')
     }
@@ -267,10 +253,14 @@ export function PpeLoansTab() {
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
             <HandCoins className="h-12 w-12 text-slate-300" />
             <p className="text-slate-500 font-medium">
-              Nenhum empréstimo encontrado para este período/planta
+              {plantId !== 'all'
+                ? 'Nenhum dado encontrado para esta unidade'
+                : 'Nenhum empréstimo encontrado para este período'}
             </p>
             <p className="text-slate-400 text-sm">
-              Ajuste os filtros ou registre um novo empréstimo.
+              {plantId !== 'all'
+                ? 'Ajuste os filtros ou registre um novo empréstimo.'
+                : 'Ajuste os filtros ou registre um novo empréstimo.'}
             </p>
           </CardContent>
         </Card>
@@ -342,6 +332,7 @@ export function PpeLoansTab() {
                   setFormPlantId(v)
                   setFormData({ ...formData, ppe_id: '' })
                 }}
+                disabled={plantId !== 'all'}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a planta" />

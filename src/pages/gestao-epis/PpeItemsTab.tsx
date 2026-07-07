@@ -38,16 +38,19 @@ import {
 } from '@/components/ui/select'
 import { Plus, Edit2, Trash2, Loader2, AlertCircle, PackageOpen, RefreshCw } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
-import { supabase } from '@/lib/supabase/client'
 import { ppeService } from '@/services/ppe'
 import { toast } from 'sonner'
 
 const LOAD_TIMEOUT = 10000
 
-export function PpeItemsTab() {
+interface PpeItemsTabProps {
+  plantId: string
+  plants: { id: string; name: string }[]
+}
+
+export function PpeItemsTab({ plantId, plants }: PpeItemsTabProps) {
   const { activeClient, profile } = useAppStore()
   const [items, setItems] = useState<any[]>([])
-  const [plants, setPlants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -82,7 +85,7 @@ export function PpeItemsTab() {
       }
     }, LOAD_TIMEOUT)
     ppeService
-      .getItems(clientId)
+      .getItems(clientId, plantId)
       .then((data) => {
         if (!cancelled) {
           setItems(data)
@@ -103,24 +106,7 @@ export function PpeItemsTab() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [clientId, profile])
-
-  useEffect(() => {
-    if (!clientId)
-      return supabase
-        .from('plants')
-        .select('id, name')
-        .eq('client_id', clientId)
-        .then(({ data }) => {
-          if (!data) return
-          let filtered = data
-          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
-            const auth = profile.authorized_plants || []
-            filtered = data.filter((p) => auth.includes(p.id))
-          }
-          setPlants(filtered)
-        })
-  }, [clientId, profile])
+  }, [clientId, profile, plantId])
 
   const openForm = (item?: any) => {
     setEditing(item || null)
@@ -138,7 +124,7 @@ export function PpeItemsTab() {
             description: '',
             ca_number: '',
             total_quantity: '0',
-            plant_id: plants.length === 1 ? plants[0].id : '',
+            plant_id: plantId !== 'all' ? plantId : plants.length === 1 ? plants[0].id : '',
           },
     )
     setIsOpen(true)
@@ -157,7 +143,7 @@ export function PpeItemsTab() {
       })
       toast.success(editing ? 'EPI atualizado!' : 'EPI criado!')
       setIsOpen(false)
-      setItems(await ppeService.getItems(clientId))
+      setItems(await ppeService.getItems(clientId, plantId))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao salvar')
     }
@@ -212,9 +198,15 @@ export function PpeItemsTab() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
             <PackageOpen className="h-12 w-12 text-slate-300" />
-            <p className="text-slate-500 font-medium">Nenhum EPI cadastrado</p>
+            <p className="text-slate-500 font-medium">
+              {plantId !== 'all'
+                ? 'Nenhum dado encontrado para esta unidade'
+                : 'Nenhum EPI cadastrado'}
+            </p>
             <p className="text-slate-400 text-sm">
-              Clique em "Novo EPI" para adicionar o primeiro item.
+              {plantId !== 'all'
+                ? 'Cadastre um novo EPI ou selecione outra planta.'
+                : 'Clique em "Novo EPI" para adicionar o primeiro item.'}
             </p>
           </CardContent>
         </Card>
@@ -277,6 +269,7 @@ export function PpeItemsTab() {
               <Select
                 value={formData.plant_id}
                 onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
+                disabled={plantId !== 'all'}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a planta" />

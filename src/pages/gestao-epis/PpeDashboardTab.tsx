@@ -10,9 +10,10 @@ import { toast } from 'sonner'
 interface PpeDashboardTabProps {
   startDate: string
   endDate: string
+  plantId: string
 }
 
-export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
+export function PpeDashboardTab({ startDate, endDate, plantId }: PpeDashboardTabProps) {
   const { activeClient, profile } = useAppStore()
   const [items, setItems] = useState<any[]>([])
   const [loans, setLoans] = useState<any[]>([])
@@ -27,8 +28,8 @@ export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
     }
     setLoading(true)
     Promise.all([
-      ppeService.getItems(clientId),
-      ppeService.getLoanTrends(clientId, startDate, endDate),
+      ppeService.getItems(clientId, plantId),
+      ppeService.getLoanTrends(clientId, startDate, endDate, plantId),
     ])
       .then(([itemsData, loansData]) => {
         setItems(itemsData)
@@ -38,7 +39,7 @@ export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
         toast.error('Erro ao carregar dados do dashboard')
       })
       .finally(() => setLoading(false))
-  }, [clientId, startDate, endDate, profile])
+  }, [clientId, startDate, endDate, profile, plantId])
 
   const stats = useMemo(() => {
     const totalItems = items.length
@@ -128,7 +129,9 @@ export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
           <CardContent className="h-[300px]">
             {chartData.length === 0 ? (
               <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-                Nenhum empréstimo no período selecionado
+                {plantId !== 'all'
+                  ? 'Nenhum empréstimo encontrado para esta unidade no período'
+                  : 'Nenhum empréstimo no período selecionado'}
               </div>
             ) : (
               <ChartContainer
