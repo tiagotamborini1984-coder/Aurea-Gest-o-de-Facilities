@@ -41,9 +41,11 @@ export default function GestaoEPIs() {
           setPlants(filtered)
           if (filtered.length === 1) {
             setSelectedPlant(filtered[0].id)
+          } else if (!selectedPlant) {
+            setSelectedPlant('all')
           }
         })
-  }, [clientId, profile, setSelectedPlant])
+  }, [clientId, profile, setSelectedPlant, selectedPlant])
 
   useEffect(() => {
     const end = new Date()
@@ -82,19 +84,24 @@ export default function GestaoEPIs() {
           {activeTab === 'dashboard' && (
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-[150px]"
-              />
-              <span className="text-slate-400 text-sm">até</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-[150px]"
-              />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-slate-500 leading-none">Data Inicial</span>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-[150px]"
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-slate-500 leading-none">Data Final</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-[150px]"
+                />
+              </div>
             </div>
           )}
         </div>

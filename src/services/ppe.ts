@@ -45,7 +45,7 @@ export const ppeService = {
     if (error) throw error
   },
 
-  async getLoans(clientId: string, plantId?: string) {
+  async getLoans(clientId: string, plantId?: string, startDate?: string, endDate?: string) {
     let query = (supabase as any)
       .from('ppe_loans')
       .select('*, ppe:ppe_items(name, ca_number), collaborator:org_collaborators(name)')
@@ -53,6 +53,13 @@ export const ppeService = {
 
     if (plantId && plantId !== 'all') {
       query = query.eq('plant_id', plantId)
+    }
+
+    if (startDate) {
+      query = query.gte('loan_date', startDate + 'T00:00:00.000Z')
+    }
+    if (endDate) {
+      query = query.lte('loan_date', endDate + 'T23:59:59.999Z')
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })

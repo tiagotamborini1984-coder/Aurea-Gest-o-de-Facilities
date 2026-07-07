@@ -127,20 +127,20 @@ export function PpeLoansTab() {
   }, [clientId, selectedPlant, profile, startDate, endDate])
 
   useEffect(() => {
-    if (!clientId)
-      return supabase
-        .from('plants')
-        .select('id, name')
-        .eq('client_id', clientId)
-        .then(({ data }) => {
-          if (!data) return
-          let filtered = data
-          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
-            const auth = profile.authorized_plants || []
-            filtered = data.filter((p) => auth.includes(p.id))
-          }
-          setPlants(filtered)
-        })
+    if (!clientId) return
+    supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', clientId)
+      .then(({ data }) => {
+        if (!data) return
+        let filtered = data
+        if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+          const auth = profile.authorized_plants || []
+          filtered = data.filter((p) => auth.includes(p.id))
+        }
+        setPlants(filtered)
+      })
   }, [clientId, profile])
 
   useEffect(() => {
@@ -239,19 +239,24 @@ export function PpeLoansTab() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-[150px]"
-          />
-          <span className="text-slate-400 text-sm">até</span>
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-[150px]"
-          />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-500 leading-none">Data Inicial</span>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-500 leading-none">Data Final</span>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-[150px]"
+            />
+          </div>
         </div>
         <Button onClick={openForm} disabled={plants.length === 0}>
           <Plus className="h-4 w-4 mr-2" /> Novo Empréstimo
