@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -41,6 +41,9 @@ import { submitAuditExecution } from '@/services/audit'
 import { format, parseISO, addDays, addWeeks, addMonths, addYears } from 'date-fns'
 
 import { PrintLayout } from './components/PrintLayout'
+import { PaginationControls } from './components/PaginationControls'
+
+const ITEMS_PER_PAGE = 3
 
 function calculateNextDate(frequency: string, baseDateStr: string | null) {
   if (!baseDateStr) return null
@@ -142,6 +145,7 @@ function AuditoriaDetalhesInner() {
   const [participants, setParticipants] = useState('')
   const [clientBrand, setClientBrand] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchData()
@@ -307,6 +311,15 @@ function AuditoriaDetalhesInner() {
     ].includes(execution.status?.toLowerCase() || '') ||
     (execution.final_score !== null && execution.realization_date !== null)
 
+  const totalPages = Math.max(1, Math.ceil(actions.length / ITEMS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedActions = useMemo(() => {
+    const start = (safeCurrentPage - 1) * ITEMS_PER_PAGE
+    return actions.slice(start, start + ITEMS_PER_PAGE)
+  }, [actions, safeCurrentPage])
+
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
+
   // Derived calculations for the History & Schedule tab
   const completedHistory = history
     .filter(
@@ -438,12 +451,12 @@ function AuditoriaDetalhesInner() {
 
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Critérios de Avaliação</h2>
-              {actions.map((action, index) => (
+              {paginatedActions.map((action, index) => (
                 <Card key={action.id}>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center justify-between">
                       <span>
-                        {index + 1}. {action.title}
+                        {startIndex + index + 1}. {action.title}
                       </span>
                       <span className="text-sm font-normal text-muted-foreground">
                         Peso: {action.weight}
@@ -563,6 +576,11 @@ function AuditoriaDetalhesInner() {
                 </Card>
               ))}
             </div>
+            <PaginationControls
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </TabsContent>
 
           <TabsContent value="historico" className="space-y-6 animate-fade-in-up">
