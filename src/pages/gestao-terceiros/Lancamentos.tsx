@@ -62,6 +62,8 @@ export default function Lancamentos() {
   const [dirtyLogs, setDirtyLogs] = useState<Set<string>>(new Set())
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set())
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<Set<string>>(new Set())
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
 
@@ -100,6 +102,7 @@ export default function Lancamentos() {
     setIsEditingPublished(false)
     setDirtyLogs(new Set())
     setSelectedCompanies(new Set())
+    setSelectedLocations(new Set())
 
     try {
       const currentPlantObj = plants.find((p) => p.id === selectedPlant)
@@ -140,6 +143,15 @@ export default function Lancamentos() {
         .order('name')
       if (isActive && compsData) {
         setCompanies(compsData)
+      }
+
+      const { data: locsData } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('plant_id', selectedPlant)
+        .order('name')
+      if (isActive && locsData) {
+        setLocations(locsData)
       }
 
       const staffLogIds = Array.from(
@@ -541,19 +553,34 @@ export default function Lancamentos() {
   }
 
   const filteredEmployees = useMemo(() => {
-    if (selectedCompanies.size === 0) return employees
-    const selectedNames = companies.filter((c) => selectedCompanies.has(c.id)).map((c) => c.name)
-    return employees.filter((emp) => {
-      if (emp.company_id && selectedCompanies.has(emp.company_id)) return true
-      return selectedNames.includes(emp.company_name)
-    })
-  }, [employees, selectedCompanies, companies])
+    let result = employees
+    if (selectedCompanies.size > 0) {
+      const selectedNames = companies.filter((c) => selectedCompanies.has(c.id)).map((c) => c.name)
+      result = result.filter((emp) => {
+        if (emp.company_id && selectedCompanies.has(emp.company_id)) return true
+        return selectedNames.includes(emp.company_name)
+      })
+    }
+    if (selectedLocations.size > 0) {
+      result = result.filter((emp) => emp.location_id && selectedLocations.has(emp.location_id))
+    }
+    return result
+  }, [employees, selectedCompanies, companies, selectedLocations])
 
   const toggleCompanyFilter = (companyId: string) => {
     setSelectedCompanies((prev) => {
       const next = new Set(prev)
       if (next.has(companyId)) next.delete(companyId)
       else next.add(companyId)
+      return next
+    })
+  }
+
+  const toggleLocationFilter = (locationId: string) => {
+    setSelectedLocations((prev) => {
+      const next = new Set(prev)
+      if (next.has(locationId)) next.delete(locationId)
+      else next.add(locationId)
       return next
     })
   }
@@ -773,7 +800,10 @@ export default function Lancamentos() {
                         variant="outline"
                         size="sm"
                         className="mt-3"
-                        onClick={() => setSelectedCompanies(new Set())}
+                        onClick={() => {
+                          setSelectedCompanies(new Set())
+                          setSelectedLocations(new Set())
+                        }}
                       >
                         Limpar filtro
                       </Button>
@@ -852,6 +882,74 @@ export default function Lancamentos() {
                                 )}
                               </div>
                             </TableHead>
+                            <TableHead className="w-[180px]">
+                              <div className="flex items-center gap-1">
+                                Local
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        'h-6 w-6',
+                                        selectedLocations.size > 0 && 'text-primary bg-primary/10',
+                                      )}
+                                    >
+                                      <Filter className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-56 p-0" align="start">
+                                    <div className="p-2 border-b">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm font-semibold">
+                                          Filtrar locais
+                                        </span>
+                                        {selectedLocations.size > 0 && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 text-xs px-2"
+                                            onClick={() => setSelectedLocations(new Set())}
+                                          >
+                                            Limpar
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="max-h-60 overflow-y-auto p-1">
+                                      {locations.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground p-2">
+                                          Nenhum local cadastrado.
+                                        </p>
+                                      ) : (
+                                        locations.map((loc) => (
+                                          <label
+                                            key={loc.id}
+                                            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
+                                          >
+                                            <Checkbox
+                                              checked={selectedLocations.has(loc.id)}
+                                              onCheckedChange={() => toggleLocationFilter(loc.id)}
+                                            />
+                                            <span className="truncate">{loc.name}</span>
+                                          </label>
+                                        ))
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {selectedLocations.size > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => setSelectedLocations(new Set())}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableHead>
                             <TableHead className="text-center">Status Treinamentos</TableHead>
                             <TableHead className="text-right w-[140px]">Presente</TableHead>
                           </TableRow>
@@ -871,6 +969,11 @@ export default function Lancamentos() {
                                 <TableCell className="font-medium">{emp.name || '-'}</TableCell>
                                 <TableCell className="text-muted-foreground text-sm">
                                   {emp.company_name || '-'}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                  {emp.location_id
+                                    ? locations.find((l) => l.id === emp.location_id)?.name || '-'
+                                    : '-'}
                                 </TableCell>
                                 <TableCell className="text-center">
                                   <TrainingStatusCell
