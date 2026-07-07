@@ -39,8 +39,11 @@ export default function GestaoEPIs() {
             filtered = data.filter((p: any) => auth.includes(p.id))
           }
           setPlants(filtered)
+          if (filtered.length === 1) {
+            setSelectedPlant(filtered[0].id)
+          }
         })
-  }, [clientId, profile])
+  }, [clientId, profile, setSelectedPlant])
 
   useEffect(() => {
     const end = new Date()

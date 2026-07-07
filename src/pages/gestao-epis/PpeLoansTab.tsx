@@ -35,7 +35,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Loader2, Undo2, AlertCircle, RefreshCw, HandCoins, Trash2 } from 'lucide-react'
+import {
+  Plus,
+  Loader2,
+  Undo2,
+  AlertCircle,
+  RefreshCw,
+  HandCoins,
+  Trash2,
+  CalendarDays,
+} from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
 import { ppeService } from '@/services/ppe'
@@ -54,6 +63,8 @@ export function PpeLoansTab() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formPlantId, setFormPlantId] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [formData, setFormData] = useState({
     ppe_id: '',
     person_type: 'collaborator',
@@ -63,6 +74,14 @@ export function PpeLoansTab() {
 
   const clientId = activeClient?.id || profile?.client_id
   const isAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
+
+  useEffect(() => {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - 30)
+    setEndDate(end.toISOString().split('T')[0])
+    setStartDate(start.toISOString().split('T')[0])
+  }, [])
 
   useEffect(() => {
     if (!clientId) {
@@ -83,7 +102,7 @@ export function PpeLoansTab() {
     }, LOAD_TIMEOUT)
 
     ppeService
-      .getLoans(clientId, selectedPlant)
+      .getLoans(clientId, selectedPlant, startDate, endDate)
       .then((data) => {
         if (!cancelled) {
           setLoans(data)
@@ -105,7 +124,7 @@ export function PpeLoansTab() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [clientId, selectedPlant, profile])
+  }, [clientId, selectedPlant, profile, startDate, endDate])
 
   useEffect(() => {
     if (!clientId)
@@ -168,7 +187,7 @@ export function PpeLoansTab() {
       })
       toast.success('Empréstimo registrado!')
       setIsOpen(false)
-      setLoans(await ppeService.getLoans(clientId, selectedPlant))
+      setLoans(await ppeService.getLoans(clientId, selectedPlant, startDate, endDate))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao registrar empréstimo')
     }
@@ -179,7 +198,7 @@ export function PpeLoansTab() {
     try {
       await ppeService.returnLoan(loanId)
       toast.success('Item devolvido com sucesso!')
-      setLoans(await ppeService.getLoans(clientId, selectedPlant))
+      setLoans(await ppeService.getLoans(clientId, selectedPlant, startDate, endDate))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao devolver')
     }
@@ -190,7 +209,7 @@ export function PpeLoansTab() {
     try {
       await ppeService.deleteLoan(deleteId)
       toast.success('Registro de empréstimo excluído')
-      setLoans(await ppeService.getLoans(clientId, selectedPlant))
+      setLoans(await ppeService.getLoans(clientId, selectedPlant, startDate, endDate))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao excluir')
     }
@@ -217,7 +236,23 @@ export function PpeLoansTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-[150px]"
+          />
+          <span className="text-slate-400 text-sm">até</span>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-[150px]"
+          />
+        </div>
         <Button onClick={openForm} disabled={plants.length === 0}>
           <Plus className="h-4 w-4 mr-2" /> Novo Empréstimo
         </Button>
@@ -226,9 +261,11 @@ export function PpeLoansTab() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
             <HandCoins className="h-12 w-12 text-slate-300" />
-            <p className="text-slate-500 font-medium">Nenhum empréstimo registrado</p>
+            <p className="text-slate-500 font-medium">
+              Nenhum empréstimo encontrado para este período/planta
+            </p>
             <p className="text-slate-400 text-sm">
-              Os empréstimos aparecerão aqui quando forem criados.
+              Ajuste os filtros ou registre um novo empréstimo.
             </p>
           </CardContent>
         </Card>
