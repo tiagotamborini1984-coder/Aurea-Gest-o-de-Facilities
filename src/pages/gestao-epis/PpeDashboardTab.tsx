@@ -13,7 +13,7 @@ interface PpeDashboardTabProps {
 }
 
 export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
-  const { activeClient, profile, selectedPlant } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [items, setItems] = useState<any[]>([])
   const [loans, setLoans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,8 +27,8 @@ export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
     }
     setLoading(true)
     Promise.all([
-      ppeService.getItems(clientId, selectedPlant),
-      ppeService.getLoanTrends(clientId, selectedPlant, startDate, endDate),
+      ppeService.getItems(clientId),
+      ppeService.getLoanTrends(clientId, startDate, endDate),
     ])
       .then(([itemsData, loansData]) => {
         setItems(itemsData)
@@ -38,7 +38,7 @@ export function PpeDashboardTab({ startDate, endDate }: PpeDashboardTabProps) {
         toast.error('Erro ao carregar dados do dashboard')
       })
       .finally(() => setLoading(false))
-  }, [clientId, selectedPlant, startDate, endDate, profile])
+  }, [clientId, startDate, endDate, profile])
 
   const stats = useMemo(() => {
     const totalItems = items.length

@@ -53,7 +53,7 @@ import { toast } from 'sonner'
 const LOAD_TIMEOUT = 10000
 
 export function PpeLoansTab() {
-  const { activeClient, profile, selectedPlant } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [loans, setLoans] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
   const [formItems, setFormItems] = useState<any[]>([])
@@ -102,7 +102,7 @@ export function PpeLoansTab() {
     }, LOAD_TIMEOUT)
 
     ppeService
-      .getLoans(clientId, selectedPlant, startDate, endDate)
+      .getLoans(clientId, startDate, endDate)
       .then((data) => {
         if (!cancelled) {
           setLoans(data)
@@ -124,23 +124,23 @@ export function PpeLoansTab() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [clientId, selectedPlant, profile, startDate, endDate])
+  }, [clientId, profile, startDate, endDate])
 
   useEffect(() => {
-    if (!clientId) return
-    supabase
-      .from('plants')
-      .select('id, name')
-      .eq('client_id', clientId)
-      .then(({ data }) => {
-        if (!data) return
-        let filtered = data
-        if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
-          const auth = profile.authorized_plants || []
-          filtered = data.filter((p) => auth.includes(p.id))
-        }
-        setPlants(filtered)
-      })
+    if (!clientId)
+      return supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', clientId)
+        .then(({ data }) => {
+          if (!data) return
+          let filtered = data
+          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+            const auth = profile.authorized_plants || []
+            filtered = data.filter((p) => auth.includes(p.id))
+          }
+          setPlants(filtered)
+        })
   }, [clientId, profile])
 
   useEffect(() => {
@@ -155,7 +155,7 @@ export function PpeLoansTab() {
   }, [formPlantId, clientId])
 
   const openForm = () => {
-    setFormPlantId(selectedPlant !== 'all' ? selectedPlant : '')
+    setFormPlantId('')
     setFormData({ ppe_id: '', person_type: 'collaborator', person_name: '', quantity: '1' })
     setIsOpen(true)
   }
@@ -187,7 +187,7 @@ export function PpeLoansTab() {
       })
       toast.success('Empréstimo registrado!')
       setIsOpen(false)
-      setLoans(await ppeService.getLoans(clientId, selectedPlant, startDate, endDate))
+      setLoans(await ppeService.getLoans(clientId, startDate, endDate))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao registrar empréstimo')
     }
@@ -198,7 +198,7 @@ export function PpeLoansTab() {
     try {
       await ppeService.returnLoan(loanId)
       toast.success('Item devolvido com sucesso!')
-      setLoans(await ppeService.getLoans(clientId, selectedPlant, startDate, endDate))
+      setLoans(await ppeService.getLoans(clientId, startDate, endDate))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao devolver')
     }
@@ -209,7 +209,7 @@ export function PpeLoansTab() {
     try {
       await ppeService.deleteLoan(deleteId)
       toast.success('Registro de empréstimo excluído')
-      setLoans(await ppeService.getLoans(clientId, selectedPlant, startDate, endDate))
+      setLoans(await ppeService.getLoans(clientId, startDate, endDate))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao excluir')
     }

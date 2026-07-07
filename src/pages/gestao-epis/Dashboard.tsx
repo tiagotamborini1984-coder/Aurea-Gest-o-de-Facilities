@@ -1,58 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Building2, CalendarDays } from 'lucide-react'
+import { CalendarDays } from 'lucide-react'
 import { PpeItemsTab } from './PpeItemsTab'
 import { PpeLoansTab } from './PpeLoansTab'
 import { PpeDashboardTab } from './PpeDashboardTab'
 import { useAppStore } from '@/store/AppContext'
-import { supabase } from '@/lib/supabase/client'
 
 export default function GestaoEPIs() {
-  const { activeClient, profile, selectedPlant, setSelectedPlant } = useAppStore()
-  const [plants, setPlants] = useState<any[]>([])
+  const { activeClient, profile } = useAppStore()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
   const clientId = activeClient?.id || profile?.client_id
-
-  useEffect(() => {
-    if (!clientId)
-      return supabase
-        .from('plants')
-        .select('id, name, code')
-        .eq('client_id', clientId)
-        .order('name')
-        .then(({ data, error }) => {
-          if (error || !data) return
-          let filtered = data
-          if (
-            profile &&
-            profile.role !== 'Master' &&
-            profile.role !== 'Administrador' &&
-            profile.authorized_plants &&
-            Array.isArray(profile.authorized_plants) &&
-            profile.authorized_plants.length > 0
-          ) {
-            const auth = profile.authorized_plants as string[]
-            filtered = data.filter((p: any) => auth.includes(p.id))
-          }
-          setPlants(filtered)
-          if (filtered.length === 1) {
-            setSelectedPlant(filtered[0].id)
-          } else if (!selectedPlant || selectedPlant === 'all') {
-            setSelectedPlant('all')
-          }
-        })
-  }, [clientId, profile, selectedPlant, setSelectedPlant])
 
   useEffect(() => {
     const end = new Date()
@@ -72,22 +33,6 @@ export default function GestaoEPIs() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-            <Select value={selectedPlant} onValueChange={(v) => setSelectedPlant(v)}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Todas as Unidades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Unidades</SelectItem>
-                {plants.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           {activeTab === 'dashboard' && (
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />

@@ -1,17 +1,12 @@
 import { supabase } from '@/lib/supabase/client'
 
 export const ppeService = {
-  async getItems(clientId: string, plantId?: string) {
-    let query = (supabase as any)
+  async getItems(clientId: string) {
+    const { data, error } = await (supabase as any)
       .from('ppe_items')
       .select('*, plants(name)')
       .eq('client_id', clientId)
-
-    if (plantId && plantId !== 'all') {
-      query = query.eq('plant_id', plantId)
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false })
+      .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
   },
@@ -45,15 +40,11 @@ export const ppeService = {
     if (error) throw error
   },
 
-  async getLoans(clientId: string, plantId?: string, startDate?: string, endDate?: string) {
+  async getLoans(clientId: string, startDate?: string, endDate?: string) {
     let query = (supabase as any)
       .from('ppe_loans')
       .select('*, ppe:ppe_items(name, ca_number), collaborator:org_collaborators(name)')
       .eq('client_id', clientId)
-
-    if (plantId && plantId !== 'all') {
-      query = query.eq('plant_id', plantId)
-    }
 
     if (startDate) {
       query = query.gte('loan_date', startDate + 'T00:00:00.000Z')
@@ -93,15 +84,11 @@ export const ppeService = {
     if (error) throw error
   },
 
-  async getLoanTrends(clientId: string, plantId?: string, startDate?: string, endDate?: string) {
+  async getLoanTrends(clientId: string, startDate?: string, endDate?: string) {
     let query = (supabase as any)
       .from('ppe_loans')
       .select('loan_date, quantity, status')
       .eq('client_id', clientId)
-
-    if (plantId && plantId !== 'all') {
-      query = query.eq('plant_id', plantId)
-    }
 
     if (startDate) {
       query = query.gte('loan_date', startDate + 'T00:00:00.000Z')

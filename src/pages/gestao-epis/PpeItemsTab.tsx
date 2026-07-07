@@ -45,7 +45,7 @@ import { toast } from 'sonner'
 const LOAD_TIMEOUT = 10000
 
 export function PpeItemsTab() {
-  const { activeClient, profile, selectedPlant } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [items, setItems] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +82,7 @@ export function PpeItemsTab() {
       }
     }, LOAD_TIMEOUT)
     ppeService
-      .getItems(clientId, selectedPlant)
+      .getItems(clientId)
       .then((data) => {
         if (!cancelled) {
           setItems(data)
@@ -103,23 +103,23 @@ export function PpeItemsTab() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [clientId, selectedPlant, profile])
+  }, [clientId, profile])
 
   useEffect(() => {
-    if (!clientId) return
-    supabase
-      .from('plants')
-      .select('id, name')
-      .eq('client_id', clientId)
-      .then(({ data }) => {
-        if (!data) return
-        let filtered = data
-        if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
-          const auth = profile.authorized_plants || []
-          filtered = data.filter((p) => auth.includes(p.id))
-        }
-        setPlants(filtered)
-      })
+    if (!clientId)
+      return supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', clientId)
+        .then(({ data }) => {
+          if (!data) return
+          let filtered = data
+          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+            const auth = profile.authorized_plants || []
+            filtered = data.filter((p) => auth.includes(p.id))
+          }
+          setPlants(filtered)
+        })
   }, [clientId, profile])
 
   const openForm = (item?: any) => {
@@ -157,7 +157,7 @@ export function PpeItemsTab() {
       })
       toast.success(editing ? 'EPI atualizado!' : 'EPI criado!')
       setIsOpen(false)
-      setItems(await ppeService.getItems(clientId, selectedPlant))
+      setItems(await ppeService.getItems(clientId))
     } catch (e: any) {
       toast.error(e.message || 'Erro ao salvar')
     }
