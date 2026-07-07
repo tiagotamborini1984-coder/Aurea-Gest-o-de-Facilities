@@ -14,6 +14,7 @@ import {
   PackageOpen,
   ExternalLink,
   Upload,
+  Printer,
 } from 'lucide-react'
 import {
   Sheet,
@@ -224,15 +225,28 @@ export default function Catalogo() {
       return mSearch && mCat
     })
 
+  const handlePrintCatalog = () => {
+    const filtered = getFilteredProducts(activeCategory)
+    if (filtered.length === 0) {
+      toast.error('Não há itens para exibir nesta categoria.')
+      return
+    }
+    window.print()
+  }
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 print:p-0 print:max-w-none">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Catálogo de Produtos</h1>
           <p className="text-slate-500">Solicite materiais e itens de estoque</p>
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handlePrintCatalog}>
+            <Printer className="w-4 h-4 mr-2" />
+            Imprimir Catálogo
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Importar
@@ -423,7 +437,7 @@ export default function Catalogo() {
         onImportComplete={loadData}
       />
 
-      <div className="relative w-full">
+      <div className="relative w-full print:hidden">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <Input
           placeholder="Buscar produtos..."
@@ -433,7 +447,11 @@ export default function Catalogo() {
         />
       </div>
 
-      <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
+      <Tabs
+        value={activeCategory}
+        onValueChange={setActiveCategory}
+        className="w-full print:hidden"
+      >
         <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1 bg-slate-100">
           {categories.map((cat) => {
             const count = products.filter((p) => normalizeMatch(p.category, cat)).length
@@ -596,6 +614,64 @@ export default function Catalogo() {
           )
         })}
       </Tabs>
+
+      <div className="hidden print:block w-full text-black">
+        <div className="mb-6 pb-4 border-b-2 border-slate-400">
+          <h1 className="text-xl font-bold text-slate-900">{activeClient?.name || ''}</h1>
+          <h2 className="text-base font-semibold text-slate-700">
+            Catálogo de Produtos — {activeCategory}
+          </h2>
+          <p className="text-xs text-slate-500">
+            Gerado em {new Date().toLocaleDateString('pt-BR')} às{' '}
+            {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+        <table className="w-full border-collapse text-xs text-black">
+          <thead>
+            <tr className="bg-slate-200">
+              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">Nome</th>
+              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
+                Descrição
+              </th>
+              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
+                Código FS
+              </th>
+              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
+                Código Supply
+              </th>
+              <th className="border border-slate-400 px-2 py-1.5 text-left font-semibold">
+                Unidade
+              </th>
+              <th className="border border-slate-400 px-2 py-1.5 text-right font-semibold">
+                Valor
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {getFilteredProducts(activeCategory).map((product) => (
+              <tr key={product.id} className="break-inside-avoid">
+                <td className="border border-slate-400 px-2 py-1.5 font-medium">{product.name}</td>
+                <td className="border border-slate-400 px-2 py-1.5 text-slate-600">
+                  {product.description || '-'}
+                </td>
+                <td className="border border-slate-400 px-2 py-1.5">{product.fs_code || '-'}</td>
+                <td className="border border-slate-400 px-2 py-1.5">
+                  {product.supply_code || '-'}
+                </td>
+                <td className="border border-slate-400 px-2 py-1.5">
+                  {product.unit_of_measure || '-'}
+                </td>
+                <td className="border border-slate-400 px-2 py-1.5 text-right">
+                  {product.item_value != null ? formatCurrency(product.item_value) : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs text-slate-500 mt-4">
+          Total de itens: {getFilteredProducts(activeCategory).length}
+        </p>
+      </div>
     </div>
   )
 }

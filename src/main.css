@@ -196,4 +196,17 @@
   .print-hide {
     display: none !important;
   }
+
+  table {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
 }
