@@ -1,6 +1,18 @@
+import { useEffect } from 'react'
 import { Navigate, useLocation, Outlet } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { useAppStore } from '@/store/AppContext'
+import { toast } from 'sonner'
+
+function ModuleAccessDenied() {
+  useEffect(() => {
+    toast.error('Acesso Negado', {
+      description:
+        'O módulo não está ativado para a sua empresa. Entre em contato com o administrador do sistema.',
+    })
+  }, [])
+  return <Navigate to="/gestao-terceiros/dashboard-gestor" replace />
+}
 
 const routeMenuMap: Record<string, string> = {
   '/gestao-ferramentas': 'Gestão de Ferramentas',
@@ -59,34 +71,7 @@ export function AccessGuard() {
     activeClient &&
     !activeClient.modules?.includes(moduleRouteMap[requiredModule])
   ) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-8">
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Módulo Não Disponível</h2>
-          <p className="text-slate-600 mb-6">
-            O módulo de Gestão de Ferramentas não está ativado para a sua empresa. Entre em contato
-            com o administrador do sistema para mais informações.
-          </p>
-        </div>
-      </div>
-    )
+    return <ModuleAccessDenied />
   }
 
   if (profile?.role === 'Master' || profile?.role === 'Administrador') {

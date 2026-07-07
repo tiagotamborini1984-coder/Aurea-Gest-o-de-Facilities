@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,6 @@ const MODULES = [
   'Book de Metas',
   'Log de Auditoria',
   'Dashboard Estratégico',
-  'Gestão de Ferramentas',
 ]
 
 export default function Clientes() {
@@ -153,6 +153,30 @@ export default function Clientes() {
                   <option value="Ativo">Ativo</option>
                   <option value="Inativo">Inativo</option>
                 </select>
+              </div>
+              <div className="col-span-2 space-y-3 mt-2 p-4 rounded-lg border border-slate-200 bg-slate-50/50">
+                <label className="text-sm font-medium border-b pb-1 block">
+                  Módulos Disponíveis
+                </label>
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-sm font-medium">Gestão de Ferramentas</p>
+                    <p className="text-xs text-slate-500">
+                      Habilita o módulo de gestão de ferramentas para este cliente
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.modules.includes('Gestão de Ferramentas')}
+                    onCheckedChange={(checked) => {
+                      setFormData({
+                        ...formData,
+                        modules: checked
+                          ? [...formData.modules, 'Gestão de Ferramentas']
+                          : formData.modules.filter((m) => m !== 'Gestão de Ferramentas'),
+                      })
+                    }}
+                  />
+                </div>
               </div>
               <div className="col-span-2 space-y-2 mt-2">
                 <label className="text-sm font-medium border-b pb-1 block">Módulos Ativos</label>

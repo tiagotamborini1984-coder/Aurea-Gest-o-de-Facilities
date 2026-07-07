@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -38,7 +39,6 @@ const AVAILABLE_MODULES = [
   'Gestão de Acidentes',
   'Gestão da Manutenção',
   'Gestão de Estoque',
-  'Gestão de Ferramentas',
 ]
 
 export function EditClientDialog({
@@ -166,21 +166,38 @@ export function EditClientDialog({
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-100">
-            <Label className="text-base font-semibold mb-3 block">Módulos Contratados</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {AVAILABLE_MODULES.map((mod) => (
-                <div key={mod} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`edit-mod-${mod}`}
-                    checked={formData.modules.includes(mod)}
-                    onCheckedChange={() => toggleModule(mod)}
-                  />
-                  <Label htmlFor={`edit-mod-${mod}`} className="font-normal cursor-pointer">
-                    {mod}
-                  </Label>
+          <div className="pt-4 border-t border-slate-100 space-y-4">
+            <div>
+              <Label className="text-base font-semibold mb-3 block">Módulos Disponíveis</Label>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg border border-slate-200 bg-slate-50/50">
+                <div>
+                  <p className="text-sm font-medium">Gestão de Ferramentas</p>
+                  <p className="text-xs text-slate-500">
+                    Habilita o módulo de gestão de ferramentas
+                  </p>
                 </div>
-              ))}
+                <Switch
+                  checked={formData.modules.includes('Gestão de Ferramentas')}
+                  onCheckedChange={() => toggleModule('Gestão de Ferramentas')}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-base font-semibold mb-3 block">Módulos Contratados</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {AVAILABLE_MODULES.map((mod) => (
+                  <div key={mod} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-mod-${mod}`}
+                      checked={formData.modules.includes(mod)}
+                      onCheckedChange={() => toggleModule(mod)}
+                    />
+                    <Label htmlFor={`edit-mod-${mod}`} className="font-normal cursor-pointer">
+                      {mod}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
