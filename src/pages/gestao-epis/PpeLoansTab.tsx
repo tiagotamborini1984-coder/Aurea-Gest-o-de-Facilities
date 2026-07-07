@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/select'
 import { Plus, Loader2, Undo2, AlertCircle, RefreshCw, HandCoins, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
+import { supabase } from '@/lib/supabase/client'
 import { ppeService } from '@/services/ppe'
 import { toast } from 'sonner'
 
@@ -45,12 +46,14 @@ const LOAD_TIMEOUT = 10000
 export function PpeLoansTab() {
   const { activeClient, profile, selectedPlant } = useAppStore()
   const [loans, setLoans] = useState<any[]>([])
-  const [items, setItems] = useState<any[]>([])
+  const [plants, setPlants] = useState<any[]>([])
+  const [formItems, setFormItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [formPlantId, setFormPlantId] = useState('')
   const [formData, setFormData] = useState({
     ppe_id: '',
     person_type: 'collaborator',
@@ -98,23 +101,49 @@ export function PpeLoansTab() {
         if (!cancelled) clearTimeout(timeoutId)
       })
 
-    ppeService
-      .getItems(clientId, selectedPlant)
-      .then((data) => {
-        if (!cancelled) setItems(data.filter((i: any) => i.current_stock > 0))
-      })
-      .catch(() => {
-        if (!cancelled) toast.warning('Não foi possível carregar a lista de EPIs disponíveis.')
-      })
-
     return () => {
       cancelled = true
       clearTimeout(timeoutId)
     }
   }, [clientId, selectedPlant, profile])
 
+  useEffect(() => {
+    if (!clientId)
+      return supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', clientId)
+        .then(({ data }) => {
+          if (!data) return
+          let filtered = data
+          if (profile && profile.role !== 'Master' && profile.role !== 'Administrador') {
+            const auth = profile.authorized_plants || []
+            filtered = data.filter((p) => auth.includes(p.id))
+          }
+          setPlants(filtered)
+        })
+  }, [clientId, profile])
+
+  useEffect(() => {
+    if (!clientId || !formPlantId) {
+      setFormItems([])
+      return
+    }
+    ppeService
+      .getItems(clientId, formPlantId)
+      .then((data) => setFormItems(data.filter((i: any) => i.current_stock > 0)))
+      .catch(() => setFormItems([]))
+  }, [formPlantId, clientId])
+
+  const openForm = () => {
+    setFormPlantId(selectedPlant !== 'all' ? selectedPlant : '')
+    setFormData({ ppe_id: '', person_type: 'collaborator', person_name: '', quantity: '1' })
+    setIsOpen(true)
+  }
+
   const handleSave = async () => {
-    if (!clientId || !activeClient) return
+    if (!clientId) return
+    if (!formPlantId) return toast.error('Selecione uma planta')
     if (!formData.ppe_id) return toast.error('Selecione um EPI')
     if (!formData.person_name.trim()) return toast.error('Informe o nome da pessoa')
     const qty = Number(formData.quantity) || 1
@@ -122,7 +151,7 @@ export function PpeLoansTab() {
 
     setSaving(true)
     try {
-      const selectedItem = items.find((i) => i.id === formData.ppe_id)
+      const selectedItem = formItems.find((i) => i.id === formData.ppe_id)
       if (selectedItem && qty > selectedItem.current_stock) {
         toast.error('Quantidade maior que estoque disponível')
         setSaving(false)
@@ -130,7 +159,7 @@ export function PpeLoansTab() {
       }
       await ppeService.createLoan({
         client_id: clientId,
-        plant_id: selectedItem.plant_id,
+        plant_id: formPlantId,
         ppe_id: formData.ppe_id,
         person_type: formData.person_type,
         person_name: formData.person_name.trim(),
@@ -139,18 +168,7 @@ export function PpeLoansTab() {
       })
       toast.success('Empréstimo registrado!')
       setIsOpen(false)
-      setFormData({
-        ppe_id: '',
-        person_type: 'collaborator',
-        person_name: '',
-        quantity: '1',
-      })
       setLoans(await ppeService.getLoans(clientId, selectedPlant))
-      setItems(
-        (await ppeService.getItems(clientId, selectedPlant)).filter(
-          (i: any) => i.current_stock > 0,
-        ),
-      )
     } catch (e: any) {
       toast.error(e.message || 'Erro ao registrar empréstimo')
     }
@@ -162,11 +180,6 @@ export function PpeLoansTab() {
       await ppeService.returnLoan(loanId)
       toast.success('Item devolvido com sucesso!')
       setLoans(await ppeService.getLoans(clientId, selectedPlant))
-      setItems(
-        (await ppeService.getItems(clientId, selectedPlant)).filter(
-          (i: any) => i.current_stock > 0,
-        ),
-      )
     } catch (e: any) {
       toast.error(e.message || 'Erro ao devolver')
     }
@@ -178,11 +191,6 @@ export function PpeLoansTab() {
       await ppeService.deleteLoan(deleteId)
       toast.success('Registro de empréstimo excluído')
       setLoans(await ppeService.getLoans(clientId, selectedPlant))
-      setItems(
-        (await ppeService.getItems(clientId, selectedPlant)).filter(
-          (i: any) => i.current_stock > 0,
-        ),
-      )
     } catch (e: any) {
       toast.error(e.message || 'Erro ao excluir')
     }
@@ -210,15 +218,10 @@ export function PpeLoansTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={() => setIsOpen(true)} disabled={items.length === 0}>
+        <Button onClick={openForm} disabled={plants.length === 0}>
           <Plus className="h-4 w-4 mr-2" /> Novo Empréstimo
         </Button>
       </div>
-      {items.length === 0 && (
-        <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-3">
-          Não há EPIs com estoque disponível para empréstimo.
-        </p>
-      )}
       {loans.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
@@ -290,22 +293,51 @@ export function PpeLoansTab() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <Label>Planta *</Label>
+              <Select
+                value={formPlantId}
+                onValueChange={(v) => {
+                  setFormPlantId(v)
+                  setFormData({ ...formData, ppe_id: '' })
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plants.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>EPI *</Label>
               <Select
                 value={formData.ppe_id}
                 onValueChange={(v) => setFormData({ ...formData, ppe_id: v })}
+                disabled={!formPlantId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o EPI" />
+                  <SelectValue
+                    placeholder={formPlantId ? 'Selecione o EPI' : 'Selecione uma planta primeiro'}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {items.map((i) => (
+                  {formItems.map((i) => (
                     <SelectItem key={i.id} value={i.id}>
                       {i.name} (Estoque: {i.current_stock})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {formPlantId && formItems.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  Não há EPIs com estoque disponível para esta planta.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Tipo de Pessoa *</Label>
