@@ -1,19 +1,24 @@
 import { supabase } from '@/lib/supabase/client'
 
 export const ppeService = {
-  async getItems(clientId: string) {
-    const { data, error } = await (supabase as any)
+  async getItems(clientId: string, plantId?: string) {
+    let query = (supabase as any)
       .from('ppe_items')
       .select('*, plants(name)')
       .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
+
+    if (plantId && plantId !== 'all') {
+      query = query.eq('plant_id', plantId)
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error
     return data || []
   },
 
   async saveItem(item: any) {
     if (item.id) {
-      const { id, created_at, current_stock, ...updateData } = item
+      const { id, created_at, current_stock, plants, ...updateData } = item
       const { data, error } = await (supabase as any)
         .from('ppe_items')
         .update({ ...updateData, total_quantity: Number(updateData.total_quantity) || 0 })
@@ -23,7 +28,7 @@ export const ppeService = {
       if (error) throw error
       return data
     } else {
-      const { id, created_at, current_stock, ...insertData } = item
+      const { id, created_at, current_stock, plants, ...insertData } = item
       const totalQty = Number(insertData.total_quantity) || 0
       const { data, error } = await (supabase as any)
         .from('ppe_items')
@@ -40,12 +45,17 @@ export const ppeService = {
     if (error) throw error
   },
 
-  async getLoans(clientId: string) {
-    const { data, error } = await (supabase as any)
+  async getLoans(clientId: string, plantId?: string) {
+    let query = (supabase as any)
       .from('ppe_loans')
       .select('*, ppe:ppe_items(name, ca_number), collaborator:org_collaborators(name)')
       .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
+
+    if (plantId && plantId !== 'all') {
+      query = query.eq('plant_id', plantId)
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error
     return data || []
   },

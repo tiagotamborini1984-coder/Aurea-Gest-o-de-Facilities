@@ -25,17 +25,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Loader2, Undo2 } from 'lucide-react'
+import { Plus, Loader2, Undo2, AlertCircle, RefreshCw, HandCoins } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { ppeService } from '@/services/ppe'
 import { toast } from 'sonner'
 
+const LOAD_TIMEOUT = 10000
+
 export function PpeLoansTab() {
-  const { activeClient, profile } = useAppStore()
+  const { activeClient, profile, selectedPlant } = useAppStore()
   const [loans, setLoans] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [collaborators, setCollaborators] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
@@ -49,26 +52,65 @@ export function PpeLoansTab() {
   const clientId = activeClient?.id || profile?.client_id
 
   useEffect(() => {
-    if (clientId) loadData()
-  }, [clientId])
-
-  const loadData = async () => {
-    if (!clientId) return
-    setLoading(true)
-    try {
-      const [loanData, itemData, collabData] = await Promise.all([
-        ppeService.getLoans(clientId),
-        ppeService.getItems(clientId),
-        ppeService.getCollaborators(clientId),
-      ])
-      setLoans(loanData)
-      setItems(itemData.filter((i: any) => i.current_stock > 0))
-      setCollaborators(collabData)
-    } catch {
-      toast.error('Erro ao carregar dados')
+    if (!clientId) {
+      if (profile) {
+        setError('Não foi possível identificar o cliente.')
+        setLoading(false)
+      }
+      return
     }
-    setLoading(false)
-  }
+    let cancelled = false
+    setError(null)
+    setLoading(true)
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        setError('Tempo limite excedido. Verifique sua conexão.')
+        setLoading(false)
+      }
+    }, LOAD_TIMEOUT)
+
+    ppeService
+      .getLoans(clientId, selectedPlant)
+      .then((data) => {
+        if (!cancelled) {
+          setLoans(data)
+          setLoading(false)
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e.message || 'Erro ao carregar empréstimos')
+          toast.error('Erro ao carregar empréstimos')
+          setLoading(false)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) clearTimeout(timeoutId)
+      })
+
+    ppeService
+      .getItems(clientId, selectedPlant)
+      .then((data) => {
+        if (!cancelled) setItems(data.filter((i: any) => i.current_stock > 0))
+      })
+      .catch(() => {
+        if (!cancelled) toast.warning('Não foi possível carregar a lista de EPIs disponíveis.')
+      })
+
+    ppeService
+      .getCollaborators(clientId)
+      .then((data) => {
+        if (!cancelled) setCollaborators(data)
+      })
+      .catch(() => {
+        if (!cancelled) toast.warning('Não foi possível carregar a lista de colaboradores.')
+      })
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
+  }, [clientId, selectedPlant, profile])
 
   const handleSave = async () => {
     if (!clientId || !activeClient) return
@@ -107,7 +149,12 @@ export function PpeLoansTab() {
         visitor_name: '',
         quantity: '1',
       })
-      loadData()
+      setLoans(await ppeService.getLoans(clientId, selectedPlant))
+      setItems(
+        (await ppeService.getItems(clientId, selectedPlant)).filter(
+          (i: any) => i.current_stock > 0,
+        ),
+      )
     } catch (e: any) {
       toast.error(e.message || 'Erro ao registrar empréstimo')
     }
@@ -118,7 +165,12 @@ export function PpeLoansTab() {
     try {
       await ppeService.returnLoan(loanId)
       toast.success('Item devolvido com sucesso!')
-      loadData()
+      setLoans(await ppeService.getLoans(clientId, selectedPlant))
+      setItems(
+        (await ppeService.getItems(clientId, selectedPlant)).filter(
+          (i: any) => i.current_stock > 0,
+        ),
+      )
     } catch (e: any) {
       toast.error(e.message || 'Erro ao devolver')
     }
@@ -128,6 +180,17 @@ export function PpeLoansTab() {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    )
+
+  if (error)
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <AlertCircle className="h-12 w-12 text-red-500" />
+        <p className="text-slate-600 text-center max-w-sm">{error}</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          <RefreshCw className="h-4 w-4 mr-2" /> Tentar novamente
+        </Button>
       </div>
     )
 
@@ -143,59 +206,64 @@ export function PpeLoansTab() {
           Não há EPIs com estoque disponível para empréstimo.
         </p>
       )}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>EPI</TableHead>
-                <TableHead>CA</TableHead>
-                <TableHead>Pessoa</TableHead>
-                <TableHead className="text-center">Qtd</TableHead>
-                <TableHead>Data Empréstimo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ação</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loans.map((loan) => (
-                <TableRow key={loan.id}>
-                  <TableCell className="font-medium">{loan.ppe?.name || '-'}</TableCell>
-                  <TableCell>{loan.ppe?.ca_number || '-'}</TableCell>
-                  <TableCell>
-                    {loan.person_type === 'collaborator'
-                      ? loan.collaborator?.name || '-'
-                      : loan.visitor_name}
-                  </TableCell>
-                  <TableCell className="text-center">{loan.quantity}</TableCell>
-                  <TableCell>{new Date(loan.loan_date).toLocaleDateString('pt-BR')}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${loan.status === 'Emprestado' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}
-                    >
-                      {loan.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {loan.status === 'Emprestado' && (
-                      <Button variant="outline" size="sm" onClick={() => handleReturn(loan.id)}>
-                        <Undo2 className="h-4 w-4 mr-1" /> Devolver
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {loans.length === 0 && (
+      {loans.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+            <HandCoins className="h-12 w-12 text-slate-300" />
+            <p className="text-slate-500 font-medium">Nenhum empréstimo registrado</p>
+            <p className="text-slate-400 text-sm">
+              Os empréstimos aparecerão aqui quando forem criados.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                    Nenhum empréstimo registrado.
-                  </TableCell>
+                  <TableHead>EPI</TableHead>
+                  <TableHead>CA</TableHead>
+                  <TableHead>Pessoa</TableHead>
+                  <TableHead className="text-center">Qtd</TableHead>
+                  <TableHead>Data Empréstimo</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {loans.map((loan) => (
+                  <TableRow key={loan.id}>
+                    <TableCell className="font-medium">{loan.ppe?.name || '-'}</TableCell>
+                    <TableCell>{loan.ppe?.ca_number || '-'}</TableCell>
+                    <TableCell>
+                      {loan.person_type === 'collaborator'
+                        ? loan.collaborator?.name || '-'
+                        : loan.visitor_name}
+                    </TableCell>
+                    <TableCell className="text-center">{loan.quantity}</TableCell>
+                    <TableCell>{new Date(loan.loan_date).toLocaleDateString('pt-BR')}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${loan.status === 'Emprestado' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}
+                      >
+                        {loan.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {loan.status === 'Emprestado' && (
+                        <Button variant="outline" size="sm" onClick={() => handleReturn(loan.id)}>
+                          <Undo2 className="h-4 w-4 mr-1" /> Devolver
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent>
