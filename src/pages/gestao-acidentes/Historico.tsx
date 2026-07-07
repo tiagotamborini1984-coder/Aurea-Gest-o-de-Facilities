@@ -12,17 +12,31 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
-import { FileText, Paperclip, Edit } from 'lucide-react'
+import { FileText, Paperclip, Edit, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '@/components/ui/use-toast'
 import { AccidentReportModal } from './components/AccidentReportModal'
 
 export default function HistoricoAcidentes() {
   const { activeClient, activePlant, profile } = useAppStore()
   const [reportAccidentId, setReportAccidentId] = useState<string | null>(null)
+  const [deleteAccidentId, setDeleteAccidentId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   useEffect(() => {
     async function fetchData() {
@@ -50,6 +64,32 @@ export default function HistoricoAcidentes() {
       profile.role === 'Gestor' ||
       item.created_by === profile.id
     )
+  }
+
+  const canDelete = () => {
+    if (!profile) return false
+    return profile.role === 'Administrador' || profile.role === 'Master'
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteAccidentId) return
+    setDeleting(true)
+    const { error } = await supabase.from('accidents').delete().eq('id', deleteAccidentId)
+    if (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao excluir o registro. Por favor, tente novamente.',
+        variant: 'destructive',
+      })
+    } else {
+      toast({
+        title: 'Sucesso',
+        description: 'Registro de acidente excluído com sucesso.',
+      })
+      setData(data.filter((item) => item.id !== deleteAccidentId))
+    }
+    setDeleting(false)
+    setDeleteAccidentId(null)
   }
 
   return (
@@ -147,6 +187,16 @@ export default function HistoricoAcidentes() {
                               <Edit className="w-4 h-4 text-gray-500" />
                             </Button>
                           )}
+                          {canDelete() && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteAccidentId(item.id)}
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -163,6 +213,34 @@ export default function HistoricoAcidentes() {
         open={!!reportAccidentId}
         onClose={() => setReportAccidentId(null)}
       />
+
+      <AlertDialog
+        open={!!deleteAccidentId}
+        onOpenChange={(open) => {
+          if (!open) setDeleteAccidentId(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este registro de acidente? Esta ação não pode ser
+              desfeita e removerá todas as tarefas associadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
