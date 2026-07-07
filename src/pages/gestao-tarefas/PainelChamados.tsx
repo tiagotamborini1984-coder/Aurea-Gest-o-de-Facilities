@@ -29,7 +29,6 @@ import {
   Users,
   UserCheck,
 } from 'lucide-react'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
