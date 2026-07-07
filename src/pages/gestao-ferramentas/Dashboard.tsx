@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
-import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +40,7 @@ import {
   TrendingUp,
   CheckCircle2,
   AlertTriangle,
+  Building2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -128,10 +128,38 @@ export default function DashboardFerramentas() {
     fetchTools()
   }, [fetchPlants, fetchTools])
 
+  const plantFilteredTools = useMemo(() => {
+    if (filterPlant === 'all') return tools
+    return tools.filter((t) => t.plant_id === filterPlant)
+  }, [tools, filterPlant])
+
+  const filteredTools = useMemo(() => {
+    return plantFilteredTools.filter((t) => {
+      const matchStatus = filterStatus === 'all' || t.status === filterStatus
+      const matchSearch =
+        !search.trim() ||
+        (t.asset_number || '').toLowerCase().includes(search.toLowerCase()) ||
+        t.description.toLowerCase().includes(search.toLowerCase())
+      return matchStatus && matchSearch
+    })
+  }, [plantFilteredTools, filterStatus, search])
+
+  const totalTools = plantFilteredTools.length
+  const operatingCount = plantFilteredTools.filter((t) => t.status === 'Operando').length
+  const maintenanceCount = plantFilteredTools.filter((t) => t.status === 'Em Manutenção').length
+
+  const chartData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    plantFilteredTools.forEach((t) => {
+      counts[t.status] = (counts[t.status] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  }, [plantFilteredTools])
+
   const openAdd = () => {
     setEditingId(null)
     setFormData({
-      plant_id: plants.length === 1 ? plants[0].id : '',
+      plant_id: filterPlant !== 'all' ? filterPlant : plants.length === 1 ? plants[0].id : '',
       asset_number: '',
       description: '',
       usage_instructions: '',
@@ -201,29 +229,10 @@ export default function DashboardFerramentas() {
     }
   }
 
-  const filteredTools = useMemo(() => {
-    return tools.filter((t) => {
-      const matchPlant = filterPlant === 'all' || t.plant_id === filterPlant
-      const matchStatus = filterStatus === 'all' || t.status === filterStatus
-      const matchSearch =
-        !search.trim() ||
-        (t.asset_number || '').toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase())
-      return matchPlant && matchStatus && matchSearch
-    })
-  }, [tools, filterPlant, filterStatus, search])
-
-  const totalTools = tools.length
-  const operatingCount = tools.filter((t) => t.status === 'Operando').length
-  const maintenanceCount = tools.filter((t) => t.status === 'Em Manutenção').length
-
-  const chartData = useMemo(() => {
-    const counts: Record<string, number> = {}
-    tools.forEach((t) => {
-      counts[t.status] = (counts[t.status] || 0) + 1
-    })
-    return Object.entries(counts).map(([name, value]) => ({ name, value }))
-  }, [tools])
+  const selectedPlantLabel = useMemo(() => {
+    if (filterPlant === 'all') return 'Todas as Plantas'
+    return plants.find((p) => p.id === filterPlant)?.name || 'Todas as Plantas'
+  }, [filterPlant, plants])
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -235,10 +244,28 @@ export default function DashboardFerramentas() {
           </h1>
           <p className="text-slate-500">Cadastre, acompanhe e gerencie ferramentas por planta</p>
         </div>
-        <Button onClick={openAdd} disabled={plants.length === 0}>
-          <Plus className="w-4 h-4 mr-2" />
-          Adicionar Ferramenta
-        </Button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 flex-1 md:flex-none">
+            <Building2 className="w-5 h-5 text-slate-400 shrink-0" />
+            <Select value={filterPlant} onValueChange={setFilterPlant}>
+              <SelectTrigger className="w-full md:w-[260px]">
+                <SelectValue placeholder="Todas as Plantas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Plantas</SelectItem>
+                {plants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={openAdd} disabled={plants.length === 0}>
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -249,7 +276,9 @@ export default function DashboardFerramentas() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Total de Ferramentas</p>
-              <h3 className="text-2xl font-bold">{totalTools}</h3>
+              <h3 className="text-2xl font-bold">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> : totalTools}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -260,7 +289,13 @@ export default function DashboardFerramentas() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Em Operação</p>
-              <h3 className="text-2xl font-bold">{operatingCount}</h3>
+              <h3 className="text-2xl font-bold">
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                ) : (
+                  operatingCount
+                )}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -271,7 +306,13 @@ export default function DashboardFerramentas() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Em Manutenção</p>
-              <h3 className="text-2xl font-bold">{maintenanceCount}</h3>
+              <h3 className="text-2xl font-bold">
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                ) : (
+                  maintenanceCount
+                )}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -284,9 +325,14 @@ export default function DashboardFerramentas() {
               <TrendingUp className="w-5 h-5 text-brand-vividBlue" />
               Distribuição por Status
             </CardTitle>
+            <p className="text-xs text-slate-400">{selectedPlantLabel}</p>
           </CardHeader>
           <CardContent className="h-[280px]">
-            {chartData.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-6 h-6 animate-spin text-brand-vividBlue" />
+              </div>
+            ) : chartData.length === 0 ? (
               <div className="flex items-center justify-center h-full text-slate-400 text-sm">
                 Nenhum dado disponível
               </div>
@@ -321,6 +367,7 @@ export default function DashboardFerramentas() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Lista de Ferramentas</CardTitle>
+            <p className="text-xs text-slate-400">{selectedPlantLabel}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
@@ -333,19 +380,6 @@ export default function DashboardFerramentas() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <Select value={filterPlant} onValueChange={setFilterPlant}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Todas as Plantas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Plantas</SelectItem>
-                  {plants.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Todos os Status" />
@@ -381,7 +415,9 @@ export default function DashboardFerramentas() {
                   ) : filteredTools.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                        Nenhuma ferramenta encontrada.
+                        {filterPlant !== 'all'
+                          ? 'Nenhuma ferramenta encontrada para esta planta.'
+                          : 'Nenhuma ferramenta encontrada.'}
                       </TableCell>
                     </TableRow>
                   ) : (
