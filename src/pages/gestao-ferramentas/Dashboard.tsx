@@ -22,6 +22,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +45,7 @@ import {
   Wrench,
   Plus,
   Edit2,
+  Trash2,
   Loader2,
   Search,
   TrendingUp,
@@ -79,6 +90,8 @@ export default function DashboardFerramentas() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<PlantTool | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [search, setSearch] = useState('')
   const [filterPlant, setFilterPlant] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -226,6 +239,26 @@ export default function DashboardFerramentas() {
       fetchTools()
     } catch (err: any) {
       toast.error(err.message || 'Erro ao atualizar status')
+    }
+  }
+
+  const canDelete = useMemo(() => {
+    return profile?.role === 'Master' || profile?.role === 'Administrador'
+  }, [profile])
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase.from('plant_tools').delete().eq('id', deleteTarget.id)
+      if (error) throw error
+      toast.success('Ferramenta excluída com sucesso')
+      setDeleteTarget(null)
+      fetchTools()
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao excluir ferramenta')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -452,9 +485,20 @@ export default function DashboardFerramentas() {
                           </Select>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(tool)}>
-                            <Edit2 className="w-4 h-4 text-blue-600" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(tool)}>
+                              <Edit2 className="w-4 h-4 text-blue-600" />
+                            </Button>
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteTarget(tool)}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -550,6 +594,40 @@ export default function DashboardFerramentas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && !isDeleting && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Ferramenta</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta ferramenta? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Excluindo...
+                </>
+              ) : (
+                'Confirmar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
