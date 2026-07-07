@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Table,
   TableBody,
@@ -29,9 +28,6 @@ import { ActionModal } from './ActionModal'
 type ActionRow = {
   plant_id: string
   assignee_id: string
-  title: string
-  description: string
-  due_date: string
 }
 
 function buildTaskNumber(seq: number) {
@@ -48,6 +44,8 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
   const [statuses, setStatuses] = useState<any[]>([])
   const [types, setTypes] = useState<any[]>([])
   const [rows, setRows] = useState<ActionRow[]>([])
+  const [sharedTitle, setSharedTitle] = useState('')
+  const [sharedDueDate, setSharedDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<any>(null)
@@ -101,10 +99,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
   }, [activeClient, profile, fetchTasks])
 
   const addRow = () => {
-    setRows([
-      ...rows,
-      { plant_id: plantId || '', assignee_id: '', title: '', description: '', due_date: '' },
-    ])
+    setRows([...rows, { plant_id: plantId || '', assignee_id: '' }])
   }
 
   const removeRow = (index: number) => {
@@ -149,15 +144,28 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
 
   const handleSave = async () => {
     if (!activeClient || !profile) return
+
+    if (!sharedTitle.trim()) {
+      toast({
+        title: 'Validação',
+        description: 'Preencha o Título da Ação.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (!sharedDueDate) {
+      toast({ title: 'Validação', description: 'Preencha o Prazo.', variant: 'destructive' })
+      return
+    }
     if (rows.length === 0) {
-      toast({ title: 'Aviso', description: 'Adicione ao menos uma ação.', variant: 'destructive' })
+      toast({ title: 'Aviso', description: 'Adicione ao menos uma linha.', variant: 'destructive' })
       return
     }
     for (let i = 0; i < rows.length; i++) {
-      if (!rows[i].plant_id || !rows[i].assignee_id || !rows[i].title.trim()) {
+      if (!rows[i].plant_id || !rows[i].assignee_id) {
         toast({
           title: 'Validação',
-          description: `Preencha planta, responsável e título na linha ${i + 1}.`,
+          description: `Selecione Planta e Responsável na linha ${i + 1}.`,
           variant: 'destructive',
         })
         return
@@ -184,6 +192,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
         if (p.length === 3) seq = parseInt(p[2], 10) + 1
       }
 
+      const dueDateIso = new Date(sharedDueDate).toISOString()
       const tasksToCreate = rows.map((r) => ({
         client_id: activeClient.id,
         plant_id: r.plant_id,
@@ -192,9 +201,9 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
         requester_id: profile.id,
         assignee_id: r.assignee_id,
         task_number: buildTaskNumber(seq++),
-        title: r.title,
-        description: r.description || r.title,
-        due_date: r.due_date ? new Date(r.due_date).toISOString() : null,
+        title: sharedTitle.trim(),
+        description: sharedTitle.trim(),
+        due_date: dueDateIso,
         accident_id: accidentId,
       }))
 
@@ -223,6 +232,8 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
         description: `${tasksToCreate.length} ação(ões) criada(s) com sucesso.`,
       })
       setRows([])
+      setSharedTitle('')
+      setSharedDueDate('')
       fetchTasks()
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
@@ -242,100 +253,101 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
         <div>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Plano de Ação</h3>
-            <Button variant="outline" size="sm" onClick={addRow} disabled={saving}>
-              <Plus className="w-4 h-4 mr-2" /> Adicionar Ação
-            </Button>
           </div>
 
-          {rows.length === 0 ? (
-            <div className="text-center py-6 text-gray-500 border rounded-lg border-dashed">
-              Nenhuma ação adicionada. Clique em "Adicionar Ação" para começar.
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50">
+              <div className="space-y-2">
+                <Label>Título da Ação</Label>
+                <Input
+                  value={sharedTitle}
+                  onChange={(e) => setSharedTitle(e.target.value)}
+                  placeholder="Digite o título da ação"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Prazo (Data de Vencimento)</Label>
+                <Input
+                  type="datetime-local"
+                  value={sharedDueDate}
+                  onChange={(e) => setSharedDueDate(e.target.value)}
+                />
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {rows.map((row, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 border rounded-lg bg-gray-50"
-                >
-                  <div className="md:col-span-3 space-y-1">
-                    <Label className="text-xs">Planta</Label>
-                    <Select
-                      value={row.plant_id || undefined}
-                      onValueChange={(v) => updateRow(index, 'plant_id', v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plants.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="md:col-span-3 space-y-1">
-                    <Label className="text-xs">Responsável</Label>
-                    <Select
-                      value={row.assignee_id || undefined}
-                      onValueChange={(v) => updateRow(index, 'assignee_id', v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profiles.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="md:col-span-3 space-y-1">
-                    <Label className="text-xs">Título</Label>
-                    <Input
-                      value={row.title}
-                      onChange={(e) => updateRow(index, 'title', e.target.value)}
-                      placeholder="Título da ação"
-                    />
-                  </div>
-                  <div className="md:col-span-2 space-y-1">
-                    <Label className="text-xs">Prazo</Label>
-                    <Input
-                      type="datetime-local"
-                      value={row.due_date}
-                      onChange={(e) => updateRow(index, 'due_date', e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-1 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeRow(index)}
-                      disabled={saving}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                  <div className="md:col-span-12">
-                    <Textarea
-                      value={row.description}
-                      onChange={(e) => updateRow(index, 'description', e.target.value)}
-                      placeholder="Descrição detalhada (opcional)"
-                      className="min-h-[60px]"
-                    />
-                  </div>
-                </div>
-              ))}
-              <Button onClick={handleSave} disabled={saving} className="w-full">
-                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Salvar Plano de Ação
+
+            <div className="flex justify-between items-center">
+              <h4 className="text-sm font-medium text-gray-600">Adicionar Planta e Responsável</h4>
+              <Button variant="outline" size="sm" onClick={addRow} disabled={saving}>
+                <Plus className="w-4 h-4 mr-2" /> Adicionar Linha
               </Button>
             </div>
-          )}
+
+            {rows.length === 0 ? (
+              <div className="text-center py-6 text-gray-500 border rounded-lg border-dashed">
+                Nenhuma linha adicionada. Clique em "Adicionar Linha" para começar.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {rows.map((row, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 border rounded-lg bg-gray-50"
+                  >
+                    <div className="md:col-span-5 space-y-1">
+                      <Label className="text-xs">Planta</Label>
+                      <Select
+                        value={row.plant_id || undefined}
+                        onValueChange={(v) => updateRow(index, 'plant_id', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plants.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-5 space-y-1">
+                      <Label className="text-xs">Responsável</Label>
+                      <Select
+                        value={row.assignee_id || undefined}
+                        onValueChange={(v) => updateRow(index, 'assignee_id', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {profiles.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeRow(index)}
+                        disabled={saving}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Salvar Plano de Ação
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
