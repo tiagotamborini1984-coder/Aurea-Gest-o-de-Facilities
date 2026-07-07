@@ -251,8 +251,7 @@ export function AppSidebar() {
         item.title !== 'Usuários' &&
         item.title !== 'Cadastros' &&
         item.title !== 'Gestão de Clientes' &&
-        item.title !== 'Gestão de Imóveis' &&
-        item.title !== 'Gestão de Ferramentas'
+        item.title !== 'Gestão de Imóveis'
       ) {
         const hasModule = activeClient?.modules?.includes(item.title)
         if (!hasModule) return null
@@ -401,6 +400,14 @@ export function AppSidebar() {
     .filter((item) => {
       if (!item) return false
       if (role === 'Administrador' || role === 'Master') return true
+      if (
+        activeClient &&
+        !item.subItems &&
+        item.title === 'Gestão de Ferramentas' &&
+        !activeClient.modules?.includes('Gestão de Ferramentas')
+      ) {
+        return false
+      }
       return (item.subItems && item.subItems.length > 0) || item.path
     })
 

@@ -3,6 +3,7 @@ import { useHasAccess } from '@/hooks/use-has-access'
 import { useAppStore } from '@/store/AppContext'
 
 const routeMenuMap: Record<string, string> = {
+  '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-terceiros/dashboard-gestor': 'Gestão de Terceiros:Dashboard do Gestor',
   '/gestao-terceiros/lancamentos': 'Lançamentos',
   '/gestao-terceiros/relatorios': 'Relatórios',
@@ -31,9 +32,13 @@ const routeMenuMap: Record<string, string> = {
   '/gestao-ferramentas': 'Gestão de Ferramentas',
 }
 
+const moduleRouteMap: Record<string, string> = {
+  '/gestao-ferramentas': 'Gestão de Ferramentas',
+}
+
 export function AccessGuard() {
   const location = useLocation()
-  const { profile } = useAppStore()
+  const { profile, activeClient } = useAppStore()
 
   const getBasePath = (path: string) => {
     if (path.startsWith('/gestao-terceiros/cadastros')) return 'Cadastros'
@@ -44,6 +49,45 @@ export function AccessGuard() {
 
   const menuName = getBasePath(location.pathname)
   const hasAccess = useHasAccess(menuName || '')
+
+  const requiredModule = Object.keys(moduleRouteMap).find(
+    (r) => location.pathname === r || location.pathname.startsWith(r + '/'),
+  )
+
+  if (
+    requiredModule &&
+    activeClient &&
+    !activeClient.modules?.includes(moduleRouteMap[requiredModule])
+  ) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-8">
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center max-w-md">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Módulo Não Disponível</h2>
+          <p className="text-slate-600 mb-6">
+            O módulo de Gestão de Ferramentas não está ativado para a sua empresa. Entre em contato
+            com o administrador do sistema para mais informações.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (profile?.role === 'Master' || profile?.role === 'Administrador') {
     return <Outlet />

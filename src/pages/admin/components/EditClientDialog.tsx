@@ -38,6 +38,7 @@ const AVAILABLE_MODULES = [
   'Gestão de Acidentes',
   'Gestão da Manutenção',
   'Gestão de Estoque',
+  'Gestão de Ferramentas',
 ]
 
 export function EditClientDialog({

@@ -38,6 +38,7 @@ const MODULES = [
   'Book de Metas',
   'Log de Auditoria',
   'Dashboard Estratégico',
+  'Gestão de Ferramentas',
 ]
 
 export default function Clientes() {
