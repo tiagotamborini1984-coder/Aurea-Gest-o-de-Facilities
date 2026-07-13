@@ -17,8 +17,14 @@ function addFrequency(date: Date, frequency: string): Date {
     case 'Semanal':
       d.setUTCDate(d.getUTCDate() + 7)
       break
+    case 'Quinzenal':
+      d.setUTCDate(d.getUTCDate() + 15)
+      break
     case 'Mensal':
       d.setUTCMonth(d.getUTCMonth() + 1)
+      break
+    case 'Trimestral':
+      d.setUTCMonth(d.getUTCMonth() + 3)
       break
     case 'Semestral':
       d.setUTCMonth(d.getUTCMonth() + 6)
