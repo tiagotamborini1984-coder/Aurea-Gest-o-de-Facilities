@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useCallback,
+} from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -102,7 +110,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [profile, selectedMasterClient])
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     setIsLoadingClients(true)
     const { data, error } = await supabase
       .from('clients')
@@ -126,85 +134,103 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       )
     }
     setIsLoadingClients(false)
-  }
+  }, [])
 
   useEffect(() => {
     if (user && profile?.role === 'Master') fetchClients()
   }, [user, profile])
 
-  const addClient = async (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => {
-    const { data, error } = await supabase
-      .from('clients')
-      .insert([
-        {
-          name: client.name,
-          url_slug: client.slug,
-          admin_name: client.adminName,
-          logo_url: client.logo,
-          primary_color: client.primaryColor,
-          secondary_color: client.secondaryColor,
-          status: client.status,
-          modules: client.modules,
-        },
-      ])
-      .select()
-      .single()
-    if (data && !error) {
-      await fetchClients()
-      return true
-    }
-    return false
-  }
-
-  const updateClient = async (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => {
-    const payload: any = {
-      name: data.name,
-      url_slug: data.slug,
-      admin_name: data.adminName,
-      logo_url: data.logo,
-      primary_color: data.primaryColor,
-      secondary_color: data.secondaryColor,
-      status: data.status,
-      modules: data.modules,
-      package_alert_days: data.packageAlertDays,
-    }
-    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
-    const { error } = await supabase.from('clients').update(payload).eq('id', id)
-    if (!error) {
-      await fetchClients()
-      return true
-    }
-    return false
-  }
-
-  const deleteClient = async (id: string) => {
-    const { error } = await supabase.from('clients').delete().eq('id', id)
-    if (!error) {
-      await fetchClients()
-      return true
-    }
-    return false
-  }
-
-  return (
-    <AppContext.Provider
-      value={{
-        clients,
-        isLoadingClients,
-        profile,
-        activeClient,
-        selectedMasterClient,
-        setSelectedMasterClient,
-        selectedPlant,
-        setSelectedPlant,
-        addClient,
-        updateClient,
-        deleteClient,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+  const addClient = useCallback(
+    async (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => {
+      const { data, error } = await supabase
+        .from('clients')
+        .insert([
+          {
+            name: client.name,
+            url_slug: client.slug,
+            admin_name: client.adminName,
+            logo_url: client.logo,
+            primary_color: client.primaryColor,
+            secondary_color: client.secondaryColor,
+            status: client.status,
+            modules: client.modules,
+          },
+        ])
+        .select()
+        .single()
+      if (data && !error) {
+        await fetchClients()
+        return true
+      }
+      return false
+    },
+    [fetchClients],
   )
+
+  const updateClient = useCallback(
+    async (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => {
+      const payload: any = {
+        name: data.name,
+        url_slug: data.slug,
+        admin_name: data.adminName,
+        logo_url: data.logo,
+        primary_color: data.primaryColor,
+        secondary_color: data.secondaryColor,
+        status: data.status,
+        modules: data.modules,
+        package_alert_days: data.packageAlertDays,
+      }
+      Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
+      const { error } = await supabase.from('clients').update(payload).eq('id', id)
+      if (!error) {
+        await fetchClients()
+        return true
+      }
+      return false
+    },
+    [fetchClients],
+  )
+
+  const deleteClient = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('clients').delete().eq('id', id)
+      if (!error) {
+        await fetchClients()
+        return true
+      }
+      return false
+    },
+    [fetchClients],
+  )
+
+  const contextValue = useMemo(
+    () => ({
+      clients,
+      isLoadingClients,
+      profile,
+      activeClient,
+      selectedMasterClient,
+      setSelectedMasterClient,
+      selectedPlant,
+      setSelectedPlant,
+      addClient,
+      updateClient,
+      deleteClient,
+    }),
+    [
+      clients,
+      isLoadingClients,
+      profile,
+      activeClient,
+      selectedMasterClient,
+      selectedPlant,
+      addClient,
+      updateClient,
+      deleteClient,
+    ],
+  )
+
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
 }
 
 export const useAppStore = () => {

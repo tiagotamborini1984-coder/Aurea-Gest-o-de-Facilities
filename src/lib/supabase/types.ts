@@ -807,6 +807,7 @@ export type Database = {
           date: string
           id: string
           is_published: boolean
+          location_id: string | null
           plant_id: string
           reference_id: string
           status: boolean
@@ -818,6 +819,7 @@ export type Database = {
           date: string
           id?: string
           is_published?: boolean
+          location_id?: string | null
           plant_id: string
           reference_id: string
           status?: boolean
@@ -829,6 +831,7 @@ export type Database = {
           date?: string
           id?: string
           is_published?: boolean
+          location_id?: string | null
           plant_id?: string
           reference_id?: string
           status?: boolean
@@ -840,6 +843,13 @@ export type Database = {
             columns: ['client_id']
             isOneToOne: false
             referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'daily_logs_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'locations'
             referencedColumns: ['id']
           },
           {

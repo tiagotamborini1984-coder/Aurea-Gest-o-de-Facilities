@@ -1,62 +1,70 @@
 import { Outlet } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useMemo, memo } from 'react'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from './AppSidebar'
 import { AppHeader } from './AppHeader'
 import { useAppStore } from '@/store/AppContext'
 import { hexToHsl } from '@/lib/color-utils'
 
+const MainContent = memo(function MainContent() {
+  return (
+    <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 animate-fade-in relative print:p-0 print:overflow-visible">
+      <Outlet />
+    </main>
+  )
+})
+
 export default function Layout() {
   const { activeClient } = useAppStore()
 
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark')
+  const applyClientColors = useMemo(
+    () => (client: typeof activeClient) => {
+      const isDark = document.documentElement.classList.contains('dark')
 
-    if (activeClient?.primaryColor) {
-      const hsl = hexToHsl(activeClient.primaryColor)
-      document.documentElement.style.setProperty('--primary', hsl)
-      // Only apply custom sidebar background in light mode
-      if (!isDark) {
-        document.documentElement.style.setProperty('--sidebar-background', hsl)
+      if (client?.primaryColor) {
+        const hsl = hexToHsl(client.primaryColor)
+        document.documentElement.style.setProperty('--primary', hsl)
+        if (!isDark) {
+          document.documentElement.style.setProperty('--sidebar-background', hsl)
+        } else {
+          document.documentElement.style.removeProperty('--sidebar-background')
+        }
       } else {
+        document.documentElement.style.removeProperty('--primary')
         document.documentElement.style.removeProperty('--sidebar-background')
       }
-    } else {
-      document.documentElement.style.removeProperty('--primary')
-      document.documentElement.style.removeProperty('--sidebar-background')
-    }
 
-    if (activeClient?.secondaryColor) {
-      const secondaryHsl = hexToHsl(activeClient.secondaryColor)
-      document.documentElement.style.setProperty('--secondary', secondaryHsl)
-      document.documentElement.style.setProperty('--sidebar-primary', secondaryHsl)
-    } else {
-      document.documentElement.style.removeProperty('--secondary')
-      document.documentElement.style.removeProperty('--sidebar-primary')
-    }
-  }, [activeClient])
+      if (client?.secondaryColor) {
+        const secondaryHsl = hexToHsl(client.secondaryColor)
+        document.documentElement.style.setProperty('--secondary', secondaryHsl)
+        document.documentElement.style.setProperty('--sidebar-primary', secondaryHsl)
+      } else {
+        document.documentElement.style.removeProperty('--secondary')
+        document.documentElement.style.removeProperty('--sidebar-primary')
+      }
+    },
+    [],
+  )
 
-  // Create an observer to watch for class changes on the html element (dark mode toggle)
   useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          const isDark = document.documentElement.classList.contains('dark')
-          if (activeClient?.primaryColor) {
-            if (isDark) {
-              document.documentElement.style.removeProperty('--sidebar-background')
-            } else {
-              const hsl = hexToHsl(activeClient.primaryColor)
-              document.documentElement.style.setProperty('--sidebar-background', hsl)
-            }
-          }
-        }
+    applyClientColors(activeClient)
+  }, [activeClient, applyClientColors])
+
+  useEffect(() => {
+    let rafId: number
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        applyClientColors(activeClient)
       })
     })
 
-    observer.observe(document.documentElement, { attributes: true })
-    return () => observer.disconnect()
-  }, [activeClient])
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => {
+      cancelAnimationFrame(rafId)
+      observer.disconnect()
+    }
+  }, [activeClient, applyClientColors])
 
   return (
     <SidebarProvider>
@@ -68,9 +76,7 @@ export default function Layout() {
           <div className="print:hidden">
             <AppHeader />
           </div>
-          <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 animate-fade-in relative print:p-0 print:overflow-visible">
-            <Outlet />
-          </main>
+          <MainContent />
         </div>
       </div>
     </SidebarProvider>

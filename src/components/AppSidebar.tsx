@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   Database,
@@ -42,380 +43,393 @@ export function AppSidebar() {
   const location = useLocation()
   const { profile, activeClient, selectedMasterClient } = useAppStore()
   const role = profile?.role || 'Operacional'
-  const accessibleMenus = profile?.accessible_menus || []
+  const accessibleMenus = useMemo(
+    () => profile?.accessible_menus || [],
+    [profile?.accessible_menus],
+  )
 
-  const navItems = [
-    {
-      title: 'Gestão de Clientes',
-      icon: Globe,
-      path: '/admin/clientes',
-    },
-    {
-      title: 'Gestão de Terceiros',
-      icon: Briefcase,
-      subItems: [
-        { title: 'Dashboard do Gestor', path: '/gestao-terceiros/dashboard-gestor' },
-        { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
-        { title: 'Treinamentos', path: '/gestao-terceiros/treinamentos' },
-        { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
-        { title: 'BI Dashboard', path: '/gestao-terceiros/bi' },
-        { title: 'Email Reports', path: '/gestao-terceiros/email-reports' },
-      ],
-    },
-    {
-      title: 'Limpeza e Jardinagem',
-      icon: Leaf,
-      subItems: [
-        { title: 'Mapa Operacional', path: '/limpeza-jardinagem/mapa' },
-        { title: 'Áreas', path: '/limpeza-jardinagem/areas' },
-        { title: 'Cronograma', path: '/limpeza-jardinagem/cronograma' },
-        { title: 'Dashboard', path: '/limpeza-jardinagem/dashboard' },
-        { title: 'Relatórios', path: '/limpeza-jardinagem/relatorios' },
-      ],
-    },
-    {
-      title: 'Gestão de Tarefas',
-      icon: CheckSquare,
-      subItems: [
-        { title: 'Painel de Chamados', path: '/gestao-tarefas' },
-        { title: 'Relatórios', path: '/gestao-tarefas/relatorios' },
-        { title: 'Tipos de Chamado', path: '/gestao-tarefas/tipos' },
-        { title: 'Status', path: '/gestao-tarefas/status' },
-      ],
-    },
-    {
-      title: 'Organograma e Fluxos',
-      icon: Network,
-      subItems: [
-        { title: 'Organograma', path: '/organograma/dashboard' },
-        { title: 'Cadastros', path: '/organograma/cadastros' },
-        { title: 'Fluxogramas', path: '/organograma/fluxogramas' },
-      ],
-    },
-    {
-      title: 'Auditoria e Checklist',
-      icon: ClipboardCheck,
-      subItems: [
-        { title: 'Nova Auditoria', path: '/auditoria-checklist/configuracao' },
-        { title: 'Auditorias Criadas', path: '/auditoria-checklist/criadas' },
-        { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
-        { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
-      ],
-    },
-    {
-      title: 'Gestão de Acidentes',
-      icon: AlertTriangle,
-      subItems: [
-        { title: 'Dashboard', path: '/gestao-acidentes/dashboard' },
-        { title: 'Novo Registro', path: '/gestao-acidentes/registro' },
-        { title: 'Histórico', path: '/gestao-acidentes/historico' },
-      ],
-    },
-    {
-      title: 'Gestão da Manutenção',
-      icon: Wrench,
-      subItems: [
-        { title: 'Dashboard', path: '/gestao-manutencao/dashboard' },
-        { title: 'Painel de Chamados', path: '/gestao-manutencao/chamados' },
-        { title: 'Planejamento (Agenda)', path: '/gestao-manutencao/planejamento' },
-        { title: 'Manutenção Preventiva', path: '/gestao-manutencao/preventivas' },
-        { title: 'Cadastros', path: '/gestao-manutencao/cadastros' },
-      ],
-    },
-    {
-      title: 'Gestão de Budget',
-      icon: DollarSign,
-      subItems: [
-        { title: 'Dashboard', path: '/gestao-budget/dashboard' },
-        {
-          title: 'Lançamentos',
-          label:
-            role === 'Master' || role === 'Administrador' ? 'Lançamentos' : 'Painel de Lançamentos',
-          path: '/gestao-budget/lancamentos',
-        },
-        { title: 'Centros de Custo', path: '/gestao-budget/centros-custo' },
-        { title: 'Contas Contábeis', path: '/gestao-budget/contas' },
-      ],
-    },
-    {
-      title: 'Gestão de Lockers',
-      icon: Archive,
-      subItems: [
-        { title: 'Dashboard', path: '/gestao-lockers/dashboard' },
-        { title: 'Mapa de Ocupação', path: '/gestao-lockers/ocupacao' },
-        { title: 'Lockers', path: '/gestao-lockers/lockers' },
-        { title: 'Colaboradores', path: '/gestao-lockers/colaboradores' },
-      ],
-    },
-    {
-      title: 'Gestão de Ferramentas',
-      icon: Hammer,
-      path: '/gestao-ferramentas',
-    },
-    {
-      title: 'Gestão de EPIs',
-      icon: HardHat,
-      path: '/gestao-epis',
-    },
-    {
-      title: 'Gestão de Documentos',
-      icon: FileText,
-      path: '/gestao-documentos',
-    },
-    {
-      title: 'Gestão de Imóveis',
-      icon: Home,
-      subItems: [
-        { title: 'Dashboard', path: '/gestao-imoveis/dashboard' },
-        { title: 'Mapa de Ocupação', path: '/gestao-imoveis/ocupacao' },
-        { title: 'Imóveis', path: '/gestao-imoveis/imoveis' },
-        { title: 'Hóspedes', path: '/gestao-imoveis/hospedes' },
-        { title: 'Centros de Custo', path: '/gestao-imoveis/centros-custo' },
-        { title: 'Relatórios', path: '/gestao-imoveis/relatorios' },
-      ],
-    },
-    {
-      title: 'Gestão de Estoque',
-      icon: Package,
-      subItems: [
-        { title: 'Catálogo', path: '/gestao-estoque/catalogo' },
-        { title: 'Meus Pedidos', path: '/gestao-estoque/meus-pedidos' },
-        { title: 'Gestão de Pedidos', path: '/gestao-estoque/gestao-pedidos' },
-        { title: 'Produtos', path: '/gestao-estoque/produtos' },
-        { title: 'Áreas', path: '/gestao-estoque/areas' },
-        { title: 'Dashboard', path: '/gestao-estoque/dashboard' },
-      ],
-    },
-    {
-      title: 'Gestão de Encomendas',
-      icon: Package,
-      subItems: [
-        { title: 'Painel', path: '/gestao-terceiros/encomendas' },
-        { title: 'Tipos de Embalagem', path: '/gestao-terceiros/encomendas/tipos' },
-        { title: 'Configurações', path: '/gestao-terceiros/encomendas/configuracoes' },
-      ],
-    },
-    {
-      title: 'Cadastros',
-      icon: Database,
-      subItems: [
-        { title: 'Plantas', path: '/gestao-terceiros/cadastros/plantas' },
-        { title: 'Locais', path: '/gestao-terceiros/cadastros/locais' },
-        { title: 'Empresas', path: '/gestao-terceiros/cadastros/empresas' },
-        { title: 'Funções', path: '/gestao-terceiros/cadastros/funcoes' },
-        { title: 'Colaboradores', path: '/gestao-terceiros/cadastros/colaboradores' },
-        { title: 'Equipamentos', path: '/gestao-terceiros/cadastros/equipamentos' },
-        { title: 'Treinamentos', path: '/gestao-terceiros/cadastros/treinamentos' },
-        { title: 'Quadro Contratado', path: '/gestao-terceiros/cadastros/quadro-contratado' },
-        { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
-      ],
-    },
-    {
-      title: 'Dashboard Estratégico',
-      icon: PieChart,
-      path: '/dashboard-estrategico',
-    },
-    {
-      title: 'Book de Metas',
-      icon: Target,
-      path: '/gestao-terceiros/metas',
-    },
-    {
-      title: 'Usuários',
-      icon: Users,
-      path: '/usuarios',
-    },
-    {
-      title: 'Log de Auditoria',
-      icon: ClipboardList,
-      path: '/admin/auditoria',
-    },
-  ]
+  const navItems = useMemo(
+    () => [
+      {
+        title: 'Gestão de Clientes',
+        icon: Globe,
+        path: '/admin/clientes',
+      },
+      {
+        title: 'Gestão de Terceiros',
+        icon: Briefcase,
+        subItems: [
+          { title: 'Dashboard do Gestor', path: '/gestao-terceiros/dashboard-gestor' },
+          { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
+          { title: 'Treinamentos', path: '/gestao-terceiros/treinamentos' },
+          { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
+          { title: 'BI Dashboard', path: '/gestao-terceiros/bi' },
+          { title: 'Email Reports', path: '/gestao-terceiros/email-reports' },
+        ],
+      },
+      {
+        title: 'Limpeza e Jardinagem',
+        icon: Leaf,
+        subItems: [
+          { title: 'Mapa Operacional', path: '/limpeza-jardinagem/mapa' },
+          { title: 'Áreas', path: '/limpeza-jardinagem/areas' },
+          { title: 'Cronograma', path: '/limpeza-jardinagem/cronograma' },
+          { title: 'Dashboard', path: '/limpeza-jardinagem/dashboard' },
+          { title: 'Relatórios', path: '/limpeza-jardinagem/relatorios' },
+        ],
+      },
+      {
+        title: 'Gestão de Tarefas',
+        icon: CheckSquare,
+        subItems: [
+          { title: 'Painel de Chamados', path: '/gestao-tarefas' },
+          { title: 'Relatórios', path: '/gestao-tarefas/relatorios' },
+          { title: 'Tipos de Chamado', path: '/gestao-tarefas/tipos' },
+          { title: 'Status', path: '/gestao-tarefas/status' },
+        ],
+      },
+      {
+        title: 'Organograma e Fluxos',
+        icon: Network,
+        subItems: [
+          { title: 'Organograma', path: '/organograma/dashboard' },
+          { title: 'Cadastros', path: '/organograma/cadastros' },
+          { title: 'Fluxogramas', path: '/organograma/fluxogramas' },
+        ],
+      },
+      {
+        title: 'Auditoria e Checklist',
+        icon: ClipboardCheck,
+        subItems: [
+          { title: 'Nova Auditoria', path: '/auditoria-checklist/configuracao' },
+          { title: 'Auditorias Criadas', path: '/auditoria-checklist/criadas' },
+          { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
+          { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
+        ],
+      },
+      {
+        title: 'Gestão de Acidentes',
+        icon: AlertTriangle,
+        subItems: [
+          { title: 'Dashboard', path: '/gestao-acidentes/dashboard' },
+          { title: 'Novo Registro', path: '/gestao-acidentes/registro' },
+          { title: 'Histórico', path: '/gestao-acidentes/historico' },
+        ],
+      },
+      {
+        title: 'Gestão da Manutenção',
+        icon: Wrench,
+        subItems: [
+          { title: 'Dashboard', path: '/gestao-manutencao/dashboard' },
+          { title: 'Painel de Chamados', path: '/gestao-manutencao/chamados' },
+          { title: 'Planejamento (Agenda)', path: '/gestao-manutencao/planejamento' },
+          { title: 'Manutenção Preventiva', path: '/gestao-manutencao/preventivas' },
+          { title: 'Cadastros', path: '/gestao-manutencao/cadastros' },
+        ],
+      },
+      {
+        title: 'Gestão de Budget',
+        icon: DollarSign,
+        subItems: [
+          { title: 'Dashboard', path: '/gestao-budget/dashboard' },
+          {
+            title: 'Lançamentos',
+            label:
+              role === 'Master' || role === 'Administrador'
+                ? 'Lançamentos'
+                : 'Painel de Lançamentos',
+            path: '/gestao-budget/lancamentos',
+          },
+          { title: 'Centros de Custo', path: '/gestao-budget/centros-custo' },
+          { title: 'Contas Contábeis', path: '/gestao-budget/contas' },
+        ],
+      },
+      {
+        title: 'Gestão de Lockers',
+        icon: Archive,
+        subItems: [
+          { title: 'Dashboard', path: '/gestao-lockers/dashboard' },
+          { title: 'Mapa de Ocupação', path: '/gestao-lockers/ocupacao' },
+          { title: 'Lockers', path: '/gestao-lockers/lockers' },
+          { title: 'Colaboradores', path: '/gestao-lockers/colaboradores' },
+        ],
+      },
+      {
+        title: 'Gestão de Ferramentas',
+        icon: Hammer,
+        path: '/gestao-ferramentas',
+      },
+      {
+        title: 'Gestão de EPIs',
+        icon: HardHat,
+        path: '/gestao-epis',
+      },
+      {
+        title: 'Gestão de Documentos',
+        icon: FileText,
+        path: '/gestao-documentos',
+      },
+      {
+        title: 'Gestão de Imóveis',
+        icon: Home,
+        subItems: [
+          { title: 'Dashboard', path: '/gestao-imoveis/dashboard' },
+          { title: 'Mapa de Ocupação', path: '/gestao-imoveis/ocupacao' },
+          { title: 'Imóveis', path: '/gestao-imoveis/imoveis' },
+          { title: 'Hóspedes', path: '/gestao-imoveis/hospedes' },
+          { title: 'Centros de Custo', path: '/gestao-imoveis/centros-custo' },
+          { title: 'Relatórios', path: '/gestao-imoveis/relatorios' },
+        ],
+      },
+      {
+        title: 'Gestão de Estoque',
+        icon: Package,
+        subItems: [
+          { title: 'Catálogo', path: '/gestao-estoque/catalogo' },
+          { title: 'Meus Pedidos', path: '/gestao-estoque/meus-pedidos' },
+          { title: 'Gestão de Pedidos', path: '/gestao-estoque/gestao-pedidos' },
+          { title: 'Produtos', path: '/gestao-estoque/produtos' },
+          { title: 'Áreas', path: '/gestao-estoque/areas' },
+          { title: 'Dashboard', path: '/gestao-estoque/dashboard' },
+        ],
+      },
+      {
+        title: 'Gestão de Encomendas',
+        icon: Package,
+        subItems: [
+          { title: 'Painel', path: '/gestao-terceiros/encomendas' },
+          { title: 'Tipos de Embalagem', path: '/gestao-terceiros/encomendas/tipos' },
+          { title: 'Configurações', path: '/gestao-terceiros/encomendas/configuracoes' },
+        ],
+      },
+      {
+        title: 'Cadastros',
+        icon: Database,
+        subItems: [
+          { title: 'Plantas', path: '/gestao-terceiros/cadastros/plantas' },
+          { title: 'Locais', path: '/gestao-terceiros/cadastros/locais' },
+          { title: 'Empresas', path: '/gestao-terceiros/cadastros/empresas' },
+          { title: 'Funções', path: '/gestao-terceiros/cadastros/funcoes' },
+          { title: 'Colaboradores', path: '/gestao-terceiros/cadastros/colaboradores' },
+          { title: 'Equipamentos', path: '/gestao-terceiros/cadastros/equipamentos' },
+          { title: 'Treinamentos', path: '/gestao-terceiros/cadastros/treinamentos' },
+          { title: 'Quadro Contratado', path: '/gestao-terceiros/cadastros/quadro-contratado' },
+          { title: 'Book de Metas', path: '/gestao-terceiros/cadastros/book-metas' },
+        ],
+      },
+      {
+        title: 'Dashboard Estratégico',
+        icon: PieChart,
+        path: '/dashboard-estrategico',
+      },
+      {
+        title: 'Book de Metas',
+        icon: Target,
+        path: '/gestao-terceiros/metas',
+      },
+      {
+        title: 'Usuários',
+        icon: Users,
+        path: '/usuarios',
+      },
+      {
+        title: 'Log de Auditoria',
+        icon: ClipboardList,
+        path: '/admin/auditoria',
+      },
+    ],
+    [],
+  )
 
-  const visibleItems = navItems
-    .map((item) => {
-      if (item.title === 'Gestão de Clientes') {
-        if (role !== 'Master') return null
-        return item
-      }
-
-      if (item.title === 'Dashboard Estratégico') {
-        if (role !== 'Master' && role !== 'Administrador') return null
-        return item
-      }
-
-      if (item.title === 'Log de Auditoria') {
-        if (role !== 'Master' && role !== 'Administrador') return null
-        return item
-      }
-
-      const isFilteredByModules =
-        (role === 'Administrador' || (role === 'Master' && selectedMasterClient !== 'all')) &&
-        activeClient
-      if (
-        isFilteredByModules &&
-        item.title !== 'Usuários' &&
-        item.title !== 'Cadastros' &&
-        item.title !== 'Gestão de Clientes' &&
-        item.title !== 'Gestão de Imóveis'
-      ) {
-        const hasModule = activeClient?.modules?.includes(item.title)
-        if (!hasModule) return null
-      }
-
-      if (role === 'Administrador' || role === 'Master') return item
-
-      let userMenus = accessibleMenus
-      if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
-        userMenus = [
-          'Lançamentos',
-          'Gestão de Encomendas',
-          'Cadastros:Colaboradores',
-          'Cadastros:Equipamentos',
-          'Cadastros:Quadro Contratado',
-          'Limpeza e Jardinagem',
-          'Gestão de Tarefas',
-          'Organograma e Fluxos',
-          'Auditoria e Checklist',
-          'Gestão de Imóveis',
-          'Gestão de Lockers',
-          'Book de Metas',
-          'Gestão de Acidentes',
-          'Gestão da Manutenção',
-          'Treinamentos',
-          'Gestão de Documentos',
-          'Gestão de Ferramentas',
-        ]
-      }
-
-      if (item.subItems) {
-        let filteredSubItems = item.subItems
-
-        if (item.title === 'Gestão de Budget') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Gestão de Budget') ||
-              userMenus.includes(`Gestão de Budget:${sub.title}`) ||
-              (sub.label && userMenus.includes(`Gestão de Budget:${sub.label}`)) ||
-              userMenus.includes(sub.title) ||
-              (sub.label && userMenus.includes(sub.label)),
-          )
-        } else if (item.title === 'Cadastros') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
-          )
-        } else if (item.title === 'Gestão de Encomendas') {
-          filteredSubItems =
-            userMenus.includes('Gestão de Encomendas') || userMenus.includes('Encomendas')
-              ? item.subItems
-              : []
-        } else if (item.title === 'Limpeza e Jardinagem') {
-          filteredSubItems = userMenus.includes('Limpeza e Jardinagem') ? item.subItems : []
-        } else if (item.title === 'Gestão de Tarefas') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Gestão de Tarefas') ||
-              userMenus.includes(`Gestão de Tarefas:${sub.title}`) ||
-              (sub.title === 'Painel de Chamados' &&
-                userMenus.includes('Gestão de Tarefas:Painel')) ||
-              (sub.title === 'Tipos de Chamado' && userMenus.includes('Gestão de Tarefas:Tipos')),
-          )
-        } else if (item.title === 'Gestão de Imóveis') {
-          filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
-        } else if (item.title === 'Gestão de Estoque') {
-          if (
-            !userMenus.includes('Gestão de Estoque') &&
-            !userMenus.some((m: string) => m.startsWith('Gestão de Estoque:'))
-          ) {
-            filteredSubItems = []
-          } else {
-            filteredSubItems = item.subItems.filter(
-              (sub: any) =>
-                userMenus.includes('Gestão de Estoque') ||
-                userMenus.includes(`Gestão de Estoque:${sub.title}`) ||
-                role === 'Administrador' ||
-                role === 'Master' ||
-                sub.title === 'Catálogo' ||
-                sub.title === 'Meus Pedidos',
-            )
-            if (
-              role !== 'Administrador' &&
-              role !== 'Master' &&
-              !userMenus.includes('Gestão de Estoque') &&
-              !userMenus.includes('Gestão de Estoque:Gestão de Pedidos')
-            ) {
-              filteredSubItems = filteredSubItems.filter(
-                (s: any) =>
-                  s.title !== 'Gestão de Pedidos' &&
-                  s.title !== 'Produtos' &&
-                  s.title !== 'Áreas' &&
-                  s.title !== 'Dashboard',
-              )
-            }
+  const visibleItems = useMemo(
+    () =>
+      navItems
+        .map((item) => {
+          if (item.title === 'Gestão de Clientes') {
+            if (role !== 'Master') return null
+            return item
           }
-        } else if (item.title === 'Gestão de Lockers') {
-          filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
-        } else if (item.title === 'Gestão da Manutenção') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Gestão da Manutenção') ||
-              userMenus.includes(`Gestão da Manutenção:${sub.title}`),
-          )
-        } else if (item.title === 'Gestão de Acidentes') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Gestão de Acidentes') ||
-              userMenus.includes(`Gestão de Acidentes:${sub.title}`),
-          )
-        } else if (item.title === 'Organograma e Fluxos') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Organograma e Fluxos') ||
-              userMenus.includes(`Organograma e Fluxos:${sub.title}`),
-          )
-        } else if (item.title === 'Auditoria e Checklist') {
-          filteredSubItems = item.subItems.filter(
-            (sub) =>
-              userMenus.includes('Auditoria e Checklist') ||
-              userMenus.includes(`Auditoria e Checklist:${sub.title}`),
-          )
-        } else if (item.title === 'Gestão de Terceiros') {
-          filteredSubItems = item.subItems.filter((sub) => {
-            const hasLegacyDashboard =
-              sub.title === 'Dashboard do Gestor' &&
-              (userMenus.includes('Dashboard Gestor') ||
-                userMenus.includes('Gestão de Terceiros:Dashboard Gestor'))
-            return (
-              userMenus.includes('Gestão de Terceiros') ||
-              userMenus.includes(`Gestão de Terceiros:${sub.title}`) ||
-              userMenus.includes(sub.title) ||
-              hasLegacyDashboard ||
-              sub.title === 'Treinamentos'
-            )
-          })
-        }
 
-        return { ...item, subItems: filteredSubItems }
-      } else {
-        if (!userMenus.includes(item.title)) return null
-      }
+          if (item.title === 'Dashboard Estratégico') {
+            if (role !== 'Master' && role !== 'Administrador') return null
+            return item
+          }
 
-      return item
-    })
-    .filter((item) => {
-      if (!item) return false
-      if (role === 'Administrador' || role === 'Master') return true
-      if (
-        activeClient &&
-        !item.subItems &&
-        (item.title === 'Gestão de Ferramentas' || item.title === 'Gestão de EPIs') &&
-        !activeClient.modules?.includes(item.title)
-      ) {
-        return false
-      }
-      return (item.subItems && item.subItems.length > 0) || item.path
-    })
+          if (item.title === 'Log de Auditoria') {
+            if (role !== 'Master' && role !== 'Administrador') return null
+            return item
+          }
+
+          const isFilteredByModules =
+            (role === 'Administrador' || (role === 'Master' && selectedMasterClient !== 'all')) &&
+            activeClient
+          if (
+            isFilteredByModules &&
+            item.title !== 'Usuários' &&
+            item.title !== 'Cadastros' &&
+            item.title !== 'Gestão de Clientes' &&
+            item.title !== 'Gestão de Imóveis'
+          ) {
+            const hasModule = activeClient?.modules?.includes(item.title)
+            if (!hasModule) return null
+          }
+
+          if (role === 'Administrador' || role === 'Master') return item
+
+          let userMenus = accessibleMenus
+          if (role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
+            userMenus = [
+              'Lançamentos',
+              'Gestão de Encomendas',
+              'Cadastros:Colaboradores',
+              'Cadastros:Equipamentos',
+              'Cadastros:Quadro Contratado',
+              'Limpeza e Jardinagem',
+              'Gestão de Tarefas',
+              'Organograma e Fluxos',
+              'Auditoria e Checklist',
+              'Gestão de Imóveis',
+              'Gestão de Lockers',
+              'Book de Metas',
+              'Gestão de Acidentes',
+              'Gestão da Manutenção',
+              'Treinamentos',
+              'Gestão de Documentos',
+              'Gestão de Ferramentas',
+            ]
+          }
+
+          if (item.subItems) {
+            let filteredSubItems = item.subItems
+
+            if (item.title === 'Gestão de Budget') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Gestão de Budget') ||
+                  userMenus.includes(`Gestão de Budget:${sub.title}`) ||
+                  (sub.label && userMenus.includes(`Gestão de Budget:${sub.label}`)) ||
+                  userMenus.includes(sub.title) ||
+                  (sub.label && userMenus.includes(sub.label)),
+              )
+            } else if (item.title === 'Cadastros') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Cadastros') || userMenus.includes(`Cadastros:${sub.title}`),
+              )
+            } else if (item.title === 'Gestão de Encomendas') {
+              filteredSubItems =
+                userMenus.includes('Gestão de Encomendas') || userMenus.includes('Encomendas')
+                  ? item.subItems
+                  : []
+            } else if (item.title === 'Limpeza e Jardinagem') {
+              filteredSubItems = userMenus.includes('Limpeza e Jardinagem') ? item.subItems : []
+            } else if (item.title === 'Gestão de Tarefas') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Gestão de Tarefas') ||
+                  userMenus.includes(`Gestão de Tarefas:${sub.title}`) ||
+                  (sub.title === 'Painel de Chamados' &&
+                    userMenus.includes('Gestão de Tarefas:Painel')) ||
+                  (sub.title === 'Tipos de Chamado' &&
+                    userMenus.includes('Gestão de Tarefas:Tipos')),
+              )
+            } else if (item.title === 'Gestão de Imóveis') {
+              filteredSubItems = userMenus.includes('Gestão de Imóveis') ? item.subItems : []
+            } else if (item.title === 'Gestão de Estoque') {
+              if (
+                !userMenus.includes('Gestão de Estoque') &&
+                !userMenus.some((m: string) => m.startsWith('Gestão de Estoque:'))
+              ) {
+                filteredSubItems = []
+              } else {
+                filteredSubItems = item.subItems.filter(
+                  (sub: any) =>
+                    userMenus.includes('Gestão de Estoque') ||
+                    userMenus.includes(`Gestão de Estoque:${sub.title}`) ||
+                    role === 'Administrador' ||
+                    role === 'Master' ||
+                    sub.title === 'Catálogo' ||
+                    sub.title === 'Meus Pedidos',
+                )
+                if (
+                  role !== 'Administrador' &&
+                  role !== 'Master' &&
+                  !userMenus.includes('Gestão de Estoque') &&
+                  !userMenus.includes('Gestão de Estoque:Gestão de Pedidos')
+                ) {
+                  filteredSubItems = filteredSubItems.filter(
+                    (s: any) =>
+                      s.title !== 'Gestão de Pedidos' &&
+                      s.title !== 'Produtos' &&
+                      s.title !== 'Áreas' &&
+                      s.title !== 'Dashboard',
+                  )
+                }
+              }
+            } else if (item.title === 'Gestão de Lockers') {
+              filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
+            } else if (item.title === 'Gestão da Manutenção') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Gestão da Manutenção') ||
+                  userMenus.includes(`Gestão da Manutenção:${sub.title}`),
+              )
+            } else if (item.title === 'Gestão de Acidentes') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Gestão de Acidentes') ||
+                  userMenus.includes(`Gestão de Acidentes:${sub.title}`),
+              )
+            } else if (item.title === 'Organograma e Fluxos') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Organograma e Fluxos') ||
+                  userMenus.includes(`Organograma e Fluxos:${sub.title}`),
+              )
+            } else if (item.title === 'Auditoria e Checklist') {
+              filteredSubItems = item.subItems.filter(
+                (sub) =>
+                  userMenus.includes('Auditoria e Checklist') ||
+                  userMenus.includes(`Auditoria e Checklist:${sub.title}`),
+              )
+            } else if (item.title === 'Gestão de Terceiros') {
+              filteredSubItems = item.subItems.filter((sub) => {
+                const hasLegacyDashboard =
+                  sub.title === 'Dashboard do Gestor' &&
+                  (userMenus.includes('Dashboard Gestor') ||
+                    userMenus.includes('Gestão de Terceiros:Dashboard Gestor'))
+                return (
+                  userMenus.includes('Gestão de Terceiros') ||
+                  userMenus.includes(`Gestão de Terceiros:${sub.title}`) ||
+                  userMenus.includes(sub.title) ||
+                  hasLegacyDashboard ||
+                  sub.title === 'Treinamentos'
+                )
+              })
+            }
+
+            return { ...item, subItems: filteredSubItems }
+          } else {
+            if (!userMenus.includes(item.title)) return null
+          }
+
+          return item
+        })
+        .filter((item) => {
+          if (!item) return false
+          if (role === 'Administrador' || role === 'Master') return true
+          if (
+            activeClient &&
+            !item.subItems &&
+            (item.title === 'Gestão de Ferramentas' || item.title === 'Gestão de EPIs') &&
+            !activeClient.modules?.includes(item.title)
+          ) {
+            return false
+          }
+          return (item.subItems && item.subItems.length > 0) || item.path
+        }),
+    [navItems, role, accessibleMenus, activeClient, selectedMasterClient],
+  )
 
   return (
     <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground h-full shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
