@@ -369,6 +369,9 @@ export default function Lancamentos() {
     const toggleKey = `${type}-${referenceId}`
     if (toggling[toggleKey]) return
 
+    const empRecord = type === 'staff' ? employees.find((e) => e.id === referenceId) : null
+    const locationId = empRecord?.location_id || null
+
     if (isEditingPublished) {
       setDirtyLogs((prev) => {
         const next = new Set(prev)
@@ -389,6 +392,7 @@ export default function Lancamentos() {
               reference_id: referenceId,
               status: newStatus,
               is_published: true,
+              ...(locationId ? { location_id: locationId } : {}),
             },
           ]
         }
@@ -417,6 +421,7 @@ export default function Lancamentos() {
         date: dateStr,
         status: newStatus,
         is_published: false,
+        ...(locationId ? { location_id: locationId } : {}),
       }
 
       const { data, error } = await supabase
@@ -468,6 +473,7 @@ export default function Lancamentos() {
           date: dateStr,
           status: l.status,
           is_published: true,
+          ...(l.location_id ? { location_id: l.location_id } : {}),
         }))
 
       if (logsToUpsert.length > 0) {
@@ -984,8 +990,10 @@ export default function Lancamentos() {
                                   {emp.company_name || '-'}
                                 </TableCell>
                                 <TableCell className="text-muted-foreground text-sm">
-                                  {emp.location_id
-                                    ? locations.find((l) => l.id === emp.location_id)?.name || '-'
+                                  {log?.location_id || emp.location_id
+                                    ? locations.find(
+                                        (l) => l.id === (log?.location_id || emp.location_id),
+                                      )?.name || '-'
                                     : '-'}
                                 </TableCell>
                                 <TableCell className="text-center">
