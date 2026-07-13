@@ -66,6 +66,101 @@ async function logAuditError(
   }
 }
 
+async function ensureTaskForExecution(
+  supabaseClient: any,
+  audit: any,
+  assign: any,
+  executionId: string,
+  typeId: string,
+  statusId: string,
+  dueDateISO: string,
+): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  const taskTitle = `Auditoria: ${audit.title}`
+
+  const { data: adminUser } = await supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('client_id', audit.client_id)
+    .in('role', ['Administrador', 'Master'])
+    .limit(1)
+  const requesterId = adminUser?.[0]?.id || assign.assignee_id
+
+  const taskDesc = `Por favor, realize a auditoria "${audit.title}" agendada. Acesse os detalhes da tarefa para preencher o checklist.`
+
+  const { data: openStatusesForDedup } = await supabaseClient
+    .from('task_statuses')
+    .select('id')
+    .eq('client_id', audit.client_id)
+    .eq('is_terminal', false)
+  const dedupStatusIds = openStatusesForDedup?.map((s: any) => s.id) || [statusId]
+
+  const { data: existingTask } = await supabaseClient
+    .from('tasks')
+    .select('id')
+    .eq('client_id', audit.client_id)
+    .eq('plant_id', assign.plant_id)
+    .eq('type_id', typeId)
+    .eq('title', taskTitle)
+    .eq('description', taskDesc)
+    .in('status_id', dedupStatusIds)
+    .limit(1)
+
+  if (existingTask && existingTask.length > 0) {
+    if (executionId) {
+      await supabaseClient
+        .from('audit_executions')
+        .update({ task_id: existingTask[0].id })
+        .eq('id', executionId)
+    }
+    console.log(
+      `[process-recurring-audits] Reusing existing task ${existingTask[0].id} for "${audit.title}"`,
+    )
+    return { success: true, taskId: existingTask[0].id }
+  }
+
+  const { data: newTask, error: taskError } = await supabaseClient
+    .from('tasks')
+    .insert({
+      client_id: audit.client_id,
+      plant_id: assign.plant_id,
+      type_id: typeId,
+      status_id: statusId,
+      requester_id: requesterId,
+      assignee_id: assign.assignee_id,
+      task_number: 'GERANDO...',
+      title: taskTitle,
+      description: taskDesc,
+      due_date: dueDateISO,
+      status_updated_at: new Date().toISOString(),
+    } as any)
+    .select()
+    .single()
+
+  if (taskError) {
+    return { success: false, error: taskError.message }
+  }
+
+  const { error: updateError } = await supabaseClient
+    .from('audit_executions')
+    .update({ task_id: newTask.id })
+    .eq('id', executionId)
+
+  if (updateError) {
+    console.error(
+      `[process-recurring-audits] Failed to link task to execution: ${updateError.message}`,
+    )
+  }
+
+  await supabaseClient.from('task_timeline').insert({
+    task_id: newTask.id,
+    user_id: requesterId,
+    content: `Tarefa gerada automaticamente para a auditoria "${audit.title}".`,
+    action_type: 'system',
+  })
+
+  return { success: true, taskId: newTask.id }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -94,6 +189,7 @@ Deno.serve(async (req: Request) => {
     let generatedCount = 0
     let skippedCount = 0
     let errorCount = 0
+    let backfillCount = 0
 
     for (const audit of audits || []) {
       const assignments = audit.audit_assignments || []
@@ -203,9 +299,52 @@ Deno.serve(async (req: Request) => {
                 .eq('id', pendingExec.task_id)
             }
           }
-          console.log(
-            `[process-recurring-audits] Pending exec exists for "${audit.title}" plant ${assign.plant_id}, skipping`,
-          )
+
+          if (!pendingExec.task_id) {
+            console.log(
+              `[process-recurring-audits] Backfilling missing task for pending execution ${pendingExec.id} on "${audit.title}" plant ${assign.plant_id}`,
+            )
+
+            let backfillDueDate: string
+            if (audit.sla_days != null) {
+              backfillDueDate = new Date(today.getTime() + audit.sla_days * 86400000).toISOString()
+            } else {
+              backfillDueDate = new Date(today.getTime() + 86399999).toISOString()
+            }
+
+            const result = await ensureTaskForExecution(
+              supabaseClient,
+              audit,
+              assign,
+              pendingExec.id,
+              typeId,
+              statusId,
+              backfillDueDate,
+            )
+
+            if (result.success) {
+              backfillCount++
+              generatedCount++
+              console.log(
+                `[process-recurring-audits] Backfilled task ${result.taskId} for execution ${pendingExec.id} on "${audit.title}"`,
+              )
+            } else {
+              console.error(
+                `[process-recurring-audits] Backfill failed for execution ${pendingExec.id}: ${result.error}`,
+              )
+              await logAuditError(
+                supabaseClient,
+                audit.client_id,
+                'audit_backfill_failed',
+                `Audit "${audit.title}" (ID: ${audit.id}) execution ${pendingExec.id}. Error: ${result.error}`,
+              )
+              errorCount++
+            }
+          } else {
+            console.log(
+              `[process-recurring-audits] Pending exec exists for "${audit.title}" plant ${assign.plant_id}, skipping`,
+            )
+          }
           skippedCount++
           continue
         }
@@ -217,10 +356,17 @@ Deno.serve(async (req: Request) => {
             skippedCount++
             continue
           }
-          const lastExec = existingExecs.find((e) => e.status === 'Finalizado') || existingExecs[0]
+          const lastExec =
+            existingExecs.find((e) => e.status === 'Finalizado' || e.status === 'Finalizada') ||
+            existingExecs[0]
           const baseDateStr = lastExec.realization_date || lastExec.created_at.split('T')[0]
           nextDueDate = addFrequency(new Date(baseDateStr + 'T00:00:00Z'), audit.frequency)
         } else {
+          if (!audit.start_date) {
+            console.log(`[process-recurring-audits] No start_date for "${audit.title}", skipping`)
+            skippedCount++
+            continue
+          }
           nextDueDate = new Date(audit.start_date + 'T00:00:00Z')
         }
 
@@ -252,6 +398,7 @@ Deno.serve(async (req: Request) => {
         }
 
         const taskTitle = `Auditoria: ${audit.title}`
+        const taskDesc = `Por favor, realize a auditoria "${audit.title}" agendada. Acesse os detalhes da tarefa para preencher o checklist.`
 
         const { data: existingTasks } = await supabaseClient
           .from('tasks')
@@ -260,6 +407,7 @@ Deno.serve(async (req: Request) => {
           .eq('plant_id', assign.plant_id)
           .eq('type_id', typeId)
           .eq('title', taskTitle)
+          .eq('description', taskDesc)
           .in('status_id', openStatusIds)
           .limit(1)
 
@@ -271,14 +419,6 @@ Deno.serve(async (req: Request) => {
           continue
         }
 
-        const { data: adminUser } = await supabaseClient
-          .from('profiles')
-          .select('id')
-          .eq('client_id', audit.client_id)
-          .in('role', ['Administrador', 'Master'])
-          .limit(1)
-        const requesterId = adminUser?.[0]?.id || assign.assignee_id
-
         const targetDateStr = nextDueDate.toISOString().split('T')[0]
         const targetDateTime = new Date(`${targetDateStr}T00:00:00.000Z`)
         const calculatedDueDate =
@@ -286,36 +426,25 @@ Deno.serve(async (req: Request) => {
             ? new Date(targetDateTime.getTime() + audit.sla_days * 86400000).toISOString()
             : new Date(targetDateTime.getTime() + 86399999).toISOString()
 
-        const taskDesc = `Por favor, realize a auditoria "${audit.title}" agendada para ${targetDateStr.split('-').reverse().join('/')}. Acesse os detalhes da tarefa para preencher o checklist.`
+        const result = await ensureTaskForExecution(
+          supabaseClient,
+          audit,
+          assign,
+          '',
+          typeId,
+          statusId,
+          calculatedDueDate,
+        )
 
-        const { data: newTask, error: taskError } = await supabaseClient
-          .from('tasks')
-          .insert({
-            client_id: audit.client_id,
-            plant_id: assign.plant_id,
-            type_id: typeId,
-            status_id: statusId,
-            requester_id: requesterId,
-            assignee_id: assign.assignee_id,
-            task_number: 'GERANDO...',
-            title: taskTitle,
-            description: taskDesc,
-            due_date: calculatedDueDate,
-            status_updated_at: new Date().toISOString(),
-          } as any)
-          .select()
-          .single()
-
-        if (taskError) {
+        if (!result.success) {
           console.error(
-            `[process-recurring-audits] Task creation failed for "${audit.title}":`,
-            taskError.message,
+            `[process-recurring-audits] Task creation failed for "${audit.title}": ${result.error}`,
           )
           await logAuditError(
             supabaseClient,
             audit.client_id,
             'audit_task_creation_failed',
-            `Audit "${audit.title}" (ID: ${audit.id}) plant ${assign.plant_id}. Error: ${taskError.message}`,
+            `Audit "${audit.title}" (ID: ${audit.id}) plant ${assign.plant_id}. Error: ${result.error}`,
           )
           errorCount++
           continue
@@ -323,7 +452,7 @@ Deno.serve(async (req: Request) => {
 
         const { error: execError } = await supabaseClient.from('audit_executions').insert({
           audit_id: audit.id,
-          task_id: newTask.id,
+          task_id: result.taskId,
           assignee_id: assign.assignee_id,
           plant_id: assign.plant_id,
           status: 'Pendente',
@@ -331,14 +460,13 @@ Deno.serve(async (req: Request) => {
 
         if (execError) {
           console.error(
-            `[process-recurring-audits] Execution creation failed for "${audit.title}":`,
-            execError.message,
+            `[process-recurring-audits] Execution creation failed for "${audit.title}": ${execError.message}`,
           )
           await logAuditError(
             supabaseClient,
             audit.client_id,
             'audit_execution_creation_failed',
-            `Audit "${audit.title}" (ID: ${audit.id}) task ${newTask.id}. Error: ${execError.message}`,
+            `Audit "${audit.title}" (ID: ${audit.id}) task ${result.taskId}. Error: ${execError.message}`,
           )
           errorCount++
         } else {
@@ -351,11 +479,11 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(
-      `[process-recurring-audits] Done. Generated: ${generatedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`,
+      `[process-recurring-audits] Done. Generated: ${generatedCount}, Backfilled: ${backfillCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`,
     )
 
     return new Response(
-      JSON.stringify({ success: true, generatedCount, skippedCount, errorCount }),
+      JSON.stringify({ success: true, generatedCount, backfillCount, skippedCount, errorCount }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       },

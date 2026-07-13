@@ -645,7 +645,7 @@ export default function PainelChamados() {
       u.name?.toLowerCase().includes(bulkAssigneeSearch.toLowerCase()),
   )
 
-  const filteredTasks = tasks.filter((t) => {
+  const _filteredTasks = tasks.filter((t) => {
     const matchPlant = filterPlant === 'all' || t.plant_id === filterPlant
     const matchStatus = selectedStatuses.includes(t.status_id)
     const matchAssignee = filterAssignee === 'all' || t.assignee_id === filterAssignee
@@ -660,6 +660,14 @@ export default function PainelChamados() {
     if (activeTab === 'participando') matchTab = (t.participants_ids || []).includes(profile.id)
 
     return matchPlant && matchStatus && matchAssignee && matchSearch && matchTab
+  })
+
+  const _dedupKeys = new Set<string>()
+  const filteredTasks = _filteredTasks.filter((t) => {
+    const key = `${t.title}|${t.plant_id}|${t.description}`
+    if (_dedupKeys.has(key)) return false
+    _dedupKeys.add(key)
+    return true
   })
 
   const isPersonalTask = form.type_id
