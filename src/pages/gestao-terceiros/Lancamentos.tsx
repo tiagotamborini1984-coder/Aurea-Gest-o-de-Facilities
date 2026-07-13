@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Filter,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,7 @@ export default function Lancamentos() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [plants, setPlants] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState<string>('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const [employees, setEmployees] = useState<any[]>([])
   const [equipment, setEquipment] = useState<any[]>([])
@@ -116,7 +118,7 @@ export default function Lancamentos() {
       isActive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPlant, dateStr])
+  }, [selectedPlant, dateStr, refreshKey])
 
   const loadDataForDate = async (isActive: boolean = true) => {
     setLoading(true)
@@ -204,22 +206,7 @@ export default function Lancamentos() {
       if (!isActive) return
 
       if (!rpcError && rpcEmps) {
-        fetchedEmps = rpcEmps
-
-        // Handle historical data gracefully for deleted collaborators
-        const missingLogIds = staffLogIds.filter((id) => !fetchedEmps.some((e) => e.id === id))
-        if (missingLogIds.length > 0) {
-          missingLogIds.forEach((id) => {
-            fetchedEmps.push({
-              id,
-              name: 'Colaborador Excluído',
-              company_name: '-',
-              status: 'Inativo',
-              reference_month: refMonth,
-              is_deleted: true,
-            })
-          })
-        }
+        fetchedEmps = (rpcEmps as any[]).filter((e: any) => e?.status === 'Ativo')
       } else {
         // Fallback to standard query if RPC fails or doesn't exist yet
         console.warn(
@@ -233,12 +220,7 @@ export default function Lancamentos() {
             'id, name, company_name, company_id, function_id, status, registration_number, reference_month, location_id, created_at',
           )
           .eq('plant_id', selectedPlant)
-
-        if (staffLogIds.length > 0) {
-          empsQuery = empsQuery.or(`status.eq.Ativo,id.in.(${staffLogIds.join(',')})`)
-        } else {
-          empsQuery = empsQuery.eq('status', 'Ativo')
-        }
+          .eq('status', 'Ativo')
 
         const { data: emps, error: empsError } = await empsQuery
 
@@ -255,7 +237,10 @@ export default function Lancamentos() {
 
           const uniqueEmpsMap = new Map()
           Array.from(grouped.values()).forEach((group) => {
-            group.sort((a, b) => {
+            const activeGroup = group.filter((e) => e.status === 'Ativo')
+            if (activeGroup.length === 0) return
+
+            activeGroup.sort((a, b) => {
               const aHasLog = staffLogIds.includes(a.id) ? 0 : 1
               const bHasLog = staffLogIds.includes(b.id) ? 0 : 1
               if (aHasLog !== bHasLog) return aHasLog - bHasLog
@@ -264,46 +249,18 @@ export default function Lancamentos() {
               const bRefMatch = b.reference_month === refMonth ? 0 : 1
               if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
 
-              const aActive = a.status === 'Ativo' ? 0 : 1
-              const bActive = b.status === 'Ativo' ? 0 : 1
-              if (aActive !== bActive) return aActive - bActive
-
               return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
             })
 
-            const best = group[0]
-            if (staffLogIds.includes(best.id) || best.status === 'Ativo') {
-              uniqueEmpsMap.set(best.id, best)
-            }
+            uniqueEmpsMap.set(activeGroup[0].id, activeGroup[0])
           })
           fetchedEmps = Array.from(uniqueEmpsMap.values())
         }
       }
 
-      // Ensure historical records reference valid entities to prevent UI crashes
-      const fetchedEmpIds = new Set(fetchedEmps.map((e) => e.id))
-      staffLogIds.forEach((logId) => {
-        if (!fetchedEmpIds.has(logId)) {
-          fetchedEmps.push({
-            id: logId,
-            name: 'Colaborador Removido',
-            company_name: '-',
-            status: 'Excluído',
-            isDeleted: true,
-          })
-        }
-      })
-
-      // Append status for inactive/deleted employees that only appear because they have a historical log
-      fetchedEmps = fetchedEmps.map((e) => {
-        if (e.status && e.status !== 'Ativo' && !e.name.includes('(Removido)')) {
-          return { ...e, name: `${e.name} (Removido)` }
-        }
-        return e
-      })
-
       if (fetchedEmps && fetchedEmps.length > 0) {
-        const uniqueEmps = fetchedEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        const activeOnlyEmps = fetchedEmps.filter((e: any) => e?.status === 'Ativo')
+        const uniqueEmps = activeOnlyEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         if (!isActive) return
         setEmployees(uniqueEmps)
         // Evaluate training statuses considering the historical selected date
@@ -328,10 +285,7 @@ export default function Lancamentos() {
         .select('id, name, type, quantity, status')
         .eq('plant_id', selectedPlant)
 
-      if (equipmentLogIds.length > 0)
-        eqsQuery = eqsQuery.or(`status.eq.Ativo,id.in.(${equipmentLogIds.join(',')})`)
-      else eqsQuery = eqsQuery.eq('status', 'Ativo')
-      eqsQuery = eqsQuery.order('name')
+      eqsQuery = eqsQuery.eq('status', 'Ativo').order('name')
 
       let fetchedEqs: any[] = []
       const { data: eqs, error: eqsError } = await eqsQuery
@@ -340,29 +294,6 @@ export default function Lancamentos() {
       if (eqs && eqs.length > 0) {
         fetchedEqs = [...eqs]
       }
-
-      // Ensure historical records reference valid equipment to prevent UI crashes
-      const fetchedEqIds = new Set(fetchedEqs.map((e) => e.id))
-      equipmentLogIds.forEach((logId) => {
-        if (!fetchedEqIds.has(logId)) {
-          fetchedEqs.push({
-            id: logId,
-            name: 'Equipamento Removido',
-            type: 'Desconhecido',
-            quantity: 0,
-            status: 'Inativo',
-            isDeleted: true,
-          })
-        }
-      })
-
-      // Append status for inactive equipment that only appear because they have a historical log
-      fetchedEqs = fetchedEqs.map((e) => {
-        if (e.status && e.status !== 'Ativo' && !e.name.includes('(Removido)')) {
-          return { ...e, name: `${e.name} (Removido)` }
-        }
-        return e
-      })
 
       if (fetchedEqs.length > 0) {
         const uniqueEqsMap = new Map()
@@ -639,6 +570,15 @@ export default function Lancamentos() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 bg-card p-2 rounded-lg border shadow-sm">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            className="h-8 w-8"
+            title="Atualizar lista"
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </Button>
           <div className="flex items-center gap-2 px-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             <Select
