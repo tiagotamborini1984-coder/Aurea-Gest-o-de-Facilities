@@ -22,7 +22,7 @@ import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinc
 export default function Cadastros() {
   const { type } = useParams()
   const { plants, locations, functions, equipment, refetch } = useMasterData()
-  const { profile, selectedMasterClient } = useAppStore()
+  const { profile, selectedMasterClient, selectedPlant: globalSelectedPlant } = useAppStore()
   const [companies, setCompanies] = useState<any[]>([])
 
   useEffect(() => {
@@ -144,13 +144,19 @@ export default function Cadastros() {
           ) : null
         }
         fetchQuery={async () => {
+          const selectFields = config.tableName === 'employees' ? '*, functions(name)' : '*'
+
           let q = supabase
             .from(config.tableName)
-            .select('*')
+            .select(selectFields)
             .order('created_at', { ascending: false })
 
-          if (config.hasMonthFilter && type !== 'colaboradores') {
-            q = q.eq('reference_month', `${selectedMonth}-01`)
+          if (config.hasMonthFilter) {
+            if (type === 'colaboradores') {
+              q = q.lte('reference_month', `${selectedMonth}-01`)
+            } else {
+              q = q.eq('reference_month', `${selectedMonth}-01`)
+            }
           }
 
           if (type === 'equipamentos') {
@@ -163,6 +169,10 @@ export default function Cadastros() {
             }
           } else {
             q = q.eq('client_id', profile.client_id)
+          }
+
+          if (config.plantField && globalSelectedPlant && globalSelectedPlant !== 'all') {
+            q = q.eq(config.plantField, globalSelectedPlant)
           }
 
           const { data } = await q
