@@ -28,6 +28,7 @@ import {
   History,
   ClipboardList,
   Info,
+  RotateCcw,
 } from 'lucide-react'
 import { FileUpload } from '@/components/FileUpload'
 import {
@@ -37,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { submitAuditExecution } from '@/services/audit'
+import { submitAuditExecution, reopenAuditExecution } from '@/services/audit'
 import { format, parseISO, addDays, addWeeks, addMonths, addYears } from 'date-fns'
 
 import { PrintLayout } from './components/PrintLayout'
@@ -147,6 +148,7 @@ function AuditoriaDetalhesInner() {
   const [clientBrand, setClientBrand] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchData()
@@ -240,6 +242,7 @@ function AuditoriaDetalhesInner() {
         variant: 'destructive',
       })
     } finally {
+      setLoading(false)
       setSaving(false)
       submittingRef.current = false
     }
@@ -257,6 +260,26 @@ function AuditoriaDetalhesInner() {
 
   const handleSave = async (isDraft: boolean) => {
     if (!id || submittingRef.current) return
+
+    if (!isDraft) {
+      const errors = new Set<string>()
+      actions.forEach((action) => {
+        const answer = answers[action.id]
+        if (!answer || answer.score === undefined || answer.score === null) {
+          errors.add(action.id)
+        }
+      })
+      if (errors.size > 0) {
+        setValidationErrors(errors)
+        toast({
+          title: 'Validação necessária',
+          description: `${errors.size} questão(ões) sem nota. Preencha todas as notas antes de finalizar.`,
+          variant: 'destructive',
+        })
+        return
+      }
+    }
+    setValidationErrors(new Set())
     submittingRef.current = true
     setSaving(true)
     try {
@@ -284,6 +307,24 @@ function AuditoriaDetalhesInner() {
     } finally {
       setSaving(false)
       submittingRef.current = false
+    }
+  }
+
+  const handleReopen = async () => {
+    if (!id) return
+    try {
+      setSaving(true)
+      await reopenAuditExecution(id)
+      toast({
+        title: 'Auditoria reaberta',
+        description: 'A auditoria foi reaberta e agora pode ser editada.',
+      })
+      setValidationErrors(new Set())
+      fetchData()
+    } catch (err: any) {
+      toast({ title: 'Erro ao reabrir', description: err.message, variant: 'destructive' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -395,10 +436,25 @@ function AuditoriaDetalhesInner() {
           </div>
           <div className="flex items-center gap-2">
             {isFinalized ? (
-              <Button onClick={() => window.print()} variant="outline" className="gap-2">
-                <Printer className="w-4 h-4" />
-                Imprimir Relatório
-              </Button>
+              <>
+                <Button onClick={() => window.print()} variant="outline" className="gap-2">
+                  <Printer className="w-4 h-4" />
+                  Imprimir Relatório
+                </Button>
+                <Button
+                  onClick={handleReopen}
+                  variant="outline"
+                  className="gap-2"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4" />
+                  )}
+                  Reabrir Auditoria
+                </Button>
+              </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => handleSave(true)} disabled={saving}>
@@ -479,12 +535,23 @@ function AuditoriaDetalhesInner() {
                           <Label>Nota</Label>
                           <Select
                             value={answers[action.id]?.score?.toString() || ''}
-                            onValueChange={(val) =>
+                            onValueChange={(val) => {
                               handleAnswerChange(action.id, 'score', parseInt(val))
-                            }
+                              setValidationErrors((prev) => {
+                                const next = new Set(prev)
+                                next.delete(action.id)
+                                return next
+                              })
+                            }}
                             disabled={isFinalized}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger
+                              className={
+                                validationErrors.has(action.id)
+                                  ? 'border-red-500 ring-2 ring-red-500/20'
+                                  : ''
+                              }
+                            >
                               <SelectValue placeholder="Selecione uma nota" />
                             </SelectTrigger>
                             <SelectContent>
@@ -495,6 +562,9 @@ function AuditoriaDetalhesInner() {
                               ))}
                             </SelectContent>
                           </Select>
+                          {validationErrors.has(action.id) && (
+                            <p className="text-sm text-red-500 font-medium">Nota obrigatória</p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label>Observações</Label>

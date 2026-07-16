@@ -34,6 +34,16 @@ export const submitAuditExecution = async (
   return data
 }
 
+export const reopenAuditExecution = async (executionId: string) => {
+  const { data, error } = await supabase.rpc('reopen_audit_execution', {
+    p_execution_id: executionId,
+  })
+
+  if (error) throw error
+
+  return data
+}
+
 export const cloneAudit = async (auditId: string, userId: string) => {
   const { audit, actions, assignments } = await getAuditConfig(auditId)
 
