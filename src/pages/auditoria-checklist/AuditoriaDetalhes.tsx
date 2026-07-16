@@ -273,7 +273,8 @@ function AuditoriaDetalhesInner() {
         setValidationErrors(errors)
         toast({
           title: 'Validação necessária',
-          description: `${errors.size} questão(ões) sem nota. Preencha todas as notas antes de finalizar.`,
+          description:
+            'Todos os campos de nota são obrigatórios. Por favor, preencha a pergunta 41 e todas as demais antes de salvar.',
           variant: 'destructive',
         })
         return
@@ -343,6 +344,11 @@ function AuditoriaDetalhesInner() {
       'completed',
     ].includes(execution?.status?.toLowerCase() || '') ||
     (execution?.final_score !== null && execution?.realization_date !== null)
+
+  const allScoresFilled = actions.every((action) => {
+    const answer = answers[action.id]
+    return answer && answer.score !== undefined && answer.score !== null
+  })
 
   const totalPages = Math.max(1, Math.ceil(actions.length / ITEMS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -465,7 +471,11 @@ function AuditoriaDetalhesInner() {
                   )}
                   Salvar como Rascunho
                 </Button>
-                <Button onClick={() => handleSave(false)} disabled={saving}>
+                <Button
+                  onClick={() => handleSave(false)}
+                  disabled={saving || !allScoresFilled}
+                  title={!allScoresFilled ? 'Preencha todas as notas para finalizar' : undefined}
+                >
                   {saving ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
