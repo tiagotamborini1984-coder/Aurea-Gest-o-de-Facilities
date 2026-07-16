@@ -273,8 +273,7 @@ function AuditoriaDetalhesInner() {
         setValidationErrors(errors)
         toast({
           title: 'Validação necessária',
-          description:
-            'Todos os campos de nota são obrigatórios. Por favor, preencha a pergunta 41 e todas as demais antes de salvar.',
+          description: 'Todos os campos de nota devem ser preenchidos antes de finalizar.',
           variant: 'destructive',
         })
         return
@@ -542,7 +541,9 @@ function AuditoriaDetalhesInner() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>Nota</Label>
+                          <Label>
+                            Nota <span className="text-red-500">*</span>
+                          </Label>
                           <Select
                             value={answers[action.id]?.score?.toString() || ''}
                             onValueChange={(val) => {

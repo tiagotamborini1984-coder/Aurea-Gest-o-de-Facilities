@@ -23,10 +23,10 @@ export const submitAuditExecution = async (
 ) => {
   const { data, error } = await supabase.rpc('submit_audit_execution', {
     p_execution_id: executionId,
-    p_answers: answers,
+    p_answers: answers as any,
     p_participants: participants,
     p_is_draft: isDraft,
-    p_signatures: signatures,
+    p_signatures: signatures as any,
   })
 
   if (error) throw error
