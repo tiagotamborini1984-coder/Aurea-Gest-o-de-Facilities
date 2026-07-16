@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { format, startOfWeek, addDays, subDays, isBefore, isSameDay, startOfDay } from 'date-fns'
+import { format, startOfWeek, addDays, subDays, isSameDay, startOfDay, isAfter } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,7 @@ import {
   FileDown,
   AlertCircle,
   Copy,
+  Lock,
 } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { supabase } from '@/lib/supabase/client'
@@ -99,6 +100,7 @@ export function PlanejamentoTab({
     justification: '',
     is_urgent: false,
     isToday: false,
+    lockedByDate: false,
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -442,7 +444,7 @@ export function PlanejamentoTab({
 
                       const dDate = startOfDay(d)
                       const todayDate = startOfDay(new Date())
-                      const isPast = isBefore(dDate, todayDate)
+                      const isLocked = !isAfter(dDate, todayDate)
                       const isToday = isSameDay(dDate, todayDate)
 
                       return (
@@ -450,28 +452,29 @@ export function PlanejamentoTab({
                           key={d.toISOString()}
                           className={cn(
                             'border-l-2 border-gray-300 p-0 align-top transition-colors relative min-w-[150px]',
-                            colIdx % 2 === 1 && !isPast && 'bg-slate-50/50',
-                            isPast
+                            colIdx % 2 === 1 && !isLocked && 'bg-slate-50/50',
+                            isLocked
                               ? 'bg-slate-200/60 cursor-not-allowed'
                               : 'hover:bg-brand-vividBlue/5 cursor-pointer',
                           )}
                           onDragOver={(e) => e.preventDefault()}
                           onDragEnter={(e) => {
                             e.preventDefault()
-                            if (!isPast) e.currentTarget.classList.add('bg-brand-vividBlue/20')
+                            if (!isLocked) e.currentTarget.classList.add('bg-brand-vividBlue/20')
                           }}
                           onDragLeave={(e) =>
                             e.currentTarget.classList.remove('bg-brand-vividBlue/20')
                           }
                           onDrop={(e) => {
-                            if (!isPast) handleDrop(e, cDate, time)
+                            if (!isLocked) handleDrop(e, cDate, time)
                           }}
                           onClick={(e) => {
                             if ((e.target as HTMLElement).dataset.slot === 'true') {
-                              if (isPast)
+                              if (isLocked)
                                 return toast({
-                                  title: 'Visualização',
-                                  description: 'Data bloqueada.',
+                                  title: 'Data bloqueada',
+                                  description:
+                                    'Alterações no planejamento são permitidas apenas até o dia anterior à atividade.',
                                 })
                               const end = new Date(`1970-01-01T${time}:00`)
                               end.setHours(end.getHours() + 1)
@@ -489,6 +492,7 @@ export function PlanejamentoTab({
                                 justification: '',
                                 is_urgent: isToday,
                                 isToday: isToday,
+                                lockedByDate: false,
                               })
                               setModalOpen(true)
                             }
@@ -503,17 +507,12 @@ export function PlanejamentoTab({
                               return (
                                 <div
                                   key={cs.id}
-                                  draggable={!isPast && !isReadonly}
+                                  draggable={!isLocked && !isReadonly}
                                   onDragStart={(e) => handleDragStart(e, cs.id)}
                                   onDragEnd={(e) => e.currentTarget.classList.remove('opacity-50')}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (isPast && !isReadonly) {
-                                      return toast({
-                                        title: 'Visualização',
-                                        description: 'Data bloqueada.',
-                                      })
-                                    }
+                                    const effectiveReadonly = isReadonly || isLocked
                                     setModalData({
                                       date: cDate,
                                       time: cs.start_time.substring(0, 5),
@@ -521,17 +520,22 @@ export function PlanejamentoTab({
                                       area_id: cs.area_id,
                                       description: cs.description,
                                       id: cs.id,
-                                      readonly: isReadonly,
+                                      readonly: effectiveReadonly,
                                       status: cs.status,
                                       evidence_url: cs.evidence_url,
                                       evidence_urls: cs.evidence_urls,
                                       justification: cs.justification,
                                       is_urgent: cs.is_urgent || false,
                                       isToday: isToday,
+                                      lockedByDate: isLocked && !isReadonly,
                                     })
                                     setModalOpen(true)
                                   }}
-                                  title={`${cs.description}\nStatus: ${cs.status}`}
+                                  title={
+                                    isLocked && !isReadonly
+                                      ? `${cs.description}\nStatus: ${cs.status}\n⚠ Bloqueada: alterações apenas até o dia anterior`
+                                      : `${cs.description}\nStatus: ${cs.status}`
+                                  }
                                   className={cn(
                                     'relative p-3 border-2 rounded-lg shadow-sm hover:shadow-lg cursor-grab active:cursor-grabbing transition-all flex flex-col break-words whitespace-normal overflow-hidden',
                                     cs.is_urgent
@@ -553,6 +557,11 @@ export function PlanejamentoTab({
                                   <p className="text-sm font-medium mt-1.5 leading-tight relative z-10">
                                     {cs.description}
                                   </p>
+                                  {isLocked && (
+                                    <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-slate-500 relative z-10">
+                                      <Lock className="h-3 w-3" /> Bloqueada
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
@@ -722,6 +731,15 @@ export function PlanejamentoTab({
 
             {modalData.readonly && (
               <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
+                {modalData.lockedByDate && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <Lock className="h-5 w-5 text-amber-600 shrink-0" />
+                    <p className="text-sm font-semibold text-amber-800">
+                      Planejamento bloqueado. Alterações são permitidas apenas até o dia anterior à
+                      atividade.
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <Label className="text-base font-bold text-slate-700">Status</Label>
                   <Badge
