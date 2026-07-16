@@ -53,6 +53,31 @@ const TERMINAL_AUDIT_STATUSES = [
 
 const PENDING_STATUSES = ['pendente', 'pending', 'rascunho', 'draft', '']
 
+function deduplicateExecutions(audits: any[]): any[] {
+  const seen = new Map<string, any>()
+  for (const audit of audits) {
+    const key = audit.task_id || audit.id
+    const existing = seen.get(key)
+    if (!existing) {
+      seen.set(key, audit)
+      continue
+    }
+    const existingScore = existing.final_score || 0
+    const currentScore = audit.final_score || 0
+    const keepCurrent =
+      currentScore > 0 && existingScore === 0
+        ? true
+        : currentScore > 0 && existingScore > 0
+          ? new Date(audit.realization_date || audit.created_at) >
+            new Date(existing.realization_date || existing.created_at)
+          : false
+    if (keepCurrent) {
+      seen.set(key, audit)
+    }
+  }
+  return Array.from(seen.values())
+}
+
 function isAuditExecutionFinished(audit: any): boolean {
   const statusLower = audit.status?.toLowerCase() || ''
   if (TERMINAL_AUDIT_STATUSES.includes(statusLower)) return true
@@ -64,6 +89,38 @@ function isAuditExecutionFinished(audit: any): boolean {
   const hasAnswers = audit.audit_execution_answers?.length > 0
   if (isNotPending && hasAnswers && audit.final_score !== null) return true
   return false
+}
+
+function deduplicateExecutions(executions: any[]): any[] {
+  const best = new Map<string, any>()
+
+  for (const exec of executions) {
+    if (!exec.task_id) continue
+    const key = exec.task_id
+    const current = best.get(key)
+
+    if (!current) {
+      best.set(key, exec)
+      continue
+    }
+
+    const currentScore = Number(current.final_score) || 0
+    const execScore = Number(exec.final_score) || 0
+    const currentDate = new Date(current.realization_date || current.created_at)
+    const execDate = new Date(exec.realization_date || exec.created_at)
+
+    const isBetter =
+      (currentScore === 0 && execScore > 0) ||
+      (currentScore === execScore && execDate > currentDate) ||
+      (currentScore > 0 && execScore > 0 && execDate > currentDate)
+
+    if (isBetter) best.set(key, exec)
+  }
+
+  return executions.filter((exec) => {
+    if (!exec.task_id) return true
+    return best.get(exec.task_id)?.id === exec.id
+  })
 }
 
 export default function AuditoriaRealizadas() {
@@ -241,7 +298,7 @@ export default function AuditoriaRealizadas() {
           return audit
         })
 
-      setAudits(finishedOrTaskCompleted)
+      setAudits(deduplicateExecutions(finishedOrTaskCompleted))
     } catch (error: any) {
       toast({
         title: 'Erro',

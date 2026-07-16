@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -138,6 +138,7 @@ function AuditoriaDetalhesInner() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const submittingRef = useRef(false)
   const [execution, setExecution] = useState<any>(null)
   const [audit, setAudit] = useState<any>(null)
   const [actions, setActions] = useState<any[]>([])
@@ -146,6 +147,7 @@ function AuditoriaDetalhesInner() {
   const [clientBrand, setClientBrand] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const submittingRef = useRef(false)
 
   useEffect(() => {
     fetchData()
@@ -239,7 +241,8 @@ function AuditoriaDetalhesInner() {
         variant: 'destructive',
       })
     } finally {
-      setLoading(false)
+      setSaving(false)
+      submittingRef.current = false
     }
   }
 
@@ -254,7 +257,8 @@ function AuditoriaDetalhesInner() {
   }
 
   const handleSave = async (isDraft: boolean) => {
-    if (!id) return
+    if (!id || submittingRef.current) return
+    submittingRef.current = true
     setSaving(true)
     try {
       const formattedAnswers = Object.entries(answers).map(([action_id, val]) => ({
@@ -280,6 +284,7 @@ function AuditoriaDetalhesInner() {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
     } finally {
       setSaving(false)
+      submittingRef.current = false
     }
   }
 
