@@ -370,7 +370,8 @@ export default function Lancamentos() {
     if (toggling[toggleKey]) return
 
     const empRecord = type === 'staff' ? employees.find((e) => e.id === referenceId) : null
-    const locationId = empRecord?.location_id || null
+    const existingLog = dailyLogs.find((l) => l?.type === type && l?.reference_id === referenceId)
+    const locationId = existingLog?.location_id || empRecord?.location_id || null
 
     if (isEditingPublished) {
       setDirtyLogs((prev) => {
@@ -465,16 +466,23 @@ export default function Lancamentos() {
 
       const logsToUpsert = dailyLogs
         .filter((l) => dirtyLogs.has(`${l.type}-${l.reference_id}`))
-        .map((l) => ({
-          client_id: clientId,
-          plant_id: selectedPlant,
-          type: l.type,
-          reference_id: l.reference_id,
-          date: dateStr,
-          status: l.status,
-          is_published: true,
-          ...(l.location_id ? { location_id: l.location_id } : {}),
-        }))
+        .map((l) => {
+          let logLocationId = l.location_id
+          if (!logLocationId && l.type === 'staff') {
+            const emp = employees.find((e) => e.id === l.reference_id)
+            logLocationId = emp?.location_id || null
+          }
+          return {
+            client_id: clientId,
+            plant_id: selectedPlant,
+            type: l.type,
+            reference_id: l.reference_id,
+            date: dateStr,
+            status: l.status,
+            is_published: true,
+            ...(logLocationId ? { location_id: logLocationId } : {}),
+          }
+        })
 
       if (logsToUpsert.length > 0) {
         const { error } = await supabase
