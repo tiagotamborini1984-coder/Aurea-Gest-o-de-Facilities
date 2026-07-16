@@ -53,31 +53,6 @@ const TERMINAL_AUDIT_STATUSES = [
 
 const PENDING_STATUSES = ['pendente', 'pending', 'rascunho', 'draft', '']
 
-function deduplicateExecutions(audits: any[]): any[] {
-  const seen = new Map<string, any>()
-  for (const audit of audits) {
-    const key = audit.task_id || audit.id
-    const existing = seen.get(key)
-    if (!existing) {
-      seen.set(key, audit)
-      continue
-    }
-    const existingScore = existing.final_score || 0
-    const currentScore = audit.final_score || 0
-    const keepCurrent =
-      currentScore > 0 && existingScore === 0
-        ? true
-        : currentScore > 0 && existingScore > 0
-          ? new Date(audit.realization_date || audit.created_at) >
-            new Date(existing.realization_date || existing.created_at)
-          : false
-    if (keepCurrent) {
-      seen.set(key, audit)
-    }
-  }
-  return Array.from(seen.values())
-}
-
 function isAuditExecutionFinished(audit: any): boolean {
   const statusLower = audit.status?.toLowerCase() || ''
   if (TERMINAL_AUDIT_STATUSES.includes(statusLower)) return true

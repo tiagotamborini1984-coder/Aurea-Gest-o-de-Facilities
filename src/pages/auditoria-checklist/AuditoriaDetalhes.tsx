@@ -147,7 +147,6 @@ function AuditoriaDetalhesInner() {
   const [clientBrand, setClientBrand] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const submittingRef = useRef(false)
 
   useEffect(() => {
     fetchData()
