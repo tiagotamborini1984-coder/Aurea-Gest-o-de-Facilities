@@ -89,7 +89,9 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
       return { success: false, error: 'No client' }
     }
 
-    const payload = { ...record, client_id: (record as any).client_id || targetClientId }
+    const { functions, org_functions, ...cleanRecord } = record as any
+    const payload = { ...cleanRecord, client_id: (record as any).client_id || targetClientId }
+
     const { data: result, error } = await supabase
       .from(tableName)
       .insert(payload)
@@ -104,9 +106,10 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
   }
 
   const update = async (id: string, record: Partial<T>) => {
+    const { functions, org_functions, ...cleanRecord } = record as any
     const { data: result, error } = await supabase
       .from(tableName)
-      .update(record)
+      .update(cleanRecord)
       .eq('id', id)
       .select(getQuerySelect())
       .single()
