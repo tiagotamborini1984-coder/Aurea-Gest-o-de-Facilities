@@ -52,7 +52,7 @@ import { useToast } from '@/hooks/use-toast'
 import { TaskDetailsSheet } from './TaskDetailsSheet'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
@@ -126,6 +126,7 @@ export default function PainelChamados() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
 
   const filterPlant = searchParams.get('plant') || 'all'
   const setFilterPlant = (val: string) => {
@@ -292,6 +293,16 @@ export default function PainelChamados() {
         if (!prev) return null
         return data?.find((t: any) => t.id === prev.id) || prev
       })
+
+      // Auto-open task if navigated from external link (e.g. Audit Details)
+      if (location.state?.taskId && data) {
+        const taskToOpen = data.find((t: any) => t.id === location.state.taskId)
+        if (taskToOpen) {
+          setSelectedTask(taskToOpen)
+          // Clean state to prevent reopening on refresh
+          window.history.replaceState({}, document.title)
+        }
+      }
     } catch (err) {
       console.error(err)
     } finally {
