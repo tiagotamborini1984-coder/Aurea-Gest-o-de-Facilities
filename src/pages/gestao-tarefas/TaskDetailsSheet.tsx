@@ -541,7 +541,8 @@ export function TaskDetailsSheet({
                 .update({
                   description: ncDescription,
                   assignee_id: auditExecution.assignee_id,
-                })
+                  audit_id: auditExecution.audit_id,
+                } as any)
                 .eq('id', existingNC[0].id)
 
               await supabase.from('task_timeline').insert({
@@ -566,6 +567,7 @@ export function TaskDetailsSheet({
                   due_date: dueDate.toISOString(),
                   status_updated_at: new Date().toISOString(),
                   participants_ids: [],
+                  audit_id: auditExecution.audit_id,
                 } as any)
                 .select()
                 .single()

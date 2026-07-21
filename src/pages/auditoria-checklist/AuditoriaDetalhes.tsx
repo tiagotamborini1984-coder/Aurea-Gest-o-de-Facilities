@@ -29,6 +29,7 @@ import {
   ClipboardList,
   Info,
   RotateCcw,
+  AlertTriangle,
 } from 'lucide-react'
 import { FileUpload } from '@/components/FileUpload'
 import {
@@ -149,10 +150,35 @@ function AuditoriaDetalhesInner() {
   const [history, setHistory] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
+  const [nonConformities, setNonConformities] = useState<any[]>([])
 
   useEffect(() => {
     fetchData()
   }, [id])
+
+  useEffect(() => {
+    if (!audit?.id) return
+    const channel = supabase
+      .channel(`audit-nc-${audit.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks', filter: `audit_id=eq.${audit.id}` },
+        async () => {
+          const { data: ncData } = await supabase
+            .from('tasks')
+            .select(
+              'id, task_number, title, description, due_date, assignee_id, status_id, task_statuses(name, color), profiles!tasks_assignee_id_fkey(name)',
+            )
+            .eq('audit_id', audit.id)
+            .order('created_at', { ascending: false })
+          setNonConformities(ncData || [])
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [audit?.id])
 
   const fetchData = async () => {
     if (!id) return
@@ -229,6 +255,23 @@ function AuditoriaDetalhesInner() {
           .order('created_at', { ascending: false })
 
         if (histData) setHistory(histData)
+
+        const { data: ncData } = await supabase
+          .from('tasks')
+          .select(`
+            id,
+            task_number,
+            title,
+            description,
+            due_date,
+            assignee_id,
+            status_id,
+            task_statuses(name, color),
+            profiles!tasks_assignee_id_fkey(name)
+          `)
+          .eq('audit_id', execData.audit_id)
+          .order('created_at', { ascending: false })
+        setNonConformities(ncData || [])
 
         window.dispatchEvent(new CustomEvent('audit-loaded', { detail: true }))
       } else {
@@ -494,6 +537,14 @@ function AuditoriaDetalhesInner() {
             </TabsTrigger>
             <TabsTrigger value="historico" className="gap-2">
               <History className="w-4 h-4" /> Histórico & Agendamento
+            </TabsTrigger>
+            <TabsTrigger value="nao-conformidades" className="gap-2">
+              <AlertTriangle className="w-4 h-4" /> Não Conformidades
+              {nonConformities.length > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center bg-amber-500 text-white text-xs font-medium rounded-full px-1.5 min-w-[20px] h-5">
+                  {nonConformities.length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -772,6 +823,81 @@ function AuditoriaDetalhesInner() {
                             </TableRow>
                           )
                         })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="nao-conformidades" className="space-y-6 animate-fade-in-up">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  Não Conformidades Geradas
+                </CardTitle>
+                <CardDescription>
+                  Tarefas de não conformidade criadas automaticamente a partir desta auditoria.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {nonConformities.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center">
+                    <AlertTriangle className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                    <p className="text-muted-foreground">
+                      Nenhuma não conformidade gerada para esta auditoria.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Número</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Responsável</TableHead>
+                          <TableHead>Prazo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {nonConformities.map((nc) => (
+                          <TableRow
+                            key={nc.id}
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() =>
+                              navigate('/gestao-tarefas', { state: { taskId: nc.id } })
+                            }
+                          >
+                            <TableCell className="font-medium text-primary hover:underline">
+                              {nc.task_number || '-'}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {nc.title || nc.description || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {nc.task_statuses ? (
+                                <Badge
+                                  variant="outline"
+                                  style={{
+                                    borderColor: nc.task_statuses.color,
+                                    color: nc.task_statuses.color,
+                                  }}
+                                >
+                                  {nc.task_statuses.name}
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">-</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{nc.profiles?.name || '-'}</TableCell>
+                            <TableCell>
+                              {nc.due_date ? format(parseISO(nc.due_date), 'dd/MM/yyyy') : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>

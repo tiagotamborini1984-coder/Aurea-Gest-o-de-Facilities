@@ -6,7 +6,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
-  
+
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) throw new Error('Missing Authorization header')
@@ -15,12 +15,12 @@ Deno.serve(async (req: Request) => {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     )
 
     const body = await req.json()
     const { plant_id, client_id } = body
-    
+
     if (!plant_id || !client_id) {
       throw new Error('Missing plant_id or client_id')
     }
@@ -43,8 +43,8 @@ Deno.serve(async (req: Request) => {
 
     if (plansError) throw plansError
 
-    const assetsWithPlans = new Set(plans?.filter(p => p.asset_id).map(p => p.asset_id))
-    const assetsWithoutPlans = assets?.filter(a => !assetsWithPlans.has(a.id)) || []
+    const assetsWithPlans = new Set(plans?.filter((p) => p.asset_id).map((p) => p.asset_id))
+    const assetsWithoutPlans = assets?.filter((a) => !assetsWithPlans.has(a.id)) || []
 
     const targetAssets = assetsWithoutPlans.slice(0, 5)
     const suggestions = []
@@ -53,15 +53,21 @@ Deno.serve(async (req: Request) => {
       const nameLower = asset.name.toLowerCase()
       let title = `Inspeção Preventiva - ${asset.name}`
       let frequency = 'Mensal'
-      let description = 'Plano de manutenção preventiva sugerido pelo Assistente IA para cobrir este equipamento.'
+      let description =
+        'Plano de manutenção preventiva sugerido pelo Assistente IA para cobrir este equipamento.'
       let checklist = [
         'Verificação geral de integridade estrutural',
         'Limpeza externa do equipamento',
         'Inspeção visual de conexões',
-        'Teste funcional de operação'
+        'Teste funcional de operação',
       ]
 
-      if (nameLower.includes('ar') || nameLower.includes('hvac') || nameLower.includes('condicionado') || nameLower.includes('split')) {
+      if (
+        nameLower.includes('ar') ||
+        nameLower.includes('hvac') ||
+        nameLower.includes('condicionado') ||
+        nameLower.includes('split')
+      ) {
         frequency = 'Mensal'
         title = `Manutenção Preventiva HVAC - ${asset.name}`
         checklist = [
@@ -69,7 +75,7 @@ Deno.serve(async (req: Request) => {
           'Verificação da pressão do gás refrigerante',
           'Inspeção e limpeza do dreno de condensado',
           'Medição da corrente elétrica do compressor',
-          'Verificação de isolamento térmico das tubulações'
+          'Verificação de isolamento térmico das tubulações',
         ]
       } else if (nameLower.includes('compressor')) {
         frequency = 'Trimestral'
@@ -79,7 +85,7 @@ Deno.serve(async (req: Request) => {
           'Verificação de vazamentos nas mangueiras e conexões',
           'Teste da válvula de segurança',
           'Drenagem do reservatório de condensado',
-          'Limpeza do filtro de admissão'
+          'Limpeza do filtro de admissão',
         ]
       } else if (nameLower.includes('gerador') || nameLower.includes('gmg')) {
         frequency = 'Semanal'
@@ -89,7 +95,7 @@ Deno.serve(async (req: Request) => {
           'Inspecionar baterias e terminais',
           'Testar acionamento em vazio por 15 min',
           'Verificar vazamentos no painel e motor',
-          'Checar temperatura do líquido de arrefecimento'
+          'Checar temperatura do líquido de arrefecimento',
         ]
       } else if (nameLower.includes('bomba') || nameLower.includes('recalque')) {
         frequency = 'Semestral'
@@ -99,7 +105,7 @@ Deno.serve(async (req: Request) => {
           'Verificar alinhamento do acoplamento',
           'Inspecionar selo mecânico contra vazamentos',
           'Lubrificar rolamentos do motor',
-          'Reaperto de parafusos de fixação'
+          'Reaperto de parafusos de fixação',
         ]
       } else if (nameLower.includes('extintor')) {
         frequency = 'Mensal'
@@ -109,7 +115,7 @@ Deno.serve(async (req: Request) => {
           'Inspecionar manômetro (pressão adequada)',
           'Verificar integridade do lacre e cupilha',
           'Checar validade da carga',
-          'Garantir bom estado da mangueira e difusor'
+          'Garantir bom estado da mangueira e difusor',
         ]
       }
 
@@ -120,7 +126,7 @@ Deno.serve(async (req: Request) => {
         title,
         frequency,
         description,
-        checklist
+        checklist,
       })
     }
 
@@ -132,9 +138,9 @@ Deno.serve(async (req: Request) => {
         .eq('client_id', client_id)
 
       if (!areasError && areas) {
-        const areasWithPlans = new Set(plans?.filter(p => p.area_id).map(p => p.area_id))
-        const areasWithoutPlans = areas.filter(a => !areasWithPlans.has(a.id))
-        
+        const areasWithPlans = new Set(plans?.filter((p) => p.area_id).map((p) => p.area_id))
+        const areasWithoutPlans = areas.filter((a) => !areasWithPlans.has(a.id))
+
         const targetAreas = areasWithoutPlans.slice(0, 5 - suggestions.length)
         for (const area of targetAreas) {
           suggestions.push({
@@ -149,8 +155,8 @@ Deno.serve(async (req: Request) => {
               'Inspecionar conservação de pintura e paredes',
               'Verificar funcionamento de esquadrias e fechaduras',
               'Checar pontos de infiltrações ou vazamentos',
-              'Verificar integridade de interruptores e tomadas'
-            ]
+              'Verificar integridade de interruptores e tomadas',
+            ],
           })
         }
       }
@@ -159,7 +165,6 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ success: true, suggestions }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
