@@ -170,6 +170,7 @@ function AuditoriaDetalhesInner() {
               'id, task_number, title, description, due_date, assignee_id, status_id, task_statuses(name, color), profiles!tasks_assignee_id_fkey(name)',
             )
             .eq('audit_id', audit.id)
+            .eq('client_id', audit.client_id)
             .order('created_at', { ascending: false })
           setNonConformities(ncData || [])
         },
@@ -270,6 +271,7 @@ function AuditoriaDetalhesInner() {
             profiles!tasks_assignee_id_fkey(name)
           `)
           .eq('audit_id', execData.audit_id)
+          .eq('client_id', execData.audits.client_id)
           .order('created_at', { ascending: false })
         setNonConformities(ncData || [])
 
@@ -847,7 +849,7 @@ function AuditoriaDetalhesInner() {
                   <div className="flex flex-col items-center justify-center p-12 text-center">
                     <AlertTriangle className="w-12 h-12 text-muted-foreground/30 mb-3" />
                     <p className="text-muted-foreground">
-                      Nenhuma não conformidade gerada para esta auditoria.
+                      Nenhuma não conformidade encontrada para esta auditoria.
                     </p>
                   </div>
                 ) : (
