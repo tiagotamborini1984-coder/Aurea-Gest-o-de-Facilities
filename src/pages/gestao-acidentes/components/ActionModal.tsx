@@ -138,7 +138,7 @@ export function ActionModal({ open, onClose, plantId, existingTask, onSaved }: a
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Planta</Label>
+              <Label>Planta de Destino</Label>
               <Select
                 value={formData.plant_id || undefined}
                 onValueChange={(v) => setFormData({ ...formData, plant_id: v })}

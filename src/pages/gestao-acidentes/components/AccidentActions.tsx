@@ -65,7 +65,6 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
 
   useEffect(() => {
     if (!activeClient || !profile) return
-    const authorizedPlants = (profile.authorized_plants as string[]) || []
 
     supabase
       .from('profiles')
@@ -88,13 +87,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
       .select('id, name')
       .eq('client_id', activeClient.id)
       .order('name')
-      .then(({ data }) => {
-        const filtered =
-          authorizedPlants.length > 0
-            ? (data || []).filter((p) => authorizedPlants.includes(p.id))
-            : data || []
-        setPlants(filtered)
-      })
+      .then(({ data }) => setPlants(data || []))
     fetchTasks()
   }, [activeClient, profile, fetchTasks])
 
@@ -294,7 +287,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
                     className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 border rounded-lg bg-gray-50"
                   >
                     <div className="md:col-span-5 space-y-1">
-                      <Label className="text-xs">Planta</Label>
+                      <Label className="text-xs">Planta de Destino</Label>
                       <Select
                         value={row.plant_id || undefined}
                         onValueChange={(v) => updateRow(index, 'plant_id', v)}
@@ -362,7 +355,7 @@ export function AccidentActions({ accidentId, plantId }: { accidentId: string; p
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Título</TableHead>
-                  <TableHead>Planta</TableHead>
+                  <TableHead>Planta de Destino</TableHead>
                   <TableHead>Responsável</TableHead>
                   <TableHead>Prazo</TableHead>
                   <TableHead>Status</TableHead>
