@@ -34,6 +34,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { submitAuditExecution } from '@/services/audit'
 import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
@@ -432,165 +433,27 @@ export function TaskDetailsSheet({
     setIsSavingAudit(true)
     setShowConfirm(false)
     try {
-      let totalScore = 0
-      let maxScore = auditActions.length * 5
-
-      const answersToUpsert = auditActions.map((action) => {
+      const formattedAnswers = auditActions.map((action) => {
         const ans = auditAnswers[action.id] || {}
-        totalScore += ans.score || 0
         return {
-          execution_id: auditExecution.id,
           action_id: action.id,
           score: ans.score,
-          evidence_url: ans.evidence_url || null,
           observations: ans.observations || null,
+          evidence_url: ans.evidence_url || null,
+          evidence_urls: ans.evidence_urls || [],
         }
       })
 
-      await supabase
-        .from('audit_execution_answers')
-        .upsert(answersToUpsert, { onConflict: 'execution_id,action_id' })
-
-      await supabase
-        .from('audit_executions')
-        .update({
-          status: 'Finalizado',
-          realization_date: auditRealizationDate,
-          participants: auditParticipants,
-          final_score: totalScore,
-          max_score: maxScore,
-        })
-        .eq('id', auditExecution.id)
+      await submitAuditExecution(auditExecution.id, formattedAnswers, auditParticipants, false)
 
       const terminalStatus = taskStatuses.find((s: any) => s.is_terminal)
       if (terminalStatus) {
-        await handleStatusChange(terminalStatus.id)
-      }
-
-      // Automatically generate Non-Conformity tasks for scores 1-3
-      const ncActions = auditActions.filter((action) => {
-        const score = auditAnswers[action.id]?.score
-        return score && score >= 1 && score <= 3
-      })
-
-      if (ncActions.length > 0 && profile) {
-        const baseDate = auditRealizationDate
-          ? new Date(`${auditRealizationDate}T12:00:00Z`)
-          : new Date()
-        let nextDate = new Date(baseDate)
-        const freq = auditExecution.audits?.frequency || 'Única'
-
-        if (freq === 'Diária') nextDate.setDate(nextDate.getDate() + 1)
-        else if (freq === 'Semanal') nextDate.setDate(nextDate.getDate() + 7)
-        else if (freq === 'Mensal') nextDate.setMonth(nextDate.getMonth() + 1)
-        else if (freq === 'Semestral') nextDate.setMonth(nextDate.getMonth() + 6)
-        else if (freq === 'Anual') nextDate.setFullYear(nextDate.getFullYear() + 1)
-        else nextDate.setDate(nextDate.getDate() + 7) // fallback
-
-        let dueDate = new Date(nextDate)
-        dueDate.setDate(dueDate.getDate() - 1)
-
-        if (dueDate < new Date()) {
-          dueDate = new Date()
-        }
-        dueDate.setHours(23, 59, 59, 999)
-
-        const { data: types } = await supabase
-          .from('task_types')
-          .select('id, name')
-          .eq('client_id', profile.client_id)
-        let ncType = types?.find(
-          (t) =>
-            t.name.toLowerCase().includes('não conformidade') ||
-            t.name.toLowerCase().includes('nc'),
-        )
-        if (!ncType && types && types.length > 0) ncType = types[0]
-
-        const { data: statuses } = await supabase
-          .from('task_statuses')
-          .select('id')
-          .eq('client_id', profile.client_id)
-          .eq('is_terminal', false)
-          .order('created_at')
-          .limit(1)
-        const initialStatusId = statuses?.[0]?.id
-
-        if (ncType && initialStatusId) {
-          const openStatuses = statuses.map((s) => s.id)
-
-          for (const nc of ncActions) {
-            const ans = auditAnswers[nc.id]
-            const ncTitle = `Não Conformidade: ${nc.title.substring(0, 50)}${nc.title.length > 50 ? '...' : ''}`
-            const ncDescription = `Foi identificada uma Não Conformidade durante a auditoria "${auditExecution.audits?.title}".\n\nAção Avaliada: ${nc.title}\nNota: ${ans.score}\nObservações: ${ans.observations || 'Nenhuma'}\n\nFavor providenciar correção até a data limite.`
-
-            // Verifique se já existe tarefa aberta para essa NC na mesma planta para não duplicar
-            const { data: existingNC } = await supabase
-              .from('tasks')
-              .select('id, task_number')
-              .eq('client_id', profile.client_id)
-              .eq('plant_id', auditExecution.plant_id)
-              .eq('type_id', ncType.id)
-              .eq('title', ncTitle)
-              .in('status_id', openStatuses)
-              .limit(1)
-
-            if (existingNC && existingNC.length > 0) {
-              // Update existing, PRESERVE SLA
-              await supabase
-                .from('tasks')
-                .update({
-                  description: ncDescription,
-                  assignee_id: auditExecution.assignee_id,
-                  audit_id: auditExecution.audit_id,
-                } as any)
-                .eq('id', existingNC[0].id)
-
-              await supabase.from('task_timeline').insert({
-                task_id: existingNC[0].id,
-                user_id: profile.id,
-                content: `Tarefa atualizada via reavaliação de auditoria (Nota ${ans.score}). SLA mantido.`,
-                action_type: 'comment',
-              })
-            } else {
-              const { data: newTask } = await supabase
-                .from('tasks')
-                .insert({
-                  client_id: profile.client_id,
-                  plant_id: auditExecution.plant_id,
-                  type_id: ncType.id,
-                  status_id: initialStatusId,
-                  requester_id: profile.id,
-                  assignee_id: auditExecution.assignee_id,
-                  task_number: 'GERANDO...',
-                  title: ncTitle,
-                  description: ncDescription,
-                  due_date: dueDate.toISOString(),
-                  status_updated_at: new Date().toISOString(),
-                  participants_ids: [],
-                  audit_id: auditExecution.audit_id,
-                } as any)
-                .select()
-                .single()
-
-              if (newTask) {
-                await supabase.from('task_timeline').insert({
-                  task_id: newTask.id,
-                  user_id: profile.id,
-                  content: `Tarefa gerada automaticamente devido à nota ${ans.score} na auditoria ${auditExecution.audits?.title}.`,
-                  action_type: 'comment',
-                })
-              }
-            }
-          }
-        }
+        await processStatusChange(terminalStatus.id)
       }
 
       toast({
         title: 'Auditoria enviada com sucesso!',
-        description:
-          ncActions.length > 0
-            ? `${ncActions.length} tarefa(s) de Não Conformidade gerada(s).`
-            : undefined,
+        description: 'Não conformidades foram geradas automaticamente pelo sistema.',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
       onClose()
