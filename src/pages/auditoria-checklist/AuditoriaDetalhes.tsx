@@ -157,20 +157,22 @@ function AuditoriaDetalhesInner() {
   }, [id])
 
   useEffect(() => {
-    if (!audit?.id) return
+    const auditId = execution?.audit_id || audit?.id
+    const clientId = audit?.client_id
+    if (!auditId || !clientId) return
     const channel = supabase
-      .channel(`audit-nc-${audit.id}`)
+      .channel(`audit-nc-${auditId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks', filter: `audit_id=eq.${audit.id}` },
+        { event: '*', schema: 'public', table: 'tasks', filter: `audit_id=eq.${auditId}` },
         async () => {
           const { data: ncData } = await supabase
             .from('tasks')
             .select(
               'id, task_number, title, description, due_date, assignee_id, status_id, task_statuses(name, color), profiles!tasks_assignee_id_fkey(name)',
             )
-            .eq('audit_id', audit.id)
-            .eq('client_id', audit.client_id)
+            .eq('audit_id', auditId)
+            .eq('client_id', clientId)
             .order('created_at', { ascending: false })
           setNonConformities(ncData || [])
         },
@@ -179,7 +181,7 @@ function AuditoriaDetalhesInner() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [audit?.id])
+  }, [audit?.id, audit?.client_id, execution?.audit_id])
 
   const fetchData = async () => {
     if (!id) return
@@ -274,6 +276,8 @@ function AuditoriaDetalhesInner() {
           .eq('client_id', execData.audits.client_id)
           .order('created_at', { ascending: false })
         setNonConformities(ncData || [])
+
+        window.dispatchEvent(new CustomEvent('audit-loaded', { detail: true }))
 
         window.dispatchEvent(new CustomEvent('audit-loaded', { detail: true }))
       } else {
