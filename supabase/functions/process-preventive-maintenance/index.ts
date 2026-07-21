@@ -4,38 +4,37 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 function addFrequency(date: Date, frequency: string): Date {
-  const d = new Date(date)
+  const d = new Date(date);
   switch (frequency) {
     case 'Diária':
-      d.setUTCDate(d.getUTCDate() + 1)
-      break
+      d.setUTCDate(d.getUTCDate() + 1);
+      break;
     case 'Semanal':
-      d.setUTCDate(d.getUTCDate() + 7)
-      break
+      d.setUTCDate(d.getUTCDate() + 7);
+      break;
     case 'Quinzenal':
-      d.setUTCDate(d.getUTCDate() + 15)
-      break
+      d.setUTCDate(d.getUTCDate() + 15);
+      break;
     case 'Mensal':
-      d.setUTCMonth(d.getUTCMonth() + 1)
-      break
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      break;
     case 'Trimestral':
-      d.setUTCMonth(d.getUTCMonth() + 3)
-      break
+      d.setUTCMonth(d.getUTCMonth() + 3);
+      break;
     case 'Semestral':
-      d.setUTCMonth(d.getUTCMonth() + 6)
-      break
+      d.setUTCMonth(d.getUTCMonth() + 6);
+      break;
     case 'Anual':
-      d.setUTCFullYear(d.getUTCFullYear() + 1)
-      break
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      break;
     default:
-      d.setUTCMonth(d.getUTCMonth() + 1)
+      d.setUTCMonth(d.getUTCMonth() + 1);
   }
-  return d
+  return d;
 }
 
 Deno.serve(async (req: Request) => {
@@ -63,14 +62,15 @@ Deno.serve(async (req: Request) => {
     let generatedCount = 0
 
     for (const plan of plans || []) {
-      let nextDate = new Date(plan.start_date + 'T00:00:00Z')
-
+      let nextDate = new Date(plan.start_date + 'T00:00:00Z');
+      
       if (plan.last_generated_date) {
-        const lastGen = new Date(plan.last_generated_date + 'T00:00:00Z')
-        nextDate = addFrequency(lastGen, plan.frequency)
+        const lastGen = new Date(plan.last_generated_date + 'T00:00:00Z');
+        nextDate = addFrequency(lastGen, plan.frequency);
       }
 
       if (today >= nextDate || !plan.last_generated_date) {
+        
         // Generate OS Number
         const year = new Date().getFullYear()
         const { data: latest } = await supabaseClient
@@ -103,17 +103,16 @@ Deno.serve(async (req: Request) => {
           .eq('plan_id', plan.id)
           .order('order_index', { ascending: true })
 
-        const initialChecklist =
-          checklistItems?.map((item) => ({
-            item_id: item.id,
-            description: item.description,
-            status: 'pending',
-            notes: '',
-          })) || []
+        const initialChecklist = checklistItems?.map(item => ({
+          item_id: item.id,
+          description: item.description,
+          status: 'pending',
+          notes: ''
+        })) || []
 
-        const plannedStart = nextDate.toISOString()
-        const endDate = addFrequency(nextDate, plan.frequency)
-        const plannedEnd = endDate.toISOString()
+        const plannedStart = nextDate.toISOString();
+        const endDate = addFrequency(nextDate, plan.frequency);
+        const plannedEnd = endDate.toISOString();
 
         const { data: newTicket } = await supabaseClient
           .from('maintenance_tickets')
@@ -132,7 +131,7 @@ Deno.serve(async (req: Request) => {
             plan_id: plan.id,
             planned_start: plannedStart,
             planned_end: plannedEnd,
-            checklist_responses: initialChecklist,
+            checklist_responses: initialChecklist
           } as any)
           .select()
 
