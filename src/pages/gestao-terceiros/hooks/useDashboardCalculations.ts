@@ -290,7 +290,8 @@ export function useDashboardCalculations(
             const dPres = dDayLogs.filter((l) => l.status).length
             const dAbs = dDayLogs.filter((l) => !l.status).length
             const dDenom = dCont > 0 ? dCont : fallbackCountByPlant.get(plant.id) || 0
-            const abs = dDenom > 0 ? Math.max(0, ((dDenom - dPres) / dDenom) * 100) : 0            return {
+            const abs = dDenom > 0 ? Math.max(0, ((dDenom - dPres) / dDenom) * 100) : 0
+            return {
               date,
               absenteismo: Number(abs.toFixed(1)),
               presentes: dPres,
@@ -312,8 +313,9 @@ export function useDashboardCalculations(
                   pCont > 0
                     ? ((pCont - pPres) / pCont) * 100
                     : (fallbackCountByPlant.get(plant.id) || 0) > 0
-                      ? ((fallbackCountByPlant.get(plant.id) || 1) - pPres) /
-                        (fallbackCountByPlant.get(plant.id) || 1) * 100
+                      ? (((fallbackCountByPlant.get(plant.id) || 1) - pPres) /
+                          (fallbackCountByPlant.get(plant.id) || 1)) *
+                        100
                       : 0,
                 ),
           dailyTrend,
@@ -410,7 +412,8 @@ export function useDashboardCalculations(
           presentes: formatStr(lPres),
           ausentes: formatStr(lAbs),
           contratado: lCont,
-          absenteismo: lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
+          absenteismo:
+            lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
           dailyTrend,
         }
       })
@@ -554,7 +557,8 @@ export function useDashboardCalculations(
         })
 
         const dDenominator = dContracted > 0 ? dContracted : dFallback
-        const abs = dDenominator > 0 ? Math.max(0, ((dDenominator - dPresentes) / dDenominator) * 100) : 0
+        const abs =
+          dDenominator > 0 ? Math.max(0, ((dDenominator - dPresentes) / dDenominator) * 100) : 0
 
         return {
           date,
