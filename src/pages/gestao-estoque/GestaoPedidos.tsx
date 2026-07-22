@@ -436,12 +436,17 @@ export default function GestaoPedidos() {
 
               {selectedRequest.items && selectedRequest.items.length > 0 && (
                 <div className="flex justify-between items-center pt-2">
-                  <span className="text-sm font-semibold text-slate-700">Total do Pedido</span>
+                  <span className="text-sm font-semibold text-slate-700">
+                    Total do Pedido
+                    {selectedRequest.status === 'Pendente' ? ' (Solicitado)' : ' (Reservado)'}
+                  </span>
                   <span className="text-lg font-bold text-slate-900">
                     {formatCurrency(
                       selectedRequest.items.reduce(
                         (acc: number, item: any) =>
-                          acc + (item.product?.item_value ?? 0) * item.quantity,
+                          acc +
+                          (item.product?.item_value ?? 0) *
+                            (item.reserved_quantity ?? item.quantity ?? 0),
                         0,
                       ),
                     )}

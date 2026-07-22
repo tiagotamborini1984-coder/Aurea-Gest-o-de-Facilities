@@ -204,6 +204,14 @@ export default function MeusPedidos() {
                           </p>
                           <p className="text-xs text-slate-500">
                             Qtd: {item.quantity} {item.product?.unit_of_measure}
+                            {item.reserved_quantity != null &&
+                              item.reserved_quantity !== item.quantity && (
+                                <>
+                                  {' '}
+                                  · Reservado: {item.reserved_quantity}{' '}
+                                  {item.product?.unit_of_measure}
+                                </>
+                              )}
                             {item.product?.item_value != null && (
                               <> · {formatCurrency(item.product.item_value)}</>
                             )}
@@ -212,7 +220,10 @@ export default function MeusPedidos() {
                       </div>
                       {item.product?.item_value != null && (
                         <span className="text-sm font-semibold text-slate-700">
-                          {formatCurrency(item.product.item_value * item.quantity)}
+                          {formatCurrency(
+                            item.product.item_value *
+                              (item.reserved_quantity ?? item.quantity ?? 0),
+                          )}
                         </span>
                       )}
                     </div>
@@ -220,12 +231,17 @@ export default function MeusPedidos() {
                 </div>
                 {selectedRequest.items?.some((item: any) => item.product?.item_value != null) && (
                   <div className="flex justify-between items-center mt-4 pt-3 border-t">
-                    <span className="font-semibold text-slate-700">Total do Pedido</span>
+                    <span className="font-semibold text-slate-700">
+                      Total do Pedido
+                      {selectedRequest.status === 'Pendente' ? ' (Solicitado)' : ' (Reservado)'}
+                    </span>
                     <span className="text-lg font-bold text-slate-900">
                       {formatCurrency(
                         selectedRequest.items.reduce(
                           (acc: number, item: any) =>
-                            acc + (item.product?.item_value ?? 0) * item.quantity,
+                            acc +
+                            (item.product?.item_value ?? 0) *
+                              (item.reserved_quantity ?? item.quantity ?? 0),
                           0,
                         ),
                       )}

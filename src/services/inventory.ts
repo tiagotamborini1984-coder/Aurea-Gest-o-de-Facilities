@@ -177,6 +177,13 @@ export const inventoryService = {
           .eq('id', item.id)
         if (itemError) throw itemError
       }
+
+      const totalReserved = items.reduce((sum, item) => sum + (item.reserved_quantity || 0), 0)
+      const { error: totalError } = await supabase
+        .from('inventory_requests')
+        .update({ total_items: totalReserved })
+        .eq('id', requestId)
+      if (totalError) throw totalError
     }
 
     return data
