@@ -216,7 +216,9 @@ export function useDashboardCalculations(
     )
     const absenteismoDenominator = contratado > 0 ? contratado : totalFallbackCount
     const absenteismo =
-      absenteismoDenominator > 0 ? Math.max(0, (avgAusente / absenteismoDenominator) * 100) : 0
+      absenteismoDenominator > 0
+        ? Math.max(0, ((absenteismoDenominator - avgPresente) / absenteismoDenominator) * 100)
+        : 0
 
     const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
 
@@ -288,8 +290,7 @@ export function useDashboardCalculations(
             const dPres = dDayLogs.filter((l) => l.status).length
             const dAbs = dDayLogs.filter((l) => !l.status).length
             const dDenom = dCont > 0 ? dCont : fallbackCountByPlant.get(plant.id) || 0
-            const abs = dDenom > 0 ? Math.max(0, (dAbs / dDenom) * 100) : 0
-            return {
+            const abs = dDenom > 0 ? Math.max(0, ((dDenom - dPres) / dDenom) * 100) : 0            return {
               date,
               absenteismo: Number(abs.toFixed(1)),
               presentes: dPres,
@@ -309,9 +310,10 @@ export function useDashboardCalculations(
               : Math.max(
                   0,
                   pCont > 0
-                    ? (pAbs / pCont) * 100
+                    ? ((pCont - pPres) / pCont) * 100
                     : (fallbackCountByPlant.get(plant.id) || 0) > 0
-                      ? (pAbs / (fallbackCountByPlant.get(plant.id) || 1)) * 100
+                      ? ((fallbackCountByPlant.get(plant.id) || 1) - pPres) /
+                        (fallbackCountByPlant.get(plant.id) || 1) * 100
                       : 0,
                 ),
           dailyTrend,
@@ -391,7 +393,7 @@ export function useDashboardCalculations(
             const dDayLogs = lLogsRaw.filter((l) => l.date === date)
             const dPres = dDayLogs.filter((l) => l.status).length
             const dAbs = dDayLogs.filter((l) => !l.status).length
-            const abs = dCont > 0 ? Math.max(0, (dAbs / dCont) * 100) : 0
+            const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
             return {
               date,
               absenteismo: Number(abs.toFixed(1)),
@@ -408,7 +410,7 @@ export function useDashboardCalculations(
           presentes: formatStr(lPres),
           ausentes: formatStr(lAbs),
           contratado: lCont,
-          absenteismo: lDays === 0 ? 0 : Math.max(0, lCont > 0 ? (lAbs / lCont) * 100 : 0),
+          absenteismo: lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
           dailyTrend,
         }
       })
@@ -552,7 +554,7 @@ export function useDashboardCalculations(
         })
 
         const dDenominator = dContracted > 0 ? dContracted : dFallback
-        const abs = dDenominator > 0 ? Math.max(0, (dAusentes / dDenominator) * 100) : 0
+        const abs = dDenominator > 0 ? Math.max(0, ((dDenominator - dPresentes) / dDenominator) * 100) : 0
 
         return {
           date,
