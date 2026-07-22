@@ -39,16 +39,15 @@ export function useDashboardCalculations(
 
     const validEqIds = new Set(equipment.map((e) => e.id))
 
+    const sortedLogsForDedup = [...logs].sort((a, b) =>
+      (b.created_at || '').localeCompare(a.created_at || ''),
+    )
     const deduplicatedProcessedLogsMap = new Map<string, any>()
-    logs.forEach((l) => {
+    sortedLogsForDedup.forEach((l) => {
       const lDate = normalizeDate(l.date)
       const key = `${lDate}_${l.type}_${l.reference_id}_${l.plant_id}`
       if (!deduplicatedProcessedLogsMap.has(key)) {
         deduplicatedProcessedLogsMap.set(key, { ...l, date: lDate })
-      } else {
-        if (l.status) {
-          deduplicatedProcessedLogsMap.get(key).status = true
-        }
       }
     })
     const processedLogs = Array.from(deduplicatedProcessedLogsMap.values())
@@ -60,6 +59,26 @@ export function useDashboardCalculations(
     const typeLog = activeTab === 'colaboradores' || activeTab === 'metas' ? 'staff' : 'equipment'
     const typeCont =
       activeTab === 'colaboradores' || activeTab === 'metas' ? 'colaborador' : 'equipamento'
+
+    const fallbackCountByPlant = new Map<string, number>()
+    if (typeCont === 'colaborador') {
+      const seenEmpKeys = new Set<string>()
+      employees.forEach((e) => {
+        if (e.status !== 'Ativo') return
+        if (selectedCompanies.length > 0 && !companiesSet.has(e.company_name)) return
+        const regNum = e.registration_number?.trim()
+        const name = e.name?.toLowerCase().trim()
+        const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
+        if (seenEmpKeys.has(dedupKey)) return
+        seenEmpKeys.add(dedupKey)
+        fallbackCountByPlant.set(e.plant_id, (fallbackCountByPlant.get(e.plant_id) || 0) + 1)
+      })
+    } else {
+      equipment.forEach((e) => {
+        if (e.status !== 'Ativo') return
+        fallbackCountByPlant.set(e.plant_id, (fallbackCountByPlant.get(e.plant_id) || 0) + 1)
+      })
+    }
 
     const activeLogs = filteredLogs.filter((l) => {
       if (l.type !== typeLog) return false
@@ -191,8 +210,13 @@ export function useDashboardCalculations(
     const avgAusente = globalDays > 0 ? totalAbsentCount / globalDays : 0
     const avgLancado = globalDays > 0 ? totalLancadoCount / globalDays : 0
 
+    const totalFallbackCount = validPlants.reduce(
+      (sum, pid) => sum + (fallbackCountByPlant.get(pid) || 0),
+      0,
+    )
+    const absenteismoDenominator = contratado > 0 ? contratado : totalFallbackCount
     const absenteismo =
-      contratado > 0 ? Math.max(0, ((contratado - avgPresente) / contratado) * 100) : 0
+      absenteismoDenominator > 0 ? Math.max(0, (avgAusente / absenteismoDenominator) * 100) : 0
 
     const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
 
@@ -260,13 +284,16 @@ export function useDashboardCalculations(
               }
               return true
             }).reduce((sum, c) => sum + c.quantity, 0)
-            const dPres = pLogs.filter((l) => l.date === date && l.status).length
-            const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
+            const dDayLogs = pLogs.filter((l) => l.date === date)
+            const dPres = dDayLogs.filter((l) => l.status).length
+            const dAbs = dDayLogs.filter((l) => !l.status).length
+            const dDenom = dCont > 0 ? dCont : fallbackCountByPlant.get(plant.id) || 0
+            const abs = dDenom > 0 ? Math.max(0, (dAbs / dDenom) * 100) : 0
             return {
               date,
               absenteismo: Number(abs.toFixed(1)),
               presentes: dPres,
-              contratado: dCont,
+              contratado: dDenom,
             }
           })
 
@@ -277,7 +304,16 @@ export function useDashboardCalculations(
           ausentes: formatStr(pAbs),
           contratado: pCont,
           absenteismo:
-            pDays === 0 ? 0 : Math.max(0, pCont > 0 ? ((pCont - pPres) / pCont) * 100 : 0),
+            pDays === 0
+              ? 0
+              : Math.max(
+                  0,
+                  pCont > 0
+                    ? (pAbs / pCont) * 100
+                    : (fallbackCountByPlant.get(plant.id) || 0) > 0
+                      ? (pAbs / (fallbackCountByPlant.get(plant.id) || 1)) * 100
+                      : 0,
+                ),
           dailyTrend,
         }
       })
@@ -352,8 +388,10 @@ export function useDashboardCalculations(
               date,
               (c) => c.location_id === loc.id,
             ).reduce((sum, c) => sum + c.quantity, 0)
-            const dPres = lLogsRaw.filter((l) => l.date === date && l.status).length
-            const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
+            const dDayLogs = lLogsRaw.filter((l) => l.date === date)
+            const dPres = dDayLogs.filter((l) => l.status).length
+            const dAbs = dDayLogs.filter((l) => !l.status).length
+            const abs = dCont > 0 ? Math.max(0, (dAbs / dCont) * 100) : 0
             return {
               date,
               absenteismo: Number(abs.toFixed(1)),
@@ -370,8 +408,7 @@ export function useDashboardCalculations(
           presentes: formatStr(lPres),
           ausentes: formatStr(lAbs),
           contratado: lCont,
-          absenteismo:
-            lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
+          absenteismo: lDays === 0 ? 0 : Math.max(0, lCont > 0 ? (lAbs / lCont) * 100 : 0),
           dailyTrend,
         }
       })
@@ -488,6 +525,8 @@ export function useDashboardCalculations(
       .map((date) => {
         let dContracted = 0
         let dPresentes = 0
+        let dAusentes = 0
+        let dFallback = 0
 
         validPlants.forEach((pid) => {
           if (plantValidDatesMap[pid].has(date)) {
@@ -504,22 +543,22 @@ export function useDashboardCalculations(
             }).reduce((sum, c) => sum + c.quantity, 0)
 
             dContracted += pCont
+            dFallback += fallbackCountByPlant.get(pid) || 0
 
-            const pPres = activeLogs.filter(
-              (l) => l.plant_id === pid && l.date === date && l.status,
-            ).length
-            dPresentes += pPres
+            const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
+            dPresentes += dayLogs.filter((l) => l.status).length
+            dAusentes += dayLogs.filter((l) => !l.status).length
           }
         })
 
-        const abs =
-          dContracted > 0 ? Math.max(0, ((dContracted - dPresentes) / dContracted) * 100) : 0
+        const dDenominator = dContracted > 0 ? dContracted : dFallback
+        const abs = dDenominator > 0 ? Math.max(0, (dAusentes / dDenominator) * 100) : 0
 
         return {
           date,
           absenteismo: Number(abs.toFixed(1)),
           presentes: dPresentes,
-          contratado: dContracted,
+          contratado: dDenominator,
         }
       })
 

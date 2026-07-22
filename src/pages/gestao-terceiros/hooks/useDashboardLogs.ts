@@ -50,6 +50,7 @@ export function useDashboardLogs(
           .gte('date', dateFrom)
           .lte('date', dateTo)
           .in('plant_id', plantIds)
+          .order('created_at', { ascending: false })
           .range(from, from + step - 1)
 
         if (data && data.length > 0) {
