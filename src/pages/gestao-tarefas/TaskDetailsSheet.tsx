@@ -723,14 +723,14 @@ export function TaskDetailsSheet({
         <div className="space-y-6 pt-2">
           <div>
             <Label className="mb-3 block text-foreground">Pontuação (1 a 5) *</Label>
-            <div className="flex gap-2 sm:gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               {[1, 2, 3, 4, 5].map((score) => (
                 <Button
                   key={score}
                   type="button"
                   variant={ans.score === score ? 'default' : 'outline'}
                   className={cn(
-                    'flex-1 h-14 text-xl font-black rounded-xl transition-all',
+                    'flex-1 min-w-[3rem] h-14 text-xl font-black rounded-xl transition-all',
                     ans.score === score
                       ? 'bg-brand-deepBlue text-white scale-[1.02] shadow-md border-transparent'
                       : 'text-muted-foreground border-border hover:border-brand-deepBlue/50 hover:bg-brand-deepBlue/5',
@@ -813,16 +813,16 @@ export function TaskDetailsSheet({
           </div>
         </div>
 
-        <div className="flex justify-between items-center pt-6 mt-6 border-t border-border gap-2">
+        <div className="flex flex-wrap justify-between items-center pt-6 mt-6 border-t border-border gap-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => setWizardStep(wizardStep - 1)}
             className="h-12 px-4 sm:px-6 border-border text-muted-foreground hover:bg-accent"
           >
-            <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
+            <ChevronLeft className="w-4 h-4 mr-2 shrink-0" /> Voltar
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-1 justify-center order-first sm:order-none w-full sm:w-auto items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
               Página
             </span>
@@ -868,8 +868,8 @@ export function TaskDetailsSheet({
   return (
     <>
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-full p-0 bg-background border-l border-border">
-          <SheetHeader className="p-6 pb-4 bg-card border-b border-border shrink-0">
+        <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-[100dvh] p-0 bg-background border-l border-border overflow-hidden">
+          <SheetHeader className="p-4 sm:p-6 pb-4 bg-card border-b border-border shrink-0">
             <SheetTitle className="text-xl text-foreground">
               {task?.task_number} {task?.title ? `- ${task.title}` : ''}
             </SheetTitle>
@@ -885,7 +885,7 @@ export function TaskDetailsSheet({
             </div>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-6">
             <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
               <div className="flex justify-between items-start mb-2">
                 <h4 className="font-semibold text-foreground">Descrição</h4>
@@ -1125,10 +1125,10 @@ export function TaskDetailsSheet({
             </div>
           </div>
 
-          <div className="p-4 bg-card border-t border-border space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+          <div className="p-4 bg-card border-t border-border space-y-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] relative z-10">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 w-full sm:w-auto">
                   <span className="text-sm font-semibold text-foreground whitespace-nowrap">
                     Alterar Status:
                   </span>
@@ -1137,7 +1137,7 @@ export function TaskDetailsSheet({
                     onValueChange={handleStatusChange}
                     disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                   >
-                    <SelectTrigger className="bg-background border-input min-w-[140px]">
+                    <SelectTrigger className="bg-background border-input w-full sm:min-w-[140px]">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1145,10 +1145,10 @@ export function TaskDetailsSheet({
                         <SelectItem key={s.id} value={s.id}>
                           <div className="flex items-center gap-2">
                             <span
-                              className="w-3 h-3 rounded-full"
+                              className="w-3 h-3 rounded-full shrink-0"
                               style={{ backgroundColor: s.color }}
                             ></span>
-                            {s.name}
+                            <span className="truncate">{s.name}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -1157,7 +1157,7 @@ export function TaskDetailsSheet({
                 </div>
 
                 {canDelegate && (
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 w-full sm:w-auto">
                     <span className="text-sm font-semibold text-foreground whitespace-nowrap">
                       Delegar para:
                     </span>
@@ -1166,7 +1166,7 @@ export function TaskDetailsSheet({
                       onValueChange={handleDelegate}
                       disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                     >
-                      <SelectTrigger className="bg-background border-input min-w-[140px] max-w-[200px]">
+                      <SelectTrigger className="bg-background border-input w-full sm:min-w-[140px] sm:max-w-[200px]">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1183,11 +1183,11 @@ export function TaskDetailsSheet({
               {canDeleteTask && (
                 <Button
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-500/10 hover:text-red-700 dark:border-red-500/30 dark:hover:text-red-400"
+                  className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-500/10 hover:text-red-700 dark:border-red-500/30 dark:hover:text-red-400"
                   onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={auditExecution && auditExecution.status !== 'Finalizado'}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Excluir Tarefa
+                  <Trash2 className="w-4 h-4 mr-2 shrink-0" /> Excluir Tarefa
                 </Button>
               )}
             </div>
@@ -1202,7 +1202,7 @@ export function TaskDetailsSheet({
                 onClick={handleAddComment}
                 disabled={isSubmitting || !comment.trim()}
                 variant="tech"
-                className="h-auto px-4"
+                className="h-auto px-4 shrink-0"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
