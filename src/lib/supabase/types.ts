@@ -170,6 +170,7 @@ export type Database = {
           corrective_due_date: string | null
           created_at: string
           evidence_url: string | null
+          evidence_urls: Json | null
           execution_id: string
           id: string
           observations: string | null
@@ -181,6 +182,7 @@ export type Database = {
           corrective_due_date?: string | null
           created_at?: string
           evidence_url?: string | null
+          evidence_urls?: Json | null
           execution_id: string
           id?: string
           observations?: string | null
@@ -192,6 +194,7 @@ export type Database = {
           corrective_due_date?: string | null
           created_at?: string
           evidence_url?: string | null
+          evidence_urls?: Json | null
           execution_id?: string
           id?: string
           observations?: string | null

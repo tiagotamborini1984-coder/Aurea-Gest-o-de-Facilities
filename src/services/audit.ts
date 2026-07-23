@@ -21,17 +21,30 @@ export const submitAuditExecution = async (
   isDraft: boolean = false,
   signatures: any[] = [],
 ) => {
-  const { data, error } = await supabase.rpc('submit_audit_execution', {
-    p_execution_id: executionId,
-    p_answers: answers as any,
-    p_participants: participants,
-    p_is_draft: isDraft,
-    p_signatures: signatures as any,
-  })
+  try {
+    const { data, error } = await supabase.rpc('submit_audit_execution', {
+      p_execution_id: executionId,
+      p_answers: answers as any,
+      p_participants: participants,
+      p_is_draft: isDraft,
+      p_signatures: signatures as any,
+    })
 
-  if (error) throw error
+    if (error) {
+      console.error('submitAuditExecution RPC Error:', error)
+      throw new Error('Erro ao enviar respostas. Tente novamente.')
+    }
 
-  return data
+    return data
+  } catch (err: any) {
+    console.error('submitAuditExecution Exception:', err)
+    if (err.message === 'Erro ao enviar respostas. Tente novamente.') {
+      throw err
+    }
+    throw new Error(
+      'Ocorreu um problema ao comunicar com o servidor. Por favor, tente novamente mais tarde.',
+    )
+  }
 }
 
 export const reopenAuditExecution = async (executionId: string) => {

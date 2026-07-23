@@ -314,15 +314,34 @@ function AuditoriaDetalhesInner() {
       const errors = new Set<string>()
       actions.forEach((action) => {
         const answer = answers[action.id]
+
+        let hasError = false
         if (!answer || answer.score === undefined || answer.score === null) {
+          hasError = true
+        }
+
+        if (
+          action.comments_required &&
+          (!answer?.observations || answer.observations.trim() === '')
+        ) {
+          hasError = true
+        }
+
+        if (action.evidence_required && !answer?.evidence_urls?.length && !answer?.evidence_url) {
+          hasError = true
+        }
+
+        if (hasError) {
           errors.add(action.id)
         }
       })
+
       if (errors.size > 0) {
         setValidationErrors(errors)
         toast({
           title: 'Validação necessária',
-          description: 'Todos os campos de nota devem ser preenchidos antes de finalizar.',
+          description:
+            'Preencha todos os campos obrigatórios (notas, observações e evidências exigidas) antes de finalizar.',
           variant: 'destructive',
         })
         return
@@ -635,22 +654,49 @@ function AuditoriaDetalhesInner() {
                           )}
                         </div>
                         <div className="space-y-2">
-                          <Label>Observações</Label>
+                          <Label>
+                            Observações{' '}
+                            {action.comments_required && <span className="text-red-500">*</span>}
+                          </Label>
                           <Textarea
                             placeholder="Detalhes adicionais..."
                             value={answers[action.id]?.observations || ''}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               handleAnswerChange(action.id, 'observations', e.target.value)
-                            }
+                              if (action.comments_required && e.target.value.trim() !== '') {
+                                setValidationErrors((prev) => {
+                                  const next = new Set(prev)
+                                  next.delete(action.id)
+                                  return next
+                                })
+                              }
+                            }}
                             disabled={isFinalized}
+                            className={
+                              validationErrors.has(action.id) &&
+                              action.comments_required &&
+                              (!answers[action.id]?.observations ||
+                                answers[action.id]?.observations.trim() === '')
+                                ? 'border-red-500 ring-2 ring-red-500/20'
+                                : ''
+                            }
                           />
+                          {validationErrors.has(action.id) &&
+                            action.comments_required &&
+                            (!answers[action.id]?.observations ||
+                              answers[action.id]?.observations.trim() === '') && (
+                              <p className="text-sm text-red-500 font-medium">
+                                Observação obrigatória
+                              </p>
+                            )}
                         </div>
                       </div>
 
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                           <Paperclip className="h-4 w-4" />
-                          Evidências (Fotos/Documentos)
+                          Evidências (Fotos/Documentos){' '}
+                          {action.evidence_required && <span className="text-red-500">*</span>}
                         </Label>
                         {isFinalized ? (
                           <div className="grid grid-cols-2 gap-4 mt-2">
@@ -693,24 +739,50 @@ function AuditoriaDetalhesInner() {
                               )}
                           </div>
                         ) : (
-                          <FileUpload
-                            multiple
-                            showThumbnails
-                            bucket="documents"
-                            existingUrls={Array.from(
-                              new Set(
-                                (answers[action.id]?.evidence_urls || []).concat(
-                                  answers[action.id]?.evidence_url
-                                    ? [answers[action.id]?.evidence_url]
-                                    : [],
+                          <div
+                            className={
+                              validationErrors.has(action.id) &&
+                              action.evidence_required &&
+                              !answers[action.id]?.evidence_urls?.length &&
+                              !answers[action.id]?.evidence_url
+                                ? 'p-2 border border-red-500 rounded-md ring-2 ring-red-500/20'
+                                : ''
+                            }
+                          >
+                            <FileUpload
+                              multiple
+                              showThumbnails
+                              bucket="documents"
+                              existingUrls={Array.from(
+                                new Set(
+                                  (answers[action.id]?.evidence_urls || []).concat(
+                                    answers[action.id]?.evidence_url
+                                      ? [answers[action.id]?.evidence_url]
+                                      : [],
+                                  ),
                                 ),
-                              ),
-                            )}
-                            onUploadComplete={(urls) => {
-                              handleAnswerChange(action.id, 'evidence_url', null)
-                              handleAnswerChange(action.id, 'evidence_urls', urls)
-                            }}
-                          />
+                              )}
+                              onUploadComplete={(urls) => {
+                                handleAnswerChange(action.id, 'evidence_url', null)
+                                handleAnswerChange(action.id, 'evidence_urls', urls)
+                                if (action.evidence_required && urls.length > 0) {
+                                  setValidationErrors((prev) => {
+                                    const next = new Set(prev)
+                                    next.delete(action.id)
+                                    return next
+                                  })
+                                }
+                              }}
+                            />
+                            {validationErrors.has(action.id) &&
+                              action.evidence_required &&
+                              !answers[action.id]?.evidence_urls?.length &&
+                              !answers[action.id]?.evidence_url && (
+                                <p className="text-sm text-red-500 font-medium mt-1">
+                                  Evidência obrigatória
+                                </p>
+                              )}
+                          </div>
                         )}
                       </div>
                     </div>
