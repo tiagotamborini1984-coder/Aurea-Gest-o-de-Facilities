@@ -50,7 +50,7 @@ export default function DetalheChamadoPublico() {
 
   if (authLoading || !user || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
       </div>
     )
@@ -58,10 +58,10 @@ export default function DetalheChamadoPublico() {
 
   if (!ticket) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <Card className="w-full max-w-md text-center shadow-xl">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md text-center shadow-xl border-border">
           <CardContent className="pt-10 pb-8">
-            <h2 className="text-xl font-bold text-slate-900">Chamado não encontrado</h2>
+            <h2 className="text-xl font-bold text-foreground">Chamado não encontrado</h2>
             <Button
               className="mt-4 hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
               style={
@@ -81,9 +81,9 @@ export default function DetalheChamadoPublico() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <header
-        className="bg-white border-b shadow-sm sticky top-0 z-20"
+        className="bg-card border-b shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: colors.primary }}
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
@@ -95,11 +95,13 @@ export default function DetalheChamadoPublico() {
           >
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
-          <span className="font-mono font-bold text-sm text-slate-800">{ticket.ticket_number}</span>
+          <span className="font-mono font-bold text-sm text-foreground">
+            {ticket.ticket_number}
+          </span>
         </div>
       </header>
       <main className="max-w-2xl mx-auto p-4 py-8 animate-fade-in-up space-y-4">
-        <Card className="shadow-md">
+        <Card className="shadow-md border-border">
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               {ticket.status && (
@@ -117,10 +119,10 @@ export default function DetalheChamadoPublico() {
               )}
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-600 mb-1">Descrição</h3>
-              <p className="text-sm text-slate-900 whitespace-pre-wrap">{ticket.description}</p>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-1">Descrição</h3>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{ticket.description}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
               {ticket.plant && (
                 <InfoItem
                   icon={<MapPin className="h-4 w-4" />}
@@ -162,9 +164,9 @@ export default function DetalheChamadoPublico() {
           </CardContent>
         </Card>
         {ticket.photos?.length > 0 && (
-          <Card className="shadow-md">
+          <Card className="shadow-md border-border">
             <CardContent className="p-6">
-              <h3 className="text-sm font-semibold text-slate-600 mb-3">Fotos anexadas</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Fotos anexadas</h3>
               <div className="grid grid-cols-3 gap-2">
                 {ticket.photos.map((url: string, i: number) => (
                   <a
@@ -178,7 +180,7 @@ export default function DetalheChamadoPublico() {
                     <img
                       src={url}
                       alt={`anexo ${i + 1}`}
-                      className="w-full h-24 object-cover rounded-md border hover:opacity-80 transition"
+                      className="w-full h-24 object-cover rounded-md border border-border hover:opacity-80 transition"
                     />
                   </a>
                 ))}
@@ -187,10 +189,12 @@ export default function DetalheChamadoPublico() {
           </Card>
         )}
         {ticket.closure_notes && (
-          <Card className="shadow-md">
+          <Card className="shadow-md border-border">
             <CardContent className="p-6">
-              <h3 className="text-sm font-semibold text-slate-600 mb-2">Notas de Fechamento</h3>
-              <p className="text-sm text-slate-900 whitespace-pre-wrap">{ticket.closure_notes}</p>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+                Notas de Fechamento
+              </h3>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{ticket.closure_notes}</p>
             </CardContent>
           </Card>
         )}
@@ -202,10 +206,10 @@ export default function DetalheChamadoPublico() {
 function InfoItem({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
-      <div className="text-slate-500 mt-0.5">{icon}</div>
+      <div className="text-muted-foreground mt-0.5">{icon}</div>
       <div>
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-sm font-medium text-slate-900">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium text-foreground">{value}</p>
       </div>
     </div>
   )

@@ -72,16 +72,16 @@ export default function MeusChamadosPublico() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <header
-        className="bg-white border-b shadow-sm sticky top-0 z-20"
+        className="bg-card border-b shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: colors.primary }}
       >
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
@@ -92,8 +92,8 @@ export default function MeusChamadosPublico() {
             <Wrench className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-base text-slate-900">Meus Chamados</h1>
-            <p className="text-xs text-slate-600 truncate">{user.email}</p>
+            <h1 className="font-bold text-base text-foreground">Meus Chamados</h1>
+            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
           </div>
           <Button
             variant="ghost"
@@ -107,7 +107,7 @@ export default function MeusChamadosPublico() {
       </header>
       <main className="max-w-3xl mx-auto p-4 py-8 animate-fade-in-up">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-slate-900">Solicitações</h2>
+          <h2 className="text-2xl font-bold text-foreground">Solicitações</h2>
           <Button
             className="hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
             style={
@@ -126,9 +126,9 @@ export default function MeusChamadosPublico() {
             <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
           </div>
         ) : tickets.length === 0 ? (
-          <Card className="shadow-md">
+          <Card className="shadow-md border-border">
             <CardContent className="pt-10 pb-10 text-center">
-              <p className="text-slate-600 mb-4">Você ainda não possui solicitações.</p>
+              <p className="text-muted-foreground mb-4">Você ainda não possui solicitações.</p>
               <Button
                 className="hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
                 style={
@@ -148,14 +148,14 @@ export default function MeusChamadosPublico() {
             {tickets.map((t) => (
               <Card
                 key={t.id}
-                className="shadow-sm hover:shadow-md transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2"
+                className="shadow-sm hover:shadow-md transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 bg-card border-border"
                 onClick={() => navigate(`/m/${slug}/chamado/${t.id}`)}
                 style={{ '--tw-ring-color': colors.primary } as React.CSSProperties}
               >
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-bold text-slate-700">
+                      <span className="text-xs font-mono font-bold text-foreground">
                         {t.ticket_number}
                       </span>
                       {t.status && (
@@ -172,21 +172,21 @@ export default function MeusChamadosPublico() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-slate-800 line-clamp-1 font-medium">
+                    <p className="text-sm text-foreground line-clamp-1 font-medium">
                       {t.description}
                     </p>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       {t.plant && (
-                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <Building2 className="h-3 w-3" /> {t.plant.name}
                         </span>
                       )}
                       {t.area && (
-                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <MapPin className="h-3 w-3" /> {t.area.name}
                         </span>
                       )}
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {new Date(t.created_at).toLocaleDateString('pt-BR', {
                           day: '2-digit',
@@ -196,7 +196,7 @@ export default function MeusChamadosPublico() {
                       </span>
                     </div>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 </CardContent>
               </Card>
             ))}

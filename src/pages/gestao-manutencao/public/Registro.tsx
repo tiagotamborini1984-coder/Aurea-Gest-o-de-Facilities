@@ -61,14 +61,14 @@ export default function RegistroPublico() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center shadow-xl animate-fade-in-up">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center shadow-xl animate-fade-in-up border-border">
           <CardContent className="pt-10 pb-8 space-y-4">
-            <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="h-10 w-10 text-green-600" />
+            <div className="mx-auto w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Conta Criada!</h2>
-            <p className="text-slate-600 text-sm">
+            <h2 className="text-2xl font-bold text-foreground">Conta Criada!</h2>
+            <p className="text-muted-foreground text-sm">
               Verifique seu e-mail para confirmar a conta e depois faça login.
             </p>
             <Button
@@ -90,9 +90,9 @@ export default function RegistroPublico() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <header
-        className="bg-white border-b-2 shadow-sm sticky top-0 z-20"
+        className="bg-card border-b-2 shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: colors.primary }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
@@ -103,27 +103,27 @@ export default function RegistroPublico() {
             <Wrench className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1">
-            <h1 className="font-bold text-base text-slate-900">Portal de Manutenção</h1>
-            <p className="text-xs text-slate-600">Criar Conta</p>
+            <h1 className="font-bold text-base text-foreground">Portal de Manutenção</h1>
+            <p className="text-xs text-muted-foreground">Criar Conta</p>
           </div>
         </div>
       </header>
       <main className="flex-1 max-w-md w-full mx-auto p-4 py-8 animate-fade-in-up">
-        <Card className="shadow-xl border-slate-200">
+        <Card className="shadow-xl border-border">
           <CardContent className="p-6 sm:p-8 space-y-5">
             <div className="text-center mb-4">
-              <h2 className="text-2xl font-bold text-slate-900">Criar Conta</h2>
-              <p className="text-sm text-slate-600 mt-1">
+              <h2 className="text-2xl font-bold text-foreground">Criar Conta</h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 Cadastre-se para acompanhar suas solicitações
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700">Nome *</Label>
+                <Label className="text-sm font-semibold text-foreground">Nome *</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    className="pl-9 h-11"
+                    className="pl-9 h-11 bg-background text-foreground border-border"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Seu nome"
@@ -132,12 +132,12 @@ export default function RegistroPublico() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700">E-mail *</Label>
+                <Label className="text-sm font-semibold text-foreground">E-mail *</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="email"
-                    className="pl-9 h-11"
+                    className="pl-9 h-11 bg-background text-foreground border-border"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="seu@email.com"
@@ -146,12 +146,12 @@ export default function RegistroPublico() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700">Senha *</Label>
+                <Label className="text-sm font-semibold text-foreground">Senha *</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="password"
-                    className="pl-9 h-11"
+                    className="pl-9 h-11 bg-background text-foreground border-border"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     placeholder="Mínimo 8 caracteres"
@@ -159,12 +159,12 @@ export default function RegistroPublico() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700">Confirmar Senha *</Label>
+                <Label className="text-sm font-semibold text-foreground">Confirmar Senha *</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="password"
-                    className="pl-9 h-11"
+                    className="pl-9 h-11 bg-background text-foreground border-border"
                     value={form.confirm}
                     onChange={(e) => setForm({ ...form, confirm: e.target.value })}
                     placeholder="Repita a senha"
@@ -197,7 +197,7 @@ export default function RegistroPublico() {
               </Link>
               <Link
                 to={`/m/${slug}/nova-solicitacao`}
-                className="text-slate-600 hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-offset-1 rounded px-1"
+                className="text-muted-foreground hover:text-foreground hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-offset-1 rounded px-1 transition-colors"
               >
                 <ArrowLeft className="h-3 w-3" /> Voltar
               </Link>
