@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -42,19 +42,20 @@ import {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 
+const ERROR_NO_CLIENT = 'Não foi possível identificar sua empresa. Entre em contato com o suporte.'
+
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+
   const [loading, setLoading] = useState(true)
-  const [loadingAreas, setLoadingAreas] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-
+  const [clientError, setClientError] = useState<string | null>(null)
   const [client, setClient] = useState<any>(null)
+  const [clientId, setClientId] = useState<string | null>(null)
   const [plants, setPlants] = useState<any[]>([])
-  const [areas, setAreas] = useState<any[]>([])
-  const [plantsError, setPlantsError] = useState<string | null>(null)
-
+  const [allAreas, setAllAreas] = useState<any[]>([])
   const [success, setSuccess] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -67,85 +68,98 @@ export default function NovaSolicitacaoPublica() {
   const [files, setFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const areas = useMemo(
+    () => allAreas.filter((a) => a.plant_id === form.plant_id),
+    [allAreas, form.plant_id],
+  )
+
   const loadClientAndPlants = useCallback(async () => {
-    if (!slug) {
+    if (!slug || !clientId) {
       setLoading(false)
       return
     }
     try {
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('id, name, logo_url, primary_color, secondary_color')
-        .eq('url_slug', slug)
-        .eq('status', 'Ativo')
-        .single()
+      const { data: optionsData, error: optionsError } = await supabase.rpc(
+        'get_maintenance_public_options',
+        { p_slug: slug },
+      )
 
-      if (clientError || !clientData) {
+      if (optionsError || !optionsData) {
+        setClientError('Não foi possível carregar os dados da empresa. Tente novamente.')
         setLoading(false)
         return
       }
-      setClient(clientData)
 
-      const { data: plantsData, error: plantsError } = await supabase
-        .from('plants')
-        .select('id, name')
-        .eq('client_id', clientData.id)
-        .order('name')
+      const options = optionsData as any
 
-      if (plantsError) {
-        setPlantsError('Erro ao carregar plantas. Tente novamente.')
-      } else if (plantsData) {
-        setPlants(plantsData)
-        setPlantsError(null)
+      if (options.client?.id !== clientId) {
+        setClientError(ERROR_NO_CLIENT)
+        setLoading(false)
+        return
       }
+
+      setClient(options.client)
+      setPlants(options.plants || [])
+      setAllAreas(options.areas || [])
     } catch (e) {
       console.error(e)
+      setClientError('Erro ao carregar dados. Tente novamente.')
     } finally {
       setLoading(false)
     }
-  }, [slug])
+  }, [slug, clientId])
 
   useEffect(() => {
-    loadClientAndPlants()
-  }, [loadClientAndPlants])
-
-  useEffect(() => {
-    async function loadAreas() {
-      if (!form.plant_id || !client) {
-        setAreas([])
-        return
-      }
-      setLoadingAreas(true)
+    if (!user) {
+      setLoading(false)
+      return
+    }
+    let mounted = true
+    const fetchProfile = async () => {
       try {
-        const { data, error } = await supabase
-          .from('maintenance_areas')
-          .select('id, name, plant_id')
-          .eq('plant_id', form.plant_id)
-          .eq('client_id', client.id)
-          .order('name')
-        if (error) {
-          toast.error('Erro ao carregar áreas. Tente novamente.')
-        } else if (data) {
-          setAreas(data)
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('client_id, name, email')
+          .eq('id', user.id)
+          .single()
+
+        if (!mounted) return
+
+        if (profileError || !profile) {
+          setClientError(ERROR_NO_CLIENT)
+          setLoading(false)
+          return
         }
+
+        if (!profile.client_id) {
+          setClientError(ERROR_NO_CLIENT)
+          setLoading(false)
+          return
+        }
+
+        setClientId(profile.client_id)
+        setForm((prev) => ({
+          ...prev,
+          name: profile.name || prev.name,
+          email: profile.email || user.email || prev.email,
+        }))
       } catch (e) {
         console.error(e)
-      } finally {
-        setLoadingAreas(false)
+        if (mounted) {
+          setClientError(ERROR_NO_CLIENT)
+          setLoading(false)
+        }
       }
     }
-    loadAreas()
-  }, [form.plant_id, client])
-
-  useEffect(() => {
-    if (user) {
-      setForm((prev) => ({
-        ...prev,
-        name: user.user_metadata?.name || prev.name,
-        email: user.email || prev.email,
-      }))
+    fetchProfile()
+    return () => {
+      mounted = false
     }
   }, [user?.id])
+
+  useEffect(() => {
+    if (clientId) loadClientAndPlants()
+  }, [clientId, loadClientAndPlants])
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -186,7 +200,7 @@ export default function NovaSolicitacaoPublica() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate() || !client) return
+    if (!validate() || !client || !clientId) return
     setSubmitting(true)
     try {
       const photoUrls: string[] = []
@@ -205,7 +219,7 @@ export default function NovaSolicitacaoPublica() {
       }
 
       const { data, error } = await supabase.rpc('submit_maintenance_ticket', {
-        p_client_id: client.id,
+        p_client_id: clientId,
         p_plant_id: form.plant_id,
         p_area_id: form.area_id,
         p_sublocation_id: null,
@@ -239,6 +253,31 @@ export default function NovaSolicitacaoPublica() {
           <Loader2 className="h-8 w-8 animate-spin" style={{ color: primaryColor }} />
           <p className="text-sm text-slate-500">Carregando formulário...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (clientError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-slate-900">
+        <Card className="w-full max-w-md text-center shadow-xl border-slate-200 bg-white">
+          <CardContent className="pt-12 pb-8 space-y-4">
+            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900">Atenção</h2>
+            <p className="text-slate-500 text-sm">{clientError}</p>
+            {user && (
+              <Button
+                variant="outline"
+                className="w-full h-11"
+                onClick={() => navigate(`/m/${slug}/meus-chamados`)}
+              >
+                Ver meus chamados
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -424,8 +463,7 @@ export default function NovaSolicitacaoPublica() {
                   {errors.plant_id && (
                     <p className="text-xs text-red-500 mt-1">{errors.plant_id}</p>
                   )}
-                  {plantsError && <p className="text-xs text-red-500 mt-1">{plantsError}</p>}
-                  {plants?.length === 0 && !plantsError && (
+                  {plants?.length === 0 && (
                     <p className="text-xs text-amber-600 mt-1">Nenhuma planta disponível.</p>
                   )}
                 </div>
@@ -441,10 +479,10 @@ export default function NovaSolicitacaoPublica() {
                       setForm({ ...form, area_id: v })
                       if (errors.area_id) setErrors({ ...errors, area_id: '' })
                     }}
-                    disabled={!form.plant_id || loadingAreas}
+                    disabled={!form.plant_id}
                   >
                     <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
-                      <SelectValue placeholder={loadingAreas ? 'Carregando...' : 'Selecione...'} />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       {areas.map((a) => (
@@ -455,7 +493,7 @@ export default function NovaSolicitacaoPublica() {
                     </SelectContent>
                   </Select>
                   {errors.area_id && <p className="text-xs text-red-500 mt-1">{errors.area_id}</p>}
-                  {form.plant_id && areas.length === 0 && !loadingAreas && (
+                  {form.plant_id && areas.length === 0 && (
                     <p className="text-xs text-amber-600 mt-1">
                       Nenhuma área cadastrada para esta planta.
                     </p>

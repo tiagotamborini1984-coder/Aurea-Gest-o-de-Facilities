@@ -1995,6 +1995,7 @@ export type Database = {
           priority_id: string | null
           reported_at: string
           requester_email: string | null
+          requester_id: string | null
           requester_name: string | null
           status_id: string | null
           sublocation_id: string | null
@@ -2026,6 +2027,7 @@ export type Database = {
           priority_id?: string | null
           reported_at?: string
           requester_email?: string | null
+          requester_id?: string | null
           requester_name?: string | null
           status_id?: string | null
           sublocation_id?: string | null
@@ -2057,6 +2059,7 @@ export type Database = {
           priority_id?: string | null
           reported_at?: string
           requester_email?: string | null
+          requester_id?: string | null
           requester_name?: string | null
           status_id?: string | null
           sublocation_id?: string | null
@@ -3605,16 +3608,17 @@ export type Database = {
       }
       submit_maintenance_ticket: {
         Args: {
-          p_area_id?: string
-          p_asset_id?: string
+          p_area_id: string
+          p_asset_id: string
           p_client_id: string
-          p_description?: string
+          p_description: string
           p_origin?: string
-          p_photos?: Json
+          p_photos: Json
           p_plant_id: string
-          p_requester_email?: string
-          p_requester_name?: string
-          p_sublocation_id?: string
+          p_requester_email: string
+          p_requester_id?: string
+          p_requester_name: string
+          p_sublocation_id: string
         }
         Returns: Json
       }
