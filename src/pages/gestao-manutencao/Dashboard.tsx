@@ -26,6 +26,8 @@ import {
   Line,
 } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { MaintenanceKpiCards } from '@/components/gestao-manutencao/MaintenanceKpiCards'
+import { Input } from '@/components/ui/input'
 
 export default function DashboardManutencao() {
   const [loading, setLoading] = useState(true)
@@ -47,6 +49,14 @@ export default function DashboardManutencao() {
   const [areas, setAreas] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
+  const [dateStart, setDateStart] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  })
+  const [dateEnd, setDateEnd] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
 
   useEffect(() => {
     loadAuxData()
@@ -358,8 +368,28 @@ export default function DashboardManutencao() {
                 ))}
             </SelectContent>
           </Select>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-medium">Data Início</span>
+            <Input
+              type="date"
+              value={dateStart}
+              onChange={(e) => setDateStart(e.target.value)}
+              className="w-[150px] bg-white"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-medium">Data Fim</span>
+            <Input
+              type="date"
+              value={dateEnd}
+              onChange={(e) => setDateEnd(e.target.value)}
+              className="w-[150px] bg-white"
+            />
+          </div>
         </div>
       </div>
+
+      <MaintenanceKpiCards selectedPlant={selectedPlant} dateStart={dateStart} dateEnd={dateEnd} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-blue-500 shadow-sm">
