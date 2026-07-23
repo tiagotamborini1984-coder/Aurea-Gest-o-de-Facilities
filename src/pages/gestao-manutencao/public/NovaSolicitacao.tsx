@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getAccessibleColors } from '@/lib/contrast-utils'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
+import { useMaintenanceFormData } from '@/hooks/use-maintenance-form-data'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,12 +38,32 @@ import {
   FileText,
   Mail,
   User,
+  Layers,
 } from 'lucide-react'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
-
 const ERROR_NO_CLIENT = 'Não foi possível identificar sua empresa. Entre em contato com o suporte.'
+
+interface FormState {
+  name: string
+  email: string
+  description: string
+  plant_id: string
+  area_id: string
+  location_id: string
+  sublocation_id: string
+}
+
+const EMPTY_FORM: FormState = {
+  name: '',
+  email: '',
+  description: '',
+  plant_id: '',
+  area_id: '',
+  location_id: '',
+  sublocation_id: '',
+}
 
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
@@ -54,60 +75,27 @@ export default function NovaSolicitacaoPublica() {
   const [clientError, setClientError] = useState<string | null>(null)
   const [client, setClient] = useState<any>(null)
   const [clientId, setClientId] = useState<string | null>(null)
-  const [plants, setPlants] = useState<any[]>([])
-  const [allAreas, setAllAreas] = useState<any[]>([])
   const [success, setSuccess] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    description: '',
-    plant_id: '',
-    area_id: '',
-  })
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [files, setFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const { plants, getAreasForPlant, getLocationsForPlant, getSublocationsForLocation } =
+    useMaintenanceFormData(clientId)
+
   const areas = useMemo(
-    () => allAreas.filter((a) => a.plant_id === form.plant_id),
-    [allAreas, form.plant_id],
+    () => (form.plant_id ? getAreasForPlant(form.plant_id) : []),
+    [form.plant_id, getAreasForPlant],
   )
-
-  const loadClientAndPlants = useCallback(async () => {
-    if (!slug || !clientId) {
-      setLoading(false)
-      return
-    }
-    try {
-      const { data: optionsData, error: optionsError } = await supabase.rpc(
-        'get_maintenance_public_options',
-        { p_slug: slug },
-      )
-
-      if (optionsError || !optionsData) {
-        setClientError('Não foi possível carregar os dados da empresa. Tente novamente.')
-        setLoading(false)
-        return
-      }
-
-      const options = optionsData as any
-
-      if (options.client?.id !== clientId) {
-        setClientError(ERROR_NO_CLIENT)
-        setLoading(false)
-        return
-      }
-
-      setClient(options.client)
-      setPlants(options.plants || [])
-      setAllAreas(options.areas || [])
-    } catch (e) {
-      console.error(e)
-      setClientError('Erro ao carregar dados. Tente novamente.')
-    } finally {
-      setLoading(false)
-    }
-  }, [slug, clientId])
+  const locations = useMemo(
+    () => (form.plant_id ? getLocationsForPlant(form.plant_id) : []),
+    [form.plant_id, getLocationsForPlant],
+  )
+  const sublocations = useMemo(
+    () => (form.location_id ? getSublocationsForLocation(form.location_id) : []),
+    [form.location_id, getSublocationsForLocation],
+  )
 
   useEffect(() => {
     if (!user) {
@@ -115,7 +103,7 @@ export default function NovaSolicitacaoPublica() {
       return
     }
     let mounted = true
-    const fetchProfile = async () => {
+    const fetchProfileAndClient = async () => {
       try {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -125,13 +113,7 @@ export default function NovaSolicitacaoPublica() {
 
         if (!mounted) return
 
-        if (profileError || !profile) {
-          setClientError(ERROR_NO_CLIENT)
-          setLoading(false)
-          return
-        }
-
-        if (!profile.client_id) {
+        if (profileError || !profile || !profile.client_id) {
           setClientError(ERROR_NO_CLIENT)
           setLoading(false)
           return
@@ -143,6 +125,16 @@ export default function NovaSolicitacaoPublica() {
           name: profile.name || prev.name,
           email: profile.email || user.email || prev.email,
         }))
+
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('id, name, logo_url, primary_color, secondary_color')
+          .eq('id', profile.client_id)
+          .single()
+
+        if (!mounted) return
+        if (clientData) setClient(clientData)
+        setLoading(false)
       } catch (e) {
         console.error(e)
         if (mounted) {
@@ -151,15 +143,11 @@ export default function NovaSolicitacaoPublica() {
         }
       }
     }
-    fetchProfile()
+    fetchProfileAndClient()
     return () => {
       mounted = false
     }
   }, [user?.id])
-
-  useEffect(() => {
-    if (clientId) loadClientAndPlants()
-  }, [clientId, loadClientAndPlants])
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -200,7 +188,7 @@ export default function NovaSolicitacaoPublica() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate() || !client || !clientId) return
+    if (!validate() || !clientId) return
     setSubmitting(true)
     try {
       const photoUrls: string[] = []
@@ -222,7 +210,7 @@ export default function NovaSolicitacaoPublica() {
         p_client_id: clientId,
         p_plant_id: form.plant_id,
         p_area_id: form.area_id,
-        p_sublocation_id: null,
+        p_sublocation_id: form.sublocation_id || null,
         p_asset_id: null,
         p_requester_name: form.name.trim(),
         p_requester_email: form.email.trim(),
@@ -234,8 +222,8 @@ export default function NovaSolicitacaoPublica() {
 
       if (error) throw error
 
-      setSuccess(data.ticket_number)
-      setForm({ name: '', email: '', description: '', plant_id: '', area_id: '' })
+      setSuccess(data?.ticket_number || 'Chamado registrado')
+      setForm(EMPTY_FORM)
       setFiles([])
       setErrors({})
       toast.success('Chamado aberto com sucesso!')
@@ -276,25 +264,6 @@ export default function NovaSolicitacaoPublica() {
                 Ver meus chamados
               </Button>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!client) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-slate-900">
-        <Card className="w-full max-w-md text-center shadow-xl border-slate-200 bg-white">
-          <CardContent className="pt-12 pb-8 space-y-4">
-            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
-              <AlertCircle className="h-8 w-8 text-red-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900">Empresa não encontrada</h2>
-            <p className="text-slate-500 text-sm">
-              Verifique o link e tente novamente. Se o problema persistir, entre em contato com o
-              suporte.
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -348,7 +317,7 @@ export default function NovaSolicitacaoPublica() {
         style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          {client.logo_url ? (
+          {client?.logo_url ? (
             <img
               src={client.logo_url}
               alt={client.name}
@@ -364,7 +333,7 @@ export default function NovaSolicitacaoPublica() {
           )}
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-base leading-tight text-slate-900 truncate">
-              {client.name}
+              {client?.name || 'Portal de Manutenção'}
             </h1>
             <p className="text-xs text-slate-500">Portal de Manutenção</p>
           </div>
@@ -442,7 +411,13 @@ export default function NovaSolicitacaoPublica() {
                   <Select
                     value={form.plant_id}
                     onValueChange={(v) => {
-                      setForm({ ...form, plant_id: v, area_id: '' })
+                      setForm({
+                        ...form,
+                        plant_id: v,
+                        area_id: '',
+                        location_id: '',
+                        sublocation_id: '',
+                      })
                       if (errors.plant_id) setErrors({ ...errors, plant_id: '' })
                     }}
                     disabled={!plants || plants.length === 0}
@@ -498,6 +473,58 @@ export default function NovaSolicitacaoPublica() {
                       Nenhuma área cadastrada para esta planta.
                     </p>
                   )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-900">
+                    <MapPin className="inline-block h-3.5 w-3.5 mr-1" />
+                    Localização (opcional)
+                  </Label>
+                  <Select
+                    value={form.location_id}
+                    onValueChange={(v) => {
+                      setForm({ ...form, location_id: v, sublocation_id: '' })
+                    }}
+                    disabled={!form.plant_id || locations.length === 0}
+                  >
+                    <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      {locations.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-900">
+                    <Layers className="inline-block h-3.5 w-3.5 mr-1" />
+                    Sublocal (opcional)
+                  </Label>
+                  <Select
+                    value={form.sublocation_id}
+                    onValueChange={(v) => {
+                      setForm({ ...form, sublocation_id: v })
+                    }}
+                    disabled={!form.location_id || sublocations.length === 0}
+                  >
+                    <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      {sublocations.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -601,26 +628,6 @@ export default function NovaSolicitacaoPublica() {
           Ao enviar, você concorda em fornecer informações verídicas para tratamento da sua
           solicitação.
         </p>
-        {!user && (
-          <div className="text-center text-sm text-slate-500 mt-4">
-            Já tem conta?{' '}
-            <Link
-              to={`/m/${slug}/entrar`}
-              className="font-medium hover:underline"
-              style={{ color: primaryColor }}
-            >
-              Entrar
-            </Link>
-            {' ou '}
-            <Link
-              to={`/m/${slug}/registro`}
-              className="font-medium hover:underline"
-              style={{ color: primaryColor }}
-            >
-              Criar conta
-            </Link>
-          </div>
-        )}
       </main>
 
       <Dialog open={!!errorModal} onOpenChange={(open) => !open && setErrorModal(null)}>
