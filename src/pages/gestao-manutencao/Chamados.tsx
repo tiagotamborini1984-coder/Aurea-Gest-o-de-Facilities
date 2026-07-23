@@ -780,6 +780,14 @@ export default function ChamadosManutencao() {
                               Preventiva
                             </Badge>
                           )}
+                          {ticket.origin === 'public' && (
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800 text-[10px] px-1.5 h-5 font-semibold tracking-wide"
+                            >
+                              Portal
+                            </Badge>
+                          )}
                         </div>
                         {ticket.priority && (
                           <Badge
@@ -882,6 +890,11 @@ export default function ChamadosManutencao() {
               {selectedTicket?.origin === 'Preventiva' && (
                 <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-transparent dark:bg-purple-950 dark:text-purple-300 dark:hover:bg-purple-900">
                   Preventiva
+                </Badge>
+              )}
+              {selectedTicket?.origin === 'public' && (
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-transparent dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900">
+                  Portal
                 </Badge>
               )}
               {selectedTicket &&

@@ -7,6 +7,13 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -14,56 +21,45 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Wrench, CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react'
+import { Wrench, CheckCircle2, AlertCircle, Loader2, Send, Camera, X } from 'lucide-react'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 
-interface ClientData {
-  id: string
-  name: string
-  logo_url: string | null
-  primary_color: string | null
+interface PublicOptions {
+  client: { id: string; name: string; logo_url: string | null; primary_color: string | null }
+  plants: { id: string; name: string }[]
+  areas: { id: string; name: string; plant_id: string }[]
 }
 
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [client, setClient] = useState<ClientData | null>(null)
-  const [plantId, setPlantId] = useState<string | null>(null)
+  const [options, setOptions] = useState<PublicOptions | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', description: '' })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    description: '',
+    plant_id: '',
+    area_id: '',
+  })
+  const [files, setFiles] = useState<File[]>([])
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const loadData = useCallback(async () => {
     if (!slug) {
       setLoading(false)
       return
     }
-
-    const { data: clientData } = await supabase
-      .from('clients')
-      .select('id, name, logo_url, primary_color')
-      .eq('url_slug', slug)
-      .eq('status', 'Ativo')
-      .maybeSingle()
-
-    if (!clientData) {
+    const { data, error } = await supabase.rpc('get_maintenance_public_options', { p_slug: slug })
+    if (error || !data) {
       setLoading(false)
       return
     }
-    setClient(clientData)
-
-    const { data: plantData } = await supabase
-      .from('plants')
-      .select('id')
-      .eq('client_id', clientData.id)
-      .limit(1)
-
-    if (plantData && plantData.length > 0) {
-      setPlantId(plantData[0].id)
-    }
+    setOptions(data as PublicOptions)
     setLoading(false)
   }, [slug])
 
@@ -71,48 +67,67 @@ export default function NovaSolicitacaoPublica() {
     loadData()
   }, [loadData])
 
-  const isFormValid =
-    form.name.trim().length > 0 &&
-    isValidEmail(form.email.trim()) &&
-    form.description.trim().length > 0
+  const client = options?.client ?? null
+  const primaryColor = client?.primary_color || '#2563eb'
+  const availableAreas = options?.areas.filter((a) => a.plant_id === form.plant_id) || []
+
+  const validate = () => {
+    const e: Record<string, string> = {}
+    if (!form.name.trim()) e.name = 'Nome é obrigatório'
+    if (!form.email.trim()) e.email = 'E-mail é obrigatório'
+    else if (!isValidEmail(form.email.trim())) e.email = 'Informe um e-mail válido'
+    if (!form.plant_id) e.plant_id = 'Selecione uma planta'
+    if (!form.area_id) e.area_id = 'Selecione uma área'
+    if (!form.description.trim()) e.description = 'Descrição é obrigatória'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid || !client) return
-
-    if (!plantId) {
-      setErrorModal('Nenhuma planta cadastrada para esta empresa. Entre em contato com o suporte.')
-      return
-    }
-
+    if (!validate() || !client) return
     setSubmitting(true)
     try {
+      const photoUrls: string[] = []
+      for (const file of files) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\- ]/g, '_')
+        const fileName = `${Date.now()}_${safeName}`
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('maintenance_attachments')
+          .upload(fileName, file)
+        if (!uploadError && uploadData) {
+          const { data: urlData } = supabase.storage
+            .from('maintenance_attachments')
+            .getPublicUrl(uploadData.path)
+          photoUrls.push(urlData.publicUrl)
+        }
+      }
+
       const { data, error } = await supabase.rpc('submit_maintenance_ticket', {
         p_client_id: client.id,
-        p_plant_id: plantId,
-        p_area_id: null,
+        p_plant_id: form.plant_id,
+        p_area_id: form.area_id,
         p_sublocation_id: null,
         p_asset_id: null,
         p_requester_name: form.name.trim(),
         p_requester_email: form.email.trim(),
         p_description: form.description.trim(),
-        p_photos: [],
+        p_photos: photoUrls,
         p_origin: 'public',
       } as any)
 
       if (error) throw error
 
       setSuccess(data.ticket_number)
-      setForm({ name: '', email: '', description: '' })
-      toast.success('Sua solicitação foi enviada com sucesso!')
+      setForm({ name: '', email: '', description: '', plant_id: '', area_id: '' })
+      setFiles([])
+      toast.success('Chamado aberto com sucesso!')
     } catch (err: any) {
       setErrorModal(err.message || 'Erro ao enviar solicitação. Tente novamente.')
     } finally {
       setSubmitting(false)
     }
   }
-
-  const primaryColor = client?.primary_color || '#2563eb'
 
   if (loading) {
     return (
@@ -147,9 +162,9 @@ export default function NovaSolicitacaoPublica() {
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Solicitação enviada com sucesso!</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Chamado aberto com sucesso!</h2>
             <p className="text-gray-500">
-              Sua solicitação de manutenção foi registrada com sucesso.
+              Sua solicitação de manutenção foi registrada e nossa equipe já foi notificada.
             </p>
             <div className="bg-gray-100 p-4 rounded-lg font-mono text-xl font-semibold mt-4">
               {success}
@@ -215,6 +230,7 @@ export default function NovaSolicitacaoPublica() {
                   placeholder="Como podemos chamá-lo?"
                   maxLength={200}
                 />
+                {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
               </div>
 
               <div className="space-y-2">
@@ -230,9 +246,54 @@ export default function NovaSolicitacaoPublica() {
                   placeholder="seu.email@exemplo.com"
                   maxLength={200}
                 />
-                {form.email.length > 0 && !isValidEmail(form.email) && (
-                  <p className="text-xs text-red-500">Informe um e-mail válido.</p>
-                )}
+                {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>
+                    Planta <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={form.plant_id}
+                    onValueChange={(v) => setForm({ ...form, plant_id: v, area_id: '' })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options?.plants.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.plant_id && <p className="text-xs text-red-500">{errors.plant_id}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>
+                    Área <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={form.area_id}
+                    onValueChange={(v) => setForm({ ...form, area_id: v })}
+                    disabled={!form.plant_id}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAreas.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.area_id && <p className="text-xs text-red-500">{errors.area_id}</p>}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -248,13 +309,50 @@ export default function NovaSolicitacaoPublica() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   maxLength={2000}
                 />
+                {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Fotos (opcional)</Label>
+                <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-gray-100/50 transition cursor-pointer relative">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={(e) =>
+                      e.target.files &&
+                      setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+                    }
+                  />
+                  <Camera className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                  <span className="text-sm text-gray-500">Clique ou arraste imagens aqui</span>
+                </div>
+                {files.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {files.map((f, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between text-xs bg-white px-2 py-1 rounded border"
+                      >
+                        <span className="truncate">{f.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
+                        >
+                          <X className="h-3 w-3 text-red-500" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Button
                 type="submit"
                 size="lg"
                 className="w-full text-base h-12 shadow-lg"
-                disabled={!isFormValid || submitting}
+                disabled={submitting}
                 style={{ backgroundColor: primaryColor }}
               >
                 {submitting ? (
