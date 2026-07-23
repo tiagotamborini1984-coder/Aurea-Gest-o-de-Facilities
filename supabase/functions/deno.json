@@ -1,15 +1,15 @@
 {
   "_versions": {
     "create-user": 8,
-    "email-reports": 6,
-    "package-notifications": 6,
-    "update-user-password": 6,
-    "delete-user": 5,
+    "email-reports": 7,
+    "package-notifications": 7,
+    "update-user-password": 7,
+    "delete-user": 6,
     "process-recurring-audits": 21,
     "process-preventive-maintenance": 4,
-    "handle-subscription-webhook": 5,
-    "maintenance-ai-advisor": 5,
-    "import-products": 8,
-    "import-tickets": 3
+    "handle-subscription-webhook": 6,
+    "maintenance-ai-advisor": 6,
+    "import-products": 9,
+    "import-tickets": 4
   }
 }

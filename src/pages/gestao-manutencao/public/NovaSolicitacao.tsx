@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,23 +12,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Wrench, CheckCircle2, UploadCloud, MapPin, Tag, X } from 'lucide-react'
+import {
+  Wrench,
+  CheckCircle2,
+  UploadCloud,
+  MapPin,
+  Tag,
+  X,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+
+interface PublicOptions {
+  client: { id: string; name: string; logo_url: string | null; primary_color: string | null } | null
+  plants: { id: string; name: string }[]
+  areas: { id: string; name: string; plant_id: string }[]
+  sublocations: { id: string; name: string; area_id: string | null; location_id: string | null }[]
+  assets: {
+    id: string
+    name: string
+    plant_id: string
+    area_id: string | null
+    location_id: string | null
+    sublocation_id: string | null
+  }[]
+}
+
+const EMPTY_OPTIONS: PublicOptions = {
+  client: null,
+  plants: [],
+  areas: [],
+  sublocations: [],
+  assets: [],
+}
 
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
+  const [errorModal, setErrorModal] = useState<string | null>(null)
 
-  const [options, setOptions] = useState<any>({
-    client: null,
-    plants: [],
-    areas: [],
-    sublocations: [],
-    assets: [],
-  })
+  const [options, setOptions] = useState<PublicOptions>(EMPTY_OPTIONS)
 
   const [form, setForm] = useState({
     plant_id: '',
@@ -47,20 +81,28 @@ export default function NovaSolicitacaoPublica() {
   }, [slug])
 
   const loadOptions = async () => {
-    if (!slug) return
-    const { data, error } = await supabase.rpc('get_maintenance_public_options', { p_slug: slug })
-    if (error || !data) {
-      toast.error('Erro ao carregar dados ou empresa não encontrada.')
+    if (!slug) {
       setLoading(false)
       return
     }
-    setOptions(data)
+    const { data, error } = await supabase.rpc('get_maintenance_public_options', { p_slug: slug })
+    if (error || !data) {
+      setLoading(false)
+      return
+    }
+    setOptions({
+      client: data.client ?? null,
+      plants: data.plants ?? [],
+      areas: data.areas ?? [],
+      sublocations: data.sublocations ?? [],
+      assets: data.assets ?? [],
+    })
     setLoading(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.plant_id || !form.requester_name || !form.description) {
+    if (!form.plant_id || !form.requester_name || !form.requester_email || !form.description) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
@@ -83,13 +125,13 @@ export default function NovaSolicitacaoPublica() {
       }
 
       const { data, error } = await supabase.rpc('submit_maintenance_ticket', {
-        p_client_id: options.client.id,
+        p_client_id: options.client!.id,
         p_plant_id: form.plant_id,
         p_area_id: form.area_id || null,
         p_sublocation_id: form.sublocation_id || null,
         p_asset_id: form.asset_id || null,
         p_requester_name: form.requester_name,
-        p_requester_email: form.requester_email || null,
+        p_requester_email: form.requester_email,
         p_description: form.description,
         p_photos: uploadedPhotos,
       })
@@ -99,25 +141,40 @@ export default function NovaSolicitacaoPublica() {
       setSuccess(data.ticket_number)
       toast.success('Chamado aberto com sucesso!')
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao enviar solicitação.')
+      setErrorModal(err.message || 'Erro ao enviar solicitação.')
     } finally {
       setSubmitting(false)
     }
   }
 
   if (loading)
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    )
   if (!options.client)
     return (
-      <div className="min-h-screen flex items-center justify-center text-red-500">
-        Página não encontrada ou inativa.
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md text-center shadow-xl">
+          <CardContent className="pt-10 pb-8 space-y-4">
+            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Empresa não encontrada</h2>
+            <p className="text-gray-500">
+              Não foi possível localizar a empresa solicitada. Verifique o endereço ou entre em
+              contato com o suporte.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     )
 
-  const filteredAreas = options.areas.filter((a: any) => a.plant_id === form.plant_id)
-  const filteredSublocations = options.sublocations.filter((s: any) => s.area_id === form.area_id)
+  const filteredAreas = options.areas.filter((a) => a.plant_id === form.plant_id)
+  const filteredSublocations = options.sublocations.filter((s) => s.area_id === form.area_id)
   const filteredAssets = options.assets.filter(
-    (a: any) =>
+    (a) =>
       (!form.plant_id || a.plant_id === form.plant_id) &&
       (!form.area_id || a.area_id === form.area_id),
   )
@@ -139,7 +196,15 @@ export default function NovaSolicitacaoPublica() {
               className="mt-8 w-full"
               onClick={() => {
                 setSuccess(null)
-                setForm({ ...form, description: '' })
+                setForm({
+                  plant_id: '',
+                  area_id: '',
+                  sublocation_id: '',
+                  asset_id: '',
+                  requester_name: '',
+                  requester_email: '',
+                  description: '',
+                })
                 setFiles([])
               }}
             >
@@ -151,20 +216,20 @@ export default function NovaSolicitacaoPublica() {
     )
   }
 
+  const primaryColor = options.client.primary_color || '#2563eb'
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header
         className="bg-white border-b shadow-sm sticky top-0 z-10"
-        style={
-          options.client.primary_color ? { borderBottomColor: options.client.primary_color } : {}
-        }
+        style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {options.client.logo_url ? (
               <img src={options.client.logo_url} alt="Logo" className="h-10 w-auto" />
             ) : (
-              <Wrench className="h-8 w-8 text-blue-600" />
+              <Wrench className="h-8 w-8" style={{ color: primaryColor }} />
             )}
             <div>
               <h1 className="font-bold text-lg leading-tight">{options.client.name}</h1>
@@ -176,12 +241,7 @@ export default function NovaSolicitacaoPublica() {
 
       <main className="flex-1 max-w-3xl w-full mx-auto p-4 py-8 animate-fade-in-up">
         <Card className="shadow-lg border-0 overflow-hidden">
-          <div
-            className="h-2 w-full bg-blue-600"
-            style={
-              options.client.primary_color ? { backgroundColor: options.client.primary_color } : {}
-            }
-          ></div>
+          <div className="h-2 w-full" style={{ backgroundColor: primaryColor }}></div>
           <CardHeader className="bg-white pb-4">
             <CardTitle className="text-2xl">Nova Solicitação</CardTitle>
             <CardDescription>
@@ -216,7 +276,7 @@ export default function NovaSolicitacaoPublica() {
                         <SelectValue placeholder="Selecione a Planta" />
                       </SelectTrigger>
                       <SelectContent>
-                        {options.plants.map((p: any) => (
+                        {options.plants.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name}
                           </SelectItem>
@@ -237,7 +297,7 @@ export default function NovaSolicitacaoPublica() {
                         <SelectValue placeholder="Selecione a Área (Opcional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredAreas.map((a: any) => (
+                        {filteredAreas.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
                             {a.name}
                           </SelectItem>
@@ -258,7 +318,7 @@ export default function NovaSolicitacaoPublica() {
                         <SelectValue placeholder="Selecione (Opcional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredSublocations.map((s: any) => (
+                        {filteredSublocations.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.name}
                           </SelectItem>
@@ -277,7 +337,7 @@ export default function NovaSolicitacaoPublica() {
                         <SelectValue placeholder="Selecione o Ativo (Opcional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredAssets.map((a: any) => (
+                        {filteredAssets.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
                             {a.name}
                           </SelectItem>
@@ -354,13 +414,15 @@ export default function NovaSolicitacaoPublica() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Seu E-mail</Label>
+                    <Label>
+                      Seu E-mail <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       className="bg-white"
                       type="email"
                       value={form.requester_email}
                       onChange={(e) => setForm({ ...form, requester_email: e.target.value })}
-                      placeholder="Para receber atualizações (opcional)"
+                      placeholder="Para receber atualizações"
                     />
                   </div>
                 </div>
@@ -370,11 +432,7 @@ export default function NovaSolicitacaoPublica() {
                 size="lg"
                 className="w-full text-base h-12 shadow-lg"
                 disabled={submitting}
-                style={
-                  options.client.primary_color
-                    ? { backgroundColor: options.client.primary_color }
-                    : {}
-                }
+                style={{ backgroundColor: primaryColor }}
               >
                 {submitting ? 'Enviando...' : 'Abrir Chamado'}
               </Button>
@@ -382,6 +440,21 @@ export default function NovaSolicitacaoPublica() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={!!errorModal} onOpenChange={(open) => !open && setErrorModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <DialogTitle className="text-center">Erro ao Enviar Solicitação</DialogTitle>
+            <DialogDescription className="text-center text-base">{errorModal}</DialogDescription>
+          </DialogHeader>
+          <Button onClick={() => setErrorModal(null)} className="w-full">
+            Tentar Novamente
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
