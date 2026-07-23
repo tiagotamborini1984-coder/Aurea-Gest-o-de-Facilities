@@ -87,6 +87,10 @@ import LancamentosBudget from './pages/gestao-budget/Lancamentos'
 
 // Gestão de Manutenção
 import NovaSolicitacaoPublica from './pages/gestao-manutencao/public/NovaSolicitacao'
+import RegistroPublico from './pages/gestao-manutencao/public/Registro'
+import LoginPublico from './pages/gestao-manutencao/public/LoginPublico'
+import MeusChamadosPublico from './pages/gestao-manutencao/public/MeusChamados'
+import DetalheChamadoPublico from './pages/gestao-manutencao/public/DetalheChamado'
 import DashboardManutencao from './pages/gestao-manutencao/Dashboard'
 import ChamadosManutencao from './pages/gestao-manutencao/Chamados'
 import PlanejamentoManutencao from './pages/gestao-manutencao/Planejamento'
@@ -121,6 +125,10 @@ const App = () => (
               <Route path="/login" element={<Navigate to="/" replace />} />
 
               <Route path="/m/:slug/nova-solicitacao" element={<NovaSolicitacaoPublica />} />
+              <Route path="/m/:slug/registro" element={<RegistroPublico />} />
+              <Route path="/m/:slug/entrar" element={<LoginPublico />} />
+              <Route path="/m/:slug/meus-chamados" element={<MeusChamadosPublico />} />
+              <Route path="/m/:slug/chamado/:ticketId" element={<DetalheChamadoPublico />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<SubscriptionGuard />}>

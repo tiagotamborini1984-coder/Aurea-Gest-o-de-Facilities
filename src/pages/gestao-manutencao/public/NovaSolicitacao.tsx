@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +49,8 @@ interface PublicOptions {
 
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [options, setOptions] = useState<PublicOptions | null>(null)
@@ -80,6 +83,16 @@ export default function NovaSolicitacaoPublica() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: user.user_metadata?.name || prev.name,
+        email: user.email || prev.email,
+      }))
+    }
+  }, [user?.id])
 
   const client = options?.client ?? null
   const primaryColor = client?.primary_color || '#2563eb'
@@ -215,6 +228,15 @@ export default function NovaSolicitacaoPublica() {
             >
               Abrir Nova Solicitação
             </Button>
+            {user && (
+              <Button
+                variant="outline"
+                className="w-full h-11"
+                onClick={() => navigate(`/m/${slug}/meus-chamados`)}
+              >
+                Ver meus chamados
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -471,6 +493,24 @@ export default function NovaSolicitacaoPublica() {
           Ao enviar, você concorda em fornecer informações verídicas para tratamento da sua
           solicitação.
         </p>
+        {!user && (
+          <div className="text-center text-sm text-slate-500 mt-4">
+            Já tem conta?{' '}
+            <Link
+              to={`/m/${slug}/entrar`}
+              className="text-brand-vividBlue font-medium hover:underline"
+            >
+              Entrar
+            </Link>
+            {' ou '}
+            <Link
+              to={`/m/${slug}/registro`}
+              className="text-brand-vividBlue font-medium hover:underline"
+            >
+              Criar conta
+            </Link>
+          </div>
+        )}
       </main>
 
       <Dialog open={!!errorModal} onOpenChange={(open) => !open && setErrorModal(null)}>
