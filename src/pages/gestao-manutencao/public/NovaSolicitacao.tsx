@@ -43,7 +43,13 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 
 interface PublicOptions {
-  client: { id: string; name: string; logo_url: string | null; primary_color: string | null }
+  client: {
+    id: string
+    name: string
+    logo_url: string | null
+    primary_color: string | null
+    secondary_color: string | null
+  }
   plants: { id: string; name: string }[]
   areas: { id: string; name: string; plant_id: string }[]
 }

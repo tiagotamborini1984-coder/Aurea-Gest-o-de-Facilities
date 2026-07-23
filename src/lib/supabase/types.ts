@@ -3605,16 +3605,16 @@ export type Database = {
       }
       submit_maintenance_ticket: {
         Args: {
-          p_area_id: string
-          p_asset_id: string
+          p_area_id?: string
+          p_asset_id?: string
           p_client_id: string
-          p_description: string
+          p_description?: string
           p_origin?: string
-          p_photos: Json
+          p_photos?: Json
           p_plant_id: string
-          p_requester_email: string
-          p_requester_name: string
-          p_sublocation_id: string
+          p_requester_email?: string
+          p_requester_name?: string
+          p_sublocation_id?: string
         }
         Returns: Json
       }
