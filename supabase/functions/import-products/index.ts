@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'npm:xlsx@0.18.5'
 
 const BATCH_SIZE = 75
 
@@ -263,8 +263,12 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return jsonRes({ success: true, inserted, updated, skipped, total: products.length, errors })
+    return jsonRes(
+      { success: true, inserted, updated, skipped, total: products.length, errors },
+      200,
+    )
   } catch (error: any) {
+    console.error('Import products error:', error)
     return jsonRes(
       {
         success: false,
@@ -275,7 +279,7 @@ Deno.serve(async (req: Request) => {
         total: 0,
         errors: [],
       },
-      400,
+      200,
     )
   }
 })

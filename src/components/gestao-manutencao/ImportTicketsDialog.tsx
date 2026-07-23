@@ -100,8 +100,11 @@ export function ImportTicketsDialog({
     }, 400)
 
     try {
+      const formData = new FormData()
+      formData.append('file', file)
+
       const { data, error } = await supabase.functions.invoke('import-tickets', {
-        body: file,
+        body: formData,
       })
       setProgress(100)
       if (error) throw error
