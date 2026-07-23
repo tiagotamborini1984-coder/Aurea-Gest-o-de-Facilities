@@ -14,6 +14,7 @@ import {
   Clock,
   Check,
   AlertTriangle,
+  UploadCloud,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -37,6 +38,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { ImportTicketsDialog } from '@/components/gestao-manutencao/ImportTicketsDialog'
 
 const toLocalDatetime = (utcStr: string | null) => {
   if (!utcStr) return ''
@@ -144,6 +146,7 @@ export default function ChamadosManutencao() {
     description: '',
     priority_id: 'none',
   })
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000)
@@ -505,6 +508,10 @@ export default function ChamadosManutencao() {
                 ))}
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <UploadCloud className="h-4 w-4 mr-2" />
+            Importar Chamados
+          </Button>
           <Select value={selectedType} onValueChange={setSelectedType}>
             <SelectTrigger className="w-[160px] bg-background">
               <Wrench className="w-4 h-4 mr-2" />
@@ -1235,6 +1242,12 @@ export default function ChamadosManutencao() {
           )}
         </SheetContent>
       </Sheet>
+
+      <ImportTicketsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImportComplete={loadTickets}
+      />
 
       <Dialog open={correctiveModalOpen} onOpenChange={setCorrectiveModalOpen}>
         <DialogContent>
