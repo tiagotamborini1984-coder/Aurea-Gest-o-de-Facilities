@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -48,11 +48,7 @@ export default function NovaSolicitacaoPublica() {
     description: '',
   })
 
-  useEffect(() => {
-    loadOptions()
-  }, [slug])
-
-  const loadOptions = async () => {
+  const loadOptions = useCallback(async () => {
     if (!slug) {
       setLoading(false)
       return
@@ -67,7 +63,11 @@ export default function NovaSolicitacaoPublica() {
       plants: data.plants ?? [],
     })
     setLoading(false)
-  }
+  }, [slug])
+
+  useEffect(() => {
+    loadOptions()
+  }, [loadOptions])
 
   const isFormValid =
     form.name.trim().length > 0 &&
@@ -134,8 +134,7 @@ export default function NovaSolicitacaoPublica() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Empresa não encontrada</h2>
             <p className="text-gray-500">
-              Não foi possível localizar a empresa solicitada. Verifique o endereço ou entre em
-              contato com o suporte.
+              Empresa não encontrada. Verifique o link e tente novamente.
             </p>
           </CardContent>
         </Card>
@@ -223,6 +222,9 @@ export default function NovaSolicitacaoPublica() {
                   placeholder="Como podemos chamá-lo?"
                   maxLength={200}
                 />
+                {form.name.length === 0 && (
+                  <p className="text-xs text-gray-400">Campo obrigatório</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -241,6 +243,9 @@ export default function NovaSolicitacaoPublica() {
                 {form.email.length > 0 && !isValidEmail(form.email) && (
                   <p className="text-xs text-red-500">Informe um e-mail válido.</p>
                 )}
+                {form.email.length === 0 && (
+                  <p className="text-xs text-gray-400">Campo obrigatório</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -256,6 +261,9 @@ export default function NovaSolicitacaoPublica() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   maxLength={2000}
                 />
+                {form.description.length === 0 && (
+                  <p className="text-xs text-gray-400">Campo obrigatório</p>
+                )}
               </div>
 
               <Button

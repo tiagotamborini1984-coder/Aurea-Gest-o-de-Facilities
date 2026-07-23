@@ -3582,6 +3582,7 @@ export type Database = {
           p_asset_id: string
           p_client_id: string
           p_description: string
+          p_origin?: string
           p_photos: Json
           p_plant_id: string
           p_requester_email: string
