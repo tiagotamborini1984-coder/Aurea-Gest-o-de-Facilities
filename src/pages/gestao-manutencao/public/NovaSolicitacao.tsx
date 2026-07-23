@@ -180,10 +180,10 @@ export default function NovaSolicitacaoPublica() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin" style={{ color: primaryColor }} />
-          <p className="text-sm text-muted-foreground">Carregando formulário...</p>
+          <p className="text-sm text-slate-500">Carregando formulário...</p>
         </div>
       </div>
     )
@@ -191,14 +191,14 @@ export default function NovaSolicitacaoPublica() {
 
   if (!client) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md text-center shadow-xl border-border">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-slate-900">
+        <Card className="w-full max-w-md text-center shadow-xl border-slate-200 bg-white">
           <CardContent className="pt-12 pb-8 space-y-4">
-            <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-2">
-              <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
+              <AlertCircle className="h-8 w-8 text-red-600" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground">Empresa não encontrada</h2>
-            <p className="text-muted-foreground text-sm">
+            <h2 className="text-2xl font-bold text-slate-900">Empresa não encontrada</h2>
+            <p className="text-slate-500 text-sm">
               Verifique o link e tente novamente. Se o problema persistir, entre em contato com o
               suporte.
             </p>
@@ -210,21 +210,21 @@ export default function NovaSolicitacaoPublica() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center shadow-xl overflow-hidden animate-fade-in-up border-border">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 text-slate-900">
+        <Card className="w-full max-w-md text-center shadow-xl overflow-hidden animate-fade-in-up border-slate-200 bg-white">
           <div className="h-2 w-full" style={{ backgroundColor: primaryColor }} />
           <CardContent className="pt-10 pb-8 space-y-4">
-            <div className="mx-auto w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+            <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="h-10 w-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground">Solicitação registrada!</h2>
-            <p className="text-muted-foreground text-sm leading-relaxed">
+            <h2 className="text-2xl font-bold text-slate-900">Solicitação registrada!</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">
               Sua solicitação de manutenção foi registrada com sucesso e nossa equipe já foi
               notificada. Acompanhe pelo número abaixo.
             </p>
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Número do chamado</p>
-              <p className="font-mono text-xl font-bold text-foreground">{success}</p>
+            <div className="bg-slate-100 p-4 rounded-lg">
+              <p className="text-xs text-slate-500 mb-1">Número do chamado</p>
+              <p className="font-mono text-xl font-bold text-slate-900">{success}</p>
             </div>
             <Button
               className="mt-6 w-full h-11"
@@ -249,9 +249,9 @@ export default function NovaSolicitacaoPublica() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900">
       <header
-        className="bg-card border-b-2 shadow-sm sticky top-0 z-20"
+        className="bg-white border-b-2 shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
@@ -270,10 +270,10 @@ export default function NovaSolicitacaoPublica() {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-base leading-tight text-foreground truncate">
+            <h1 className="font-bold text-base leading-tight text-slate-900 truncate">
               {client.name}
             </h1>
-            <p className="text-xs text-muted-foreground">Portal de Manutenção</p>
+            <p className="text-xs text-slate-500">Portal de Manutenção</p>
           </div>
         </div>
       </header>
@@ -286,25 +286,25 @@ export default function NovaSolicitacaoPublica() {
           >
             <Wrench className="h-7 w-7" style={{ color: primaryColor }} />
           </div>
-          <h2 className="text-2xl font-bold text-foreground">Nova Solicitação</h2>
-          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-slate-900">Nova Solicitação</h2>
+          <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
             Descreva o problema encontrado para que nossa equipe de manutenção possa agir
             rapidamente.
           </p>
         </div>
 
-        <Card className="shadow-xl border-border overflow-hidden">
+        <Card className="shadow-xl border-slate-200 bg-white overflow-hidden">
           <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
           <CardContent className="p-6 sm:p-8 space-y-5">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-semibold text-foreground">
+                <Label htmlFor="name" className="text-sm font-semibold text-slate-900">
                   <User className="inline-block h-3.5 w-3.5 mr-1" />
                   Nome <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="name"
-                  className="bg-background text-foreground border-border h-11"
+                  className="bg-white text-slate-900 border-slate-300 h-11 placeholder:text-slate-400"
                   value={form.name}
                   onChange={(e) => {
                     setForm({ ...form, name: e.target.value })
@@ -317,14 +317,14 @@ export default function NovaSolicitacaoPublica() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-foreground">
+                <Label htmlFor="email" className="text-sm font-semibold text-slate-900">
                   <Mail className="inline-block h-3.5 w-3.5 mr-1" />
                   E-mail <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  className="bg-background text-foreground border-border h-11"
+                  className="bg-white text-slate-900 border-slate-300 h-11 placeholder:text-slate-400"
                   value={form.email}
                   onChange={(e) => {
                     setForm({ ...form, email: e.target.value })
@@ -338,7 +338,7 @@ export default function NovaSolicitacaoPublica() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-foreground">
+                  <Label className="text-sm font-semibold text-slate-900">
                     <Building2 className="inline-block h-3.5 w-3.5 mr-1" />
                     Planta <span className="text-red-500">*</span>
                   </Label>
@@ -348,11 +348,16 @@ export default function NovaSolicitacaoPublica() {
                       setForm({ ...form, plant_id: v, area_id: '' })
                       if (errors.plant_id) setErrors({ ...errors, plant_id: '' })
                     }}
+                    disabled={!options?.plants || options.plants.length === 0}
                   >
-                    <SelectTrigger className="bg-background text-foreground border-border h-11">
-                      <SelectValue placeholder="Selecione..." />
+                    <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
+                      <SelectValue
+                        placeholder={
+                          options?.plants?.length ? 'Selecione...' : 'Nenhuma planta cadastrada'
+                        }
+                      />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border-slate-200">
                       {options?.plants.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name}
@@ -363,10 +368,15 @@ export default function NovaSolicitacaoPublica() {
                   {errors.plant_id && (
                     <p className="text-xs text-red-500 mt-1">{errors.plant_id}</p>
                   )}
+                  {options?.plants?.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Nenhuma planta cadastrada para esta empresa.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-foreground">
+                  <Label className="text-sm font-semibold text-slate-900">
                     <MapPin className="inline-block h-3.5 w-3.5 mr-1" />
                     Área <span className="text-red-500">*</span>
                   </Label>
@@ -378,10 +388,10 @@ export default function NovaSolicitacaoPublica() {
                     }}
                     disabled={!form.plant_id}
                   >
-                    <SelectTrigger className="bg-background text-foreground border-border h-11">
+                    <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border-slate-200">
                       {availableAreas.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.name}
@@ -391,7 +401,7 @@ export default function NovaSolicitacaoPublica() {
                   </Select>
                   {errors.area_id && <p className="text-xs text-red-500 mt-1">{errors.area_id}</p>}
                   {form.plant_id && availableAreas.length === 0 && (
-                    <p className="text-xs text-amber-500 mt-1">
+                    <p className="text-xs text-amber-600 mt-1">
                       Nenhuma área cadastrada para esta planta.
                     </p>
                   )}
@@ -399,14 +409,14 @@ export default function NovaSolicitacaoPublica() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-semibold text-foreground">
+                <Label htmlFor="description" className="text-sm font-semibold text-slate-900">
                   <FileText className="inline-block h-3.5 w-3.5 mr-1" />
                   Descrição do Problema <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   rows={5}
-                  className="bg-background text-foreground border-border resize-none"
+                  className="bg-white text-slate-900 border-slate-300 resize-none placeholder:text-slate-400"
                   placeholder="Descreva com detalhes o que está acontecendo (ex: equipamento, local exato, quando começou, etc.)..."
                   value={form.description}
                   onChange={(e) => {
@@ -426,11 +436,11 @@ export default function NovaSolicitacaoPublica() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-foreground">
+                <Label className="text-sm font-semibold text-slate-900">
                   <Camera className="inline-block h-3.5 w-3.5 mr-1" />
                   Fotos (opcional)
                 </Label>
-                <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 hover:bg-muted/50 transition cursor-pointer relative group">
+                <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-primary/50 hover:bg-slate-50 transition cursor-pointer relative group">
                   <input
                     type="file"
                     multiple
@@ -439,13 +449,11 @@ export default function NovaSolicitacaoPublica() {
                     onChange={(e) => handleFileSelect(e.target.files)}
                   />
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center group-hover:bg-accent transition">
-                      <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-slate-200 transition">
+                      <ImagePlus className="h-6 w-6 text-slate-500" />
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      Clique para adicionar imagens
-                    </span>
-                    <span className="text-xs text-muted-foreground">JPG, PNG, GIF</span>
+                    <span className="text-sm text-slate-500">Clique para adicionar imagens</span>
+                    <span className="text-xs text-slate-400">JPG, PNG, GIF</span>
                   </div>
                 </div>
                 {files.length > 0 && (
@@ -453,7 +461,7 @@ export default function NovaSolicitacaoPublica() {
                     {files.map((f, i) => (
                       <div
                         key={i}
-                        className="relative group aspect-square rounded-lg overflow-hidden border border-border bg-muted"
+                        className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100"
                       >
                         <img
                           src={URL.createObjectURL(f)}
@@ -496,12 +504,12 @@ export default function NovaSolicitacaoPublica() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p className="text-center text-xs text-slate-500 mt-6">
           Ao enviar, você concorda em fornecer informações verídicas para tratamento da sua
           solicitação.
         </p>
         {!user && (
-          <div className="text-center text-sm text-muted-foreground mt-4">
+          <div className="text-center text-sm text-slate-500 mt-4">
             Já tem conta?{' '}
             <Link
               to={`/m/${slug}/entrar`}
@@ -523,13 +531,15 @@ export default function NovaSolicitacaoPublica() {
       </main>
 
       <Dialog open={!!errorModal} onOpenChange={(open) => !open && setErrorModal(null)}>
-        <DialogContent>
+        <DialogContent className="bg-white border-slate-200 text-slate-900">
           <DialogHeader>
-            <div className="mx-auto w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
+            <div className="mx-auto w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="h-7 w-7 text-red-600" />
             </div>
-            <DialogTitle className="text-center">Erro ao Enviar Solicitação</DialogTitle>
-            <DialogDescription className="text-center text-base pt-2">
+            <DialogTitle className="text-center text-slate-900">
+              Erro ao Enviar Solicitação
+            </DialogTitle>
+            <DialogDescription className="text-center text-base pt-2 text-slate-500">
               {errorModal}
             </DialogDescription>
           </DialogHeader>

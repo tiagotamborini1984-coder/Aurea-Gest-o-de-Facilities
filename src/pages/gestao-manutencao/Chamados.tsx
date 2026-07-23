@@ -193,6 +193,21 @@ export default function ChamadosManutencao() {
 
   useEffect(() => {
     loadTickets()
+
+    const subscription = supabase
+      .channel('public:maintenance_tickets')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'maintenance_tickets' },
+        () => {
+          loadTickets()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
   }, [selectedPlant, selectedArea, selectedType])
 
   useEffect(() => {
