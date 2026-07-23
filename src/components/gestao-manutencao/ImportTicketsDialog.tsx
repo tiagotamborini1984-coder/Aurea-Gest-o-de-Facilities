@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -7,374 +7,309 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
-import { supabase } from '@/lib/supabase/client'
-import { useAuth } from '@/hooks/use-auth'
-import { toast } from 'sonner'
 import {
   UploadCloud,
   FileSpreadsheet,
   Loader2,
   CheckCircle2,
   AlertCircle,
-  ArrowLeft,
+  Download,
+  X,
 } from 'lucide-react'
-import {
-  parseExcelFile,
-  autoDetectMapping,
-  validateRows,
-  bulkInsertTickets,
-  SYSTEM_FIELDS,
-  ImportFieldMapping,
-  ReferenceData,
-  ValidationSummary,
-  ParsedExcelData,
-  FieldKey,
-} from '@/services/maintenance-tickets'
+import { supabase } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { downloadTicketsTemplate } from '@/lib/xlsx-template'
 
-type Step = 'upload' | 'mapping' | 'validation' | 'importing' | 'result'
+interface ImportResult {
+  success: boolean
+  inserted: number
+  updated: number
+  skipped: number
+  total: number
+  errors: string[]
+  error?: string
+}
+
+interface ImportTicketsDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onImportComplete: () => void
+}
 
 export function ImportTicketsDialog({
   open,
   onOpenChange,
   onImportComplete,
-}: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  onImportComplete: () => void
-}) {
-  const { user } = useAuth()
-  const [step, setStep] = useState<Step>('upload')
+}: ImportTicketsDialogProps) {
   const [file, setFile] = useState<File | null>(null)
-  const [parsing, setParsing] = useState(false)
-  const [parsed, setParsed] = useState<ParsedExcelData | null>(null)
-  const [mapping, setMapping] = useState<ImportFieldMapping>({})
-  const [refData, setRefData] = useState<ReferenceData | null>(null)
-  const [clientId, setClientId] = useState<string | null>(null)
-  const [existingNumbers, setExistingNumbers] = useState<Set<string>>(new Set())
-  const [validation, setValidation] = useState<ValidationSummary | null>(null)
-  const [validating, setValidating] = useState(false)
-  const [importedCount, setImportedCount] = useState(0)
-  const [importError, setImportError] = useState<string | null>(null)
-
-  const reset = useCallback(() => {
-    setStep('upload')
-    setFile(null)
-    setParsed(null)
-    setMapping({})
-    setValidation(null)
-    setImportedCount(0)
-    setImportError(null)
-  }, [])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [dragActive, setDragActive] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    if (!open) {
-      reset()
-      return
+    return () => {
+      if (progressTimer.current) clearInterval(progressTimer.current)
     }
-    ;(async () => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('client_id')
-        .eq('id', user?.id)
-        .single()
-      if (!profile?.client_id) return
-      setClientId(profile.client_id)
-      const [p, pr, t, s, a, as, asg, loc, sub, tk] = await Promise.all([
-        supabase.from('plants').select('id, name, code'),
-        supabase.from('maintenance_priorities').select('id, name'),
-        supabase.from('maintenance_types').select('id, name'),
-        supabase.from('maintenance_statuses').select('id, name, step, order_index'),
-        supabase.from('maintenance_areas').select('id, name'),
-        supabase.from('maintenance_assets').select('id, name'),
-        supabase.from('profiles').select('id, name'),
-        supabase.from('locations').select('id, name'),
-        supabase.from('maintenance_sublocations').select('id, name'),
-        supabase
-          .from('maintenance_tickets')
-          .select('ticket_number')
-          .eq('client_id', profile.client_id),
-      ])
-      setRefData({
-        plants: p.data || [],
-        priorities: pr.data || [],
-        types: t.data || [],
-        statuses: s.data || [],
-        areas: a.data || [],
-        assets: as.data || [],
-        assignees: asg.data || [],
-        locations: loc.data || [],
-        sublocations: sub.data || [],
-      })
-      const nums = new Set<string>()
-      ;(tk.data || []).forEach((t: any) => nums.add(String(t.ticket_number ?? '').toLowerCase()))
-      setExistingNumbers(nums)
-    })()
-  }, [open, user?.id])
+  }, [])
 
-  const handleFileSelect = async (f: File | undefined) => {
-    if (!f) return
-    if (!f.name.toLowerCase().endsWith('.xlsx')) {
-      toast.error('Apenas arquivos .xlsx são aceitos')
+  const reset = useCallback(() => {
+    setFile(null)
+    setIsProcessing(false)
+    setResult(null)
+    setProgress(0)
+    if (progressTimer.current) {
+      clearInterval(progressTimer.current)
+      progressTimer.current = null
+    }
+  }, [])
+
+  const handleFileSelect = (selectedFile: File | undefined) => {
+    if (!selectedFile) return
+    const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase()
+    if (!['.csv', '.xlsx', '.xls'].includes(ext)) {
+      toast.error('Formato inválido. Use .csv, .xlsx ou .xls')
       return
     }
-    setFile(f)
-    setParsing(true)
-    try {
-      const data = await parseExcelFile(f)
-      if (!data.headers.length) throw new Error('Nenhuma coluna encontrada')
-      setParsed(data)
-      setMapping(autoDetectMapping(data.headers))
-      setStep('mapping')
-    } catch (err: any) {
-      toast.error(err.message)
-      setFile(null)
-    } finally {
-      setParsing(false)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 10MB')
+      return
     }
+    setFile(selectedFile)
+    setResult(null)
   }
 
-  const handleValidate = () => {
-    if (!parsed || !refData || !clientId) return
-    setValidating(true)
-    try {
-      const r = validateRows(parsed.rows, mapping, refData, existingNumbers)
-      setValidation(r)
-      setStep('validation')
-    } catch (err: any) {
-      toast.error(err.message)
-    } finally {
-      setValidating(false)
-    }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+    handleFileSelect(e.dataTransfer.files[0])
   }
 
   const handleImport = async () => {
-    if (!validation || !clientId || !refData) return
-    setStep('importing')
+    if (!file) return
+    setIsProcessing(true)
+    setResult(null)
+    setProgress(0)
+
+    progressTimer.current = setInterval(() => {
+      setProgress((prev) => Math.min(prev + Math.random() * 8, 90))
+    }, 400)
+
     try {
-      const ds = refData.statuses.find((s) => s.step === 'Aberto') || refData.statuses[0]
-      const count = await bulkInsertTickets(validation.validRows, clientId, ds?.id || null)
-      setImportedCount(count)
-      setStep('result')
-      toast.success(`${count} chamados importados com sucesso.`)
-      onImportComplete()
+      const { data, error } = await supabase.functions.invoke('import-tickets', {
+        body: file,
+      })
+      setProgress(100)
+      if (error) throw error
+      const res = data as ImportResult
+      setResult(res)
+      if (res.success && (res.inserted > 0 || res.updated > 0)) {
+        const parts: string[] = []
+        if (res.inserted > 0) parts.push(`${res.inserted} importado(s)`)
+        if (res.updated > 0) parts.push(`${res.updated} atualizado(s)`)
+        if (res.skipped > 0) parts.push(`${res.skipped} ignorado(s)`)
+        toast.success(
+          parts.join(', ') + (res.errors.length > 0 ? ` (${res.errors.length} erro(s))` : ''),
+        )
+        onImportComplete()
+      } else if (res.success && res.inserted === 0 && res.updated === 0) {
+        toast.info('Nenhum chamado novo para importar.')
+      } else {
+        toast.error(res.error || 'Erro ao importar chamados')
+      }
     } catch (err: any) {
-      setImportError(err.message)
-      setStep('result')
-      toast.error(err.message)
+      setResult({
+        success: false,
+        inserted: 0,
+        updated: 0,
+        skipped: 0,
+        total: 0,
+        errors: [],
+        error: err.message,
+      })
+      toast.error(err.message || 'Erro ao importar chamados')
+    } finally {
+      if (progressTimer.current) {
+        clearInterval(progressTimer.current)
+        progressTimer.current = null
+      }
+      setIsProcessing(false)
     }
   }
 
-  const previewRows = parsed?.rows.slice(0, 5) || []
+  const handleOpenChange = (open: boolean) => {
+    if (!open) reset()
+    onOpenChange(open)
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Importar Chamados (OS)</DialogTitle>
+          <DialogTitle>Importar Chamados</DialogTitle>
         </DialogHeader>
 
-        {step === 'upload' && (
-          <div className="py-4">
+        {!result ? (
+          <div className="space-y-4 py-2">
             <div
               className={cn(
-                'border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all',
-                parsing
-                  ? 'opacity-50 pointer-events-none'
-                  : 'hover:bg-muted/50 border-border hover:border-brand-vividBlue/50',
+                'border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer',
+                dragActive
+                  ? 'border-brand-vividBlue bg-brand-vividBlue/5'
+                  : 'border-slate-300 hover:border-brand-vividBlue/50 hover:bg-slate-50',
+                isProcessing && 'opacity-50 pointer-events-none',
               )}
-              onClick={() => !parsing && document.getElementById('import-tickets-input')?.click()}
+              onClick={() => !isProcessing && inputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragActive(true)
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault()
+                setDragActive(false)
+              }}
+              onDrop={handleDrop}
             >
-              {parsing ? (
+              {file ? (
                 <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="w-10 h-10 animate-spin text-brand-vividBlue" />
-                  <p className="text-sm text-muted-foreground">Processando arquivo...</p>
-                </div>
-              ) : file ? (
-                <div className="flex flex-col items-center gap-2">
-                  <FileSpreadsheet className="w-10 h-10 text-green-600" />
-                  <p className="text-sm font-medium">{file.name}</p>
+                  <FileSpreadsheet className="w-12 h-12 text-green-600" />
+                  <p className="text-sm font-medium text-slate-700">{file.name}</p>
+                  <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  <UploadCloud className="w-10 h-10 text-muted-foreground" />
-                  <p className="text-sm font-medium">Clique para selecionar um arquivo .xlsx</p>
-                  <p className="text-xs text-muted-foreground">
-                    Apenas arquivos Excel (.xlsx) são aceitos
+                  <UploadCloud className="w-12 h-12 text-slate-400" />
+                  <p className="text-sm font-medium text-slate-700">
+                    Arraste um arquivo ou clique para selecionar
                   </p>
+                  <p className="text-xs text-slate-500">Formatos: .csv, .xlsx, .xls (máx. 10MB)</p>
                 </div>
               )}
               <input
-                id="import-tickets-input"
+                ref={inputRef}
                 type="file"
-                accept=".xlsx"
                 className="hidden"
+                accept=".csv,.xlsx,.xls"
                 onChange={(e) => handleFileSelect(e.target.files?.[0])}
+                disabled={isProcessing}
               />
             </div>
-          </div>
-        )}
 
-        {step === 'mapping' && parsed && (
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              Mapeie as colunas do Excel aos campos do sistema. {parsed.rows.length} linhas
-              encontradas.
-            </p>
-            <div className="border rounded-lg overflow-auto max-h-40">
-              <table className="w-full text-xs">
-                <thead className="bg-muted sticky top-0">
-                  <tr>
-                    {parsed.headers.map((h, i) => (
-                      <th key={i} className="px-2 py-1 text-left font-medium whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewRows.map((row, ri) => (
-                    <tr key={ri} className="border-t">
-                      {parsed.headers.map((h, ci) => (
-                        <td key={ci} className="px-2 py-1 truncate max-w-[120px]">
-                          {String(row[h] ?? '')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SYSTEM_FIELDS.map((field) => (
-                <div key={field.key} className="flex items-center gap-2">
-                  <span className="text-xs font-medium w-32 shrink-0">
-                    {field.label}
-                    {field.required && <span className="text-red-500"> *</span>}
-                  </span>
-                  <Select
-                    value={mapping[field.key] || '__none__'}
-                    onValueChange={(v) =>
-                      setMapping({ ...mapping, [field.key]: v === '__none__' ? '' : v })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-xs flex-1">
-                      <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Não mapear</SelectItem>
-                      {parsed.headers.map((h) => (
-                        <SelectItem key={h} value={h}>
-                          {h}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {isProcessing && (
+              <div className="space-y-2 bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span>Processando importação... {progress.toFixed(0)}%</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 'validation' && validation && (
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-blue-700">{validation.total}</p>
-                <p className="text-xs text-blue-600">Total</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-green-700">{validation.valid}</p>
-                <p className="text-xs text-green-600">Válidos</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-red-700">{validation.invalid}</p>
-                <p className="text-xs text-red-600">Inválidos</p>
-              </div>
-            </div>
-            {validation.errors.length > 0 && (
-              <div className="max-h-60 overflow-auto border rounded-lg">
-                {validation.errors.slice(0, 100).map((e, i) => (
-                  <div key={i} className="px-3 py-2 border-b text-xs last:border-0">
-                    <span className="font-semibold text-red-700">
-                      Linha {e.rowIndex}
-                      {e.ticketNumber && ` (${e.ticketNumber})`}:
-                    </span>
-                    <span className="text-red-600"> {e.messages.join(', ')}</span>
-                  </div>
-                ))}
+                <Progress value={progress} className="h-2" />
               </div>
             )}
-          </div>
-        )}
 
-        {step === 'importing' && (
-          <div className="py-10 flex flex-col items-center gap-4">
-            <Loader2 className="w-10 h-10 animate-spin text-brand-vividBlue" />
-            <p className="text-sm text-muted-foreground">Importando chamados...</p>
-            <Progress value={50} className="h-2 w-full max-w-xs" />
-          </div>
-        )}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="link"
+                size="sm"
+                onClick={downloadTicketsTemplate}
+                className="text-brand-vividBlue p-0 h-auto"
+              >
+                <Download className="w-3.5 h-3.5 mr-1" />
+                Baixar Template
+              </Button>
+              {file && !isProcessing && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFile(null)}
+                  className="text-slate-500"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Remover
+                </Button>
+              )}
+            </div>
 
-        {step === 'result' && (
-          <div className="py-10 flex flex-col items-center gap-3">
-            {importError ? (
-              <>
-                <AlertCircle className="w-12 h-12 text-red-500" />
-                <p className="text-lg font-semibold">Falha na importação</p>
-                <p className="text-sm text-muted-foreground text-center max-w-md">{importError}</p>
-              </>
+            <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-600">
+              <p className="font-semibold text-slate-700 mb-1">Colunas esperadas:</p>
+              <p>
+                <span className="font-mono">Título</span>,{' '}
+                <span className="font-mono">Descrição</span>,{' '}
+                <span className="font-mono">Prioridade</span> (Alta/Média/Baixa),{' '}
+                <span className="font-mono">Data de Abertura</span> (YYYY-MM-DD),{' '}
+                <span className="font-mono">Status</span> (Aberto/Em Andamento/Fechado),{' '}
+                <span className="font-mono">Área</span>, <span className="font-mono">Ativo</span>,{' '}
+                <span className="font-mono">Tipo</span>
+              </p>
+              <p className="mt-2 text-slate-500">
+                Baixe o template Excel para preencher corretamente e evitar erros de importação.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            {result.success ? (
+              <div className="flex flex-col items-center text-center py-4">
+                <CheckCircle2 className="w-14 h-14 text-green-500 mb-3" />
+                <p className="text-lg font-semibold text-slate-800">Importação concluída!</p>
+                <div className="mt-4 grid grid-cols-4 gap-3 w-full">
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-green-700">{result.inserted}</p>
+                    <p className="text-xs text-green-600">Importados</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-700">{result.updated}</p>
+                    <p className="text-xs text-blue-600">Atualizados</p>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-amber-700">{result.skipped}</p>
+                    <p className="text-xs text-amber-600">Ignorados</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-red-700">{result.errors.length}</p>
+                    <p className="text-xs text-red-600">Erros</p>
+                  </div>
+                </div>
+                {result.errors.length > 0 && (
+                  <div className="mt-4 w-full max-h-40 overflow-auto bg-red-50 rounded-lg p-3 text-left border border-red-100">
+                    {result.errors.slice(0, 50).map((err, i) => (
+                      <p key={i} className="text-xs text-red-600 mb-1">
+                        • {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : (
-              <>
-                <CheckCircle2 className="w-12 h-12 text-green-500" />
-                <p className="text-lg font-semibold">Importação concluída!</p>
-                <p className="text-sm text-muted-foreground">
-                  {importedCount} chamado(s) importado(s) com sucesso.
-                </p>
-              </>
+              <div className="flex flex-col items-center text-center py-4">
+                <AlertCircle className="w-14 h-14 text-red-500 mb-3" />
+                <p className="text-lg font-semibold text-slate-800">Falha na importação</p>
+                <p className="text-sm text-slate-500 mt-1">{result.error}</p>
+              </div>
             )}
           </div>
         )}
 
         <DialogFooter>
-          {step === 'mapping' && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setStep('upload')
-                  setFile(null)
-                }}
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-              </Button>
-              <Button onClick={handleValidate} disabled={validating}>
-                {validating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-                Validar Dados
-              </Button>
-            </>
-          )}
-          {step === 'validation' && (
-            <>
-              <Button variant="outline" onClick={() => setStep('mapping')}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-              </Button>
-              <Button onClick={handleImport} disabled={validation.valid === 0}>
-                Importar {validation.valid} Chamado(s)
-              </Button>
-            </>
-          )}
-          {step === 'result' && (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Fechar
+          {result ? (
+            <Button variant="outline" onClick={reset} className="w-full">
+              Importar outro arquivo
+            </Button>
+          ) : (
+            <Button onClick={handleImport} disabled={!file || isProcessing} className="w-full">
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <UploadCloud className="w-4 h-4 mr-2" />
+                  Importar Chamados
+                </>
+              )}
             </Button>
           )}
         </DialogFooter>
