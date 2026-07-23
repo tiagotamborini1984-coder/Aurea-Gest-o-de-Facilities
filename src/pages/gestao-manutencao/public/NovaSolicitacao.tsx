@@ -42,25 +42,19 @@ import {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 
-interface PublicOptions {
-  client: {
-    id: string
-    name: string
-    logo_url: string | null
-    primary_color: string | null
-    secondary_color: string | null
-  }
-  plants: { id: string; name: string }[]
-  areas: { id: string; name: string; plant_id: string }[]
-}
-
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [loadingAreas, setLoadingAreas] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [options, setOptions] = useState<PublicOptions | null>(null)
+
+  const [client, setClient] = useState<any>(null)
+  const [plants, setPlants] = useState<any[]>([])
+  const [areas, setAreas] = useState<any[]>([])
+  const [plantsError, setPlantsError] = useState<string | null>(null)
+
   const [success, setSuccess] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -73,23 +67,75 @@ export default function NovaSolicitacaoPublica() {
   const [files, setFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const loadData = useCallback(async () => {
+  const loadClientAndPlants = useCallback(async () => {
     if (!slug) {
       setLoading(false)
       return
     }
-    const { data, error } = await supabase.rpc('get_maintenance_public_options', { p_slug: slug })
-    if (error || !data) {
+    try {
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id, name, logo_url, primary_color, secondary_color')
+        .eq('url_slug', slug)
+        .eq('status', 'Ativo')
+        .single()
+
+      if (clientError || !clientData) {
+        setLoading(false)
+        return
+      }
+      setClient(clientData)
+
+      const { data: plantsData, error: plantsError } = await supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', clientData.id)
+        .order('name')
+
+      if (plantsError) {
+        setPlantsError('Erro ao carregar plantas. Tente novamente.')
+      } else if (plantsData) {
+        setPlants(plantsData)
+        setPlantsError(null)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
       setLoading(false)
-      return
     }
-    setOptions(data as PublicOptions)
-    setLoading(false)
   }, [slug])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadClientAndPlants()
+  }, [loadClientAndPlants])
+
+  useEffect(() => {
+    async function loadAreas() {
+      if (!form.plant_id || !client) {
+        setAreas([])
+        return
+      }
+      setLoadingAreas(true)
+      try {
+        const { data, error } = await supabase
+          .from('maintenance_areas')
+          .select('id, name, plant_id')
+          .eq('plant_id', form.plant_id)
+          .eq('client_id', client.id)
+          .order('name')
+        if (error) {
+          toast.error('Erro ao carregar áreas. Tente novamente.')
+        } else if (data) {
+          setAreas(data)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoadingAreas(false)
+      }
+    }
+    loadAreas()
+  }, [form.plant_id, client])
 
   useEffect(() => {
     if (user) {
@@ -101,16 +147,11 @@ export default function NovaSolicitacaoPublica() {
     }
   }, [user?.id])
 
-  const client = options?.client ?? null
   const accessibleColors = useMemo(
     () => getAccessibleColors(client?.primary_color || null, client?.secondary_color || null),
     [client],
   )
   const primaryColor = accessibleColors.primary
-  const availableAreas = useMemo(
-    () => options?.areas.filter((a) => a.plant_id === form.plant_id) || [],
-    [options, form.plant_id],
-  )
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -354,17 +395,15 @@ export default function NovaSolicitacaoPublica() {
                       setForm({ ...form, plant_id: v, area_id: '' })
                       if (errors.plant_id) setErrors({ ...errors, plant_id: '' })
                     }}
-                    disabled={!options?.plants || options.plants.length === 0}
+                    disabled={!plants || plants.length === 0}
                   >
                     <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
                       <SelectValue
-                        placeholder={
-                          options?.plants?.length ? 'Selecione...' : 'Nenhuma planta cadastrada'
-                        }
+                        placeholder={plants?.length ? 'Selecione...' : 'Nenhuma planta disponível'}
                       />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
-                      {options?.plants.map((p) => (
+                      {plants.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name}
                         </SelectItem>
@@ -374,10 +413,9 @@ export default function NovaSolicitacaoPublica() {
                   {errors.plant_id && (
                     <p className="text-xs text-red-500 mt-1">{errors.plant_id}</p>
                   )}
-                  {options?.plants?.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      Nenhuma planta cadastrada para esta empresa.
-                    </p>
+                  {plantsError && <p className="text-xs text-red-500 mt-1">{plantsError}</p>}
+                  {plants?.length === 0 && !plantsError && (
+                    <p className="text-xs text-amber-600 mt-1">Nenhuma planta disponível.</p>
                   )}
                 </div>
 
@@ -392,13 +430,13 @@ export default function NovaSolicitacaoPublica() {
                       setForm({ ...form, area_id: v })
                       if (errors.area_id) setErrors({ ...errors, area_id: '' })
                     }}
-                    disabled={!form.plant_id}
+                    disabled={!form.plant_id || loadingAreas}
                   >
                     <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
-                      <SelectValue placeholder="Selecione..." />
+                      <SelectValue placeholder={loadingAreas ? 'Carregando...' : 'Selecione...'} />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
-                      {availableAreas.map((a) => (
+                      {areas.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.name}
                         </SelectItem>
@@ -406,7 +444,7 @@ export default function NovaSolicitacaoPublica() {
                     </SelectContent>
                   </Select>
                   {errors.area_id && <p className="text-xs text-red-500 mt-1">{errors.area_id}</p>}
-                  {form.plant_id && availableAreas.length === 0 && (
+                  {form.plant_id && areas.length === 0 && !loadingAreas && (
                     <p className="text-xs text-amber-600 mt-1">
                       Nenhuma área cadastrada para esta planta.
                     </p>

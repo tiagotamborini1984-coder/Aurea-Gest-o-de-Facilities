@@ -939,6 +939,28 @@ export default function ChamadosManutencao() {
                 </p>
               </div>
 
+              {selectedTicket.requester_name && (
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <Label className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1 block">
+                    Solicitante
+                  </Label>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {selectedTicket.requester_name}
+                  </div>
+                  {selectedTicket.requester_email && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {selectedTicket.requester_email}
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Reportado em:{' '}
+                    {new Date(
+                      selectedTicket.reported_at || selectedTicket.created_at,
+                    ).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+              )}
+
               {/* Checklist Section */}
               {checklistResponses.length > 0 && (
                 <div className="pt-4 border-t">
