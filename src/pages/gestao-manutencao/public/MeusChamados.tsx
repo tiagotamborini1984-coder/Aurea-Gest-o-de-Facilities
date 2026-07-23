@@ -32,9 +32,9 @@ export default function MeusChamadosPublico() {
   }, [authLoading, user, slug, navigate])
 
   useEffect(() => {
-    if (user?.email) {
+    if (user?.id && user?.email) {
       ensureRequesterRecord(user)
-      loadTickets(user.email)
+      loadTickets(user.id, user.email)
     }
   }, [user])
 
@@ -49,7 +49,7 @@ export default function MeusChamadosPublico() {
     )
   }
 
-  const loadTickets = async (email: string) => {
+  const loadTickets = async (userId: string, email: string) => {
     setLoading(true)
     const { data } = await supabase
       .from('maintenance_tickets')
@@ -59,7 +59,7 @@ export default function MeusChamadosPublico() {
         area:maintenance_areas(name),
         plant:plants(name)`,
       )
-      .eq('requester_email', email)
+      .or(`requester_id.eq.${userId},requester_email.eq.${email}`)
       .order('created_at', { ascending: false })
     setTickets(data || [])
     setLoading(false)
@@ -118,7 +118,7 @@ export default function MeusChamadosPublico() {
             }
             onClick={() => navigate(`/m/${slug}/nova-solicitacao`)}
           >
-            <Plus className="h-4 w-4 mr-2" /> Nova Solicitação
+            <Plus className="h-4 w-4 mr-2" /> Abrir Novo Chamado
           </Button>
         </div>
         {loading ? (
@@ -139,7 +139,7 @@ export default function MeusChamadosPublico() {
                 }
                 onClick={() => navigate(`/m/${slug}/nova-solicitacao`)}
               >
-                Criar primeira solicitação
+                Abrir Primeiro Chamado
               </Button>
             </CardContent>
           </Card>

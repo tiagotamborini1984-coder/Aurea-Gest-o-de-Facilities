@@ -23,12 +23,12 @@ export default function DetalheChamadoPublico() {
   }, [authLoading, user, slug, navigate])
 
   useEffect(() => {
-    if (user?.email && ticketId) {
-      loadTicket(ticketId, user.email)
+    if (user?.id && user?.email && ticketId) {
+      loadTicket(ticketId, user.id, user.email)
     }
   }, [user, ticketId])
 
-  const loadTicket = async (id: string, email: string) => {
+  const loadTicket = async (id: string, userId: string, email: string) => {
     setLoading(true)
     const { data } = await supabase
       .from('maintenance_tickets')
@@ -42,7 +42,7 @@ export default function DetalheChamadoPublico() {
         assignee:profiles!maintenance_tickets_assignee_id_fkey(name)`,
       )
       .eq('id', id)
-      .eq('requester_email', email)
+      .or(`requester_id.eq.${userId},requester_email.eq.${email}`)
       .single()
     setTicket(data)
     setLoading(false)

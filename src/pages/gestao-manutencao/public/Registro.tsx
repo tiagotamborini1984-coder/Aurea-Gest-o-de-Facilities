@@ -18,10 +18,25 @@ export default function RegistroPublico() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [clientId, setClientId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) navigate(`/m/${slug}/meus-chamados`, { replace: true })
   }, [user, slug, navigate])
+
+  useEffect(() => {
+    async function fetchClient() {
+      if (!slug) return
+      const { data } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('url_slug', slug)
+        .eq('status', 'Ativo')
+        .single()
+      if (data) setClientId(data.id)
+    }
+    fetchClient()
+  }, [slug])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,7 +57,7 @@ export default function RegistroPublico() {
       email: form.email.trim(),
       password: form.password,
       options: {
-        data: { name: form.name.trim(), role: 'Solicitante' },
+        data: { name: form.name.trim(), role: 'chamado', client_id: clientId },
         emailRedirectTo: `${window.location.origin}/m/${slug}/entrar`,
       },
     })

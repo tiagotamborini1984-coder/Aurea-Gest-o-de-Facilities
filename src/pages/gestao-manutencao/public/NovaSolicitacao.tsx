@@ -44,7 +44,7 @@ const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [loadingAreas, setLoadingAreas] = useState(false)
@@ -147,6 +147,12 @@ export default function NovaSolicitacaoPublica() {
     }
   }, [user?.id])
 
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate(`/m/${slug}/entrar`, { replace: true })
+    }
+  }, [authLoading, user, slug, navigate])
+
   const accessibleColors = useMemo(
     () => getAccessibleColors(client?.primary_color || null, client?.secondary_color || null),
     [client],
@@ -209,6 +215,7 @@ export default function NovaSolicitacaoPublica() {
         p_description: form.description.trim(),
         p_photos: photoUrls,
         p_origin: 'public',
+        p_requester_id: user?.id || null,
       } as any)
 
       if (error) throw error
@@ -225,7 +232,7 @@ export default function NovaSolicitacaoPublica() {
     }
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900">
         <div className="flex flex-col items-center gap-3">
@@ -359,6 +366,8 @@ export default function NovaSolicitacaoPublica() {
                   }}
                   placeholder="Como podemos chamá-lo?"
                   maxLength={200}
+                  readOnly={!!user}
+                  disabled={!!user}
                 />
                 {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
               </div>
@@ -379,6 +388,8 @@ export default function NovaSolicitacaoPublica() {
                   }}
                   placeholder="seu.email@exemplo.com"
                   maxLength={200}
+                  readOnly={!!user}
+                  disabled={!!user}
                 />
                 {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
               </div>
