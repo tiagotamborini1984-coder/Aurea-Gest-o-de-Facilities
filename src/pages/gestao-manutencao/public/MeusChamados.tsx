@@ -2,15 +2,26 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { useClientColors } from '@/hooks/use-client-colors'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Loader2, Plus, Wrench, LogOut, ChevronRight } from 'lucide-react'
+import {
+  Loader2,
+  Plus,
+  Wrench,
+  LogOut,
+  ChevronRight,
+  MapPin,
+  Building2,
+  Calendar,
+} from 'lucide-react'
 
 export default function MeusChamadosPublico() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
+  const { colors } = useClientColors(slug)
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -62,23 +73,34 @@ export default function MeusChamadosPublico() {
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-brand-vividBlue" />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b shadow-sm sticky top-0 z-20 border-brand-vividBlue">
+      <header
+        className="bg-white border-b shadow-sm sticky top-0 z-20"
+        style={{ borderBottomColor: colors.primary }}
+      >
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-brand-vividBlue">
+          <div
+            className="h-10 w-10 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: colors.primary }}
+          >
             <Wrench className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="font-bold text-base text-slate-900">Meus Chamados</h1>
-            <p className="text-xs text-slate-500 truncate">{user.email}</p>
+            <p className="text-xs text-slate-600 truncate">{user.email}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            className="focus:ring-2 focus:ring-offset-1"
+          >
             <LogOut className="h-4 w-4 mr-1" /> Sair
           </Button>
         </div>
@@ -87,7 +109,13 @@ export default function MeusChamadosPublico() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-slate-900">Solicitações</h2>
           <Button
-            className="bg-brand-vividBlue"
+            className="hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
+            style={
+              {
+                backgroundColor: colors.primary,
+                '--tw-ring-color': colors.primary,
+              } as React.CSSProperties
+            }
             onClick={() => navigate(`/m/${slug}/nova-solicitacao`)}
           >
             <Plus className="h-4 w-4 mr-2" /> Nova Solicitação
@@ -95,14 +123,20 @@ export default function MeusChamadosPublico() {
         </div>
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-vividBlue" />
+            <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
           </div>
         ) : tickets.length === 0 ? (
           <Card className="shadow-md">
             <CardContent className="pt-10 pb-10 text-center">
-              <p className="text-slate-500 mb-4">Você ainda não possui solicitações.</p>
+              <p className="text-slate-600 mb-4">Você ainda não possui solicitações.</p>
               <Button
-                className="bg-brand-vividBlue"
+                className="hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
+                style={
+                  {
+                    backgroundColor: colors.primary,
+                    '--tw-ring-color': colors.primary,
+                  } as React.CSSProperties
+                }
                 onClick={() => navigate(`/m/${slug}/nova-solicitacao`)}
               >
                 Criar primeira solicitação
@@ -114,13 +148,14 @@ export default function MeusChamadosPublico() {
             {tickets.map((t) => (
               <Card
                 key={t.id}
-                className="shadow-sm hover:shadow-md transition cursor-pointer"
+                className="shadow-sm hover:shadow-md transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2"
                 onClick={() => navigate(`/m/${slug}/chamado/${t.id}`)}
+                style={{ '--tw-ring-color': colors.primary } as React.CSSProperties}
               >
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-bold text-slate-500">
+                      <span className="text-xs font-mono font-bold text-slate-700">
                         {t.ticket_number}
                       </span>
                       {t.status && (
@@ -137,16 +172,29 @@ export default function MeusChamadosPublico() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-slate-700 line-clamp-1">{t.description}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {new Date(t.created_at).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                    <p className="text-sm text-slate-800 line-clamp-1 font-medium">
+                      {t.description}
                     </p>
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                      {t.plant && (
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                          <Building2 className="h-3 w-3" /> {t.plant.name}
+                        </span>
+                      )}
+                      {t.area && (
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {t.area.name}
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(t.created_at).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0" />
                 </CardContent>

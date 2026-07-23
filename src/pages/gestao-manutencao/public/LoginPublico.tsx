@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { useClientColors } from '@/hooks/use-client-colors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +14,7 @@ export default function LoginPublico() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { colors } = useClientColors(slug)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -38,14 +40,20 @@ export default function LoginPublico() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-white border-b-2 shadow-sm sticky top-0 z-20 border-brand-vividBlue">
+      <header
+        className="bg-white border-b-2 shadow-sm sticky top-0 z-20"
+        style={{ borderBottomColor: colors.primary }}
+      >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-brand-vividBlue">
+          <div
+            className="h-11 w-11 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: colors.primary }}
+          >
             <Wrench className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1">
             <h1 className="font-bold text-base text-slate-900">Portal de Manutenção</h1>
-            <p className="text-xs text-slate-500">Entrar</p>
+            <p className="text-xs text-slate-600">Entrar</p>
           </div>
         </div>
       </header>
@@ -54,7 +62,7 @@ export default function LoginPublico() {
           <CardContent className="p-6 sm:p-8 space-y-5">
             <div className="text-center mb-4">
               <h2 className="text-2xl font-bold text-slate-900">Entrar</h2>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-slate-600 mt-1">
                 Acesse para acompanhar suas solicitações
               </p>
             </div>
@@ -90,7 +98,13 @@ export default function LoginPublico() {
               <Button
                 type="submit"
                 size="lg"
-                className="w-full bg-brand-vividBlue"
+                className="w-full hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
+                style={
+                  {
+                    backgroundColor: colors.primary,
+                    '--tw-ring-color': colors.primary,
+                  } as React.CSSProperties
+                }
                 disabled={loading}
               >
                 {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -98,12 +112,16 @@ export default function LoginPublico() {
               </Button>
             </form>
             <div className="flex items-center justify-between text-sm">
-              <Link to={`/m/${slug}/registro`} className="text-brand-vividBlue hover:underline">
+              <Link
+                to={`/m/${slug}/registro`}
+                className="font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-1 rounded px-1"
+                style={{ color: colors.primary }}
+              >
                 Criar conta
               </Link>
               <Link
                 to={`/m/${slug}/nova-solicitacao`}
-                className="text-slate-500 hover:underline flex items-center gap-1"
+                className="text-slate-600 hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-offset-1 rounded px-1"
               >
                 <ArrowLeft className="h-3 w-3" /> Voltar
               </Link>

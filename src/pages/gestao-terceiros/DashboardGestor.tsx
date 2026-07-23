@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { format, subDays } from 'date-fns'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
+import { getAccessibleColors } from '@/lib/contrast-utils'
 import { Building2, Settings2 } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
@@ -22,7 +23,12 @@ import { supabase } from '@/lib/supabase/client'
 
 export default function DashboardGestor() {
   const { activeClient, profile, selectedMasterClient } = useAppStore()
-  const brandSecondary = activeClient?.secondaryColor || '#1e3a8a'
+  const brandSecondary = useMemo(
+    () =>
+      getAccessibleColors(activeClient?.primaryColor || null, activeClient?.secondaryColor || null)
+        .secondary,
+    [activeClient?.primaryColor, activeClient?.secondaryColor],
+  )
 
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))

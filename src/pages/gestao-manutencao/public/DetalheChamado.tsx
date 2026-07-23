@@ -2,15 +2,17 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { useClientColors } from '@/hooks/use-client-colors'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Loader2, ArrowLeft, MapPin, Calendar, Clock, Wrench } from 'lucide-react'
+import { Loader2, ArrowLeft, MapPin, Calendar, Clock, Wrench, User } from 'lucide-react'
 
 export default function DetalheChamadoPublico() {
   const { slug, ticketId } = useParams()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
+  const { colors } = useClientColors(slug)
   const [ticket, setTicket] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -49,7 +51,7 @@ export default function DetalheChamadoPublico() {
   if (authLoading || !user || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-brand-vividBlue" />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
       </div>
     )
   }
@@ -61,7 +63,13 @@ export default function DetalheChamadoPublico() {
           <CardContent className="pt-10 pb-8">
             <h2 className="text-xl font-bold text-slate-900">Chamado não encontrado</h2>
             <Button
-              className="mt-4 bg-brand-vividBlue"
+              className="mt-4 hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
+              style={
+                {
+                  backgroundColor: colors.primary,
+                  '--tw-ring-color': colors.primary,
+                } as React.CSSProperties
+              }
               onClick={() => navigate(`/m/${slug}/meus-chamados`)}
             >
               Voltar
@@ -74,12 +82,20 @@ export default function DetalheChamadoPublico() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b shadow-sm sticky top-0 z-20 border-brand-vividBlue">
+      <header
+        className="bg-white border-b shadow-sm sticky top-0 z-20"
+        style={{ borderBottomColor: colors.primary }}
+      >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/m/${slug}/meus-chamados`)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/m/${slug}/meus-chamados`)}
+            className="focus:ring-2 focus:ring-offset-1"
+          >
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
-          <span className="font-mono font-bold text-sm text-slate-700">{ticket.ticket_number}</span>
+          <span className="font-mono font-bold text-sm text-slate-800">{ticket.ticket_number}</span>
         </div>
       </header>
       <main className="max-w-2xl mx-auto p-4 py-8 animate-fade-in-up space-y-4">
@@ -101,10 +117,10 @@ export default function DetalheChamadoPublico() {
               )}
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-500 mb-1">Descrição</h3>
-              <p className="text-sm text-slate-800 whitespace-pre-wrap">{ticket.description}</p>
+              <h3 className="text-sm font-semibold text-slate-600 mb-1">Descrição</h3>
+              <p className="text-sm text-slate-900 whitespace-pre-wrap">{ticket.description}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
               {ticket.plant && (
                 <InfoItem
                   icon={<MapPin className="h-4 w-4" />}
@@ -126,7 +142,7 @@ export default function DetalheChamadoPublico() {
               />
               {ticket.assignee && (
                 <InfoItem
-                  icon={<Clock className="h-4 w-4" />}
+                  icon={<User className="h-4 w-4" />}
                   label="Responsável"
                   value={ticket.assignee.name}
                 />
@@ -134,7 +150,7 @@ export default function DetalheChamadoPublico() {
             </div>
             {ticket.priority && (
               <div className="flex items-center gap-2 pt-2">
-                <span className="text-xs text-slate-500">Prioridade:</span>
+                <span className="text-xs text-slate-600">Prioridade:</span>
                 <Badge
                   variant="outline"
                   style={{ borderColor: ticket.priority.color, color: ticket.priority.color }}
@@ -148,10 +164,17 @@ export default function DetalheChamadoPublico() {
         {ticket.photos?.length > 0 && (
           <Card className="shadow-md">
             <CardContent className="p-6">
-              <h3 className="text-sm font-semibold text-slate-500 mb-3">Fotos anexadas</h3>
+              <h3 className="text-sm font-semibold text-slate-600 mb-3">Fotos anexadas</h3>
               <div className="grid grid-cols-3 gap-2">
                 {ticket.photos.map((url: string, i: number) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer">
+                  <a
+                    key={i}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
+                    style={{ '--tw-ring-color': colors.primary } as React.CSSProperties}
+                  >
                     <img
                       src={url}
                       alt={`anexo ${i + 1}`}
@@ -166,8 +189,8 @@ export default function DetalheChamadoPublico() {
         {ticket.closure_notes && (
           <Card className="shadow-md">
             <CardContent className="p-6">
-              <h3 className="text-sm font-semibold text-slate-500 mb-2">Notas de Fechamento</h3>
-              <p className="text-sm text-slate-800 whitespace-pre-wrap">{ticket.closure_notes}</p>
+              <h3 className="text-sm font-semibold text-slate-600 mb-2">Notas de Fechamento</h3>
+              <p className="text-sm text-slate-900 whitespace-pre-wrap">{ticket.closure_notes}</p>
             </CardContent>
           </Card>
         )}
@@ -179,10 +202,10 @@ export default function DetalheChamadoPublico() {
 function InfoItem({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
-      <div className="text-slate-400 mt-0.5">{icon}</div>
+      <div className="text-slate-500 mt-0.5">{icon}</div>
       <div>
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className="text-sm font-medium text-slate-800">{value}</p>
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-sm font-medium text-slate-900">{value}</p>
       </div>
     </div>
   )

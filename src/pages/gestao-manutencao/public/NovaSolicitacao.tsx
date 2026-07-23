@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { getAccessibleColors } from '@/lib/contrast-utils'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
@@ -95,7 +96,11 @@ export default function NovaSolicitacaoPublica() {
   }, [user?.id])
 
   const client = options?.client ?? null
-  const primaryColor = client?.primary_color || '#2563eb'
+  const accessibleColors = useMemo(
+    () => getAccessibleColors(client?.primary_color || null, client?.secondary_color || null),
+    [client],
+  )
+  const primaryColor = accessibleColors.primary
   const availableAreas = useMemo(
     () => options?.areas.filter((a) => a.plant_id === form.plant_id) || [],
     [options, form.plant_id],
