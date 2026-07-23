@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -14,76 +15,71 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Wrench, CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
-interface ClientInfo {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
+
+interface ClientData {
   id: string
   name: string
   logo_url: string | null
   primary_color: string | null
 }
 
-interface PublicOptions {
-  client: ClientInfo | null
-  plants: { id: string; name: string }[]
-}
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-function isValidEmail(email: string): boolean {
-  return EMAIL_REGEX.test(email)
-}
-
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [client, setClient] = useState<ClientData | null>(null)
+  const [plantId, setPlantId] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
-  const [options, setOptions] = useState<PublicOptions>({ client: null, plants: [] })
+  const [form, setForm] = useState({ name: '', email: '', description: '' })
 
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    description: '',
-  })
-
-  const loadOptions = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!slug) {
       setLoading(false)
       return
     }
-    const { data, error } = await supabase.rpc('get_maintenance_public_options', { p_slug: slug })
-    if (error || !data) {
+
+    const { data: clientData } = await supabase
+      .from('clients')
+      .select('id, name, logo_url, primary_color')
+      .eq('url_slug', slug)
+      .eq('status', 'Ativo')
+      .maybeSingle()
+
+    if (!clientData) {
       setLoading(false)
       return
     }
-    setOptions({
-      client: data.client ?? null,
-      plants: data.plants ?? [],
-    })
+    setClient(clientData)
+
+    const { data: plantData } = await supabase
+      .from('plants')
+      .select('id')
+      .eq('client_id', clientData.id)
+      .limit(1)
+
+    if (plantData && plantData.length > 0) {
+      setPlantId(plantData[0].id)
+    }
     setLoading(false)
   }, [slug])
 
   useEffect(() => {
-    loadOptions()
-  }, [loadOptions])
+    loadData()
+  }, [loadData])
 
   const isFormValid =
     form.name.trim().length > 0 &&
-    form.email.trim().length > 0 &&
     isValidEmail(form.email.trim()) &&
     form.description.trim().length > 0
 
-  const resetForm = () => {
-    setForm({ name: '', email: '', description: '' })
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid || !options.client) return
+    if (!isFormValid || !client) return
 
-    const plantId = options.plants[0]?.id
     if (!plantId) {
       setErrorModal('Nenhuma planta cadastrada para esta empresa. Entre em contato com o suporte.')
       return
@@ -92,7 +88,7 @@ export default function NovaSolicitacaoPublica() {
     setSubmitting(true)
     try {
       const { data, error } = await supabase.rpc('submit_maintenance_ticket', {
-        p_client_id: options.client.id,
+        p_client_id: client.id,
         p_plant_id: plantId,
         p_area_id: null,
         p_sublocation_id: null,
@@ -107,14 +103,16 @@ export default function NovaSolicitacaoPublica() {
       if (error) throw error
 
       setSuccess(data.ticket_number)
-      resetForm()
-      toast.success('Solicitação registrada com sucesso!')
+      setForm({ name: '', email: '', description: '' })
+      toast.success('Sua solicitação foi enviada com sucesso!')
     } catch (err: any) {
       setErrorModal(err.message || 'Erro ao enviar solicitação. Tente novamente.')
     } finally {
       setSubmitting(false)
     }
   }
+
+  const primaryColor = client?.primary_color || '#2563eb'
 
   if (loading) {
     return (
@@ -124,7 +122,7 @@ export default function NovaSolicitacaoPublica() {
     )
   }
 
-  if (!options.client) {
+  if (!client) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md text-center shadow-xl">
@@ -133,9 +131,7 @@ export default function NovaSolicitacaoPublica() {
               <AlertCircle className="h-8 w-8 text-red-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Empresa não encontrada</h2>
-            <p className="text-gray-500">
-              Empresa não encontrada. Verifique o link e tente novamente.
-            </p>
+            <p className="text-gray-500">Verifique o link e tente novamente.</p>
           </CardContent>
         </Card>
       </div>
@@ -143,7 +139,6 @@ export default function NovaSolicitacaoPublica() {
   }
 
   if (success) {
-    const primaryColor = options.client.primary_color || '#2563eb'
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center shadow-xl animate-fade-in-up">
@@ -152,7 +147,7 @@ export default function NovaSolicitacaoPublica() {
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Solicitação Registrada!</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Solicitação enviada com sucesso!</h2>
             <p className="text-gray-500">
               Sua solicitação de manutenção foi registrada com sucesso.
             </p>
@@ -172,8 +167,6 @@ export default function NovaSolicitacaoPublica() {
     )
   }
 
-  const primaryColor = options.client.primary_color || '#2563eb'
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header
@@ -181,8 +174,8 @@ export default function NovaSolicitacaoPublica() {
         style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          {options.client.logo_url ? (
-            <img src={options.client.logo_url} alt="Logo" className="h-10 w-auto" />
+          {client.logo_url ? (
+            <img src={client.logo_url} alt="Logo" className="h-10 w-auto" />
           ) : (
             <div
               className="h-10 w-10 rounded-lg flex items-center justify-center"
@@ -192,7 +185,7 @@ export default function NovaSolicitacaoPublica() {
             </div>
           )}
           <div>
-            <h1 className="font-bold text-lg leading-tight text-gray-900">{options.client.name}</h1>
+            <h1 className="font-bold text-lg leading-tight text-gray-900">{client.name}</h1>
             <p className="text-xs text-gray-500">Portal de Manutenção</p>
           </div>
         </div>
@@ -222,9 +215,6 @@ export default function NovaSolicitacaoPublica() {
                   placeholder="Como podemos chamá-lo?"
                   maxLength={200}
                 />
-                {form.name.length === 0 && (
-                  <p className="text-xs text-gray-400">Campo obrigatório</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -243,9 +233,6 @@ export default function NovaSolicitacaoPublica() {
                 {form.email.length > 0 && !isValidEmail(form.email) && (
                   <p className="text-xs text-red-500">Informe um e-mail válido.</p>
                 )}
-                {form.email.length === 0 && (
-                  <p className="text-xs text-gray-400">Campo obrigatório</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -261,9 +248,6 @@ export default function NovaSolicitacaoPublica() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   maxLength={2000}
                 />
-                {form.description.length === 0 && (
-                  <p className="text-xs text-gray-400">Campo obrigatório</p>
-                )}
               </div>
 
               <Button
@@ -281,7 +265,7 @@ export default function NovaSolicitacaoPublica() {
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Enviar Solicitação
+                    Enviar
                   </>
                 )}
               </Button>
