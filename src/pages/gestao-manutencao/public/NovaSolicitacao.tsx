@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,21 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Wrench, CheckCircle2, AlertCircle, Loader2, Send, Camera, X } from 'lucide-react'
+import {
+  Wrench,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Send,
+  Camera,
+  X,
+  ImagePlus,
+  MapPin,
+  Building2,
+  FileText,
+  Mail,
+  User,
+} from 'lucide-react'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
@@ -69,7 +83,10 @@ export default function NovaSolicitacaoPublica() {
 
   const client = options?.client ?? null
   const primaryColor = client?.primary_color || '#2563eb'
-  const availableAreas = options?.areas.filter((a) => a.plant_id === form.plant_id) || []
+  const availableAreas = useMemo(
+    () => options?.areas.filter((a) => a.plant_id === form.plant_id) || [],
+    [options, form.plant_id],
+  )
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -81,6 +98,19 @@ export default function NovaSolicitacaoPublica() {
     if (!form.description.trim()) e.description = 'Descrição é obrigatória'
     setErrors(e)
     return Object.keys(e).length === 0
+  }
+
+  const handleFileSelect = (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return
+    const imageFiles = Array.from(selectedFiles).filter((f) => f.type.startsWith('image/'))
+    if (imageFiles.length !== selectedFiles.length) {
+      toast.warning('Apenas arquivos de imagem são aceitos.')
+    }
+    setFiles((prev) => [...prev, ...imageFiles])
+  }
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,6 +151,7 @@ export default function NovaSolicitacaoPublica() {
       setSuccess(data.ticket_number)
       setForm({ name: '', email: '', description: '', plant_id: '', area_id: '' })
       setFiles([])
+      setErrors({})
       toast.success('Chamado aberto com sucesso!')
     } catch (err: any) {
       setErrorModal(err.message || 'Erro ao enviar solicitação. Tente novamente.')
@@ -131,22 +162,28 @@ export default function NovaSolicitacaoPublica() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin" style={{ color: primaryColor }} />
+          <p className="text-sm text-slate-500">Carregando formulário...</p>
+        </div>
       </div>
     )
   }
 
   if (!client) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md text-center shadow-xl">
-          <CardContent className="pt-10 pb-8 space-y-4">
-            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md text-center shadow-xl border-slate-200">
+          <CardContent className="pt-12 pb-8 space-y-4">
+            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
               <AlertCircle className="h-8 w-8 text-red-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Empresa não encontrada</h2>
-            <p className="text-gray-500">Verifique o link e tente novamente.</p>
+            <h2 className="text-2xl font-bold text-slate-900">Empresa não encontrada</h2>
+            <p className="text-slate-500 text-sm">
+              Verifique o link e tente novamente. Se o problema persistir, entre em contato com o
+              suporte.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -155,22 +192,24 @@ export default function NovaSolicitacaoPublica() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center shadow-xl animate-fade-in-up">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center shadow-xl overflow-hidden animate-fade-in-up">
           <div className="h-2 w-full" style={{ backgroundColor: primaryColor }} />
           <CardContent className="pt-10 pb-8 space-y-4">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="h-10 w-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Chamado aberto com sucesso!</h2>
-            <p className="text-gray-500">
-              Sua solicitação de manutenção foi registrada e nossa equipe já foi notificada.
+            <h2 className="text-2xl font-bold text-slate-900">Solicitação registrada!</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              Sua solicitação de manutenção foi registrada com sucesso e nossa equipe já foi
+              notificada. Acompanhe pelo número abaixo.
             </p>
-            <div className="bg-gray-100 p-4 rounded-lg font-mono text-xl font-semibold mt-4">
-              {success}
+            <div className="bg-slate-100 p-4 rounded-lg">
+              <p className="text-xs text-slate-400 mb-1">Número do chamado</p>
+              <p className="font-mono text-xl font-bold text-slate-900">{success}</p>
             </div>
             <Button
-              className="mt-8 w-full"
+              className="mt-6 w-full h-11"
               style={{ backgroundColor: primaryColor }}
               onClick={() => setSuccess(null)}
             >
@@ -183,82 +222,107 @@ export default function NovaSolicitacaoPublica() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <header
-        className="bg-white border-b shadow-sm sticky top-0 z-10"
+        className="bg-white border-b-2 shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
           {client.logo_url ? (
-            <img src={client.logo_url} alt="Logo" className="h-10 w-auto" />
+            <img
+              src={client.logo_url}
+              alt={client.name}
+              className="h-11 w-auto object-contain rounded"
+            />
           ) : (
             <div
-              className="h-10 w-10 rounded-lg flex items-center justify-center"
+              className="h-11 w-11 rounded-xl flex items-center justify-center shadow-sm"
               style={{ backgroundColor: primaryColor }}
             >
               <Wrench className="h-5 w-5 text-white" />
             </div>
           )}
-          <div>
-            <h1 className="font-bold text-lg leading-tight text-gray-900">{client.name}</h1>
-            <p className="text-xs text-gray-500">Portal de Manutenção</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold text-base leading-tight text-slate-900 truncate">
+              {client.name}
+            </h1>
+            <p className="text-xs text-slate-500">Portal de Manutenção</p>
           </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-2xl w-full mx-auto p-4 py-8 animate-fade-in-up">
-        <Card className="shadow-lg border-0 overflow-hidden">
-          <div className="h-2 w-full" style={{ backgroundColor: primaryColor }} />
-          <CardHeader className="bg-white pb-4">
-            <CardTitle className="text-2xl">Nova Solicitação</CardTitle>
-            <CardDescription>
-              Descreva o problema encontrado para que nossa equipe de manutenção possa agir
-              rapidamente.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="bg-gray-50/50 pt-6">
+        <div className="mb-6 text-center">
+          <div
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3 shadow-sm"
+            style={{ backgroundColor: `${primaryColor}15` }}
+          >
+            <Wrench className="h-7 w-7" style={{ color: primaryColor }} />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900">Nova Solicitação</h2>
+          <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+            Descreva o problema encontrado para que nossa equipe de manutenção possa agir
+            rapidamente.
+          </p>
+        </div>
+
+        <Card className="shadow-xl border-slate-200 overflow-hidden">
+          <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
+          <CardContent className="p-6 sm:p-8 space-y-5">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="name">
+                <Label htmlFor="name" className="text-sm font-semibold text-slate-700">
+                  <User className="inline-block h-3.5 w-3.5 mr-1" />
                   Nome <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="name"
-                  className="bg-white"
+                  className="bg-white h-11"
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, name: e.target.value })
+                    if (errors.name) setErrors({ ...errors, name: '' })
+                  }}
                   placeholder="Como podemos chamá-lo?"
                   maxLength={200}
                 />
-                {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">
+                <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
+                  <Mail className="inline-block h-3.5 w-3.5 mr-1" />
                   E-mail <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  className="bg-white"
+                  className="bg-white h-11"
                   value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, email: e.target.value })
+                    if (errors.email) setErrors({ ...errors, email: '' })
+                  }}
                   placeholder="seu.email@exemplo.com"
                   maxLength={200}
                 />
-                {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>
+                  <Label className="text-sm font-semibold text-slate-700">
+                    <Building2 className="inline-block h-3.5 w-3.5 mr-1" />
                     Planta <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     value={form.plant_id}
-                    onValueChange={(v) => setForm({ ...form, plant_id: v, area_id: '' })}
+                    onValueChange={(v) => {
+                      setForm({ ...form, plant_id: v, area_id: '' })
+                      if (errors.plant_id) setErrors({ ...errors, plant_id: '' })
+                    }}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-white h-11">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -269,19 +333,25 @@ export default function NovaSolicitacaoPublica() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.plant_id && <p className="text-xs text-red-500">{errors.plant_id}</p>}
+                  {errors.plant_id && (
+                    <p className="text-xs text-red-500 mt-1">{errors.plant_id}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>
+                  <Label className="text-sm font-semibold text-slate-700">
+                    <MapPin className="inline-block h-3.5 w-3.5 mr-1" />
                     Área <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     value={form.area_id}
-                    onValueChange={(v) => setForm({ ...form, area_id: v })}
+                    onValueChange={(v) => {
+                      setForm({ ...form, area_id: v })
+                      if (errors.area_id) setErrors({ ...errors, area_id: '' })
+                    }}
                     disabled={!form.plant_id}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="bg-white h-11">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -292,55 +362,81 @@ export default function NovaSolicitacaoPublica() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.area_id && <p className="text-xs text-red-500">{errors.area_id}</p>}
+                  {errors.area_id && <p className="text-xs text-red-500 mt-1">{errors.area_id}</p>}
+                  {form.plant_id && availableAreas.length === 0 && (
+                    <p className="text-xs text-amber-500 mt-1">
+                      Nenhuma área cadastrada para esta planta.
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">
+                <Label htmlFor="description" className="text-sm font-semibold text-slate-700">
+                  <FileText className="inline-block h-3.5 w-3.5 mr-1" />
                   Descrição do Problema <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   rows={5}
                   className="bg-white resize-none"
-                  placeholder="Descreva com detalhes o que está acontecendo..."
+                  placeholder="Descreva com detalhes o que está acontecendo (ex: equipamento, local exato, quando começou, etc.)..."
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, description: e.target.value })
+                    if (errors.description) setErrors({ ...errors, description: '' })
+                  }}
                   maxLength={2000}
                 />
-                {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
+                <div className="flex justify-between items-center">
+                  {errors.description ? (
+                    <p className="text-xs text-red-500">{errors.description}</p>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="text-xs text-slate-400">{form.description.length}/2000</span>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Fotos (opcional)</Label>
-                <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-gray-100/50 transition cursor-pointer relative">
+                <Label className="text-sm font-semibold text-slate-700">
+                  <Camera className="inline-block h-3.5 w-3.5 mr-1" />
+                  Fotos (opcional)
+                </Label>
+                <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-slate-400 hover:bg-slate-50 transition cursor-pointer relative group">
                   <input
                     type="file"
                     multiple
                     accept="image/*"
                     className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={(e) =>
-                      e.target.files &&
-                      setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
-                    }
+                    onChange={(e) => handleFileSelect(e.target.files)}
                   />
-                  <Camera className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-                  <span className="text-sm text-gray-500">Clique ou arraste imagens aqui</span>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-slate-200 transition">
+                      <ImagePlus className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <span className="text-sm text-slate-500">Clique para adicionar imagens</span>
+                    <span className="text-xs text-slate-400">JPG, PNG, GIF</span>
+                  </div>
                 </div>
                 {files.length > 0 && (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {files.map((f, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between text-xs bg-white px-2 py-1 rounded border"
+                        className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100"
                       >
-                        <span className="truncate">{f.name}</span>
+                        <img
+                          src={URL.createObjectURL(f)}
+                          alt={f.name}
+                          className="w-full h-full object-cover"
+                        />
                         <button
                           type="button"
-                          onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
+                          onClick={() => removeFile(i)}
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md hover:bg-red-600"
                         >
-                          <X className="h-3 w-3 text-red-500" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ))}
@@ -358,30 +454,41 @@ export default function NovaSolicitacaoPublica() {
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Enviando...
+                    Enviando solicitação...
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Enviar
+                    Enviar Solicitação
                   </>
                 )}
               </Button>
             </form>
           </CardContent>
         </Card>
+
+        <p className="text-center text-xs text-slate-400 mt-6">
+          Ao enviar, você concorda em fornecer informações verídicas para tratamento da sua
+          solicitação.
+        </p>
       </main>
 
       <Dialog open={!!errorModal} onOpenChange={(open) => !open && setErrorModal(null)}>
         <DialogContent>
           <DialogHeader>
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="mx-auto w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="h-7 w-7 text-red-600" />
             </div>
             <DialogTitle className="text-center">Erro ao Enviar Solicitação</DialogTitle>
-            <DialogDescription className="text-center text-base">{errorModal}</DialogDescription>
+            <DialogDescription className="text-center text-base pt-2">
+              {errorModal}
+            </DialogDescription>
           </DialogHeader>
-          <Button onClick={() => setErrorModal(null)} className="w-full">
+          <Button
+            onClick={() => setErrorModal(null)}
+            className="w-full"
+            style={{ backgroundColor: primaryColor }}
+          >
             Tentar Novamente
           </Button>
         </DialogContent>
