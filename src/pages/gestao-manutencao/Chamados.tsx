@@ -1198,7 +1198,7 @@ export default function ChamadosManutencao() {
                 </div>
 
                 <div className="col-span-2">
-                  <Label className="text-muted-foreground">Manutentor Responsável</Label>
+                  <Label className="text-muted-foreground">Executor</Label>
                   <Select
                     value={editForm.assignee_id}
                     onValueChange={(v) => setEditForm({ ...editForm, assignee_id: v })}
@@ -1220,7 +1220,7 @@ export default function ChamadosManutencao() {
                 </div>
 
                 <div>
-                  <Label className="text-muted-foreground">Início Planejado</Label>
+                  <Label className="text-muted-foreground">Data de Planejamento</Label>
                   <Input
                     type="datetime-local"
                     value={editForm.planned_start}

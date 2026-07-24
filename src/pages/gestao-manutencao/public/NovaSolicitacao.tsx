@@ -45,15 +45,6 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 const ERROR_NO_CLIENT = 'Não foi possível identificar sua empresa. Entre em contato com o suporte.'
 
-const INDUSTRIAL_BG_STYLE: CSSProperties = {
-  backgroundImage:
-    'linear-gradient(to bottom right, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.78), rgba(30, 58, 138, 0.85)), linear-gradient(to top, rgba(15, 23, 42, 0.95), transparent 40%, rgba(15, 23, 42, 0.65)), radial-gradient(circle at top right, rgba(15, 23, 42, 0.3), transparent 50%), url("https://img.usecurling.com/p/1920/1080?q=corn%20ethanol%20plant%20silo%20industrial&dpr=2")',
-  backgroundSize: 'cover, cover, cover, cover',
-  backgroundAttachment: 'fixed',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'no-repeat',
-}
-
 interface FormState {
   name: string
   email: string
@@ -73,6 +64,23 @@ const EMPTY_FORM: FormState = {
   location_id: '',
   sublocation_id: '',
 }
+
+const BackgroundElements = () => (
+  <>
+    <div
+      className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none scale-105"
+      style={{
+        backgroundImage:
+          'url("https://img.usecurling.com/p/1920/1080?q=corn%20ethanol%20plant%20silo%20industrial&dpr=2")',
+      }}
+    />
+    <div className="absolute inset-0 bg-gradient-to-br from-[#1f2937]/95 via-[#1f2937]/85 to-[#1e3a8a]/90 pointer-events-none" />
+    <div className="absolute inset-0 bg-gradient-to-t from-[#1f2937]/95 via-transparent to-[#1f2937]/70 pointer-events-none" />
+    <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-[#1e3a8a]/20 rounded-full blur-[120px] pointer-events-none" />
+    <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-[#1e3a8a]/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none opacity-40"></div>
+  </>
+)
 
 export default function NovaSolicitacaoPublica() {
   const { slug } = useParams()
@@ -245,11 +253,9 @@ export default function NovaSolicitacaoPublica() {
 
   if (loading || authLoading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center text-white"
-        style={INDUSTRIAL_BG_STYLE}
-      >
-        <div className="flex flex-col items-center gap-3">
+      <div className="min-h-screen flex items-center justify-center text-white relative overflow-hidden font-sans bg-[#1f2937]">
+        <BackgroundElements />
+        <div className="flex flex-col items-center gap-3 z-10">
           <Loader2 className="h-8 w-8 animate-spin" style={{ color: primaryColor }} />
           <p className="text-sm text-slate-200">Carregando formulário...</p>
         </div>
@@ -259,11 +265,9 @@ export default function NovaSolicitacaoPublica() {
 
   if (clientError) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4 text-slate-900"
-        style={INDUSTRIAL_BG_STYLE}
-      >
-        <Card className="w-full max-w-md text-center shadow-2xl border-slate-200 bg-white/95 backdrop-blur-sm">
+      <div className="min-h-screen flex items-center justify-center p-4 text-slate-900 relative overflow-hidden font-sans bg-[#1f2937]">
+        <BackgroundElements />
+        <Card className="w-full max-w-md text-center shadow-2xl border-slate-200 bg-white/95 backdrop-blur-sm z-10">
           <CardContent className="pt-12 pb-8 space-y-4">
             <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
               <AlertCircle className="h-8 w-8 text-red-600" />
@@ -287,11 +291,9 @@ export default function NovaSolicitacaoPublica() {
 
   if (success) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4 text-slate-900"
-        style={INDUSTRIAL_BG_STYLE}
-      >
-        <Card className="w-full max-w-md text-center shadow-2xl overflow-hidden animate-fade-in-up border-slate-200 bg-white/95 backdrop-blur-sm">
+      <div className="min-h-screen flex items-center justify-center p-4 text-slate-900 relative overflow-hidden font-sans bg-[#1f2937]">
+        <BackgroundElements />
+        <Card className="w-full max-w-md text-center shadow-2xl overflow-hidden animate-fade-in-up border-slate-200 bg-white/95 backdrop-blur-sm z-10">
           <div className="h-2 w-full" style={{ backgroundColor: primaryColor }} />
           <CardContent className="pt-10 pb-8 space-y-4">
             <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -329,9 +331,10 @@ export default function NovaSolicitacaoPublica() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col text-slate-900" style={INDUSTRIAL_BG_STYLE}>
+    <div className="min-h-screen flex flex-col text-slate-900 relative overflow-hidden font-sans bg-[#1f2937]">
+      <BackgroundElements />
       <header
-        className="bg-white/95 backdrop-blur-sm border-b-2 shadow-sm sticky top-0 z-20"
+        className="bg-white/95 backdrop-blur-sm border-b-2 shadow-sm sticky top-0 z-20 relative"
         style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
@@ -358,7 +361,7 @@ export default function NovaSolicitacaoPublica() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl w-full mx-auto p-4 py-8 animate-fade-in-up">
+      <main className="flex-1 max-w-2xl w-full mx-auto p-4 py-8 animate-fade-in-up z-10 relative">
         <div className="mb-6 text-center">
           <div
             className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3 shadow-sm"
