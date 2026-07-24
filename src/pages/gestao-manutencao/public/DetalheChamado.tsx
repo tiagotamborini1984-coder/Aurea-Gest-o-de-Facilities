@@ -7,6 +7,24 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Loader2, ArrowLeft, MapPin, Calendar, Clock, Wrench, User } from 'lucide-react'
+import { getReadableTextColor } from '@/lib/contrast-utils'
+
+const BackgroundElements = () => (
+  <>
+    <div
+      className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none scale-105"
+      style={{
+        backgroundImage:
+          'url("https://img.usecurling.com/p/1920/1080?q=corn%20ethanol%20plant%20silo%20industrial&dpr=2")',
+      }}
+    />
+    <div className="fixed inset-0 bg-gradient-to-br from-[#1f2937]/95 via-[#1f2937]/85 to-[#1e3a8a]/90 pointer-events-none" />
+    <div className="fixed inset-0 bg-gradient-to-t from-[#1f2937]/95 via-transparent to-[#1f2937]/70 pointer-events-none" />
+    <div className="fixed top-[-15%] left-[-10%] w-[500px] h-[500px] bg-[#1e3a8a]/20 rounded-full blur-[120px] pointer-events-none" />
+    <div className="fixed bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-[#1e3a8a]/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="fixed inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none opacity-40"></div>
+  </>
+)
 
 export default function DetalheChamadoPublico() {
   const { slug, ticketId } = useParams()
@@ -50,16 +68,21 @@ export default function DetalheChamadoPublico() {
 
   if (authLoading || !user || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: colors.primary }} />
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#1f2937]">
+        <BackgroundElements />
+        <Loader2
+          className="h-8 w-8 animate-spin z-10"
+          style={{ color: colors.primary || '#3b82f6' }}
+        />
       </div>
     )
   }
 
   if (!ticket) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <Card className="w-full max-w-md text-center shadow-xl border-slate-200 bg-white">
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden font-sans bg-[#1f2937] p-4">
+        <BackgroundElements />
+        <Card className="w-full max-w-md text-center shadow-xl border-slate-200 bg-white/95 backdrop-blur-sm z-10">
           <CardContent className="pt-10 pb-8">
             <h2 className="text-xl font-bold text-slate-900">Chamado não encontrado</h2>
             <Button
@@ -67,6 +90,7 @@ export default function DetalheChamadoPublico() {
               style={
                 {
                   backgroundColor: colors.primary,
+                  color: colors.primaryContrast,
                   '--tw-ring-color': colors.primary,
                 } as React.CSSProperties
               }
@@ -81,9 +105,10 @@ export default function DetalheChamadoPublico() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen relative overflow-hidden font-sans bg-[#1f2937] text-slate-900">
+      <BackgroundElements />
       <header
-        className="bg-white border-b shadow-sm sticky top-0 z-20"
+        className="bg-white/95 backdrop-blur-sm border-b-2 shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: colors.primary }}
       >
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
@@ -98,13 +123,16 @@ export default function DetalheChamadoPublico() {
           <span className="font-mono font-bold text-sm text-slate-800">{ticket.ticket_number}</span>
         </div>
       </header>
-      <main className="max-w-2xl mx-auto p-4 py-8 animate-fade-in-up space-y-4">
-        <Card className="shadow-md border-slate-200 bg-white">
+      <main className="max-w-2xl mx-auto p-4 py-8 animate-fade-in-up space-y-4 z-10 relative">
+        <Card className="shadow-md border-slate-200 bg-white/95 backdrop-blur-sm">
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               {ticket.status && (
                 <Badge
-                  style={{ backgroundColor: ticket.status.color, color: '#fff' }}
+                  style={{
+                    backgroundColor: ticket.status.color,
+                    color: getReadableTextColor(ticket.status.color),
+                  }}
                   className="font-medium"
                 >
                   {ticket.status.name}
@@ -143,11 +171,18 @@ export default function DetalheChamadoPublico() {
                 label="Criado em"
                 value={new Date(ticket.created_at).toLocaleString('pt-BR')}
               />
-              {ticket.assignee && (
+              <InfoItem
+                icon={<User className="h-4 w-4" />}
+                label="Responsável"
+                value={ticket.assignee ? ticket.assignee.name : 'Não atribuído'}
+              />
+              {ticket.planned_start && (
                 <InfoItem
-                  icon={<User className="h-4 w-4" />}
-                  label="Responsável"
-                  value={ticket.assignee.name}
+                  icon={<Clock className="h-4 w-4" />}
+                  label="Data de Planejamento"
+                  value={new Date(ticket.planned_start).toLocaleDateString('pt-BR', {
+                    timeZone: 'UTC',
+                  })}
                 />
               )}
             </div>
@@ -165,7 +200,7 @@ export default function DetalheChamadoPublico() {
           </CardContent>
         </Card>
         {ticket.photos?.length > 0 && (
-          <Card className="shadow-md border-slate-200 bg-white">
+          <Card className="shadow-md border-slate-200 bg-white/95 backdrop-blur-sm">
             <CardContent className="p-6">
               <h3 className="text-sm font-semibold text-slate-500 mb-3">Fotos anexadas</h3>
               <div className="grid grid-cols-3 gap-2">
@@ -190,7 +225,7 @@ export default function DetalheChamadoPublico() {
           </Card>
         )}
         {ticket.closure_notes && (
-          <Card className="shadow-md border-slate-200 bg-white">
+          <Card className="shadow-md border-slate-200 bg-white/95 backdrop-blur-sm">
             <CardContent className="p-6">
               <h3 className="text-sm font-semibold text-slate-500 mb-2">Notas de Fechamento</h3>
               <p className="text-sm text-slate-900 whitespace-pre-wrap">{ticket.closure_notes}</p>
