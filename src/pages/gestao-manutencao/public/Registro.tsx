@@ -10,6 +10,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Wrench, User, Mail, Lock, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
+const INDUSTRIAL_BG_STYLE: React.CSSProperties = {
+  backgroundImage:
+    'radial-gradient(circle at top right, rgba(15, 23, 42, 0.3), transparent 50%), linear-gradient(to bottom, rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.95)), url("https://img.usecurling.com/p/1920/1080?q=industrial%20maintenance%20factory")',
+  backgroundSize: 'cover',
+  backgroundAttachment: 'fixed',
+  backgroundPosition: 'center',
+}
+
 export default function RegistroPublico() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -76,8 +84,11 @@ export default function RegistroPublico() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 text-slate-900">
-        <Card className="w-full max-w-md text-center shadow-xl animate-fade-in-up border-slate-200 bg-white">
+      <div
+        className="min-h-screen flex items-center justify-center p-4 text-slate-900"
+        style={INDUSTRIAL_BG_STYLE}
+      >
+        <Card className="w-full max-w-md text-center shadow-2xl animate-fade-in-up border-slate-200 bg-white/95 backdrop-blur-sm">
           <CardContent className="pt-10 pb-8 space-y-4">
             <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-10 w-10 text-green-600" />
@@ -105,9 +116,9 @@ export default function RegistroPublico() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900">
+    <div className="min-h-screen flex flex-col text-slate-900" style={INDUSTRIAL_BG_STYLE}>
       <header
-        className="bg-white border-b-2 shadow-sm sticky top-0 z-20"
+        className="bg-white/95 backdrop-blur-sm border-b-2 shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: colors.primary }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
@@ -123,12 +134,12 @@ export default function RegistroPublico() {
           </div>
         </div>
       </header>
-      <main className="flex-1 max-w-md w-full mx-auto p-4 py-8 animate-fade-in-up">
-        <Card className="shadow-xl border-slate-200 bg-white">
+      <main className="flex-1 max-w-md w-full mx-auto p-4 py-8 animate-fade-in-up flex items-center">
+        <Card className="w-full shadow-2xl border-slate-200 bg-white/95 backdrop-blur-sm">
           <CardContent className="p-6 sm:p-8 space-y-5">
             <div className="text-center mb-4">
               <h2 className="text-2xl font-bold text-slate-900">Criar Conta</h2>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-slate-600 mt-1">
                 Cadastre-se para acompanhar suas solicitações
               </p>
             </div>
@@ -138,7 +149,7 @@ export default function RegistroPublico() {
                 <div className="relative">
                   <User className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
-                    className="pl-9 h-11 bg-white text-slate-900 border-slate-300 placeholder:text-slate-400"
+                    className="pl-9 h-11 bg-white/80 text-slate-900 border-slate-300 placeholder:text-slate-400 focus:bg-white transition-colors"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Seu nome"
@@ -152,7 +163,7 @@ export default function RegistroPublico() {
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
                     type="email"
-                    className="pl-9 h-11 bg-white text-slate-900 border-slate-300 placeholder:text-slate-400"
+                    className="pl-9 h-11 bg-white/80 text-slate-900 border-slate-300 placeholder:text-slate-400 focus:bg-white transition-colors"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="seu@email.com"
@@ -166,7 +177,7 @@ export default function RegistroPublico() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
                     type="password"
-                    className="pl-9 h-11 bg-white text-slate-900 border-slate-300 placeholder:text-slate-400"
+                    className="pl-9 h-11 bg-white/80 text-slate-900 border-slate-300 placeholder:text-slate-400 focus:bg-white transition-colors"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     placeholder="Mínimo 8 caracteres"
@@ -179,7 +190,7 @@ export default function RegistroPublico() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
                     type="password"
-                    className="pl-9 h-11 bg-white text-slate-900 border-slate-300 placeholder:text-slate-400"
+                    className="pl-9 h-11 bg-white/80 text-slate-900 border-slate-300 placeholder:text-slate-400 focus:bg-white transition-colors"
                     value={form.confirm}
                     onChange={(e) => setForm({ ...form, confirm: e.target.value })}
                     placeholder="Repita a senha"
@@ -189,7 +200,7 @@ export default function RegistroPublico() {
               <Button
                 type="submit"
                 size="lg"
-                className="w-full hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2"
+                className="w-full hover:opacity-90 transition-opacity shadow-md focus:ring-2 focus:ring-offset-2"
                 style={
                   {
                     backgroundColor: colors.primary,

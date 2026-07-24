@@ -151,7 +151,17 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#1f2937] relative overflow-hidden font-sans">
-      {/* High-tech backdrop with Deep Blue and Graphite aesthetics */}
+      {/* Corn ethanol plant background image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none scale-105"
+        style={{
+          backgroundImage:
+            'url("https://img.usecurling.com/p/1920/1080?q=corn%20ethanol%20plant%20silo%20industrial&dpr=2")',
+        }}
+      />
+      {/* 3D gradient overlay for depth and legibility */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#1f2937]/95 via-[#1f2937]/85 to-[#1e3a8a]/90 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#1f2937]/95 via-transparent to-[#1f2937]/70 pointer-events-none" />
       <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-[#1e3a8a]/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-[#1e3a8a]/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none opacity-40"></div>

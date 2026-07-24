@@ -2186,6 +2186,51 @@ export type Database = {
           },
         ]
       }
+      maintenance_workers: {
+        Row: {
+          client_id: string
+          company: string
+          created_at: string
+          discipline: string
+          id: string
+          name: string
+          plant_id: string
+        }
+        Insert: {
+          client_id: string
+          company: string
+          created_at?: string
+          discipline: string
+          id?: string
+          name: string
+          plant_id: string
+        }
+        Update: {
+          client_id?: string
+          company?: string
+          created_at?: string
+          discipline?: string
+          id?: string
+          name?: string
+          plant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'maintenance_workers_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'maintenance_workers_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       monthly_goals_data: {
         Row: {
           client_id: string

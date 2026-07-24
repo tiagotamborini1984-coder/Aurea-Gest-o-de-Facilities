@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, type CSSProperties } from 'react'
 import { getAccessibleColors } from '@/lib/contrast-utils'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
@@ -44,6 +44,15 @@ import {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isValidEmail = (email: string) => EMAIL_REGEX.test(email)
 const ERROR_NO_CLIENT = 'Não foi possível identificar sua empresa. Entre em contato com o suporte.'
+
+const INDUSTRIAL_BG_STYLE: CSSProperties = {
+  backgroundImage:
+    'linear-gradient(to bottom right, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.78), rgba(30, 58, 138, 0.85)), linear-gradient(to top, rgba(15, 23, 42, 0.95), transparent 40%, rgba(15, 23, 42, 0.65)), radial-gradient(circle at top right, rgba(15, 23, 42, 0.3), transparent 50%), url("https://img.usecurling.com/p/1920/1080?q=corn%20ethanol%20plant%20silo%20industrial&dpr=2")',
+  backgroundSize: 'cover, cover, cover, cover',
+  backgroundAttachment: 'fixed',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
+}
 
 interface FormState {
   name: string
@@ -236,10 +245,13 @@ export default function NovaSolicitacaoPublica() {
 
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900">
+      <div
+        className="min-h-screen flex items-center justify-center text-white"
+        style={INDUSTRIAL_BG_STYLE}
+      >
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin" style={{ color: primaryColor }} />
-          <p className="text-sm text-slate-500">Carregando formulário...</p>
+          <p className="text-sm text-slate-200">Carregando formulário...</p>
         </div>
       </div>
     )
@@ -247,8 +259,11 @@ export default function NovaSolicitacaoPublica() {
 
   if (clientError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-slate-900">
-        <Card className="w-full max-w-md text-center shadow-xl border-slate-200 bg-white">
+      <div
+        className="min-h-screen flex items-center justify-center p-4 text-slate-900"
+        style={INDUSTRIAL_BG_STYLE}
+      >
+        <Card className="w-full max-w-md text-center shadow-2xl border-slate-200 bg-white/95 backdrop-blur-sm">
           <CardContent className="pt-12 pb-8 space-y-4">
             <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
               <AlertCircle className="h-8 w-8 text-red-600" />
@@ -272,8 +287,11 @@ export default function NovaSolicitacaoPublica() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 text-slate-900">
-        <Card className="w-full max-w-md text-center shadow-xl overflow-hidden animate-fade-in-up border-slate-200 bg-white">
+      <div
+        className="min-h-screen flex items-center justify-center p-4 text-slate-900"
+        style={INDUSTRIAL_BG_STYLE}
+      >
+        <Card className="w-full max-w-md text-center shadow-2xl overflow-hidden animate-fade-in-up border-slate-200 bg-white/95 backdrop-blur-sm">
           <div className="h-2 w-full" style={{ backgroundColor: primaryColor }} />
           <CardContent className="pt-10 pb-8 space-y-4">
             <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -311,9 +329,9 @@ export default function NovaSolicitacaoPublica() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900">
+    <div className="min-h-screen flex flex-col text-slate-900" style={INDUSTRIAL_BG_STYLE}>
       <header
-        className="bg-white border-b-2 shadow-sm sticky top-0 z-20"
+        className="bg-white/95 backdrop-blur-sm border-b-2 shadow-sm sticky top-0 z-20"
         style={{ borderBottomColor: primaryColor }}
       >
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
@@ -344,18 +362,18 @@ export default function NovaSolicitacaoPublica() {
         <div className="mb-6 text-center">
           <div
             className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3 shadow-sm"
-            style={{ backgroundColor: `${primaryColor}15` }}
+            style={{ backgroundColor: `${primaryColor}30` }}
           >
             <Wrench className="h-7 w-7" style={{ color: primaryColor }} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Nova Solicitação</h2>
-          <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+          <h2 className="text-2xl font-bold text-white">Nova Solicitação</h2>
+          <p className="text-sm text-slate-200 mt-1 max-w-md mx-auto">
             Descreva o problema encontrado para que nossa equipe de manutenção possa agir
             rapidamente.
           </p>
         </div>
 
-        <Card className="shadow-xl border-slate-200 bg-white overflow-hidden">
+        <Card className="shadow-2xl border-slate-200 bg-white/95 backdrop-blur-sm overflow-hidden">
           <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
           <CardContent className="p-6 sm:p-8 space-y-5">
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -624,7 +642,7 @@ export default function NovaSolicitacaoPublica() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-slate-500 mt-6">
+        <p className="text-center text-xs text-slate-300 mt-6">
           Ao enviar, você concorda em fornecer informações verídicas para tratamento da sua
           solicitação.
         </p>

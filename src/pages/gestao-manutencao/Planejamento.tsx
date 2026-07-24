@@ -105,7 +105,8 @@ export default function PlanejamentoManutencao() {
       status:maintenance_statuses(step),
       area:maintenance_areas(name),
       sublocation:maintenance_sublocations(name),
-      asset:maintenance_assets(name)
+      asset:maintenance_assets(name),
+      type:maintenance_types(id, color, name)
     `)
       .not('status.step', 'eq', 'Concluído')
 
@@ -368,11 +369,6 @@ export default function PlanejamentoManutencao() {
                   )}
                 >
                   {day.label}
-                  {day.isWeekend && (
-                    <span className="text-[9px] uppercase font-bold bg-amber-200 text-amber-800 px-1 rounded">
-                      Fim de semana
-                    </span>
-                  )}
                 </h4>
                 <div className="flex-1 border-2 border-transparent hover:border-dashed hover:border-blue-300 rounded-lg p-1 transition-all space-y-2 min-h-[100px] lg:min-h-[120px]">
                   {dayTickets.map((t) => (
@@ -381,7 +377,8 @@ export default function PlanejamentoManutencao() {
                       draggable
                       onDragStart={(e) => handleDragStart(e, t.id)}
                       onClick={() => setSelectedTicket(t)}
-                      className="border-l-4 border-l-blue-500 shadow-sm bg-blue-50/50 cursor-pointer active:cursor-move"
+                      className="border-l-4 shadow-sm bg-blue-50/50 cursor-pointer active:cursor-move"
+                      style={{ borderLeftColor: t.type?.color || '#3b82f6' }}
                     >
                       <CardContent className="p-3">
                         <div className="flex items-center justify-between gap-2">
