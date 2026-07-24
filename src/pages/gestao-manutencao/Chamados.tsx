@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -110,8 +110,14 @@ export default function ChamadosManutencao() {
   const [assignees, setAssignees] = useState<any[]>([])
 
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedArea, setSelectedArea] = useState<string>('all')
-  const [selectedType, setSelectedType] = useState<string>('all')
+  const [closureModalOpen, setClosureModalOpen] = useState(false)
+  const [closureTicket, setClosureTicket] = useState<any>(null)
+  const [closureForm, setClosureForm] = useState({ closure_notes: '', actual_end: '' })
+  const [closureFiles, setClosureFiles] = useState<File[]>([])
+  const [concludedDateFilter, setConcludedDateFilter] = useState<string>('')
+  const [closingTicket, setClosingTicket] = useState(false)
+  const overdueShownRef = useRef<Set<string>>(new Set())
+  const loadTicketsRef = useRef<() => void>(() => {})
 
   const [form, setForm] = useState({
     description: '',
@@ -153,6 +159,61 @@ export default function ChamadosManutencao() {
     const interval = setInterval(() => setNow(new Date()), 60000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (statuses.length === 0 || tickets.length === 0) return
+    const executionStatus = statuses.find((s) => s.step === 'Em Execução')
+    if (!executionStatus) return
+    const nowMs = Date.now()
+    const toUpdate = tickets.filter(
+      (t) =>
+        t.planned_start &&
+        new Date(t.planned_start).getTime() <= nowMs &&
+        t.status?.step !== 'Em Execução' &&
+        t.status?.step !== 'Concluído' &&
+        !t.status?.is_terminal,
+    )
+    if (toUpdate.length > 0) {
+      supabase
+        .from('maintenance_tickets')
+        .update({ status_id: executionStatus.id })
+        .in(
+          'id',
+          toUpdate.map((t) => t.id),
+        )
+        .then(({ error }) => {
+          if (!error) loadTicketsRef.current()
+        })
+    }
+    tickets.forEach((t) => {
+      if (
+        t.planned_start &&
+        new Date(t.planned_start).getTime() < nowMs &&
+        t.status?.step !== 'Concluído' &&
+        !t.status?.is_terminal &&
+        !overdueShownRef.current.has(t.id)
+      ) {
+        overdueShownRef.current.add(t.id)
+        toast.warning(`OS ${t.ticket_number} está atrasada!`, {
+          description: 'A data planejada foi atingida. Finalize a OS.',
+          duration: 10000,
+          action: {
+            label: 'Finalizar',
+            onClick: () => {
+              setClosureTicket(t)
+              setClosureForm({
+                closure_notes: '',
+                actual_end: toLocalDatetime(new Date().toISOString()),
+              })
+              setClosureFiles([])
+              setClosureModalOpen(true)
+            },
+          },
+        })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets, statuses, now])
 
   const formAreas = useMemo(
     () => areas.filter((a) => a.plant_id === form.plant_id),
@@ -209,7 +270,7 @@ export default function ChamadosManutencao() {
     return () => {
       supabase.removeChannel(subscription)
     }
-  }, [selectedPlant, selectedArea, selectedType])
+  }, [selectedPlant])
 
   useEffect(() => {
     if (selectedTicket) {
@@ -281,13 +342,12 @@ export default function ChamadosManutencao() {
       .order('created_at', { ascending: false })
 
     if (selectedPlant !== 'all') q = q.eq('plant_id', selectedPlant)
-    if (selectedArea !== 'all') q = q.eq('area_id', selectedArea)
-    if (selectedType !== 'all') q = q.eq('type_id', selectedType)
 
     const { data } = await q
     setTickets(data || [])
     setLoading(false)
   }
+  loadTicketsRef.current = loadTickets
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -476,6 +536,63 @@ export default function ChamadosManutencao() {
     }
   }
 
+  const handleOpenClosure = (ticket: any) => {
+    setClosureTicket(ticket)
+    setClosureForm({
+      closure_notes: '',
+      actual_end: toLocalDatetime(new Date().toISOString()),
+    })
+    setClosureFiles([])
+    setClosureModalOpen(true)
+  }
+
+  const handleCloseTicket = async () => {
+    if (!closureTicket) return
+    if (!closureForm.closure_notes.trim()) return toast.error('Informe o que foi realizado')
+    if (!closureForm.actual_end) return toast.error('Informe a data e horário de finalização')
+
+    setClosingTicket(true)
+    try {
+      let closurePhotos: string[] = []
+      for (const file of closureFiles) {
+        const originalName = file.name.replace(/[^a-zA-Z0-9.\- ]/g, '_')
+        const fileName = `closure_${Date.now()}_${originalName}`
+        const { data } = await supabase.storage
+          .from('maintenance_attachments')
+          .upload(fileName, file)
+        if (data) {
+          const { data: urlData } = supabase.storage
+            .from('maintenance_attachments')
+            .getPublicUrl(data.path)
+          closurePhotos.push(urlData.publicUrl)
+        }
+      }
+
+      const terminalStatus = statuses.find((s) => s.is_terminal)
+      if (!terminalStatus) throw new Error('Status de conclusão não encontrado')
+
+      const { error } = await supabase
+        .from('maintenance_tickets')
+        .update({
+          status_id: terminalStatus.id,
+          closure_notes: closureForm.closure_notes,
+          actual_end: new Date(closureForm.actual_end).toISOString(),
+          closure_photos: closurePhotos,
+        })
+        .eq('id', closureTicket.id)
+
+      if (error) throw error
+      toast.success('OS finalizada com sucesso!')
+      setClosureModalOpen(false)
+      setClosureTicket(null)
+      loadTickets()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setClosingTicket(false)
+    }
+  }
+
   const columns = ['Aberto', 'Planejado', 'Em Execução', 'Concluído']
 
   return (
@@ -492,7 +609,6 @@ export default function ChamadosManutencao() {
             value={selectedPlant}
             onValueChange={(v) => {
               setSelectedPlant(v)
-              setSelectedArea('all')
             }}
           >
             <SelectTrigger className="w-[160px] bg-background">
@@ -508,40 +624,10 @@ export default function ChamadosManutencao() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedArea} onValueChange={setSelectedArea}>
-            <SelectTrigger className="w-[160px] bg-background">
-              <MapPin className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Áreas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Áreas</SelectItem>
-              {areas
-                .filter((a) => selectedPlant === 'all' || a.plant_id === selectedPlant)
-                .map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <UploadCloud className="h-4 w-4 mr-2" />
             Importar Chamados
           </Button>
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-[160px] bg-background">
-              <Wrench className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Tipos</SelectItem>
-              {types.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button className="bg-brand-vividBlue">
@@ -751,6 +837,21 @@ export default function ChamadosManutencao() {
               return t.status.step === 'Aberto' && !isPlanejadoByName
             }
 
+            if (column === 'Concluído') {
+              const matches = t.status.step === 'Concluído'
+              if (!matches) return false
+              if (concludedDateFilter && t.actual_end) {
+                const fd = new Date(concludedDateFilter + 'T00:00:00')
+                const ad = new Date(t.actual_end)
+                return (
+                  fd.getFullYear() === ad.getFullYear() &&
+                  fd.getMonth() === ad.getMonth() &&
+                  fd.getDate() === ad.getDate()
+                )
+              }
+              return true
+            }
+
             return t.status.step === column
           })
           return (
@@ -758,11 +859,21 @@ export default function ChamadosManutencao() {
               key={column}
               className="flex-none w-80 bg-muted/30 rounded-xl p-3 flex flex-col h-full border"
             >
-              <div className="font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm text-foreground bg-muted">
+              <div className="font-bold mb-3 px-3 py-2 flex justify-between items-center gap-2 rounded-lg text-sm text-foreground bg-muted">
                 {column}
-                <Badge variant="secondary" className="text-white">
-                  {colTickets.length}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {column === 'Concluído' && (
+                    <Input
+                      type="date"
+                      value={concludedDateFilter}
+                      onChange={(e) => setConcludedDateFilter(e.target.value)}
+                      className="h-7 text-xs w-[140px]"
+                    />
+                  )}
+                  <Badge variant="secondary" className="text-white">
+                    {colTickets.length}
+                  </Badge>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 px-1">
                 {colTickets.map((ticket) => (
@@ -889,6 +1000,24 @@ export default function ChamadosManutencao() {
                       {ticket.asset && (
                         <div className="text-xs font-mono bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-2 py-1 rounded inline-block mt-1.5">
                           Ativo: {ticket.asset.name}
+                        </div>
+                      )}
+                      {column === 'Em Execução' && (
+                        <Button
+                          size="sm"
+                          className="w-full h-7 text-xs bg-green-600 hover:bg-green-700 mt-2"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenClosure(ticket)
+                          }}
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          Finalizar OS
+                        </Button>
+                      )}
+                      {column === 'Concluído' && ticket.closure_notes && (
+                        <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded mt-1.5 line-clamp-2">
+                          {ticket.closure_notes}
                         </div>
                       )}
                     </CardContent>
@@ -1346,6 +1475,84 @@ export default function ChamadosManutencao() {
               </Button>
               <Button onClick={handleCreateCorrective} className="bg-brand-vividBlue">
                 Criar Corretiva
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closureModalOpen} onOpenChange={setClosureModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalizar OS {closureTicket?.ticket_number}</DialogTitle>
+            <DialogDescription>
+              Preencha os campos obrigatórios para concluir a Ordem de Serviço.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>O que foi realizado *</Label>
+              <Textarea
+                rows={4}
+                value={closureForm.closure_notes}
+                onChange={(e) => setClosureForm({ ...closureForm, closure_notes: e.target.value })}
+                placeholder="Descreva o que foi realizado..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data e Horário de Finalização *</Label>
+              <Input
+                type="datetime-local"
+                value={closureForm.actual_end}
+                onChange={(e) => setClosureForm({ ...closureForm, actual_end: e.target.value })}
+                className="[&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Anexar Imagens</Label>
+              <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/50 transition cursor-pointer relative">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  onChange={(e) =>
+                    e.target.files &&
+                    setClosureFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+                  }
+                />
+                <Paperclip className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                <span className="text-sm text-muted-foreground">Clique ou arraste imagens</span>
+              </div>
+              {closureFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {closureFiles.map((f, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between text-xs bg-muted px-2 py-1 rounded"
+                    >
+                      <span className="truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setClosureFiles(closureFiles.filter((_, idx) => idx !== i))}
+                      >
+                        <X className="h-3 w-3 text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setClosureModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCloseTicket}
+                disabled={closingTicket}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {closingTicket ? 'Finalizando...' : 'Finalizar OS'}
               </Button>
             </div>
           </div>
