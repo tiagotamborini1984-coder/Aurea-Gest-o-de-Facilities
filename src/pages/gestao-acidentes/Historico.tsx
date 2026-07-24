@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
-import { FileText, Paperclip, Edit, Trash2, Loader2 } from 'lucide-react'
+import { FileText, Paperclip, Edit, Trash2, Loader2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { exportToXlsx } from '@/lib/export-xlsx'
+import { format } from 'date-fns'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +73,40 @@ export default function HistoricoAcidentes() {
     return profile.role === 'Administrador' || profile.role === 'Master'
   }
 
+  const handleExportExcel = () => {
+    if (!data || data.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: 'Nenhum acidente para exportar.',
+      })
+      return
+    }
+    try {
+      const rows = data.map((item) => [
+        item.event_date ? format(new Date(item.event_date), 'dd/MM/yyyy HH:mm') : '',
+        item.plants?.name || 'N/A',
+        item.description || '',
+      ])
+      const today = format(new Date(), 'yyyy-MM-dd')
+      exportToXlsx(
+        `acidentes_export_${today}.xlsx`,
+        'Acidentes',
+        ['Data', 'Planta', 'Descrição'],
+        rows,
+      )
+      toast({
+        title: 'Sucesso',
+        description: `${data.length} registro(s) exportado(s) com sucesso.`,
+      })
+    } catch {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao exportar os dados. Por favor, tente novamente.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleDeleteConfirm = async () => {
     if (!deleteAccidentId) return
     setDeleting(true)
@@ -104,11 +140,21 @@ export default function HistoricoAcidentes() {
       </div>
 
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-4 flex flex-row items-center justify-between flex-wrap gap-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <FileText className="w-5 h-5 text-gray-500" />
             Registros
           </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            disabled={loading || data.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Exportar Excel
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (

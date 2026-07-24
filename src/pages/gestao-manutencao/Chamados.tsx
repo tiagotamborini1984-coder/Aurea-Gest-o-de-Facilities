@@ -96,6 +96,24 @@ const getTicketSLA = (ticket: any, currentTime: Date) => {
   return { text, color, isLate }
 }
 
+function validateTicketForClosure(ticket: {
+  assignee_id?: string | null
+  actual_start?: string | null
+  actual_end?: string | null
+}): string[] {
+  const errors: string[] = []
+  if (!ticket.assignee_id || ticket.assignee_id === 'none') {
+    errors.push('O Manutentor deve ser preenchido')
+  }
+  if (!ticket.actual_start) {
+    errors.push('A Data/Hora de Início Realizado deve ser preenchida')
+  }
+  if (!ticket.actual_end) {
+    errors.push('A Data/Hora de Fim Realizado deve ser preenchida')
+  }
+  return errors
+}
+
 export default function ChamadosManutencao() {
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -152,11 +170,6 @@ export default function ChamadosManutencao() {
   const [updating, setUpdating] = useState(false)
   const [now, setNow] = useState(new Date())
 
-  const isAdmin = ['Master', 'Admin', 'Administrador'].includes(userRole)
-  const isTicketFinalized =
-    selectedTicket?.status?.is_terminal || selectedTicket?.status?.step === 'Concluído'
-  const canEditTicket = !isTicketFinalized || isAdmin
-
   const [correctiveModalOpen, setCorrectiveModalOpen] = useState(false)
   const [correctiveForm, setCorrectiveForm] = useState({
     description: '',
@@ -165,8 +178,21 @@ export default function ChamadosManutencao() {
   const [importOpen, setImportOpen] = useState(false)
   const [userRole, setUserRole] = useState<string>('')
   const [logModalOpen, setLogModalOpen] = useState(false)
+
+  const isAdmin = ['Master', 'Admin', 'Administrador'].includes(userRole)
+  const isTicketFinalized =
+    selectedTicket?.status?.is_terminal || selectedTicket?.status?.step === 'Concluído'
+  const canEditTicket = !isTicketFinalized || isAdmin
   const [logTicketId, setLogTicketId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+
+  const closureErrors = closureTicket
+    ? validateTicketForClosure({
+        assignee_id: closureTicket.assignee_id,
+        actual_start: closureTicket.actual_start,
+        actual_end: closureTicket.actual_end || closureForm.actual_end || null,
+      })
+    : []
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000)
@@ -466,25 +492,69 @@ export default function ChamadosManutencao() {
       }
     }
 
+    const targetStatus = statuses.find((s) => s.id === editForm.status_id)
+    const wasAlreadyTerminal =
+      selectedTicket.status?.is_terminal || selectedTicket.status?.step === 'Concluído'
+
+    const payload = {
+      plant_id: editForm.plant_id,
+      area_id: editForm.area_id === 'none' ? null : editForm.area_id,
+      sublocation_id: editForm.sublocation_id === 'none' ? null : editForm.sublocation_id,
+      asset_id: editForm.asset_id === 'none' ? null : editForm.asset_id,
+      type_id: editForm.type_id === 'none' ? null : editForm.type_id,
+      priority_id: editForm.priority_id === 'none' ? null : editForm.priority_id,
+      assignee_id: editForm.assignee_id === 'none' ? null : editForm.assignee_id,
+      status_id: editForm.status_id === 'none' ? null : editForm.status_id,
+      planned_start: editForm.planned_start ? new Date(editForm.planned_start).toISOString() : null,
+      planned_end: editForm.planned_end ? new Date(editForm.planned_end).toISOString() : null,
+      actual_start: editForm.actual_start ? new Date(editForm.actual_start).toISOString() : null,
+      actual_end: editForm.actual_end ? new Date(editForm.actual_end).toISOString() : null,
+      checklist_responses: checklistResponses,
+    }
+
+    if (targetStatus?.is_terminal && !wasAlreadyTerminal) {
+      setUpdating(true)
+      try {
+        const updatePayload = { ...payload, status_id: selectedTicket.status_id }
+        const { error: updateError } = await supabase
+          .from('maintenance_tickets')
+          .update(updatePayload)
+          .eq('id', selectedTicket.id)
+        if (updateError) throw updateError
+
+        const updatedTicket = {
+          ...selectedTicket,
+          ...updatePayload,
+          plant: plants.find((p) => p.id === updatePayload.plant_id),
+          area: areas.find((a) => a.id === updatePayload.area_id),
+          sublocation: sublocations.find((s) => s.id === updatePayload.sublocation_id),
+          asset: assets.find((a) => a.id === updatePayload.asset_id),
+          priority: priorities.find((p) => p.id === updatePayload.priority_id),
+          assignee: assignees.find((a) => a.id === updatePayload.assignee_id),
+          status: statuses.find((s) => s.id === updatePayload.status_id),
+          type: types.find((t) => t.id === updatePayload.type_id),
+        }
+
+        setSelectedTicket(updatedTicket)
+        toast.info('Preencha os dados de fechamento para finalizar a OS.')
+        setClosureTicket(updatedTicket)
+        setClosureForm({
+          closure_notes: updatedTicket.closure_notes || '',
+          actual_end: toLocalDatetime(updatedTicket.actual_end || new Date().toISOString()),
+        })
+        setClosureFiles([])
+        setClosureModalOpen(true)
+        loadTickets()
+      } catch (e: any) {
+        toast.error(e.message)
+      } finally {
+        setUpdating(false)
+      }
+      return
+    }
+
     setUpdating(true)
     try {
-      const payload = {
-        plant_id: editForm.plant_id,
-        area_id: editForm.area_id === 'none' ? null : editForm.area_id,
-        sublocation_id: editForm.sublocation_id === 'none' ? null : editForm.sublocation_id,
-        asset_id: editForm.asset_id === 'none' ? null : editForm.asset_id,
-        type_id: editForm.type_id === 'none' ? null : editForm.type_id,
-        priority_id: editForm.priority_id === 'none' ? null : editForm.priority_id,
-        assignee_id: editForm.assignee_id === 'none' ? null : editForm.assignee_id,
-        status_id: editForm.status_id === 'none' ? null : editForm.status_id,
-        planned_start: editForm.planned_start
-          ? new Date(editForm.planned_start).toISOString()
-          : null,
-        planned_end: editForm.planned_end ? new Date(editForm.planned_end).toISOString() : null,
-        actual_start: editForm.actual_start ? new Date(editForm.actual_start).toISOString() : null,
-        actual_end: editForm.actual_end ? new Date(editForm.actual_end).toISOString() : null,
-        checklist_responses: checklistResponses,
-      }
       const { error } = await supabase
         .from('maintenance_tickets')
         .update(payload)
@@ -565,8 +635,8 @@ export default function ChamadosManutencao() {
   const handleOpenClosure = (ticket: any) => {
     setClosureTicket(ticket)
     setClosureForm({
-      closure_notes: '',
-      actual_end: toLocalDatetime(new Date().toISOString()),
+      closure_notes: ticket.closure_notes || '',
+      actual_end: toLocalDatetime(ticket.actual_end || new Date().toISOString()),
     })
     setClosureFiles([])
     setClosureModalOpen(true)
@@ -574,7 +644,18 @@ export default function ChamadosManutencao() {
 
   const handleCloseTicket = async () => {
     if (!closureTicket) return
-    if (!closureForm.closure_notes.trim()) return toast.error('Informe o que foi realizado')
+    const missing = validateTicketForClosure({
+      assignee_id: closureTicket.assignee_id,
+      actual_start: closureTicket.actual_start,
+      actual_end: closureTicket.actual_end || closureForm.actual_end || null,
+    })
+    if (missing.length > 0) {
+      toast.error('Preencha os campos obrigatórios antes de finalizar.', {
+        description: missing.join('\n'),
+        duration: 8000,
+      })
+      return
+    }
     if (!closureForm.actual_end) return toast.error('Informe a data e horário de finalização')
 
     setClosingTicket(true)
@@ -604,6 +685,7 @@ export default function ChamadosManutencao() {
           closure_notes: closureForm.closure_notes,
           actual_end: new Date(closureForm.actual_end).toISOString(),
           closure_photos: closurePhotos,
+          closed_at: new Date().toISOString(),
         })
         .eq('id', closureTicket.id)
 
@@ -1481,14 +1563,23 @@ export default function ChamadosManutencao() {
                 )}
 
                 {canEditTicket && (
-                  <div className="col-span-2 mt-4">
+                  <div className="col-span-2 mt-4 flex gap-2">
                     <Button
                       onClick={handleUpdateTicket}
                       disabled={updating}
-                      className="w-full bg-brand-vividBlue text-sm h-10"
+                      className="flex-1 bg-brand-vividBlue text-sm h-10"
                     >
                       {updating ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
+                    {!isTicketFinalized && (
+                      <Button
+                        onClick={() => handleOpenClosure(selectedTicket)}
+                        variant="outline"
+                        className="text-sm h-10 border-green-600 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-950/40"
+                      >
+                        Finalizar OS
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1509,6 +1600,31 @@ export default function ChamadosManutencao() {
                   </div>
                 </div>
               )}
+
+              {isTicketFinalized &&
+                (selectedTicket.closure_notes || selectedTicket.closure_photos?.length > 0) && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <Label className="text-muted-foreground mb-2 block">Fechamento da OS</Label>
+                    {selectedTicket.closure_notes && (
+                      <div className="text-sm bg-muted/50 rounded-lg p-3 mb-3 whitespace-pre-wrap">
+                        {selectedTicket.closure_notes}
+                      </div>
+                    )}
+                    {selectedTicket.closure_photos?.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {selectedTicket.closure_photos.map((url: string, idx: number) => (
+                          <a key={idx} href={url} target="_blank" rel="noreferrer">
+                            <img
+                              src={url}
+                              alt="evidência"
+                              className="w-full h-20 object-cover rounded-md border hover:opacity-80 transition"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
           )}
         </SheetContent>
@@ -1578,9 +1694,25 @@ export default function ChamadosManutencao() {
               Preencha os campos obrigatórios para concluir a Ordem de Serviço.
             </DialogDescription>
           </DialogHeader>
+          {closureErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-1 dark:bg-red-950/40 dark:border-red-800">
+              <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+                Campos obrigatórios pendentes. Preencha no formulário de edição antes de finalizar:
+              </p>
+              {closureErrors.map((err, i) => (
+                <p
+                  key={i}
+                  className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {err}
+                </p>
+              ))}
+            </div>
+          )}
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label>O que foi realizado *</Label>
+              <Label>O que foi feito</Label>
               <Textarea
                 rows={4}
                 value={closureForm.closure_notes}
@@ -1598,7 +1730,7 @@ export default function ChamadosManutencao() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Anexar Imagens</Label>
+              <Label>Anexar evidências</Label>
               <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/50 transition cursor-pointer relative">
                 <input
                   type="file"
@@ -1611,7 +1743,9 @@ export default function ChamadosManutencao() {
                   }
                 />
                 <Paperclip className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <span className="text-sm text-muted-foreground">Clique ou arraste imagens</span>
+                <span className="text-sm text-muted-foreground">
+                  Clique ou arraste imagens de evidência
+                </span>
               </div>
               {closureFiles.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -1638,7 +1772,7 @@ export default function ChamadosManutencao() {
               </Button>
               <Button
                 onClick={handleCloseTicket}
-                disabled={closingTicket}
+                disabled={closingTicket || closureErrors.length > 0}
                 className="bg-green-600 hover:bg-green-700"
               >
                 {closingTicket ? 'Finalizando...' : 'Finalizar OS'}

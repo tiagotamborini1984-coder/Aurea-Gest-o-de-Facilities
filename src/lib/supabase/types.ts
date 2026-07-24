@@ -1970,6 +1970,44 @@ export type Database = {
           },
         ]
       }
+      maintenance_ticket_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          ticket_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'maintenance_ticket_logs_ticket_id_fkey'
+            columns: ['ticket_id']
+            isOneToOne: false
+            referencedRelation: 'maintenance_tickets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       maintenance_tickets: {
         Row: {
           actual_end: string | null
@@ -1979,6 +2017,7 @@ export type Database = {
           assignee_id: string | null
           checklist_responses: Json | null
           client_id: string
+          closed_at: string | null
           closure_notes: string | null
           closure_photos: Json | null
           created_at: string
@@ -2011,6 +2050,7 @@ export type Database = {
           assignee_id?: string | null
           checklist_responses?: Json | null
           client_id: string
+          closed_at?: string | null
           closure_notes?: string | null
           closure_photos?: Json | null
           created_at?: string
@@ -2043,6 +2083,7 @@ export type Database = {
           assignee_id?: string | null
           checklist_responses?: Json | null
           client_id?: string
+          closed_at?: string | null
           closure_notes?: string | null
           closure_photos?: Json | null
           created_at?: string
