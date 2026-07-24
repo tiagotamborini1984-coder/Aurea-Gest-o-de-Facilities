@@ -12,6 +12,7 @@ import {
   Users,
   ListTodo,
   Pencil,
+  Briefcase,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,7 @@ import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import {
   Sheet,
   SheetContent,
@@ -29,6 +31,33 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+const DISCIPLINES = [
+  'Manutentor',
+  'Pedreiro',
+  'Eletricista',
+  'Pintor',
+  'Auxiliar de Manutenção',
+  'Auxiliar de Facilities',
+] as const
+
+type Worker = {
+  id: string
+  client_id: string
+  plant_id: string
+  name: string
+  company: string
+  discipline: string
+  created_at: string
+  plant?: { name: string } | null
+}
 
 export default function CadastrosManutencao() {
   const { user } = useAuth()
@@ -37,16 +66,16 @@ export default function CadastrosManutencao() {
   const [plants, setPlants] = useState<any[]>([])
   const [tipos, setTipos] = useState<any[]>([])
   const [prioridades, setPrioridades] = useState<any[]>([])
-  const [manutentores, setManutentores] = useState<any[]>([])
+  const [workers, setWorkers] = useState<Worker[]>([])
   const [statuses, setStatuses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [newArea, setNewArea] = useState({ name: '', plant_id: '' })
   const [newStatus, setNewStatus] = useState({ name: '', color: '#64748b', step: 'Aberto' })
-  const [newManutentor, setNewManutentor] = useState({
+  const [newWorker, setNewWorker] = useState({
     name: '',
-    email: '',
-    password: '',
+    company: '',
+    discipline: '',
     plant_id: '',
   })
   const [newSubarea, setNewSubarea] = useState({ name: '', area_id: '' })
@@ -69,7 +98,7 @@ export default function CadastrosManutencao() {
 
   const loadData = async () => {
     setLoading(true)
-    const [pRes, aRes, sRes, tRes, prRes, mRes, statRes] = await Promise.all([
+    const [pRes, aRes, sRes, tRes, prRes, wRes, statRes] = await Promise.all([
       supabase.from('plants').select('id, name').order('name'),
       supabase.from('maintenance_areas').select('*, plant:plants(name)').order('name'),
       supabase
@@ -78,7 +107,10 @@ export default function CadastrosManutencao() {
         .order('name'),
       supabase.from('maintenance_types').select('*').order('name'),
       supabase.from('maintenance_priorities').select('*').order('sla_hours'),
-      supabase.from('profiles').select('*').eq('role', 'Manutentor').order('name'),
+      supabase
+        .from('maintenance_workers')
+        .select('*, plant:plants(name)')
+        .order('created_at', { ascending: false }),
       supabase.from('maintenance_statuses').select('*').order('order_index'),
     ])
     if (pRes.data) setPlants(pRes.data)
@@ -86,7 +118,7 @@ export default function CadastrosManutencao() {
     if (sRes.data) setSubareas(sRes.data)
     if (tRes.data) setTipos(tRes.data)
     if (prRes.data) setPrioridades(prRes.data)
-    if (mRes.data) setManutentores(mRes.data)
+    if (wRes.data) setWorkers(wRes.data as Worker[])
     if (statRes.data) setStatuses(statRes.data)
     setLoading(false)
   }
@@ -263,62 +295,42 @@ export default function CadastrosManutencao() {
     }
   }
 
-  const handleAddManutentor = async () => {
-    if (
-      !newManutentor.name ||
-      !newManutentor.email ||
-      !newManutentor.password ||
-      !newManutentor.plant_id
-    ) {
-      toast.error('Preencha nome, e-mail, senha e planta do Manutentor')
+  const handleAddWorker = async () => {
+    if (!newWorker.name || !newWorker.company || !newWorker.discipline || !newWorker.plant_id) {
+      toast.error('Preencha todos os campos: Planta, Nome, Empresa e Disciplina')
       return
     }
     const clientId = await getClientId()
     if (!clientId) return toast.error('Erro de permissão: Client ID não encontrado')
 
-    toast.loading('Criando manutentor...', { id: 'create-manutentor' })
-    const { data, error } = await supabase.functions.invoke('create-user', {
-      body: {
-        email: newManutentor.email,
-        password: newManutentor.password,
-        name: newManutentor.name,
-        role: 'Manutentor',
-        client_id: clientId,
-        authorized_plants: [newManutentor.plant_id],
-      },
+    const { error } = await supabase.from('maintenance_workers').insert({
+      client_id: clientId,
+      plant_id: newWorker.plant_id,
+      name: newWorker.name,
+      company: newWorker.company,
+      discipline: newWorker.discipline,
     })
 
-    if (error || data?.error) {
-      toast.error('Erro ao salvar: ' + (error?.message || data?.error), { id: 'create-manutentor' })
+    if (error) {
+      toast.error('Erro ao salvar: ' + error.message)
     } else {
-      toast.success('Manutentor adicionado', { id: 'create-manutentor' })
-      setNewManutentor({ name: '', email: '', password: '', plant_id: '' })
+      toast.success('Manutentor adicionado com sucesso!')
+      setNewWorker({ name: '', company: '', discipline: '', plant_id: '' })
       loadData()
     }
   }
 
-  const handleDeleteManutentor = async (id: string) => {
-    if (!confirm('Deseja realmente remover este manutentor? O acesso dele será revogado.')) return
-
-    toast.loading('Removendo manutentor...', { id: 'del-manutentor' })
-    const { data, error } = await supabase.functions.invoke('delete-user', {
-      body: { userId: id },
-    })
-
-    if (error || data?.error) {
-      toast.error('Erro ao remover: ' + (error?.message || data?.error), { id: 'del-manutentor' })
-    } else {
-      toast.success('Manutentor removido', { id: 'del-manutentor' })
+  const handleDeleteWorker = async (id: string) => {
+    const { error } = await supabase.from('maintenance_workers').delete().eq('id', id)
+    if (error) toast.error('Erro ao remover: ' + error.message)
+    else {
+      toast.success('Manutentor removido')
       loadData()
     }
   }
 
   const openEdit = (type: string, item: any) => {
-    const data = { ...item }
-    if (type === 'manutentor') {
-      data.plant_id = item.authorized_plants?.[0] || ''
-    }
-    setEditModal({ open: true, type, data })
+    setEditModal({ open: true, type, data: { ...item } })
   }
 
   const handleUpdateField = (field: string, value: any) => {
@@ -367,10 +379,15 @@ export default function CadastrosManutencao() {
           .update({ name: data.name, color: data.color, sla_hours: data.sla_hours })
           .eq('id', data.id)
         error = res.error
-      } else if (type === 'manutentor') {
+      } else if (type === 'worker') {
         const res = await supabase
-          .from('profiles')
-          .update({ name: data.name, authorized_plants: data.plant_id ? [data.plant_id] : [] })
+          .from('maintenance_workers')
+          .update({
+            name: data.name,
+            company: data.company,
+            discipline: data.discipline,
+            plant_id: data.plant_id,
+          })
           .eq('id', data.id)
         error = res.error
       }
@@ -384,6 +401,9 @@ export default function CadastrosManutencao() {
       toast.error('Erro ao atualizar: ' + err.message)
     }
   }
+
+  const selectClass =
+    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue'
 
   return (
     <div className="p-6 space-y-6 animate-fade-in-up">
@@ -440,7 +460,7 @@ export default function CadastrosManutencao() {
                 <div className="space-y-2">
                   <Label>Planta / Filial</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    className={selectClass}
                     value={newArea.plant_id}
                     onChange={(e) => setNewArea({ ...newArea, plant_id: e.target.value })}
                   >
@@ -533,7 +553,7 @@ export default function CadastrosManutencao() {
                 <div className="space-y-2">
                   <Label>Área Pai (Local Macro)</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    className={selectClass}
                     value={newSubarea.area_id}
                     onChange={(e) => setNewSubarea({ ...newSubarea, area_id: e.target.value })}
                   >
@@ -722,7 +742,7 @@ export default function CadastrosManutencao() {
                 <div className="space-y-2">
                   <Label>Etapa no Kanban</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    className={selectClass}
                     value={newStatus.step}
                     onChange={(e) => setNewStatus({ ...newStatus, step: e.target.value })}
                   >
@@ -912,56 +932,71 @@ export default function CadastrosManutencao() {
             <Card className="lg:col-span-1 shadow-sm h-fit">
               <CardHeader>
                 <CardTitle className="text-lg">Novo Manutentor</CardTitle>
-                <CardDescription>Cadastre um técnico para assumir as O.S.</CardDescription>
+                <CardDescription>Cadastre um trabalhador da equipe de manutenção</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Nome Completo</Label>
+                  <Label>
+                    Planta <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={newWorker.plant_id}
+                    onValueChange={(val) => setNewWorker({ ...newWorker, plant_id: val })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione a Planta..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plants.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Nome Completo <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     placeholder="Ex: João Silva"
-                    value={newManutentor.name}
-                    onChange={(e) => setNewManutentor({ ...newManutentor, name: e.target.value })}
+                    value={newWorker.name}
+                    onChange={(e) => setNewWorker({ ...newWorker, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>E-mail de Acesso</Label>
+                  <Label>
+                    Empresa <span className="text-red-500">*</span>
+                  </Label>
                   <Input
-                    type="email"
-                    placeholder="joao.silva@email.com"
-                    value={newManutentor.email}
-                    onChange={(e) => setNewManutentor({ ...newManutentor, email: e.target.value })}
+                    placeholder="Ex: Empresa Terceirizada LTDA"
+                    value={newWorker.company}
+                    onChange={(e) => setNewWorker({ ...newWorker, company: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Senha Inicial</Label>
-                  <Input
-                    type="password"
-                    placeholder="******"
-                    value={newManutentor.password}
-                    onChange={(e) =>
-                      setNewManutentor({ ...newManutentor, password: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Planta Vinculada</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
-                    value={newManutentor.plant_id}
-                    onChange={(e) =>
-                      setNewManutentor({ ...newManutentor, plant_id: e.target.value })
-                    }
+                  <Label>
+                    Disciplina <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={newWorker.discipline}
+                    onValueChange={(val) => setNewWorker({ ...newWorker, discipline: val })}
                   >
-                    <option value="">Selecione a Planta...</option>
-                    {plants.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione a Disciplina..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISCIPLINES.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button
-                  onClick={handleAddManutentor}
+                  onClick={handleAddWorker}
                   className="w-full bg-brand-vividBlue hover:bg-brand-vividBlue/90"
                 >
                   <Plus className="h-4 w-4 mr-2" /> Cadastrar Manutentor
@@ -978,57 +1013,56 @@ export default function CadastrosManutencao() {
                   <p className="text-sm text-gray-500">Carregando manutentores...</p>
                 ) : (
                   <div className="space-y-2">
-                    {manutentores.map((m) => {
-                      const plantNames =
-                        m.authorized_plants && Array.isArray(m.authorized_plants)
-                          ? m.authorized_plants
-                              .map((id: string) => plants.find((p) => p.id === id)?.name)
-                              .filter(Boolean)
-                              .join(', ')
-                          : 'Sem planta vinculada'
-
-                      return (
-                        <div
-                          key={m.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-brand-vividBlue text-white text-xs">
-                                {m.name?.[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium text-sm text-gray-900">{m.name}</p>
-                              <p className="text-xs text-gray-500">{m.email}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                    {workers.map((w) => (
+                      <div
+                        key={w.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-brand-vividBlue text-white text-xs">
+                              {w.name?.[0]?.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm text-gray-900 truncate">{w.name}</p>
+                            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                                <Briefcase className="w-3 h-3" />
+                                {w.company}
+                              </span>
+                              <span className="text-gray-300">•</span>
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
                                 <Building2 className="w-3 h-3" />
-                                {plantNames || 'Todas as plantas'}
-                              </p>
+                                {w.plant?.name || '—'}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEdit('manutentor', m)}
-                              className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteManutentor(m.id)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
                         </div>
-                      )
-                    })}
-                    {manutentores.length === 0 && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {w.discipline}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit('worker', w)}
+                            className="text-brand-vividBlue hover:text-blue-700 hover:bg-blue-50 h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteWorker(w.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {workers.length === 0 && (
                       <p className="text-sm text-gray-500 italic py-4 text-center">
                         Nenhum manutentor cadastrado.
                       </p>
@@ -1072,7 +1106,7 @@ export default function CadastrosManutencao() {
                 <div className="space-y-2">
                   <Label>Planta / Filial</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    className={selectClass}
                     value={editModal.data?.plant_id || ''}
                     onChange={(e) => handleUpdateField('plant_id', e.target.value)}
                   >
@@ -1099,7 +1133,7 @@ export default function CadastrosManutencao() {
                 <div className="space-y-2">
                   <Label>Área Pai (Local Macro)</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    className={selectClass}
                     value={editModal.data?.area_id || ''}
                     onChange={(e) => handleUpdateField('area_id', e.target.value)}
                   >
@@ -1147,7 +1181,7 @@ export default function CadastrosManutencao() {
                 <div className="space-y-2">
                   <Label>Etapa no Kanban</Label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
+                    className={selectClass}
                     value={editModal.data?.step || ''}
                     onChange={(e) => handleUpdateField('step', e.target.value)}
                   >
@@ -1199,29 +1233,65 @@ export default function CadastrosManutencao() {
               </>
             )}
 
-            {editModal.type === 'manutentor' && (
+            {editModal.type === 'worker' && (
               <>
                 <div className="space-y-2">
-                  <Label>Nome Completo</Label>
+                  <Label>
+                    Nome Completo <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     value={editModal.data?.name || ''}
                     onChange={(e) => handleUpdateField('name', e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Planta Vinculada</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-vividBlue"
-                    value={editModal.data?.plant_id || ''}
-                    onChange={(e) => handleUpdateField('plant_id', e.target.value)}
+                  <Label>
+                    Empresa <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    value={editModal.data?.company || ''}
+                    onChange={(e) => handleUpdateField('company', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Disciplina <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={editModal.data?.discipline || ''}
+                    onValueChange={(val) => handleUpdateField('discipline', val)}
                   >
-                    <option value="">Todas as plantas (ou selecione...)</option>
-                    {plants.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione a Disciplina..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISCIPLINES.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Planta <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={editModal.data?.plant_id || ''}
+                    onValueChange={(val) => handleUpdateField('plant_id', val)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione a Planta..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plants.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </>
             )}

@@ -3583,6 +3583,24 @@ export type Database = {
               isSetofReturn: true
             }
           }
+      get_maintenance_dashboard_metrics: {
+        Args: {
+          p_client_id: string
+          p_date_end: string
+          p_date_start: string
+          p_plant_id: string
+        }
+        Returns: Json
+      }
+      get_maintenance_kpis: {
+        Args: {
+          p_client_id: string
+          p_date_end: string
+          p_date_start: string
+          p_plant_id: string
+        }
+        Returns: Json
+      }
       get_maintenance_public_options: {
         Args: { p_slug: string }
         Returns: Json

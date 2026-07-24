@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { Activity, Clock, Target, Filter, MapPin, CheckCircle2, Download } from 'lucide-react'
+import { Activity, Clock, Filter, MapPin, CheckCircle2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { exportToCSV } from '@/lib/export'
 import {
@@ -12,21 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Bar,
-  BarChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from 'recharts'
+import { Bar, BarChart, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { MaintenanceKpiCards } from '@/components/gestao-manutencao/MaintenanceKpiCards'
+import { MaintenanceDashboardCharts } from '@/components/gestao-manutencao/MaintenanceDashboardCharts'
 import { Input } from '@/components/ui/input'
 
 export default function DashboardManutencao() {
@@ -39,8 +28,6 @@ export default function DashboardManutencao() {
     reparo: 0,
     total: 0,
   })
-  const [reparoAderenciaData, setReparoAderenciaData] = useState<any[]>([])
-  const [prevAderenciaData, setPrevAderenciaData] = useState<any[]>([])
   const [evolData, setEvolData] = useState<any[]>([])
   const [mttrData, setMttrData] = useState<any[]>([])
   const [rawTickets, setRawTickets] = useState<any[]>([])
@@ -64,7 +51,7 @@ export default function DashboardManutencao() {
 
   useEffect(() => {
     fetchStats()
-  }, [selectedPlant, selectedArea])
+  }, [selectedPlant, selectedArea, dateStart, dateEnd])
 
   const loadAuxData = async () => {
     const [pRes, aRes] = await Promise.all([
@@ -87,6 +74,8 @@ export default function DashboardManutencao() {
 
       if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
       if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
+      query = query.gte('reported_at', dateStart)
+      query = query.lte('reported_at', `${dateEnd}T23:59:59`)
 
       const { data: tickets } = await query
 
@@ -224,30 +213,6 @@ export default function DashboardManutencao() {
           total: adTotal,
         })
 
-        const rData = []
-        if (reparoTotal === 0) rData.push({ name: 'Sem dados', value: 1, color: '#e5e7eb' })
-        else {
-          if (reparoNoPrazo > 0)
-            rData.push({ name: 'No Prazo', value: reparoNoPrazo, color: '#10b981' })
-          if (reparoTotal - reparoNoPrazo > 0)
-            rData.push({ name: 'Atrasado', value: reparoTotal - reparoNoPrazo, color: '#ef4444' })
-        }
-        setReparoAderenciaData(rData)
-
-        const pData = []
-        if (preventivaTotal === 0) pData.push({ name: 'Sem dados', value: 1, color: '#e5e7eb' })
-        else {
-          if (preventivaNoPrazo > 0)
-            pData.push({ name: 'No Prazo', value: preventivaNoPrazo, color: '#10b981' })
-          if (preventivaTotal - preventivaNoPrazo > 0)
-            pData.push({
-              name: 'Atrasado',
-              value: preventivaTotal - preventivaNoPrazo,
-              color: '#ef4444',
-            })
-        }
-        setPrevAderenciaData(pData)
-
         const evolDataObj = Object.values(monthlyStats).map((m: any) => ({
           name: m.label.charAt(0).toUpperCase() + m.label.slice(1),
           Reparos:
@@ -299,12 +264,6 @@ export default function DashboardManutencao() {
       }
     })
     exportToCSV('dashboard_manutencao.csv', exportData)
-  }
-
-  const pieConfig = {
-    noPrazo: { label: 'No Prazo', color: '#10b981' },
-    atrasado: { label: 'Atrasado', color: '#ef4444' },
-    semDados: { label: 'Sem dados', color: '#e5e7eb' },
   }
 
   const lineConfig = {
@@ -426,87 +385,13 @@ export default function DashboardManutencao() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-start gap-2">
-              <Target className="h-5 w-5 text-indigo-500 mt-0.5 shrink-0" />
-              <div className="flex flex-col">
-                <span className="leading-tight">Aderência a Programação de OS</span>
-                <span className="text-xs text-gray-500 font-normal mt-0.5">
-                  (Reparos Pró Ativos e Reativos)
-                </span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-[250px] flex items-center justify-center p-4">
-            {loading ? (
-              <div className="text-gray-400">Carregando...</div>
-            ) : (
-              <ChartContainer config={pieConfig} className="w-full h-full">
-                <PieChart>
-                  <Pie
-                    data={reparoAderenciaData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    labelLine={false}
-                  >
-                    {reparoAderenciaData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
+      <MaintenanceDashboardCharts
+        selectedPlant={selectedPlant}
+        dateStart={dateStart}
+        dateEnd={dateEnd}
+      />
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-start gap-2">
-              <Target className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
-              <div className="flex flex-col">
-                <span className="leading-tight">Aderência Manutenção Preventiva</span>
-                <span className="text-xs text-gray-500 font-normal mt-0.5">
-                  (Apenas Preventivas)
-                </span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-[250px] flex items-center justify-center p-4">
-            {loading ? (
-              <div className="text-gray-400">Carregando...</div>
-            ) : (
-              <ChartContainer config={pieConfig} className="w-full h-full">
-                <PieChart>
-                  <Pie
-                    data={prevAderenciaData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    labelLine={false}
-                  >
-                    {prevAderenciaData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-6">
         <Card className="shadow-sm flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">

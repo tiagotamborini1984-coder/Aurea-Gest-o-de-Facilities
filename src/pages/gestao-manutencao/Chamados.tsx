@@ -39,6 +39,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { ImportTicketsDialog } from '@/components/gestao-manutencao/ImportTicketsDialog'
+import { getReadableTextColor } from '@/lib/contrast-utils'
 
 const toLocalDatetime = (utcStr: string | null) => {
   if (!utcStr) return ''
@@ -759,7 +760,9 @@ export default function ChamadosManutencao() {
             >
               <div className="font-bold mb-3 px-3 py-2 flex justify-between items-center rounded-lg text-sm text-foreground bg-muted">
                 {column}
-                <Badge variant="secondary">{colTickets.length}</Badge>
+                <Badge variant="secondary" className="text-white">
+                  {colTickets.length}
+                </Badge>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 px-1">
                 {colTickets.map((ticket) => (
@@ -779,7 +782,7 @@ export default function ChamadosManutencao() {
                               variant="outline"
                               style={{
                                 backgroundColor: ticket.type.color || '#e5e7eb',
-                                color: '#fff',
+                                color: getReadableTextColor(ticket.type.color || '#e5e7eb'),
                                 borderColor: ticket.type.color || '#e5e7eb',
                               }}
                               className="text-[10px] px-1.5 h-5 font-semibold tracking-wide dark:opacity-90"
@@ -816,13 +819,13 @@ export default function ChamadosManutencao() {
                               ticket.priority.name.toLowerCase() === 'planejado'
                                 ? {
                                     backgroundColor: '#22c55e',
-                                    color: '#000000',
+                                    color: getReadableTextColor('#22c55e'),
                                     borderColor: '#22c55e',
                                   }
                                 : ticket.priority.name.toLowerCase() === 'urgente'
                                   ? {
                                       backgroundColor: '#ef4444',
-                                      color: '#ffffff',
+                                      color: getReadableTextColor('#ef4444'),
                                       borderColor: '#ef4444',
                                     }
                                   : {

@@ -56,6 +56,13 @@ export interface AccessibleColors {
   primaryContrast: string
 }
 
+export function getReadableTextColor(bgHex: string | null | undefined): string {
+  const rgb = parseHex(bgHex)
+  if (!rgb) return '#ffffff'
+  const luminance = relativeLuminance(rgb)
+  return luminance > 0.4 ? '#000000' : '#ffffff'
+}
+
 export function getAccessibleColors(
   primary: string | null | undefined,
   secondary: string | null | undefined,

@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 const toLocalDatetime = (utcStr: string | null) => {
   if (!utcStr) return ''
@@ -52,14 +53,16 @@ export default function PlanejamentoManutencao() {
   })
   const [updating, setUpdating] = useState(false)
 
-  const weekDays = Array.from({ length: 5 }).map((_, i) => {
+  const weekDays = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(currentWeek)
     const currentDay = d.getDay()
     const diff = d.getDate() - currentDay + (currentDay === 0 ? -6 : 1) + i
     d.setDate(diff)
+    const dayOfWeek = d.getDay()
     return {
       date: d.toISOString().split('T')[0],
       label: new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit' }).format(d),
+      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
     }
   })
 
@@ -341,7 +344,7 @@ export default function PlanejamentoManutencao() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2 lg:gap-1.5 overflow-x-auto">
           {weekDays.map((day) => {
             const dayTickets = tickets.filter(
               (t) => t.planned_start && t.planned_start.startsWith(day.date),
@@ -349,14 +352,29 @@ export default function PlanejamentoManutencao() {
             return (
               <div
                 key={day.date}
-                className="bg-white border rounded-xl p-3 flex flex-col transition-colors hover:bg-gray-50/50"
+                className={cn(
+                  'border rounded-xl p-2 lg:p-3 flex flex-col transition-colors min-w-[140px] lg:min-w-0',
+                  day.isWeekend
+                    ? 'bg-amber-50/60 hover:bg-amber-100/60'
+                    : 'bg-white hover:bg-gray-50/50',
+                )}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => handleDrop(e, day.date)}
               >
-                <h4 className="text-center font-medium text-gray-500 text-sm mb-3 pb-2 border-b capitalize">
+                <h4
+                  className={cn(
+                    'text-center font-medium text-sm mb-2 pb-2 border-b capitalize flex items-center justify-center gap-1',
+                    day.isWeekend ? 'text-amber-700 border-amber-200' : 'text-gray-500',
+                  )}
+                >
                   {day.label}
+                  {day.isWeekend && (
+                    <span className="text-[9px] uppercase font-bold bg-amber-200 text-amber-800 px-1 rounded">
+                      Fim de semana
+                    </span>
+                  )}
                 </h4>
-                <div className="flex-1 border-2 border-transparent hover:border-dashed hover:border-blue-300 rounded-lg p-1 transition-all space-y-2 min-h-[100px]">
+                <div className="flex-1 border-2 border-transparent hover:border-dashed hover:border-blue-300 rounded-lg p-1 transition-all space-y-2 min-h-[100px] lg:min-h-[120px]">
                   {dayTickets.map((t) => (
                     <Card
                       key={t.id}
