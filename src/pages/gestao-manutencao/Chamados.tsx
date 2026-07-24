@@ -15,6 +15,8 @@ import {
   Check,
   AlertTriangle,
   UploadCloud,
+  FileText,
+  History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -39,6 +41,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { ImportTicketsDialog } from '@/components/gestao-manutencao/ImportTicketsDialog'
+import { TicketLogModal } from '@/components/gestao-manutencao/TicketLogModal'
+import { generateTicketPdf } from '@/components/gestao-manutencao/generate-ticket-pdf'
 import { getReadableTextColor } from '@/lib/contrast-utils'
 
 const toLocalDatetime = (utcStr: string | null) => {
@@ -148,12 +152,21 @@ export default function ChamadosManutencao() {
   const [updating, setUpdating] = useState(false)
   const [now, setNow] = useState(new Date())
 
+  const isAdmin = ['Master', 'Admin', 'Administrador'].includes(userRole)
+  const isTicketFinalized =
+    selectedTicket?.status?.is_terminal || selectedTicket?.status?.step === 'Concluído'
+  const canEditTicket = !isTicketFinalized || isAdmin
+
   const [correctiveModalOpen, setCorrectiveModalOpen] = useState(false)
   const [correctiveForm, setCorrectiveForm] = useState({
     description: '',
     priority_id: 'none',
   })
   const [importOpen, setImportOpen] = useState(false)
+  const [userRole, setUserRole] = useState<string>('')
+  const [logModalOpen, setLogModalOpen] = useState(false)
+  const [logTicketId, setLogTicketId] = useState<string | null>(null)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000)
@@ -252,6 +265,19 @@ export default function ChamadosManutencao() {
   useEffect(() => {
     loadAuxData()
   }, [])
+
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.role) setUserRole(data.role)
+        })
+    }
+  }, [user?.id])
 
   useEffect(() => {
     loadTickets()
@@ -590,6 +616,24 @@ export default function ChamadosManutencao() {
       toast.error(err.message)
     } finally {
       setClosingTicket(false)
+    }
+  }
+
+  const handleGeneratePdf = async () => {
+    if (!selectedTicket) return
+    setGeneratingPdf(true)
+    try {
+      const { data: logs } = await supabase
+        .from('maintenance_ticket_logs')
+        .select('*, user:profiles!maintenance_ticket_logs_user_id_fkey(name)')
+        .eq('ticket_id', selectedTicket.id)
+        .order('created_at', { ascending: true })
+
+      await generateTicketPdf(selectedTicket, logs || [])
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao gerar PDF')
+    } finally {
+      setGeneratingPdf(false)
     }
   }
 
@@ -1015,6 +1059,21 @@ export default function ChamadosManutencao() {
                           Finalizar OS
                         </Button>
                       )}
+                      {column === 'Concluído' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full h-7 text-xs mt-2"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setLogTicketId(ticket.id)
+                            setLogModalOpen(true)
+                          }}
+                        >
+                          <History className="w-3 h-3 mr-1" />
+                          Log de Ações
+                        </Button>
+                      )}
                       {column === 'Concluído' && ticket.closure_notes && (
                         <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded mt-1.5 line-clamp-2">
                           {ticket.closure_notes}
@@ -1160,7 +1219,35 @@ export default function ChamadosManutencao() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              {isTicketFinalized && (
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    onClick={() => handleGeneratePdf()}
+                    disabled={generatingPdf}
+                    className="flex-1 bg-brand-vividBlue text-sm h-10"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    {generatingPdf ? 'Gerando...' : 'Gerar PDF'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setLogTicketId(selectedTicket.id)
+                      setLogModalOpen(true)
+                    }}
+                    className="flex-1 text-sm h-10"
+                  >
+                    <History className="w-4 h-4 mr-2" />
+                    Log
+                  </Button>
+                </div>
+              )}
+              <div
+                className={cn(
+                  'grid grid-cols-2 gap-4 pt-4 border-t',
+                  !canEditTicket && 'pointer-events-none opacity-60',
+                )}
+              >
                 <div className="col-span-2">
                   <Label className="text-muted-foreground">Planta</Label>
                   <Select
@@ -1393,15 +1480,17 @@ export default function ChamadosManutencao() {
                   </>
                 )}
 
-                <div className="col-span-2 mt-4">
-                  <Button
-                    onClick={handleUpdateTicket}
-                    disabled={updating}
-                    className="w-full bg-brand-vividBlue text-sm h-10"
-                  >
-                    {updating ? 'Salvando...' : 'Salvar Alterações'}
-                  </Button>
-                </div>
+                {canEditTicket && (
+                  <div className="col-span-2 mt-4">
+                    <Button
+                      onClick={handleUpdateTicket}
+                      disabled={updating}
+                      className="w-full bg-brand-vividBlue text-sm h-10"
+                    >
+                      {updating ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {selectedTicket.photos?.length > 0 && (
@@ -1558,6 +1647,8 @@ export default function ChamadosManutencao() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <TicketLogModal open={logModalOpen} onOpenChange={setLogModalOpen} ticketId={logTicketId} />
     </div>
   )
 }
