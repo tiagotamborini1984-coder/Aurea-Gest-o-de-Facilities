@@ -243,6 +243,14 @@ export const inventoryService = {
     if (error) throw error
   },
 
+  async reactivateProduct(productId: string) {
+    const { error } = await supabase
+      .from('inventory_products')
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq('id', productId)
+    if (error) throw error
+  },
+
   async deleteRequest(requestId: string) {
     const { error: itemsError } = await supabase
       .from('inventory_request_items')

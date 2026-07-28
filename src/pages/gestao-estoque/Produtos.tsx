@@ -20,7 +20,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit2, Archive, Tag, Search, History } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, Edit2, Archive, Tag, Search, History, Power } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import {
@@ -43,6 +45,7 @@ import {
 } from '@/components/ui/select'
 import { normalizeIncludes, normalizeMatch } from '@/lib/string-utils'
 import { CategoryManagerDialog } from '@/components/gestao-estoque/CategoryManagerDialog'
+import { cn } from '@/lib/utils'
 
 export default function Produtos() {
   const { activeClient, profile } = useAppStore()
@@ -51,6 +54,8 @@ export default function Produtos() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active')
+  const [reactivateTarget, setReactivateTarget] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<{
     name: string
@@ -73,22 +78,26 @@ export default function Produtos() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [sdsFile, setSdsFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isReactivating, setIsReactivating] = useState(false)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null)
 
   const clientId = activeClient?.id || profile?.client_id
+  const editingProduct = editingId ? products.find((p) => p.id === editingId) : null
+  const isEditingInactive = editingProduct?.is_active === false
 
   useEffect(() => {
     if (clientId) {
       loadProducts()
       loadCategories()
     }
-  }, [clientId])
+  }, [clientId, statusFilter])
 
   const loadProducts = () => {
     if (!clientId) return
-    inventoryService.getProducts(clientId).then(setProducts)
+    const includeInactive = statusFilter !== 'active'
+    inventoryService.getProducts(clientId, includeInactive).then(setProducts)
   }
 
   const loadCategories = () => {
@@ -204,10 +213,34 @@ export default function Produtos() {
     }
   }
 
+  const handleReactivate = async () => {
+    if (!reactivateTarget) return
+    setIsReactivating(true)
+    try {
+      await inventoryService.reactivateProduct(reactivateTarget)
+      toast.success('Produto reativado com sucesso')
+      setReactivateTarget(null)
+      if (formModalOpen && editingId === reactivateTarget) {
+        setFormModalOpen(false)
+      }
+      loadProducts()
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao reativar produto')
+      setReactivateTarget(null)
+    } finally {
+      setIsReactivating(false)
+    }
+  }
+
   const filteredProducts = products.filter((p) => {
+    const mStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && p.is_active !== false) ||
+      (statusFilter === 'inactive' && p.is_active === false)
     const mCategory = categoryFilter === 'all' || normalizeMatch(p.category, categoryFilter)
-    if (!search.trim()) return mCategory
+    if (!search.trim()) return mStatus && mCategory
     return (
+      mStatus &&
       mCategory &&
       (normalizeIncludes(p.name, search) ||
         normalizeIncludes(p.supply_code, search) ||
@@ -241,7 +274,14 @@ export default function Produtos() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 w-full">
+      <div className="flex flex-col sm:flex-row gap-3 w-full items-start sm:items-center">
+        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+          <TabsList>
+            <TabsTrigger value="active">Ativos</TabsTrigger>
+            <TabsTrigger value="inactive">Inativos</TabsTrigger>
+            <TabsTrigger value="all">Todos</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
@@ -280,7 +320,10 @@ export default function Produtos() {
             </TableHeader>
             <TableBody>
               {filteredProducts.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow
+                  key={p.id}
+                  className={cn(p.is_active === false && 'opacity-60 bg-slate-50')}
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {p.image_url ? (
@@ -289,7 +332,14 @@ export default function Produtos() {
                         <div className="w-10 h-10 rounded bg-slate-100" />
                       )}
                       <div>
-                        <p className="font-medium">{p.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{p.name}</p>
+                          {p.is_active === false && (
+                            <Badge variant="secondary" className="text-xs">
+                              Inativo
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500">{p.unit_of_measure}</p>
                       </div>
                     </div>
@@ -301,22 +351,34 @@ export default function Produtos() {
                       </div>
                       <div>
                         <span className="font-medium">Supply:</span> {p.supply_code || '-'}
-                      </div>{' '}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{p.category}</TableCell>
                   <TableCell>
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                      p.item_value || 0,
-                    )}
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(p.item_value || 0)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => openForm(p)}>
                       <Edit2 className="w-4 h-4 text-blue-600" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setArchiveTarget(p.id)}>
-                      <Archive className="w-4 h-4 text-amber-600" />
-                    </Button>
+                    {p.is_active === false ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setReactivateTarget(p.id)}
+                        title="Reativar"
+                      >
+                        <Power className="w-4 h-4 text-green-600" />
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="icon" onClick={() => setArchiveTarget(p.id)}>
+                        <Archive className="w-4 h-4 text-amber-600" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -344,7 +406,14 @@ export default function Produtos() {
       <Dialog open={formModalOpen} onOpenChange={setFormModalOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {editingId ? 'Editar Produto' : 'Novo Produto'}
+              {isEditingInactive && (
+                <Badge variant="secondary" className="text-xs">
+                  Inativo
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="col-span-2 space-y-2">
@@ -436,6 +505,16 @@ export default function Produtos() {
             <Button variant="outline" onClick={() => setFormModalOpen(false)}>
               Cancelar
             </Button>
+            {isEditingInactive && (
+              <Button
+                variant="outline"
+                onClick={() => setReactivateTarget(editingId)}
+                className="text-green-700 border-green-300 hover:bg-green-50"
+              >
+                <Power className="w-4 h-4 mr-2" />
+                Reativar
+              </Button>
+            )}
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? 'Salvando...' : 'Salvar'}
             </Button>
@@ -462,6 +541,27 @@ export default function Produtos() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleArchive}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!reactivateTarget}
+        onOpenChange={(open) => !open && setReactivateTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reativar Produto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja reativar este produto? Ele voltará a aparecer na lista de
+              produtos ativos e estará disponível para novas solicitações e importações.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReactivate} disabled={isReactivating}>
+              {isReactivating ? 'Reativando...' : 'Confirmar'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
