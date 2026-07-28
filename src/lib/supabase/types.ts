@@ -1178,6 +1178,67 @@ export type Database = {
           },
         ]
       }
+      import_logs: {
+        Row: {
+          action_type: string
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          inserted_products: Json
+          module: string
+          plant_id: string | null
+          total_products: number
+          updated_products: Json
+        }
+        Insert: {
+          action_type?: string
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          inserted_products?: Json
+          module?: string
+          plant_id?: string | null
+          total_products?: number
+          updated_products?: Json
+        }
+        Update: {
+          action_type?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          inserted_products?: Json
+          module?: string
+          plant_id?: string | null
+          total_products?: number
+          updated_products?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'import_logs_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'import_logs_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'import_logs_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inventory_categories: {
         Row: {
           client_id: string | null

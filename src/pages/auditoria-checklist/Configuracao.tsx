@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { ArrowLeft, Plus, Trash2, Save, Send } from 'lucide-react'
+import { AuditDiagnostic } from '@/pages/auditoria-checklist/components/AuditDiagnostic'
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
@@ -148,6 +149,8 @@ export default function AuditoriaConfig() {
           </Button>
         </div>
       </div>
+
+      {id && <AuditDiagnostic auditId={id} />}
 
       <Card>
         <CardHeader>
