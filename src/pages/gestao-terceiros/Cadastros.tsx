@@ -18,6 +18,7 @@ import { useCadastrosConfig } from './useCadastrosConfig'
 import QuadroContratado from './QuadroContratado'
 import { DuplicateHeadcountDialog } from '@/components/gestao-terceiros/DuplicateHeadcountDialog'
 import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
+import { logAudit } from '@/services/audit'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -268,25 +269,55 @@ export default function Cadastros() {
             .single()
           if (!error && data) {
             if (training_records && config.tableName === 'employees') {
-              const trPayload = training_records.map((tr: any) => ({
-                client_id: targetClientId,
-                employee_id: data.id,
-                training_id: tr.training_id,
-                document_url: tr.document_url || '',
-                completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
-              }))
+              const trPayload = training_records
+                .filter((tr: any) => tr.training_id)
+                .map((tr: any) => ({
+                  client_id: targetClientId,
+                  employee_id: data.id,
+                  training_id: tr.training_id,
+                  document_url: tr.document_url || '',
+                  completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                }))
               if (trPayload.length > 0) {
-                await supabase.from('employee_training_records').insert(trPayload)
+                const { error: trError } = await supabase
+                  .from('employee_training_records')
+                  .insert(trPayload)
+                if (trError) {
+                  return {
+                    success: false,
+                    error: {
+                      message: `Erro ao salvar treinamentos do colaborador: ${trError.message}`,
+                    },
+                  }
+                }
+                await logAudit(
+                  targetClientId,
+                  profile.id,
+                  'training_record_created',
+                  `Colaborador: ${data.name || data.id}`,
+                )
               }
             }
             if (training_records && config.tableName === 'functions') {
-              const trPayload = training_records.map((tr: any) => ({
-                client_id: targetClientId,
-                function_id: data.id,
-                training_id: tr.training_id,
-              }))
-              if (trPayload.length > 0) {
-                await supabase.from('function_required_trainings').insert(trPayload)
+              const frPayload = training_records
+                .filter((tr: any) => tr.training_id)
+                .map((tr: any) => ({
+                  client_id: targetClientId,
+                  function_id: data.id,
+                  training_id: tr.training_id,
+                }))
+              if (frPayload.length > 0) {
+                const { error: frError } = await supabase
+                  .from('function_required_trainings')
+                  .insert(frPayload)
+                if (frError) {
+                  return {
+                    success: false,
+                    error: {
+                      message: `Erro ao salvar treinamentos da função: ${frError.message}`,
+                    },
+                  }
+                }
               }
             }
             refetch()
@@ -314,6 +345,12 @@ export default function Cadastros() {
             record
           const payload = { ...rest }
 
+          const updateClientId =
+            payload.client_id ||
+            (profile.role === 'Master' && selectedMasterClient !== 'all'
+              ? selectedMasterClient
+              : profile.client_id)
+
           if (type === 'colaboradores' && payload.company_id) {
             const comp = companies.find((c: any) => c.id === payload.company_id)
             if (comp) {
@@ -324,27 +361,68 @@ export default function Cadastros() {
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
             if (training_records && config.tableName === 'employees') {
-              await supabase.from('employee_training_records').delete().eq('employee_id', id)
-              const trPayload = training_records.map((tr: any) => ({
-                client_id: payload.client_id || record.client_id,
-                employee_id: id,
-                training_id: tr.training_id,
-                document_url: tr.document_url || '',
-                completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
-              }))
+              const { error: delError } = await supabase
+                .from('employee_training_records')
+                .delete()
+                .eq('employee_id', id)
+              if (delError) {
+                return {
+                  success: false,
+                  error: {
+                    message: `Erro ao atualizar treinamentos: ${delError.message}`,
+                  },
+                }
+              }
+              const trPayload = training_records
+                .filter((tr: any) => tr.training_id)
+                .map((tr: any) => ({
+                  client_id: updateClientId,
+                  employee_id: id,
+                  training_id: tr.training_id,
+                  document_url: tr.document_url || '',
+                  completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                }))
               if (trPayload.length > 0) {
-                await supabase.from('employee_training_records').insert(trPayload)
+                const { error: trError } = await supabase
+                  .from('employee_training_records')
+                  .insert(trPayload)
+                if (trError) {
+                  return {
+                    success: false,
+                    error: {
+                      message: `Erro ao salvar treinamentos do colaborador: ${trError.message}`,
+                    },
+                  }
+                }
+                await logAudit(
+                  updateClientId,
+                  profile.id,
+                  'training_record_created',
+                  `Colaborador ID: ${id}`,
+                )
               }
             }
             if (training_records && config.tableName === 'functions') {
               await supabase.from('function_required_trainings').delete().eq('function_id', id)
-              const trPayload = training_records.map((tr: any) => ({
-                client_id: payload.client_id || record.client_id,
-                function_id: id,
-                training_id: tr.training_id,
-              }))
-              if (trPayload.length > 0) {
-                await supabase.from('function_required_trainings').insert(trPayload)
+              const frPayload = training_records
+                .filter((tr: any) => tr.training_id)
+                .map((tr: any) => ({
+                  client_id: updateClientId,
+                  function_id: id,
+                  training_id: tr.training_id,
+                }))
+              if (frPayload.length > 0) {
+                const { error: frError } = await supabase
+                  .from('function_required_trainings')
+                  .insert(frPayload)
+                if (frError) {
+                  return {
+                    success: false,
+                    error: {
+                      message: `Erro ao salvar treinamentos da função: ${frError.message}`,
+                    },
+                  }
+                }
               }
             }
             refetch()
