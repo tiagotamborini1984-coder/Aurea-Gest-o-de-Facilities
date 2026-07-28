@@ -20,8 +20,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit2, Archive, Tag, Search } from 'lucide-react'
+import { Plus, Edit2, Archive, Tag, Search, History } from 'lucide-react'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -223,6 +224,12 @@ export default function Produtos() {
           <p className="text-slate-500">Gerencie os itens do estoque</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/gestao-estoque/historico-importacoes">
+              <History className="w-4 h-4 mr-2" />
+              Histórico de Importações
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => setCategoryModalOpen(true)}>
             <Tag className="w-4 h-4 mr-2" />
             Gerenciar Categorias

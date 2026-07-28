@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
+import { exportToXlsx } from '@/lib/export-xlsx'
 
 export const inventoryService = {
   async getProducts(clientId: string, includeInactive = false) {
@@ -320,9 +321,10 @@ export const inventoryService = {
     return count || 0
   },
 
-  async importProducts(file: File) {
+  async importProducts(file: File, plantId?: string) {
     const formData = new FormData()
     formData.append('file', file)
+    if (plantId) formData.append('plant_id', plantId)
 
     const { data, error } = await supabase.functions.invoke('import-products', {
       body: formData,
@@ -337,6 +339,81 @@ export const inventoryService = {
       total: number
       errors: string[]
       error?: string
+    }
+  },
+
+  async getImportLogs(clientId: string) {
+    const { data, error } = await (supabase as any)
+      .from('import_logs')
+      .select(`*, creator:profiles!import_logs_created_by_fkey(name)`)
+      .eq('client_id', clientId)
+      .eq('module', 'inventory')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  async getProductNamesByIds(ids: string[]) {
+    if (ids.length === 0) return {} as Record<string, string>
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .select('id, name')
+      .in('id', ids)
+    if (error) throw error
+    const map: Record<string, string> = {}
+    for (const p of data || []) map[p.id] = p.name
+    return map
+  },
+
+  async undoImport(importLogId: string) {
+    const { data: log, error: logError } = await (supabase as any)
+      .from('import_logs')
+      .select('*')
+      .eq('id', importLogId)
+      .single()
+    if (logError) throw logError
+
+    const insertedIds: string[] = log.inserted_products || []
+    const updatedProducts: { product_id: string; previous_state: any }[] =
+      log.updated_products || []
+
+    if (insertedIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('inventory_products')
+        .delete()
+        .in('id', insertedIds)
+      if (deleteError) throw deleteError
+    }
+
+    for (const { product_id, previous_state } of updatedProducts) {
+      const { error: updateError } = await supabase
+        .from('inventory_products')
+        .update({
+          name: previous_state.name,
+          description: previous_state.description,
+          category: previous_state.category,
+          item_value: previous_state.item_value,
+          supply_code: previous_state.supply_code,
+          fs_code: previous_state.fs_code,
+          sds_url: previous_state.sds_url,
+          unit_of_measure: previous_state.unit_of_measure,
+          is_active: previous_state.is_active,
+          image_url: previous_state.image_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', product_id)
+      if (updateError) throw updateError
+    }
+
+    const { error: deleteLogError } = await (supabase as any)
+      .from('import_logs')
+      .delete()
+      .eq('id', importLogId)
+    if (deleteLogError) throw deleteLogError
+
+    return {
+      deletedCount: insertedIds.length,
+      restoredCount: updatedProducts.length,
     }
   },
 }

@@ -40,6 +40,23 @@ function jsonRes(data: any, status = 200) {
   })
 }
 
+function snapshotProduct(p: any): any {
+  if (!p) return null
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    category: p.category,
+    unit_of_measure: p.unit_of_measure,
+    image_url: p.image_url,
+    sds_url: p.sds_url,
+    fs_code: p.fs_code,
+    supply_code: p.supply_code,
+    item_value: p.item_value,
+    is_active: p.is_active,
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -67,6 +84,7 @@ Deno.serve(async (req: Request) => {
 
     const formData = await req.formData()
     const file = formData.get('file')
+    const plantId = (formData.get('plant_id') as string) || null
     if (!file || !(file instanceof File)) throw new Error('No file provided')
 
     const buf = await file.arrayBuffer()
@@ -171,14 +189,26 @@ Deno.serve(async (req: Request) => {
 
     const { data: existing } = await userClient
       .from('inventory_products')
-      .select('id, name, supply_code, fs_code')
+      .select('*')
       .eq('client_id', clientId)
+
+    const exSupplyFull = new Map<string, any>()
+    const exFsFull = new Map<string, any>()
+    const exNamesFull = new Map<string, any>()
     const exSupply = new Map<string, string>()
     const exFs = new Map<string, string>()
     const exNames = new Set<string>()
+
     for (const p of existing || []) {
-      if (p.supply_code) exSupply.set(p.supply_code, p.id)
-      if (p.fs_code) exFs.set(p.fs_code, p.id)
+      if (p.supply_code) {
+        exSupplyFull.set(p.supply_code, p)
+        exSupply.set(p.supply_code, p.id)
+      }
+      if (p.fs_code) {
+        exFsFull.set(p.fs_code, p)
+        exFs.set(p.fs_code, p.id)
+      }
+      exNamesFull.set(p.name.toLowerCase(), p)
       exNames.add(p.name.toLowerCase())
     }
 
@@ -189,6 +219,8 @@ Deno.serve(async (req: Request) => {
     let inserted = 0,
       updated = 0,
       skipped = 0
+    const insertedProductIds: string[] = []
+    const updatedProductsLog: { product_id: string; previous_state: any }[] = []
 
     const bySupply = products.filter((p) => p.supply_code)
     for (let i = 0; i < bySupply.length; i += BATCH_SIZE) {
@@ -200,17 +232,44 @@ Deno.serve(async (req: Request) => {
         .select('id, supply_code')
       if (error) {
         for (const p of batch) {
-          const { error: ie } = await userClient
+          const { data: idata, error: ie } = await userClient
             .from('inventory_products')
             .upsert(strip(p), { onConflict: 'client_id,supply_code' })
-          if (ie) errors.push(`Linha ${p.row_number}: ${ie.message}`)
-          else if (exSupply.has(p.supply_code!)) updated++
-          else inserted++
+            .select('id')
+          if (ie) {
+            errors.push(`Linha ${p.row_number}: ${ie.message}`)
+          } else {
+            if (exSupply.has(p.supply_code!)) {
+              updated++
+              const prev = exSupplyFull.get(p.supply_code!)
+              if (prev && idata?.[0]?.id)
+                updatedProductsLog.push({
+                  product_id: idata[0].id,
+                  previous_state: snapshotProduct(prev),
+                })
+            } else {
+              inserted++
+              if (idata?.[0]?.id) insertedProductIds.push(idata[0].id)
+            }
+          }
         }
       } else if (data) {
         updated += existed
         inserted += data.length - existed
-        for (const item of data) if (item.supply_code) exSupply.set(item.supply_code, item.id)
+        for (const item of data) {
+          if (item.supply_code) {
+            const prev = exSupplyFull.get(item.supply_code)
+            if (prev) {
+              updatedProductsLog.push({
+                product_id: item.id,
+                previous_state: snapshotProduct(prev),
+              })
+            } else {
+              insertedProductIds.push(item.id)
+            }
+            exSupply.set(item.supply_code, item.id)
+          }
+        }
       }
     }
 
@@ -224,17 +283,44 @@ Deno.serve(async (req: Request) => {
         .select('id, fs_code')
       if (error) {
         for (const p of batch) {
-          const { error: ie } = await userClient
+          const { data: idata, error: ie } = await userClient
             .from('inventory_products')
             .upsert(strip(p), { onConflict: 'client_id,fs_code' })
-          if (ie) errors.push(`Linha ${p.row_number}: ${ie.message}`)
-          else if (exFs.has(p.fs_code!)) updated++
-          else inserted++
+            .select('id')
+          if (ie) {
+            errors.push(`Linha ${p.row_number}: ${ie.message}`)
+          } else {
+            if (exFs.has(p.fs_code!)) {
+              updated++
+              const prev = exFsFull.get(p.fs_code!)
+              if (prev && idata?.[0]?.id)
+                updatedProductsLog.push({
+                  product_id: idata[0].id,
+                  previous_state: snapshotProduct(prev),
+                })
+            } else {
+              inserted++
+              if (idata?.[0]?.id) insertedProductIds.push(idata[0].id)
+            }
+          }
         }
       } else if (data) {
         updated += existed
         inserted += data.length - existed
-        for (const item of data) if (item.fs_code) exFs.set(item.fs_code, item.id)
+        for (const item of data) {
+          if (item.fs_code) {
+            const prev = exFsFull.get(item.fs_code)
+            if (prev) {
+              updatedProductsLog.push({
+                product_id: item.id,
+                previous_state: snapshotProduct(prev),
+              })
+            } else {
+              insertedProductIds.push(item.id)
+            }
+            exFs.set(item.fs_code, item.id)
+          }
+        }
       }
     }
 
@@ -254,13 +340,37 @@ Deno.serve(async (req: Request) => {
         .select('id')
       if (error) {
         for (const p of batch) {
-          const { error: ie } = await userClient.from('inventory_products').insert(strip(p))
-          if (ie) errors.push(`Linha ${p.row_number}: ${ie.message}`)
-          else inserted++
+          const { data: idata, error: ie } = await userClient
+            .from('inventory_products')
+            .insert(strip(p))
+            .select('id')
+          if (ie) {
+            errors.push(`Linha ${p.row_number}: ${ie.message}`)
+          } else {
+            inserted++
+            if (idata?.[0]?.id) insertedProductIds.push(idata[0].id)
+          }
         }
       } else {
         inserted += data?.length || 0
+        for (const item of data || []) {
+          if (item.id) insertedProductIds.push(item.id)
+        }
       }
+    }
+
+    if (insertedProductIds.length > 0 || updatedProductsLog.length > 0) {
+      const { error: logError } = await userClient.from('import_logs').insert({
+        client_id: clientId,
+        plant_id: plantId,
+        module: 'inventory',
+        created_by: user.id,
+        total_products: inserted + updated,
+        inserted_products: insertedProductIds,
+        updated_products: updatedProductsLog,
+        action_type: 'upsert',
+      })
+      if (logError) console.error('Failed to log import:', logError)
     }
 
     return jsonRes(

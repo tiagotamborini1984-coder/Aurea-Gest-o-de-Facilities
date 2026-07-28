@@ -108,6 +108,7 @@ import CatalogoEstoque from './pages/gestao-estoque/Catalogo'
 import MeusPedidosEstoque from './pages/gestao-estoque/MeusPedidos'
 import GestaoPedidosEstoque from './pages/gestao-estoque/GestaoPedidos'
 import ProdutosEstoque from './pages/gestao-estoque/Produtos'
+import HistoricoImportacoes from './pages/gestao-estoque/HistoricoImportacoes'
 import DashboardEstoque from './pages/gestao-estoque/Dashboard'
 import AreasEstoque from './pages/gestao-estoque/Areas'
 
@@ -259,6 +260,10 @@ const App = () => (
                         element={<GestaoPedidosEstoque />}
                       />
                       <Route path="/gestao-estoque/produtos" element={<ProdutosEstoque />} />
+                      <Route
+                        path="/gestao-estoque/historico-importacoes"
+                        element={<HistoricoImportacoes />}
+                      />
                       <Route path="/gestao-estoque/areas" element={<AreasEstoque />} />
                       <Route path="/gestao-estoque/dashboard" element={<DashboardEstoque />} />
 
