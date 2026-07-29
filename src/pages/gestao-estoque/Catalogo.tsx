@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { inventoryService } from '@/services/inventory'
 import { useAuth } from '@/hooks/use-auth'
@@ -42,17 +42,20 @@ import { ImportProductsDialog } from '@/components/gestao-estoque/ImportProducts
 
 const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado.'
 
+const ALL_TAB = '__TODOS__'
+const NO_CATEGORY_TAB = '__SEM_CATEGORIA__'
+
 export default function Catalogo() {
   const { activeClient } = useAppStore()
   const { user } = useAuth()
   const [products, setProducts] = useState<any[]>([])
-  const [categories, setCategories] = useState<string[]>(['Limpeza'])
+  const [dbCategories, setDbCategories] = useState<string[]>([])
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
 
   const [search, setSearch] = useState('')
   const [fsCodeSearch, setFsCodeSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState<string>('Limpeza')
+  const [activeCategory, setActiveCategory] = useState<string>(ALL_TAB)
 
   const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
   const [selectedPlant, setSelectedPlant] = useState('')
@@ -95,13 +98,7 @@ export default function Catalogo() {
     try {
       const cats = await inventoryService.getCategories(activeClient.id)
       const catNames = cats.map((c: any) => c.name)
-      if (catNames.length > 0) {
-        setCategories(catNames)
-        const found = catNames.some((c: string) => normalizeMatch(c, activeCategory))
-        if (!found) {
-          setActiveCategory(catNames[0])
-        }
-      }
+      setDbCategories(catNames)
       const pts = await inventoryService.getPlants(activeClient.id)
       const uniquePlants = Array.from(new Map(pts.map((p: any) => [p.id, p])).values())
       setPlants(uniquePlants)
@@ -228,8 +225,34 @@ export default function Catalogo() {
     }
   }
 
-  const getFilteredProducts = (category: string) =>
-    products.filter((p) => normalizeMatch(p.category, category))
+  const tabItems = useMemo(() => {
+    return [
+      { value: ALL_TAB, label: 'Todos' },
+      ...dbCategories.map((c) => ({ value: c, label: c })),
+      { value: NO_CATEGORY_TAB, label: 'Sem Categoria' },
+    ]
+  }, [dbCategories])
+
+  const getCategoryCount = (category: string) => {
+    if (category === ALL_TAB) return products.length
+    if (category === NO_CATEGORY_TAB) {
+      return products.filter((p) => !p.category || !p.category.trim()).length
+    }
+    return products.filter((p) => normalizeMatch(p.category, category)).length
+  }
+
+  const getFilteredProducts = (category: string) => {
+    if (category === ALL_TAB) return products
+    if (category === NO_CATEGORY_TAB) {
+      return products.filter((p) => !p.category || !p.category.trim())
+    }
+    return products.filter((p) => normalizeMatch(p.category, category))
+  }
+
+  const activeCategoryLabel = useMemo(
+    () => tabItems.find((t) => t.value === activeCategory)?.label || activeCategory,
+    [tabItems, activeCategory],
+  )
 
   const handlePrintCatalog = async () => {
     const filtered = getFilteredProducts(activeCategory)
@@ -493,23 +516,23 @@ export default function Catalogo() {
         className="w-full print:hidden"
       >
         <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1 bg-slate-100">
-          {categories.map((cat) => {
-            const count = products.filter((p) => normalizeMatch(p.category, cat)).length
+          {tabItems.map((tab) => {
+            const count = getCategoryCount(tab.value)
             return (
               <TabsTrigger
-                key={cat}
-                value={cat}
+                key={tab.value}
+                value={tab.value}
                 className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-slate-600 rounded-md"
               >
-                {cat} ({count})
+                {tab.label} ({count})
               </TabsTrigger>
             )
           })}
         </TabsList>
-        {categories.map((cat) => {
-          const tabFiltered = getFilteredProducts(cat)
+        {tabItems.map((tab) => {
+          const tabFiltered = getFilteredProducts(tab.value)
           return (
-            <TabsContent key={cat} value={cat} className="mt-6">
+            <TabsContent key={tab.value} value={tab.value} className="mt-6">
               {tabFiltered.length === 0 ? (
                 <div className="text-center text-slate-500 py-20">{EMPTY_STATE_MESSAGE}</div>
               ) : (
@@ -661,7 +684,7 @@ export default function Catalogo() {
             <div>
               <h1 className="text-2xl font-bold text-black">{activeClient?.name || ''}</h1>
               <h2 className="text-lg font-semibold text-black mt-1">
-                Catálogo de Produtos — {activeCategory}
+                Catálogo de Produtos — {activeCategoryLabel}
               </h2>
               <p className="text-xs text-black mt-1">
                 Gerado em {new Date().toLocaleDateString('pt-BR')} às{' '}
@@ -722,7 +745,7 @@ export default function Catalogo() {
         <div className="mt-4 pt-2 border-t border-black flex justify-between text-[10px] text-black">
           <span>Total de itens: {getFilteredProducts(activeCategory).length}</span>
           <span>
-            {activeClient?.name || ''} — Catálogo {activeCategory} —{' '}
+            {activeClient?.name || ''} — Catálogo {activeCategoryLabel} —{' '}
             {new Date().toLocaleDateString('pt-BR')}
           </span>
         </div>
