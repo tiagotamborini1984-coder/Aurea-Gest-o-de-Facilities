@@ -6,7 +6,7 @@ export const inventoryService = {
     let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
 
     if (!includeInactive) {
-      query = query.eq('is_active', true)
+      query = query.or('is_active.eq.true,is_active.is.null')
     }
 
     const { data, error } = await query.order('name').limit(10000)
@@ -23,7 +23,7 @@ export const inventoryService = {
     let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
 
     if (!includeInactive) {
-      query = query.eq('is_active', true)
+      query = query.or('is_active.eq.true,is_active.is.null')
     }
 
     if (nameSearch && nameSearch.trim()) {

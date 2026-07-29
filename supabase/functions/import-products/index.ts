@@ -172,6 +172,7 @@ Deno.serve(async (req: Request) => {
         item_value: itemValue,
         sds_url: getField(row, ['sds_url', 'fds_url', 'fds', 'sds']) || null,
         image_url: getField(row, ['image_url', 'imagem_url', 'imagem']) || null,
+        is_active: true,
         row_number: rn,
       })
     })
