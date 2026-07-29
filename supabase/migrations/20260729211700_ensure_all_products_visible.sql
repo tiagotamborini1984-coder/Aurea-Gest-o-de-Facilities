@@ -2,6 +2,23 @@
 -- Fixes: is_active = false/NULL, client_id = NULL, RLS policies, aggressive category trigger
 -- Idempotent: safe to run multiple times
 
+-- 0. Define helper functions if they don't exist yet
+CREATE OR REPLACE FUNCTION public.normalize_category_text(input text)
+RETURNS text AS $$
+BEGIN
+  RETURN lower(trim(unaccent(input)));
+EXCEPTION WHEN OTHERS THEN
+  RETURN lower(trim(input));
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION public.clean_category_name(input text)
+RETURNS text AS $$
+BEGIN
+  RETURN trim(regexp_replace(input, '\s+', ' ', 'g'));
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 -- 1. Set is_active = true for ALL products
 UPDATE public.inventory_products
 SET is_active = true, updated_at = COALESCE(updated_at, NOW())
@@ -34,8 +51,6 @@ CREATE POLICY "authenticated_delete_inventory_products" ON public.inventory_prod
   FOR DELETE TO authenticated USING (client_id = get_user_client_id());
 
 -- 4. Make the normalize_inventory_product_category trigger less aggressive
---    Previously: set category to NULL if no match in inventory_categories
---    Now: keep the cleaned category name so products don't lose their category
 CREATE OR REPLACE FUNCTION public.normalize_inventory_product_category()
 RETURNS TRIGGER AS $$
 DECLARE
