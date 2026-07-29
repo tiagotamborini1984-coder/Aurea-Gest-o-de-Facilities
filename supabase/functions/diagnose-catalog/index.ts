@@ -15,10 +15,7 @@ Deno.serve(async (req: Request) => {
       { global: { headers: { Authorization: authHeader } } },
     )
 
-    const {
-      data: { user },
-      error: authError,
-    } = await userClient.auth.getUser()
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
     if (authError || !user) throw new Error('Unauthorized')
 
     const { data: profile, error: profileError } = await userClient
@@ -76,54 +73,34 @@ Deno.serve(async (req: Request) => {
       return 'Filtro is_active do catálogo'
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        summary: {
-          total_in_database: allProducts?.length || 0,
-          visible_with_rls: rlsProducts?.length || 0,
-          visible_in_catalog: catalogProducts?.length || 0,
-          missing_from_rls: missingFromRLS.length,
-          missing_from_catalog: missingFromCatalog.length,
-        },
-        missing_from_rls: missingFromRLS.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          is_active: p.is_active,
-          client_id: p.client_id,
-          reason: diagnoseReason(p),
-        })),
-        missing_from_catalog: missingFromCatalog.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          is_active: p.is_active,
-          category: p.category,
-          reason: diagnoseReason(p),
-        })),
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({
+      success: true,
+      summary: {
+        total_in_database: allProducts?.length || 0,
+        visible_with_rls: rlsProducts?.length || 0,
+        visible_in_catalog: catalogProducts?.length || 0,
+        missing_from_rls: missingFromRLS.length,
+        missing_from_catalog: missingFromCatalog.length,
       },
-    )
+      missing_from_rls: missingFromRLS.map((p: any) => ({
+        id: p.id, name: p.name, is_active: p.is_active, client_id: p.client_id,
+        reason: diagnoseReason(p),
+      })),
+      missing_from_catalog: missingFromCatalog.map((p: any) => ({
+        id: p.id, name: p.name, is_active: p.is_active, category: p.category,
+        reason: diagnoseReason(p),
+      })),
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   } catch (error: any) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        summary: {
-          total_in_database: 0,
-          visible_with_rls: 0,
-          visible_in_catalog: 0,
-          missing_from_rls: 0,
-          missing_from_catalog: 0,
-        },
-        missing_from_rls: [],
-        missing_from_catalog: [],
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    )
+    return new Response(JSON.stringify({
+      success: false, error: error.message,
+      summary: { total_in_database: 0, visible_with_rls: 0, visible_in_catalog: 0, missing_from_rls: 0, missing_from_catalog: 0 },
+      missing_from_rls: [], missing_from_catalog: [],
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 })
