@@ -231,7 +231,7 @@ Deno.serve(async (req: Request) => {
 
     const strip = (p: any) => {
       const { row_number, ...rest } = p
-      return rest
+      return { ...rest, is_active: true }
     }
     let inserted = 0,
       updated = 0,

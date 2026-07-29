@@ -25,6 +25,50 @@ export const inventoryService = {
     if (!includeInactive) {
       query = query.or('is_active.eq.true,is_active.is.null')
     }
+    if (nameSearch && nameSearch.trim()) {
+      const term = nameSearch.trim()
+      query = query.or(`name.ilike.%${term}%,fs_code.ilike.%${term}%,supply_code.ilike.%${term}%`)
+    }
+
+    if (fsCodeSearch && fsCodeSearch.trim()) {
+      const term = fsCodeSearch.trim()
+      query = query.or(`fs_code.ilike.%${term}%,supply_code.ilike.%${term}%`)
+    }
+
+    const { data, error } = await query.order('name').limit(10000)
+    if (error) throw error
+    return data || []
+  },
+
+  async diagnoseVisibility(clientId: string) {
+    const { data, error } = await supabase.rpc('diagnose_inventory_visibility', {
+      p_client_id: clientId,
+    })
+    if (error) throw error
+    return data
+  },
+
+  async getDiagnosticProducts(clientId: string) {
+    const { data, error } = await (supabase as any)
+      .from('v_inventory_product_diagnostics')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('visibility_status', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
+
+  async _searchProductsInternal(
+    clientId: string,
+    nameSearch?: string,
+    fsCodeSearch?: string,
+    includeInactive = false,
+  ) {
+    let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
+
+    if (!includeInactive) {
+      query = query.or('is_active.eq.true,is_active.is.null')
+    }
 
     if (nameSearch && nameSearch.trim()) {
       const term = nameSearch.trim()
