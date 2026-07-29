@@ -109,7 +109,10 @@ export default function OcupacaoLockers() {
   }
 
   const fetchData = async () => {
-    let lockersQuery = supabase.from('lockers').select('*').eq('client_id', activeClient!.id)
+    let lockersQuery = supabase
+      .from('lockers')
+      .select('*, plants(code, name)')
+      .eq('client_id', activeClient!.id)
 
     if (selectedPlant !== 'all') {
       lockersQuery = lockersQuery.eq('plant_id', selectedPlant)
@@ -309,6 +312,12 @@ export default function OcupacaoLockers() {
             >
               <Archive className={cn('h-8 w-8', isOccupied ? 'text-red-500' : 'text-green-500')} />
               <span className="font-bold text-slate-700">{locker.identification}</span>
+              <span className="text-[10px] text-slate-500 font-medium truncate w-full text-center">
+                {locker.plants?.code ?? ''}
+              </span>
+              <span className="text-[10px] text-slate-400 truncate w-full text-center">
+                {locker.location}
+              </span>
               {isOccupied ? (
                 <span className="text-[10px] font-medium text-red-700 truncate w-full text-center bg-red-100 px-1 rounded">
                   {occupation.locker_collaborators?.name}
