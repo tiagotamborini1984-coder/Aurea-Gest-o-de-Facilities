@@ -36,11 +36,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { cn, formatCurrency } from '@/lib/utils'
-import { normalizeMatch, normalizeIncludes } from '@/lib/string-utils'
+import { normalizeMatch } from '@/lib/string-utils'
 import { supabase } from '@/lib/supabase/client'
 import { ImportProductsDialog } from '@/components/gestao-estoque/ImportProductsDialog'
 
-const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado nesta categoria.'
+const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado.'
 
 export default function Catalogo() {
   const { activeClient } = useAppStore()
@@ -51,6 +51,7 @@ export default function Catalogo() {
   const [areas, setAreas] = useState<any[]>([])
 
   const [search, setSearch] = useState('')
+  const [fsCodeSearch, setFsCodeSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('Limpeza')
 
   const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
@@ -68,6 +69,17 @@ export default function Catalogo() {
   }, [activeClient])
 
   useEffect(() => {
+    if (!activeClient) return
+    const timer = setTimeout(() => {
+      inventoryService
+        .searchProducts(activeClient.id, search, fsCodeSearch)
+        .then((prods) => setProducts(prods))
+        .catch(() => toast.error('Erro ao buscar produtos'))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search, fsCodeSearch, activeClient])
+
+  useEffect(() => {
     if (selectedPlant) {
       inventoryService.getAreas(selectedPlant).then((res) => {
         const uniqueAreas = Array.from(new Map(res.map((a: any) => [a.id, a])).values())
@@ -81,8 +93,6 @@ export default function Catalogo() {
 
   const loadData = async () => {
     try {
-      const prods = await inventoryService.getProducts(activeClient.id)
-      setProducts(prods)
       const cats = await inventoryService.getCategories(activeClient.id)
       const catNames = cats.map((c: any) => c.name)
       if (catNames.length > 0) {
@@ -219,11 +229,7 @@ export default function Catalogo() {
   }
 
   const getFilteredProducts = (category: string) =>
-    products.filter((p) => {
-      const mSearch = normalizeIncludes(p.name, search)
-      const mCat = normalizeMatch(p.category, category)
-      return mSearch && mCat
-    })
+    products.filter((p) => normalizeMatch(p.category, category))
 
   const handlePrintCatalog = async () => {
     const filtered = getFilteredProducts(activeCategory)
@@ -456,19 +462,34 @@ export default function Catalogo() {
         onImportComplete={loadData}
       />
 
-      <div className="relative w-full print:hidden">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Buscar produtos..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-3 print:hidden">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Buscar por nome..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Código FS..."
+            className="pl-9"
+            value={fsCodeSearch}
+            onChange={(e) => setFsCodeSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <Tabs
         value={activeCategory}
-        onValueChange={setActiveCategory}
+        onValueChange={(v) => {
+          setSearch('')
+          setFsCodeSearch('')
+          setActiveCategory(v)
+        }}
         className="w-full print:hidden"
       >
         <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1 bg-slate-100">

@@ -14,6 +14,31 @@ export const inventoryService = {
     return data
   },
 
+  async searchProducts(
+    clientId: string,
+    nameSearch?: string,
+    fsCodeSearch?: string,
+    includeInactive = false,
+  ) {
+    let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
+
+    if (!includeInactive) {
+      query = query.eq('is_active', true)
+    }
+
+    if (nameSearch && nameSearch.trim()) {
+      query = query.ilike('name', `%${nameSearch.trim()}%`)
+    }
+
+    if (fsCodeSearch && fsCodeSearch.trim()) {
+      query = query.ilike('fs_code', `%${fsCodeSearch.trim()}%`)
+    }
+
+    const { data, error } = await query.order('name').limit(10000)
+    if (error) throw error
+    return data
+  },
+
   async getPlants(clientId: string) {
     const { data, error } = await supabase.from('plants').select('*').eq('client_id', clientId)
     if (error) throw error
