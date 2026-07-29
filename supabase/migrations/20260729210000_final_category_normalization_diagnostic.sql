@@ -13,19 +13,21 @@ CREATE OR REPLACE FUNCTION public.clean_category_name(input text)
 RETURNS text AS $$
 BEGIN
   IF input IS NULL THEN RETURN NULL; END IF;
-  RETURN BTRIM(REGEXP_REPLACE(
+  RETURN BTRIM(
     REGEXP_REPLACE(
       REGEXP_REPLACE(
         REGEXP_REPLACE(
-          REGEXP REPLACE(
-            REGEXP_REPLACE(input,
-              E'[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD]', '', 'g'),
-            E'[\u0000-\u001F\u007F-\u009F]', '', 'g'),
-          E'[\u00A0\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]', ' ', 'g'),
-        E'[\u2018\u2019\u201A\u201B]', '''', 'g'),
-      E'[\u201C\u201D\u201E\u201F]', '"', 'g'),
-    '\s+', ' ', 'g')
-  ));
+          REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              REGEXP_REPLACE(input,
+                E'[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD]', '', 'g'),
+              E'[\u0001-\u001F\u007F-\u009F]', '', 'g'),
+            E'[\u00A0\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]', ' ', 'g'),
+          E'[\u2018\u2019\u201A\u201B]', '''', 'g'),
+        E'[\u201C\u201D\u201E\u201F]', '"', 'g'),
+      '\s+', ' ', 'g')
+    )
+  );
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
