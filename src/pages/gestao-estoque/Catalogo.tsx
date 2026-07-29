@@ -233,20 +233,36 @@ export default function Catalogo() {
     ]
   }, [dbCategories])
 
+  const belongsToCategory = (
+    productCategory: string | null | undefined,
+    targetCategory: string,
+  ) => {
+    if (!productCategory || !productCategory.trim()) return false
+    return normalizeMatch(productCategory, targetCategory)
+  }
+
+  const isUncategorized = (
+    productCategory: string | null | undefined,
+    validCategories: string[],
+  ) => {
+    if (!productCategory || !productCategory.trim()) return true
+    return !validCategories.some((cat) => normalizeMatch(productCategory, cat))
+  }
+
   const getCategoryCount = (category: string) => {
     if (category === ALL_TAB) return products.length
     if (category === NO_CATEGORY_TAB) {
-      return products.filter((p) => !p.category || !p.category.trim()).length
+      return products.filter((p) => isUncategorized(p.category, dbCategories)).length
     }
-    return products.filter((p) => normalizeMatch(p.category, category)).length
+    return products.filter((p) => belongsToCategory(p.category, category)).length
   }
 
   const getFilteredProducts = (category: string) => {
     if (category === ALL_TAB) return products
     if (category === NO_CATEGORY_TAB) {
-      return products.filter((p) => !p.category || !p.category.trim())
+      return products.filter((p) => isUncategorized(p.category, dbCategories))
     }
-    return products.filter((p) => normalizeMatch(p.category, category))
+    return products.filter((p) => belongsToCategory(p.category, category))
   }
 
   const activeCategoryLabel = useMemo(
@@ -509,8 +525,6 @@ export default function Catalogo() {
       <Tabs
         value={activeCategory}
         onValueChange={(v) => {
-          setSearch('')
-          setFsCodeSearch('')
           setActiveCategory(v)
         }}
         className="w-full print:hidden"

@@ -27,16 +27,18 @@ export const inventoryService = {
     }
 
     if (nameSearch && nameSearch.trim()) {
-      query = query.ilike('name', `%${nameSearch.trim()}%`)
+      const term = nameSearch.trim()
+      query = query.or(`name.ilike.%${term}%,fs_code.ilike.%${term}%,supply_code.ilike.%${term}%`)
     }
 
     if (fsCodeSearch && fsCodeSearch.trim()) {
-      query = query.ilike('fs_code', `%${fsCodeSearch.trim()}%`)
+      const term = fsCodeSearch.trim()
+      query = query.or(`fs_code.ilike.%${term}%,supply_code.ilike.%${term}%`)
     }
 
     const { data, error } = await query.order('name').limit(10000)
     if (error) throw error
-    return data
+    return data || []
   },
 
   async getPlants(clientId: string) {
