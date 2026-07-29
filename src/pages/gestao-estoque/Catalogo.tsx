@@ -320,7 +320,7 @@ export default function Catalogo() {
           </Button>
           <Button variant="outline" onClick={() => setDiagnosticOpen(true)}>
             <Stethoscope className="w-4 h-4 mr-2" />
-            Diagnóstico
+            Diagnosticar Catálogo
           </Button>
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             <SheetTrigger asChild>

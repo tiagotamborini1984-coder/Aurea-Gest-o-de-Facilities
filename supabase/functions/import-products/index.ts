@@ -56,6 +56,17 @@ function normalizeCategoryName(s: string): string {
     .trim()
 }
 
+function cleanCategoryValue(s: string | null | undefined): string | null {
+  if (!s) return null
+  const cleaned = s
+    .replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD]/g, '')
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    .replace(/[\u00A0\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned || null
+}
+
 function snapshotProduct(p: any): any {
   if (!p) return null
   return {
@@ -161,7 +172,7 @@ Deno.serve(async (req: Request) => {
       products.push({
         client_id: clientId,
         name,
-        category: getField(row, ['category', 'categoria', 'Category']) || null,
+        category: cleanCategoryValue(getField(row, ['category', 'categoria', 'Category'])),
         description:
           getField(row, ['description', 'descricao', 'descrição', 'Description']) || null,
         fs_code: getField(row, ['fs_code', 'codigo_fs', 'código_fs', 'FS']) || null,
@@ -231,7 +242,7 @@ Deno.serve(async (req: Request) => {
 
     const strip = (p: any) => {
       const { row_number, ...rest } = p
-      return { ...rest, is_active: true }
+      return { ...rest, is_active: true, category: cleanCategoryValue(rest.category) }
     }
     let inserted = 0,
       updated = 0,

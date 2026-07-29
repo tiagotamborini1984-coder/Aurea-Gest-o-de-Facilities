@@ -7,16 +7,75 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, CheckCircle2, Loader2, Stethoscope } from 'lucide-react'
-import { runCatalogDiagnostic, type DiagnosticResult } from '@/services/catalog-diagnostic'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { AlertCircle, CheckCircle2, Loader2, Stethoscope, ShieldAlert } from 'lucide-react'
+import {
+  runCatalogDiagnostic,
+  type DiagnosticResult,
+  type SimpleProduct,
+  type DiagnosticProduct,
+} from '@/services/catalog-diagnostic'
 import { toast } from 'sonner'
 
-interface CatalogDiagnosticDialogProps {
+interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function CatalogDiagnosticDialog({ open, onOpenChange }: CatalogDiagnosticDialogProps) {
+function ProductTable({
+  products,
+  missing,
+}: {
+  products: SimpleProduct[] | DiagnosticProduct[]
+  missing?: boolean
+}) {
+  if (products.length === 0)
+    return <p className="text-center text-slate-400 py-8 text-sm">Nenhum produto</p>
+  return (
+    <div className="max-h-80 overflow-auto border rounded-lg">
+      <table className="w-full text-xs">
+        <thead className="sticky top-0 bg-slate-50 z-10">
+          <tr className="border-b">
+            <th className="text-left p-2 font-medium">Nome</th>
+            <th className="text-left p-2 font-medium">Categoria</th>
+            <th className="text-left p-2 font-medium">is_active</th>
+            <th className="text-left p-2 font-medium">client_id</th>
+            {missing && <th className="text-left p-2 font-medium">Campo Suspeito</th>}
+            {missing && <th className="text-left p-2 font-medium">Sugestão</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((p: any) => (
+            <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50">
+              <td className="p-2 font-medium max-w-48 truncate">{p.name}</td>
+              <td className="p-2 text-slate-600">{p.category || '—'}</td>
+              <td className="p-2">
+                <span
+                  className={
+                    p.is_active === false || p.is_active === null
+                      ? 'text-red-500 font-medium'
+                      : 'text-green-600'
+                  }
+                >
+                  {String(p.is_active)}
+                </span>
+              </td>
+              <td className="p-2 text-slate-500 font-mono text-[10px] max-w-32 truncate">
+                {p.client_id ? p.client_id.slice(0, 8) + '...' : 'NULL'}
+              </td>
+              {missing && <td className="p-2 text-amber-600 font-medium">{p.suspected_field}</td>}
+              {missing && (
+                <td className="p-2 text-slate-500 max-w-48">{p.correction_suggestion}</td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<DiagnosticResult | null>(null)
 
@@ -40,7 +99,7 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: CatalogDiagnosti
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Stethoscope className="w-5 h-5" />
@@ -52,7 +111,7 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: CatalogDiagnosti
           <div className="py-8 text-center">
             <p className="text-sm text-slate-500 mb-4">
               Compara todos os produtos no banco de dados com os exibidos no catálogo, identificando
-              produtos ocultos e o motivo.
+              produtos ocultos, o campo suspeito e a sugestão de correção.
             </p>
             <Button onClick={runDiagnostic} disabled={loading}>
               {loading ? (
@@ -65,26 +124,43 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: CatalogDiagnosti
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-5 gap-2">
               <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-slate-500">Total no Banco</p>
-                <p className="text-2xl font-bold text-slate-800">
+                <p className="text-[10px] text-slate-500">Total no Banco</p>
+                <p className="text-xl font-bold text-slate-800">
                   {result.summary.total_in_database}
                 </p>
               </div>
               <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-slate-500">Visíveis (RLS)</p>
-                <p className="text-2xl font-bold text-slate-800">
+                <p className="text-[10px] text-slate-500">Visíveis (RLS)</p>
+                <p className="text-xl font-bold text-slate-800">
                   {result.summary.visible_with_rls}
                 </p>
               </div>
               <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-slate-500">No Catálogo</p>
-                <p className="text-2xl font-bold text-slate-800">
+                <p className="text-[10px] text-slate-500">No Catálogo</p>
+                <p className="text-xl font-bold text-slate-800">
                   {result.summary.visible_in_catalog}
                 </p>
               </div>
+              <div className="bg-red-50 rounded-lg p-3 text-center">
+                <p className="text-[10px] text-red-500">Bloqueados RLS</p>
+                <p className="text-xl font-bold text-red-700">{result.summary.missing_from_rls}</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3 text-center">
+                <p className="text-[10px] text-amber-500">Ausentes Catálogo</p>
+                <p className="text-xl font-bold text-amber-700">
+                  {result.summary.missing_from_catalog}
+                </p>
+              </div>
             </div>
+
+            {result.rls_analysis.blocking_count > 0 && (
+              <div className="flex items-center gap-2 text-red-700 bg-red-50 rounded-lg p-3 border border-red-200">
+                <ShieldAlert className="w-5 h-5 shrink-0" />
+                <span className="text-sm font-medium">{result.rls_analysis.suggestion}</span>
+              </div>
+            )}
 
             {result.summary.missing_from_catalog === 0 ? (
               <div className="flex items-center gap-2 text-green-600 bg-green-50 rounded-lg p-3">
@@ -94,33 +170,46 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: CatalogDiagnosti
                 </span>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="text-sm font-medium">
-                    {result.summary.missing_from_catalog} produto(s) oculto(s) no catálogo
-                  </span>
-                </div>
-                <div className="max-h-48 overflow-auto border rounded-lg">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-slate-50">
-                      <tr className="border-b">
-                        <th className="text-left p-2 font-medium">Produto</th>
-                        <th className="text-left p-2 font-medium">Motivo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.missing_from_catalog.map((p) => (
-                        <tr key={p.id} className="border-b last:border-0">
-                          <td className="p-2 font-medium">{p.name}</td>
-                          <td className="p-2 text-amber-600">{p.reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3">
+                <AlertCircle className="w-5 h-5" />
+                <span className="text-sm font-medium">
+                  {result.summary.missing_from_catalog} produto(s) oculto(s) no catálogo. Verifique
+                  a aba "Produtos Ausentes".
+                </span>
               </div>
             )}
+
+            <Tabs defaultValue="missing">
+              <TabsList className="w-full">
+                <TabsTrigger value="bank" className="flex-1">
+                  Banco ({result.all_products.length})
+                </TabsTrigger>
+                <TabsTrigger value="visible" className="flex-1">
+                  Visíveis ({result.visible_products.length})
+                </TabsTrigger>
+                <TabsTrigger value="missing" className="flex-1">
+                  Ausentes ({result.missing_from_catalog.length})
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="bank" className="mt-3">
+                <p className="text-xs text-slate-500 mb-2">
+                  Produtos no Banco (Total: {result.all_products.length})
+                </p>
+                <ProductTable products={result.all_products} />
+              </TabsContent>
+              <TabsContent value="visible" className="mt-3">
+                <p className="text-xs text-slate-500 mb-2">
+                  Produtos Visíveis no Catálogo (Total: {result.visible_products.length})
+                </p>
+                <ProductTable products={result.visible_products} />
+              </TabsContent>
+              <TabsContent value="missing" className="mt-3">
+                <p className="text-xs text-slate-500 mb-2">
+                  Produtos Ausentes (Total: {result.missing_from_catalog.length})
+                </p>
+                <ProductTable products={result.missing_from_catalog} missing />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
