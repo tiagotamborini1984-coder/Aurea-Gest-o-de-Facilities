@@ -6,7 +6,6 @@
     "update-user-password": 61,
     "delete-user": 60,
     "process-recurring-audits": 22,
-    "process-preventive-maintenance": 5,
     "handle-subscription-webhook": 60,
     "maintenance-ai-advisor": 60,
     "import-products": 63,
