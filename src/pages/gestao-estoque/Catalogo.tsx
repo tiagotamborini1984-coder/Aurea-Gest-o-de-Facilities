@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Upload,
   Printer,
+  Stethoscope,
 } from 'lucide-react'
 import {
   Sheet,
@@ -39,6 +40,7 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { normalizeMatch } from '@/lib/string-utils'
 import { supabase } from '@/lib/supabase/client'
 import { ImportProductsDialog } from '@/components/gestao-estoque/ImportProductsDialog'
+import { CatalogDiagnosticDialog } from '@/components/gestao-estoque/CatalogDiagnosticDialog'
 
 const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado.'
 
@@ -64,6 +66,7 @@ export default function Catalogo() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [diagnosticOpen, setDiagnosticOpen] = useState(false)
 
   useEffect(() => {
     if (activeClient) {
@@ -315,6 +318,10 @@ export default function Catalogo() {
             <Upload className="w-4 h-4 mr-2" />
             Importar
           </Button>
+          <Button variant="outline" onClick={() => setDiagnosticOpen(true)}>
+            <Stethoscope className="w-4 h-4 mr-2" />
+            Diagnóstico
+          </Button>
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             <SheetTrigger asChild>
               <Button className="relative">
@@ -500,6 +507,8 @@ export default function Catalogo() {
         onOpenChange={setImportOpen}
         onImportComplete={loadData}
       />
+
+      <CatalogDiagnosticDialog open={diagnosticOpen} onOpenChange={setDiagnosticOpen} />
 
       <div className="flex flex-col sm:flex-row gap-3 print:hidden">
         <div className="relative w-full">
