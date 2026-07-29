@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Edit2, Trash2, Plus, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { normalizeMatch } from '@/lib/string-utils'
 
 interface CategoryManagerDialogProps {
   open: boolean
@@ -41,7 +42,7 @@ export function CategoryManagerDialog({
   const handleAdd = async () => {
     if (!clientId) return
     if (!newName.trim()) return toast.error('Nome é obrigatório')
-    const exists = categories.some((c) => c.name.toLowerCase() === newName.trim().toLowerCase())
+    const exists = categories.some((c) => normalizeMatch(c.name, newName.trim()))
     if (exists) return toast.error('Categoria já existe')
     try {
       await inventoryService.saveCategory({ client_id: clientId, name: newName.trim() })
@@ -60,7 +61,7 @@ export function CategoryManagerDialog({
     const category = categories.find((c) => c.id === editingId)
     if (!category) return
     const exists = categories.some(
-      (c) => c.id !== editingId && c.name.toLowerCase() === editName.trim().toLowerCase(),
+      (c) => c.id !== editingId && normalizeMatch(c.name, editName.trim()),
     )
     if (exists) return toast.error('Categoria já existe')
     try {

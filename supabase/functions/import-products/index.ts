@@ -40,6 +40,22 @@ function jsonRes(data: any, status = 200) {
   })
 }
 
+function normalizeCategoryName(s: string): string {
+  if (!s) return ''
+  return s
+    .replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD]/g, '')
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[\u00A0\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function snapshotProduct(p: any): any {
   if (!p) return null
   return {
@@ -175,10 +191,10 @@ Deno.serve(async (req: Request) => {
       .from('inventory_categories')
       .select('name')
       .eq('client_id', clientId)
-    const catSet = new Set((existingCats || []).map((c: any) => c.name.toLowerCase()))
+    const catSet = new Set((existingCats || []).map((c: any) => normalizeCategoryName(c.name)))
     const newCats = new Set<string>()
     for (const p of products) {
-      if (p.category && !catSet.has(p.category.toLowerCase())) newCats.add(p.category)
+      if (p.category && !catSet.has(normalizeCategoryName(p.category))) newCats.add(p.category)
     }
     if (newCats.size > 0) {
       await userClient.from('inventory_categories').upsert(
