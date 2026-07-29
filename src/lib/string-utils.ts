@@ -1,6 +1,7 @@
 export function normalizeString(str: string | null | undefined): string {
   if (!str) return ''
   return str
+    .replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD]/g, '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
