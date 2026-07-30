@@ -417,6 +417,13 @@ export const inventoryService = {
     return map
   },
 
+  async normalizeClientInventory(clientId: string) {
+    const { error } = await supabase.rpc('normalize_client_inventory_categories', {
+      p_client_id: clientId,
+    })
+    if (error) throw error
+  },
+
   async undoImport(importLogId: string) {
     const { data: log, error: logError } = await (supabase as any)
       .from('import_logs')

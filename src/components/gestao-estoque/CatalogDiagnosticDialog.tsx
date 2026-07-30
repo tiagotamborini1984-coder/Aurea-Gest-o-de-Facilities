@@ -8,13 +8,15 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, Loader2, Stethoscope, ShieldAlert } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2, Stethoscope, ShieldAlert, Wrench } from 'lucide-react'
 import {
   runCatalogDiagnostic,
   type DiagnosticResult,
   type SimpleProduct,
   type DiagnosticProduct,
 } from '@/services/catalog-diagnostic'
+import { inventoryService } from '@/services/inventory'
+import { useAppStore } from '@/store/AppContext'
 import { toast } from 'sonner'
 
 interface Props {
@@ -76,12 +78,16 @@ function ProductTable({
 }
 
 export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
+  const { activeClient } = useAppStore()
   const [loading, setLoading] = useState(false)
+  const [fixing, setFixing] = useState(false)
+  const [fixed, setFixed] = useState(false)
   const [result, setResult] = useState<DiagnosticResult | null>(null)
 
   const runDiagnostic = async () => {
     setLoading(true)
     setResult(null)
+    setFixed(false)
     try {
       const res = await runCatalogDiagnostic()
       setResult(res)
@@ -94,6 +100,25 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
       toast.error(err.message || 'Erro ao executar diagnóstico')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFix = async () => {
+    if (!activeClient?.id) return
+    setFixing(true)
+    try {
+      await inventoryService.normalizeClientInventory(activeClient.id)
+      toast.success('Correção aplicada com sucesso! Re-executando diagnóstico...')
+      setFixed(true)
+      const res = await runCatalogDiagnostic()
+      setResult(res)
+      if (res.success && res.summary.missing_from_catalog === 0) {
+        toast.success('Todos os produtos agora estão visíveis no catálogo!')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao aplicar correção')
+    } finally {
+      setFixing(false)
     }
   }
 
@@ -163,19 +188,43 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
             )}
 
             {result.summary.missing_from_catalog === 0 ? (
-              <div className="flex items-center gap-2 text-green-600 bg-green-50 rounded-lg p-3">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-medium">
-                  Todos os {result.summary.total_in_database} produtos estão visíveis no catálogo!
-                </span>
+              <div className="flex items-center justify-between gap-2 text-green-600 bg-green-50 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    Todos os {result.summary.total_in_database} produtos estão visíveis no catálogo!
+                  </span>
+                </div>
+                {fixed && (
+                  <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Corrigido
+                  </span>
+                )}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3">
-                <AlertCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">
-                  {result.summary.missing_from_catalog} produto(s) oculto(s) no catálogo. Verifique
-                  a aba "Produtos Ausentes".
-                </span>
+              <div className="flex items-center justify-between gap-2 text-amber-600 bg-amber-50 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    {result.summary.missing_from_catalog} produto(s) oculto(s) no catálogo.
+                    Verifique a aba "Produtos Ausentes".
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleFix}
+                  disabled={fixing || !activeClient?.id}
+                  className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100"
+                >
+                  {fixing ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Wrench className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  {fixing ? 'Corrigindo...' : 'Corrigir Agora'}
+                </Button>
               </div>
             )}
 
@@ -215,7 +264,13 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
 
         <DialogFooter>
           {result && (
-            <Button variant="outline" onClick={() => setResult(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResult(null)
+                setFixed(false)
+              }}
+            >
               Executar Novamente
             </Button>
           )}

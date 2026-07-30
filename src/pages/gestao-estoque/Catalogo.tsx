@@ -47,6 +47,11 @@ const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado.'
 const ALL_TAB = '__TODOS__'
 const NO_CATEGORY_TAB = '__SEM_CATEGORIA__'
 
+const EMPTY_STATE_MESSAGE = 'Nenhum produto encontrado.'
+
+const ALL_TAB = '__TODOS__'
+const NO_CATEGORY_TAB = '__SEM_CATEGORIA__'
+
 export default function Catalogo() {
   const { activeClient } = useAppStore()
   const { user } = useAuth()

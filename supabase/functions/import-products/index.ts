@@ -387,6 +387,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    await userClient.rpc('normalize_client_inventory_categories', { p_client_id: clientId })
+
     if (insertedProductIds.length > 0 || updatedProductsLog.length > 0) {
       const { error: logError } = await userClient.from('import_logs').insert({
         client_id: clientId,
