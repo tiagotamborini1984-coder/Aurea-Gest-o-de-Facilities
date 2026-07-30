@@ -7,13 +7,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, Loader2, Stethoscope, ShieldAlert, Wrench } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { AlertCircle, CheckCircle2, Loader2, Stethoscope, Wrench, Eye, EyeOff } from 'lucide-react'
 import {
-  runCatalogDiagnostic,
-  type DiagnosticResult,
-  type SimpleProduct,
-  type DiagnosticProduct,
+  diagnoseCatalog,
+  type DiagnoseCatalogResponse,
+  type CatalogDiagnostic,
 } from '@/services/catalog-diagnostic'
 import { inventoryService } from '@/services/inventory'
 import { useAppStore } from '@/store/AppContext'
@@ -24,15 +23,9 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-function ProductTable({
-  products,
-  missing,
-}: {
-  products: SimpleProduct[] | DiagnosticProduct[]
-  missing?: boolean
-}) {
-  if (products.length === 0)
-    return <p className="text-center text-slate-400 py-8 text-sm">Nenhum produto</p>
+function DiagnosticTable({ diagnostics }: { diagnostics: CatalogDiagnostic[] }) {
+  if (diagnostics.length === 0)
+    return <p className="text-center text-slate-400 py-8 text-sm">Nenhum diagnóstico encontrado</p>
   return (
     <div className="max-h-80 overflow-auto border rounded-lg">
       <table className="w-full text-xs">
@@ -40,35 +33,39 @@ function ProductTable({
           <tr className="border-b">
             <th className="text-left p-2 font-medium">Nome</th>
             <th className="text-left p-2 font-medium">Categoria</th>
-            <th className="text-left p-2 font-medium">is_active</th>
-            <th className="text-left p-2 font-medium">client_id</th>
-            {missing && <th className="text-left p-2 font-medium">Campo Suspeito</th>}
-            {missing && <th className="text-left p-2 font-medium">Sugestão</th>}
+            <th className="text-left p-2 font-medium">Ativo</th>
+            <th className="text-left p-2 font-medium">Visibilidade</th>
+            <th className="text-left p-2 font-medium">Mensagem</th>
           </tr>
         </thead>
         <tbody>
-          {products.map((p: any) => (
+          {diagnostics.map((p) => (
             <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50">
               <td className="p-2 font-medium max-w-48 truncate">{p.name}</td>
-              <td className="p-2 text-slate-600">{p.category || '—'}</td>
+              <td className="p-2 text-slate-600">{p.product_category || '—'}</td>
               <td className="p-2">
                 <span
                   className={
-                    p.is_active === false || p.is_active === null
-                      ? 'text-red-500 font-medium'
-                      : 'text-green-600'
+                    p.is_active ? 'text-green-600 font-medium' : 'text-red-500 font-medium'
                   }
                 >
                   {String(p.is_active)}
                 </span>
               </td>
-              <td className="p-2 text-slate-500 font-mono text-[10px] max-w-32 truncate">
-                {p.client_id ? p.client_id.slice(0, 8) + '...' : 'NULL'}
+              <td className="p-2">
+                {p.visibility_status === 'visible' || (p.is_active && !p.diagnostic_message) ? (
+                  <Badge variant="outline" className="text-green-600 border-green-300 gap-1">
+                    <Eye className="w-3 h-3" /> Visível
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-amber-600 border-amber-300 gap-1">
+                    <EyeOff className="w-3 h-3" /> Oculto
+                  </Badge>
+                )}
               </td>
-              {missing && <td className="p-2 text-amber-600 font-medium">{p.suspected_field}</td>}
-              {missing && (
-                <td className="p-2 text-slate-500 max-w-48">{p.correction_suggestion}</td>
-              )}
+              <td className="p-2 text-slate-500 max-w-48 text-[11px]">
+                {p.diagnostic_message || '—'}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -82,19 +79,23 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [fixing, setFixing] = useState(false)
   const [fixed, setFixed] = useState(false)
-  const [result, setResult] = useState<DiagnosticResult | null>(null)
+  const [result, setResult] = useState<DiagnoseCatalogResponse | null>(null)
 
   const runDiagnostic = async () => {
+    if (!activeClient?.id) {
+      toast.error('Nenhum cliente ativo selecionado')
+      return
+    }
     setLoading(true)
     setResult(null)
     setFixed(false)
     try {
-      const res = await runCatalogDiagnostic()
+      const res = await diagnoseCatalog(activeClient.id)
       setResult(res)
-      if (res.success && res.summary.missing_from_catalog === 0) {
-        toast.success('Todos os produtos estão visíveis no catálogo!')
-      } else if (res.success && res.summary.missing_from_catalog > 0) {
-        toast.warning(`${res.summary.missing_from_catalog} produto(s) não visível(is) no catálogo`)
+      if (res.success && res.inactiveProducts === 0) {
+        toast.success('Todos os produtos estão ativos e visíveis no catálogo!')
+      } else if (res.success && res.inactiveProducts > 0) {
+        toast.warning(`${res.inactiveProducts} produto(s) inativo(s) no catálogo`)
       }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao executar diagnóstico')
@@ -110,9 +111,9 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
       await inventoryService.normalizeClientInventory(activeClient.id)
       toast.success('Correção aplicada com sucesso! Re-executando diagnóstico...')
       setFixed(true)
-      const res = await runCatalogDiagnostic()
+      const res = await diagnoseCatalog(activeClient.id)
       setResult(res)
-      if (res.success && res.summary.missing_from_catalog === 0) {
+      if (res.success && res.inactiveProducts === 0) {
         toast.success('Todos os produtos agora estão visíveis no catálogo!')
       }
     } catch (err: any) {
@@ -121,6 +122,10 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
       setFixing(false)
     }
   }
+
+  const hasIssues = result
+    ? result.inactiveProducts > 0 || result.diagnostics.some((d) => d.diagnostic_message)
+    : false
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,10 +140,10 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
         {!result ? (
           <div className="py-8 text-center">
             <p className="text-sm text-slate-500 mb-4">
-              Compara todos os produtos no banco de dados com os exibidos no catálogo, identificando
-              produtos ocultos, o campo suspeito e a sugestão de correção.
+              Analisa todos os produtos do catálogo, identificando produtos inativos, problemas de
+              visibilidade e sugestões de correção.
             </p>
-            <Button onClick={runDiagnostic} disabled={loading}>
+            <Button onClick={runDiagnostic} disabled={loading || !activeClient?.id}>
               {loading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
@@ -149,50 +154,27 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-5 gap-2">
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-slate-500">Total no Banco</p>
-                <p className="text-xl font-bold text-slate-800">
-                  {result.summary.total_in_database}
-                </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-slate-50 rounded-lg p-4 text-center">
+                <p className="text-xs text-slate-500 mb-1">Total no Banco</p>
+                <p className="text-2xl font-bold text-slate-800">{result.totalProducts}</p>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-slate-500">Visíveis (RLS)</p>
-                <p className="text-xl font-bold text-slate-800">
-                  {result.summary.visible_with_rls}
-                </p>
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <p className="text-xs text-green-600 mb-1">Ativos</p>
+                <p className="text-2xl font-bold text-green-700">{result.activeProducts}</p>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-slate-500">No Catálogo</p>
-                <p className="text-xl font-bold text-slate-800">
-                  {result.summary.visible_in_catalog}
-                </p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-red-500">Bloqueados RLS</p>
-                <p className="text-xl font-bold text-red-700">{result.summary.missing_from_rls}</p>
-              </div>
-              <div className="bg-amber-50 rounded-lg p-3 text-center">
-                <p className="text-[10px] text-amber-500">Ausentes Catálogo</p>
-                <p className="text-xl font-bold text-amber-700">
-                  {result.summary.missing_from_catalog}
-                </p>
+              <div className="bg-amber-50 rounded-lg p-4 text-center">
+                <p className="text-xs text-amber-600 mb-1">Inativos</p>
+                <p className="text-2xl font-bold text-amber-700">{result.inactiveProducts}</p>
               </div>
             </div>
 
-            {result.rls_analysis.blocking_count > 0 && (
-              <div className="flex items-center gap-2 text-red-700 bg-red-50 rounded-lg p-3 border border-red-200">
-                <ShieldAlert className="w-5 h-5 shrink-0" />
-                <span className="text-sm font-medium">{result.rls_analysis.suggestion}</span>
-              </div>
-            )}
-
-            {result.summary.missing_from_catalog === 0 ? (
+            {!hasIssues ? (
               <div className="flex items-center justify-between gap-2 text-green-600 bg-green-50 rounded-lg p-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="text-sm font-medium">
-                    Todos os {result.summary.total_in_database} produtos estão visíveis no catálogo!
+                    Todos os {result.totalProducts} produtos estão ativos e visíveis no catálogo!
                   </span>
                 </div>
                 {fixed && (
@@ -205,10 +187,10 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
             ) : (
               <div className="flex items-center justify-between gap-2 text-amber-600 bg-amber-50 rounded-lg p-3">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5" />
+                  <AlertCircle className="w-5 h-5 shrink-0" />
                   <span className="text-sm font-medium">
-                    {result.summary.missing_from_catalog} produto(s) oculto(s) no catálogo.
-                    Verifique a aba "Produtos Ausentes".
+                    {result.inactiveProducts} produto(s) inativo(s) ou com problemas de
+                    visibilidade.
                   </span>
                 </div>
                 <Button
@@ -228,37 +210,12 @@ export function CatalogDiagnosticDialog({ open, onOpenChange }: Props) {
               </div>
             )}
 
-            <Tabs defaultValue="missing">
-              <TabsList className="w-full">
-                <TabsTrigger value="bank" className="flex-1">
-                  Banco ({result.all_products.length})
-                </TabsTrigger>
-                <TabsTrigger value="visible" className="flex-1">
-                  Visíveis ({result.visible_products.length})
-                </TabsTrigger>
-                <TabsTrigger value="missing" className="flex-1">
-                  Ausentes ({result.missing_from_catalog.length})
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="bank" className="mt-3">
-                <p className="text-xs text-slate-500 mb-2">
-                  Produtos no Banco (Total: {result.all_products.length})
-                </p>
-                <ProductTable products={result.all_products} />
-              </TabsContent>
-              <TabsContent value="visible" className="mt-3">
-                <p className="text-xs text-slate-500 mb-2">
-                  Produtos Visíveis no Catálogo (Total: {result.visible_products.length})
-                </p>
-                <ProductTable products={result.visible_products} />
-              </TabsContent>
-              <TabsContent value="missing" className="mt-3">
-                <p className="text-xs text-slate-500 mb-2">
-                  Produtos Ausentes (Total: {result.missing_from_catalog.length})
-                </p>
-                <ProductTable products={result.missing_from_catalog} missing />
-              </TabsContent>
-            </Tabs>
+            <div>
+              <p className="text-xs text-slate-500 mb-2">
+                Diagnóstico Detalhado ({result.diagnostics.length} produto(s))
+              </p>
+              <DiagnosticTable diagnostics={result.diagnostics} />
+            </div>
           </div>
         )}
 

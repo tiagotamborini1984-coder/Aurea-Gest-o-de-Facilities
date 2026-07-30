@@ -279,6 +279,13 @@ async function saveProduct(payload: any): Promise<any> {
   return data
 }
 
+async function normalizeClientInventory(clientId: string): Promise<void> {
+  const { error } = await supabase.rpc('normalize_client_inventory_categories', {
+    p_client_id: clientId,
+  })
+  if (error) throw error
+}
+
 async function archiveProduct(productId: string): Promise<void> {
   const { error } = await supabase
     .from('inventory_products')
@@ -333,6 +340,7 @@ export const inventoryService = {
   getProductNamesByIds,
   undoImport,
   uploadFile,
+  normalizeClientInventory,
   saveProduct,
   archiveProduct,
   reactivateProduct,
