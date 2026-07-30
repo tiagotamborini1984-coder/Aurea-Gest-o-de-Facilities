@@ -28,6 +28,7 @@ interface ImportResult {
   skipped: number
   total: number
   errors: string[]
+  warnings?: string[]
   error?: string
 }
 
@@ -94,6 +95,7 @@ export function ImportProductsDialog({
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [showWarnings, setShowWarnings] = useState(false)
   const [progress, setProgress] = useState(0)
   const [validationWarning, setValidationWarning] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -111,6 +113,7 @@ export function ImportProductsDialog({
     setResult(null)
     setProgress(0)
     setValidationWarning(null)
+    setShowWarnings(false)
     if (progressTimer.current) {
       clearInterval(progressTimer.current)
       progressTimer.current = null
@@ -356,6 +359,35 @@ export function ImportProductsDialog({
                     <p className="text-xs text-red-600">Erros</p>
                   </div>
                 </div>
+
+                {result.warnings && result.warnings.length > 0 && (
+                  <div className="mt-4 w-full max-h-40 overflow-auto bg-amber-50 rounded-lg p-3 text-left border border-amber-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-amber-700">
+                        Avisos ({result.warnings.length}):
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 text-xs text-amber-600 px-2"
+                        onClick={() => setShowWarnings((v) => !v)}
+                      >
+                        {showWarnings ? 'Ocultar' : 'Mostrar'}
+                      </Button>
+                    </div>
+                    {showWarnings &&
+                      result.warnings.slice(0, 50).map((warn, i) => (
+                        <p key={i} className="text-xs text-amber-600 mb-1">
+                          • {warn}
+                        </p>
+                      ))}
+                    {showWarnings && result.warnings.length > 50 && (
+                      <p className="text-xs text-amber-500 mt-1">
+                        ... e mais {result.warnings.length - 50} aviso(s)
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {result.errors.length > 0 && (
                   <div className="mt-4 w-full max-h-40 overflow-auto bg-red-50 rounded-lg p-3 text-left border border-red-100">

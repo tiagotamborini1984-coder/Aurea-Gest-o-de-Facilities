@@ -3808,6 +3808,10 @@ export type Database = {
         Returns: undefined
       }
       normalize_category_text: { Args: { input: string }; Returns: string }
+      normalize_client_inventory_categories: {
+        Args: { p_client_id: string }
+        Returns: undefined
+      }
       submit_audit_execution: {
         Args: {
           p_answers: Json
