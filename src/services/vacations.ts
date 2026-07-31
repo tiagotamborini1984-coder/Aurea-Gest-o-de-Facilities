@@ -16,7 +16,7 @@ export interface Vacation {
   org_collaborators?: { id: string; name: string; photo_url: string | null } | null
 }
 
-export async function getVacations(clientId: string, plantId?: string) {
+export async function getVacations(clientId: string, plantId?: string, collaboratorId?: string) {
   let query = supabase
     .from('vacations')
     .select('*, org_collaborators(id, name, photo_url)')
@@ -25,6 +25,10 @@ export async function getVacations(clientId: string, plantId?: string) {
 
   if (plantId && plantId !== 'all') {
     query = query.eq('plant_id', plantId)
+  }
+
+  if (collaboratorId && collaboratorId !== 'all') {
+    query = query.eq('collaborator_id', collaboratorId)
   }
 
   const { data, error } = await query

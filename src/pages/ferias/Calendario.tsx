@@ -106,14 +106,14 @@ export default function FeriasCalendario() {
     if (!activeClient) return
     setLoading(true)
     try {
-      const data = await getVacations(activeClient.id, selectedPlant)
+      const data = await getVacations(activeClient.id, selectedPlant, selectedCollaborator)
       setVacations(data)
     } catch (e: any) {
       toast.error('Erro ao carregar férias: ' + e.message)
     } finally {
       setLoading(false)
     }
-  }, [activeClient, selectedPlant])
+  }, [activeClient, selectedPlant, selectedCollaborator])
 
   useEffect(() => {
     loadPlants()
@@ -131,9 +131,8 @@ export default function FeriasCalendario() {
   }, [currentMonth])
 
   const filteredVacations = useMemo(() => {
-    if (selectedCollaborator === 'all') return vacations
-    return vacations.filter((v) => v.collaborator_id === selectedCollaborator)
-  }, [vacations, selectedCollaborator])
+    return vacations
+  }, [vacations])
 
   const getVacationsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
@@ -167,6 +166,11 @@ export default function FeriasCalendario() {
     } catch (e: any) {
       toast.error('Erro ao solicitar férias: ' + e.message)
     }
+  }
+
+  const handlePlantChange = (value: string) => {
+    setSelectedPlant(value)
+    setSelectedCollaborator('all')
   }
 
   const handleApprove = async (id: string) => {
@@ -217,7 +221,7 @@ export default function FeriasCalendario() {
           <p className="text-gray-500 mt-1">Visualize e gerencie as férias dos colaboradores</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
-          <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+          <Select value={selectedPlant} onValueChange={handlePlantChange}>
             <SelectTrigger className="w-[200px] bg-white">
               <SelectValue placeholder="Planta" />
             </SelectTrigger>
