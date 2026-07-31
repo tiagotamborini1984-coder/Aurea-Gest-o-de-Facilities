@@ -23,6 +23,7 @@ import {
   FileText,
   Hammer,
   HardHat,
+  Plane,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -160,6 +161,14 @@ export function AppSidebar() {
         path: '/gestao-ferramentas',
       },
       {
+        title: 'Férias',
+        icon: Plane,
+        subItems: [
+          { title: 'Calendário', path: '/ferias/calendario' },
+          { title: 'Dashboard', path: '/ferias/dashboard' },
+        ],
+      },
+      {
         title: 'Gestão de EPIs',
         icon: HardHat,
         path: '/gestao-epis',
@@ -268,7 +277,8 @@ export function AppSidebar() {
             item.title !== 'Usuários' &&
             item.title !== 'Cadastros' &&
             item.title !== 'Gestão de Clientes' &&
-            item.title !== 'Gestão de Imóveis'
+            item.title !== 'Gestão de Imóveis' &&
+            item.title !== 'Férias'
           ) {
             const hasModule = activeClient?.modules?.includes(item.title)
             if (!hasModule) return null
@@ -368,6 +378,8 @@ export function AppSidebar() {
               }
             } else if (item.title === 'Gestão de Lockers') {
               filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
+            } else if (item.title === 'Férias') {
+              filteredSubItems = userMenus.includes('Férias') ? item.subItems : []
             } else if (item.title === 'Gestão da Manutenção') {
               filteredSubItems = item.subItems.filter(
                 (sub) =>
@@ -423,6 +435,14 @@ export function AppSidebar() {
             !item.subItems &&
             (item.title === 'Gestão de Ferramentas' || item.title === 'Gestão de EPIs') &&
             !activeClient.modules?.includes(item.title)
+          ) {
+            return false
+          }
+          if (
+            activeClient &&
+            item.subItems &&
+            item.title === 'Férias' &&
+            !activeClient.modules?.includes('Férias')
           ) {
             return false
           }

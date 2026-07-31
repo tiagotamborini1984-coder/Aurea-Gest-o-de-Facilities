@@ -97,6 +97,10 @@ import PlanejamentoManutencao from './pages/gestao-manutencao/Planejamento'
 import PreventivasManutencao from './pages/gestao-manutencao/Preventivas'
 import CadastrosManutencao from './pages/gestao-manutencao/Cadastros'
 
+// Gestão de Férias
+import FeriasCalendario from './pages/ferias/Calendario'
+import FeriasDashboard from './pages/ferias/Dashboard'
+
 // Gestão de Ferramentas
 import DashboardFerramentas from './pages/gestao-ferramentas/Dashboard'
 
@@ -266,6 +270,10 @@ const App = () => (
                       />
                       <Route path="/gestao-estoque/areas" element={<AreasEstoque />} />
                       <Route path="/gestao-estoque/dashboard" element={<DashboardEstoque />} />
+
+                      {/* Gestão de Férias */}
+                      <Route path="/ferias/calendario" element={<FeriasCalendario />} />
+                      <Route path="/ferias/dashboard" element={<FeriasDashboard />} />
 
                       {/* Gestão de Ferramentas */}
                       <Route path="/gestao-ferramentas" element={<DashboardFerramentas />} />
