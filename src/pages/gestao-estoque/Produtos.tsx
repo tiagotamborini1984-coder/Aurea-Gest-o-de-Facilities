@@ -54,7 +54,7 @@ export default function Produtos() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active')
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('all')
   const [reactivateTarget, setReactivateTarget] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<{
@@ -96,8 +96,7 @@ export default function Produtos() {
 
   const loadProducts = () => {
     if (!clientId) return
-    const includeInactive = statusFilter !== 'active'
-    inventoryService.getProducts(clientId, includeInactive).then(setProducts)
+    inventoryService.getProducts(clientId, true).then(setProducts)
   }
 
   const loadCategories = () => {
@@ -150,6 +149,34 @@ export default function Produtos() {
 
     const parsedItemValue = parseNumericValue(formData.item_value)
     if (parsedItemValue < 0) return toast.error('Valor do item não pode ser negativo')
+
+    const trimmedFs = formData.fs_code?.trim().toLowerCase()
+    if (trimmedFs) {
+      const existingWithFs = products.find(
+        (p) =>
+          p.id !== editingId &&
+          p.is_active !== false &&
+          p.fs_code?.trim().toLowerCase() === trimmedFs,
+      )
+      if (existingWithFs) {
+        return toast.error('Já existe um produto ativo com este Código FS. Use um código único.')
+      }
+    }
+
+    const trimmedSupply = formData.supply_code?.trim().toLowerCase()
+    if (trimmedSupply) {
+      const existingWithSupply = products.find(
+        (p) =>
+          p.id !== editingId &&
+          p.is_active !== false &&
+          p.supply_code?.trim().toLowerCase() === trimmedSupply,
+      )
+      if (existingWithSupply) {
+        return toast.error(
+          'Já existe um produto ativo com este Código Supply. Use um código único.',
+        )
+      }
+    }
 
     setIsSaving(true)
     try {

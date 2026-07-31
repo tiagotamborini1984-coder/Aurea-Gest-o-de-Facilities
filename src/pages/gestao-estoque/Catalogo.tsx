@@ -228,14 +228,6 @@ export default function Catalogo() {
     }
   }
 
-  const tabItems = useMemo(() => {
-    return [
-      { value: ALL_TAB, label: 'Todos' },
-      ...dbCategories.map((c) => ({ value: c, label: c })),
-      { value: NO_CATEGORY_TAB, label: 'Sem Categoria' },
-    ]
-  }, [dbCategories])
-
   const belongsToCategory = (
     productCategory: string | null | undefined,
     targetCategory: string,
@@ -251,6 +243,28 @@ export default function Catalogo() {
     if (!productCategory || !productCategory.trim()) return true
     return !validCategories.some((cat) => normalizeMatch(productCategory, cat))
   }
+
+  const uncategorizedCount = useMemo(
+    () => products.filter((p) => isUncategorized(p.category, dbCategories)).length,
+    [products, dbCategories],
+  )
+
+  const tabItems = useMemo(() => {
+    const items = [
+      { value: ALL_TAB, label: 'Todos' },
+      ...dbCategories.map((c) => ({ value: c, label: c })),
+    ]
+    if (uncategorizedCount > 0) {
+      items.push({ value: NO_CATEGORY_TAB, label: 'Sem Categoria' })
+    }
+    return items
+  }, [dbCategories, uncategorizedCount])
+
+  useEffect(() => {
+    if (activeCategory === NO_CATEGORY_TAB && uncategorizedCount === 0) {
+      setActiveCategory(ALL_TAB)
+    }
+  }, [uncategorizedCount, activeCategory])
 
   const getCategoryCount = (category: string) => {
     if (category === ALL_TAB) return products.length
@@ -514,7 +528,7 @@ export default function Catalogo() {
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Buscar por nome..."
+            placeholder="Buscar por nome ou código..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -26,7 +26,7 @@ export interface ImportProductsResult {
 
 export async function getProducts(
   clientId: string,
-  includeInactive = false,
+  includeInactive = true,
 ): Promise<InventoryProduct[]> {
   let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
   if (!includeInactive) query = query.neq('is_active', false)
@@ -80,12 +80,10 @@ async function searchProducts(
   search: string,
   fsCodeSearch: string,
 ): Promise<any[]> {
-  let query = supabase
-    .from('inventory_products')
-    .select('*')
-    .eq('client_id', clientId)
-    .neq('is_active', false)
-  if (search.trim()) query = query.ilike('name', `%${search.trim()}%`)
+  let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
+  if (search.trim()) {
+    query = query.or(`name.ilike.%${search.trim()}%,supply_code.ilike.%${search.trim()}%`)
+  }
   if (fsCodeSearch.trim()) query = query.ilike('fs_code', `%${fsCodeSearch.trim()}%`)
   const { data, error } = await query.order('name')
   if (error) throw error
@@ -264,6 +262,21 @@ async function uploadFile(bucket: string, file: File, path: string): Promise<str
 
 async function saveProduct(payload: any): Promise<any> {
   const { id, ...rest } = payload
+
+  if (rest.category) {
+    rest.category =
+      String(rest.category)
+        .replace(/[\r\n\t]+/g, ' ')
+        .trim() || null
+  }
+  if (rest.fs_code) {
+    rest.fs_code = String(rest.fs_code).trim() || null
+  }
+  if (rest.supply_code) {
+    rest.supply_code = String(rest.supply_code).trim() || null
+  }
+  rest.is_active = true
+
   if (id) {
     const { data, error } = await supabase
       .from('inventory_products')

@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { inventoryService } from '@/services/inventory'
+import { useAppStore } from '@/store/AppContext'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -63,6 +64,73 @@ function parseCsvHeaders(text: string, delimiter: string): string[] {
   )
 }
 
+function parseCsvToProducts(text: string): Record<string, any>[] {
+  const delimiter = detectDelimiter(text)
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '')
+  if (lines.length <= 1) return []
+
+  const rawHeaders = lines[0].split(delimiter).map((h) =>
+    h
+      .trim()
+      .toLowerCase()
+      .replace(/^["']|["']$/g, ''),
+  )
+
+  const headerMap: Record<number, string> = {}
+  rawHeaders.forEach((h, idx) => {
+    if (h === 'name' || h === 'nome' || h === 'produto') headerMap[idx] = 'name'
+    else if (h === 'description' || h === 'descrição' || h === 'descricao')
+      headerMap[idx] = 'description'
+    else if (h === 'category' || h === 'categoria') headerMap[idx] = 'category'
+    else if (h === 'unit_of_measure' || h === 'unidade' || h === 'un')
+      headerMap[idx] = 'unit_of_measure'
+    else if (h === 'item_value' || h === 'valor' || h === 'preco' || h === 'preço')
+      headerMap[idx] = 'item_value'
+    else if (h === 'fs_code' || h === 'codigo_fs' || h === 'código fs' || h === 'codigo fs')
+      headerMap[idx] = 'fs_code'
+    else if (
+      h === 'supply_code' ||
+      h === 'codigo_supply' ||
+      h === 'código supply' ||
+      h === 'codigo supply'
+    )
+      headerMap[idx] = 'supply_code'
+    else if (h === 'sds_url' || h === 'fds' || h === 'sds') headerMap[idx] = 'sds_url'
+    else if (h === 'image_url' || h === 'imagem') headerMap[idx] = 'image_url'
+  })
+
+  const products: Record<string, any>[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(delimiter)
+    if (!row.some((cell) => cell.trim() !== '')) continue
+
+    const prod: Record<string, any> = {}
+    rawHeaders.forEach((_, idx) => {
+      const key = headerMap[idx]
+      if (key) {
+        let val = row[idx] ? row[idx].trim().replace(/^["']|["']$/g, '') : ''
+        if (key === 'item_value') {
+          if (val) {
+            val = val.replace(/\./g, '').replace(',', '.')
+            const num = parseFloat(val)
+            prod[key] = isNaN(num) ? 0 : num
+          } else {
+            prod[key] = 0
+          }
+        } else {
+          prod[key] = val || null
+        }
+      }
+    })
+
+    if (prod.name) {
+      products.push(prod)
+    }
+  }
+
+  return products
+}
+
 function validateCsvFile(file: File): Promise<string | null> {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -91,6 +159,8 @@ export function ImportProductsDialog({
   onOpenChange,
   onImportComplete,
 }: ImportProductsDialogProps) {
+  const { activeClient, profile } = useAppStore()
+  const clientId = activeClient?.id || profile?.client_id
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -165,6 +235,11 @@ export function ImportProductsDialog({
 
   const handleImport = async () => {
     if (!file) return
+    if (!clientId) {
+      toast.error('Erro: Cliente não identificado')
+      return
+    }
+
     setIsProcessing(true)
     setResult(null)
     setProgress(0)
@@ -174,7 +249,14 @@ export function ImportProductsDialog({
     }, 400)
 
     try {
-      const res = await inventoryService.importProducts(file)
+      const text = await file.text()
+      const parsedProducts = parseCsvToProducts(text)
+
+      if (parsedProducts.length === 0) {
+        throw new Error('Nenhum produto válido encontrado no arquivo CSV.')
+      }
+
+      const res = await inventoryService.importProducts(clientId, parsedProducts)
       setProgress(100)
       setResult(res)
       if (res.success && (res.inserted > 0 || res.updated > 0)) {

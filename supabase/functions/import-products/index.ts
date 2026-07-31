@@ -28,14 +28,33 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const productsWithClient = products.map((p) => ({
-      ...p,
-      client_id: clientId,
-      is_active: p.is_active !== undefined ? p.is_active : true,
-    }))
+    const cleanedProducts = products.map((p) => {
+      const fsCode = p.fs_code ? String(p.fs_code).trim() : null
+      const supplyCode = p.supply_code ? String(p.supply_code).trim() : null
+      const category = p.category
+        ? String(p.category)
+            .replace(/[\r\n\t]+/g, ' ')
+            .trim()
+        : null
+      const name = p.name
+        ? String(p.name)
+            .replace(/[\r\n\t]+/g, ' ')
+            .trim()
+        : ''
 
-    const withFsCode = productsWithClient.filter((p) => p.fs_code)
-    const withoutFsCode = productsWithClient.filter((p) => !p.fs_code)
+      return {
+        ...p,
+        client_id: clientId,
+        name: name || 'Produto sem nome',
+        category: category || null,
+        fs_code: fsCode || null,
+        supply_code: supplyCode || null,
+        is_active: true,
+      }
+    })
+
+    const withFsCode = cleanedProducts.filter((p) => p.fs_code)
+    const withoutFsCode = cleanedProducts.filter((p) => !p.fs_code)
 
     let totalInserted = 0
     const errors: Array<{ item: string; error: string }> = []
@@ -46,7 +65,14 @@ Deno.serve(async (req: Request) => {
         .upsert(withFsCode, { onConflict: 'client_id,fs_code' })
         .select()
       if (error) {
-        errors.push({ item: 'batch_fs_code', error: error.message })
+        for (const p of withFsCode) {
+          const { data: d2, error: e2 } = await supabase
+            .from('inventory_products')
+            .upsert(p, { onConflict: 'client_id,fs_code' })
+            .select()
+          if (e2) errors.push({ item: String(p.name || p.fs_code || ''), error: e2.message })
+          else totalInserted += d2?.length || 0
+        }
       } else {
         totalInserted += data?.length || 0
       }
@@ -67,7 +93,7 @@ Deno.serve(async (req: Request) => {
               .from('inventory_products')
               .upsert(p, { onConflict: 'client_id,supply_code' })
               .select()
-            if (e2) errors.push({ item: String(p.name || ''), error: e2.message })
+            if (e2) errors.push({ item: String(p.name || p.supply_code || ''), error: e2.message })
             else totalInserted += d2?.length || 0
           }
         } else {
