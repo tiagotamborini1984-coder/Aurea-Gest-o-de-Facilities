@@ -68,6 +68,7 @@ export default function FeriasCalendario() {
   const [collaborators, setCollaborators] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  const [selectedCollaborator, setSelectedCollaborator] = useState<string>('all')
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -129,9 +130,14 @@ export default function FeriasCalendario() {
     return eachDayOfInterval({ start, end })
   }, [currentMonth])
 
+  const filteredVacations = useMemo(() => {
+    if (selectedCollaborator === 'all') return vacations
+    return vacations.filter((v) => v.collaborator_id === selectedCollaborator)
+  }, [vacations, selectedCollaborator])
+
   const getVacationsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
-    return vacations.filter((v) => {
+    return filteredVacations.filter((v) => {
       return v.start_date <= dateStr && v.end_date >= dateStr && v.status !== 'rejected'
     })
   }
@@ -220,6 +226,19 @@ export default function FeriasCalendario() {
               {plants.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedCollaborator} onValueChange={setSelectedCollaborator}>
+            <SelectTrigger className="w-[220px] bg-white">
+              <SelectValue placeholder="Colaborador" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Colaboradores</SelectItem>
+              {collaborators.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>
