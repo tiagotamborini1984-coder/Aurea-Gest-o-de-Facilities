@@ -108,6 +108,13 @@ export default function FeriasCalendario() {
     try {
       const data = await getVacations(activeClient.id, selectedPlant, selectedCollaborator)
       setVacations(data)
+      if (selectedCollaborator !== 'all' && data.length > 0) {
+        const earliest = data[0]
+        const date = new Date(earliest.start_date + 'T00:00:00')
+        setCurrentMonth(date)
+      } else if (selectedCollaborator === 'all') {
+        setCurrentMonth(new Date())
+      }
     } catch (e: any) {
       toast.error('Erro ao carregar férias: ' + e.message)
     } finally {
