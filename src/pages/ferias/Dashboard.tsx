@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { getMonthlyVacationCounts, getVacations } from '@/services/vacations'
 import type { Vacation } from '@/services/vacations'
+import { RegisteredVacations } from '@/pages/ferias/components/RegisteredVacations'
 
 export default function FeriasDashboard() {
   const { activeClient } = useAppStore()
@@ -186,6 +187,8 @@ export default function FeriasDashboard() {
           )}
         </CardContent>
       </Card>
+
+      <RegisteredVacations clientId={activeClient?.id || ''} plantId={selectedPlant} />
 
       <Card className="shadow-sm">
         <CardHeader>
