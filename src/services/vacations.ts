@@ -14,12 +14,13 @@ export interface Vacation {
   created_at: string
   updated_at: string
   org_collaborators?: { id: string; name: string; photo_url: string | null } | null
+  profiles?: { id: string; name: string } | null
 }
 
 export async function getVacations(clientId: string, plantId?: string, collaboratorId?: string) {
   let query = supabase
     .from('vacations')
-    .select('*, org_collaborators(id, name, photo_url)')
+    .select('*, org_collaborators(id, name, photo_url), profiles!approved_by(id, name)')
     .eq('client_id', clientId)
     .order('start_date', { ascending: true })
 
@@ -46,7 +47,7 @@ export async function createVacation(payload: {
   const { data, error } = await supabase
     .from('vacations')
     .insert({ ...payload, status: 'scheduled' })
-    .select('*, org_collaborators(id, name, photo_url)')
+    .select('*, org_collaborators(id, name, photo_url), profiles!approved_by(id, name)')
     .single()
   if (error) throw error
   return data as Vacation
@@ -57,7 +58,7 @@ export async function approveVacation(id: string, approverId: string) {
     .from('vacations')
     .update({ status: 'approved', approved_by: approverId })
     .eq('id', id)
-    .select('*, org_collaborators(id, name, photo_url)')
+    .select('*, org_collaborators(id, name, photo_url), profiles!approved_by(id, name)')
     .single()
   if (error) throw error
   return data as Vacation
@@ -68,7 +69,7 @@ export async function rejectVacation(id: string) {
     .from('vacations')
     .update({ status: 'rejected' })
     .eq('id', id)
-    .select('*, org_collaborators(id, name, photo_url)')
+    .select('*, org_collaborators(id, name, photo_url), profiles!approved_by(id, name)')
     .single()
   if (error) throw error
   return data as Vacation

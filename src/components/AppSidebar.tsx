@@ -166,6 +166,7 @@ export function AppSidebar() {
         subItems: [
           { title: 'Calendário', path: '/ferias/calendario' },
           { title: 'Dashboard', path: '/ferias/dashboard' },
+          { title: 'Meus Pedidos', path: '/ferias/meus-pedidos' },
         ],
       },
       {

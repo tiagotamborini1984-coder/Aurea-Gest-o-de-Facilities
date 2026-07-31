@@ -100,6 +100,7 @@ import CadastrosManutencao from './pages/gestao-manutencao/Cadastros'
 // Gestão de Férias
 import FeriasCalendario from './pages/ferias/Calendario'
 import FeriasDashboard from './pages/ferias/Dashboard'
+import FeriasMeusPedidos from './pages/ferias/MeusPedidos'
 
 // Gestão de Ferramentas
 import DashboardFerramentas from './pages/gestao-ferramentas/Dashboard'
@@ -274,6 +275,7 @@ const App = () => (
                       {/* Gestão de Férias */}
                       <Route path="/ferias/calendario" element={<FeriasCalendario />} />
                       <Route path="/ferias/dashboard" element={<FeriasDashboard />} />
+                      <Route path="/ferias/meus-pedidos" element={<FeriasMeusPedidos />} />
 
                       {/* Gestão de Ferramentas */}
                       <Route path="/gestao-ferramentas" element={<DashboardFerramentas />} />
