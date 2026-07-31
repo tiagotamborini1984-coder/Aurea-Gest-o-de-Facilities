@@ -24,7 +24,7 @@ export function useHasAccess(menuName: string) {
       'Gestão de Documentos',
       'Gestão de Ferramentas',
       'Gestão de EPIs',
-      'Férias',
+      'Gestão de Férias',
     ]
   }
 

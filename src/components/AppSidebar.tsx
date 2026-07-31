@@ -161,7 +161,7 @@ export function AppSidebar() {
         path: '/gestao-ferramentas',
       },
       {
-        title: 'Férias',
+        title: 'Gestão de Férias',
         icon: Plane,
         subItems: [
           { title: 'Calendário', path: '/ferias/calendario' },
@@ -278,7 +278,7 @@ export function AppSidebar() {
             item.title !== 'Cadastros' &&
             item.title !== 'Gestão de Clientes' &&
             item.title !== 'Gestão de Imóveis' &&
-            item.title !== 'Férias'
+            item.title !== 'Gestão de Férias'
           ) {
             const hasModule = activeClient?.modules?.includes(item.title)
             if (!hasModule) return null
@@ -378,8 +378,8 @@ export function AppSidebar() {
               }
             } else if (item.title === 'Gestão de Lockers') {
               filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
-            } else if (item.title === 'Férias') {
-              filteredSubItems = userMenus.includes('Férias') ? item.subItems : []
+            } else if (item.title === 'Gestão de Férias') {
+              filteredSubItems = userMenus.includes('Gestão de Férias') ? item.subItems : []
             } else if (item.title === 'Gestão da Manutenção') {
               filteredSubItems = item.subItems.filter(
                 (sub) =>
@@ -441,8 +441,8 @@ export function AppSidebar() {
           if (
             activeClient &&
             item.subItems &&
-            item.title === 'Férias' &&
-            !activeClient.modules?.includes('Férias')
+            item.title === 'Gestão de Férias' &&
+            !activeClient.modules?.includes('Gestão de Férias')
           ) {
             return false
           }

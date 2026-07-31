@@ -40,7 +40,7 @@ const AVAILABLE_MODULES = [
   'Gestão da Manutenção',
   'Gestão de Estoque',
   'Gestão de EPIs',
-  'Férias',
+  'Gestão de Férias',
 ]
 
 export function EditClientDialog({

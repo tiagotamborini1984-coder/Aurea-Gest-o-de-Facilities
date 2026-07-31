@@ -206,7 +206,7 @@ export default function FeriasCalendario() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <CalendarDays className="h-8 w-8 text-brand-vividBlue" />
-            Calendário de Férias
+            Calendário de Gestão de Férias
           </h1>
           <p className="text-gray-500 mt-1">Visualize e gerencie as férias dos colaboradores</p>
         </div>

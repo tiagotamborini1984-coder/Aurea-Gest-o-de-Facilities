@@ -33,6 +33,7 @@ const AVAILABLE_MODULES = [
   'Gestão da Manutenção',
   'Gestão de Estoque',
   'Gestão de EPIs',
+  'Gestão de Férias',
 ]
 
 export function CreateClientDialog({

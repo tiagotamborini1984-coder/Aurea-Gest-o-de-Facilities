@@ -74,7 +74,7 @@ export default function FeriasDashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <PieIcon className="h-8 w-8 text-brand-vividBlue" />
-            Dashboard de Férias
+            Dashboard de Gestão de Férias
           </h1>
           <p className="text-gray-500 mt-1">Visão geral das férias por mês</p>
         </div>
