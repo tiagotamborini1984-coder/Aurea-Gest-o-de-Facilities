@@ -307,6 +307,7 @@ export function AppSidebar() {
               'Treinamentos',
               'Gestão de Documentos',
               'Gestão de Ferramentas',
+              'Gestão de Férias',
             ]
           }
 

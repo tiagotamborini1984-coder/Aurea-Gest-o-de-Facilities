@@ -17,6 +17,7 @@ function ModuleAccessDenied() {
 const routeMenuMap: Record<string, string> = {
   '/ferias/calendario': 'Gestão de Férias',
   '/ferias/dashboard': 'Gestão de Férias',
+  '/ferias/meus-pedidos': 'Gestão de Férias',
   '/gestao-epis': 'Gestão de EPIs',
   '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-terceiros/dashboard-gestor': 'Gestão de Terceiros:Dashboard do Gestor',

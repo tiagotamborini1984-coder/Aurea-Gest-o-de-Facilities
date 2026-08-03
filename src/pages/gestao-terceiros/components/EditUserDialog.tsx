@@ -36,6 +36,7 @@ const MAIN_MENUS = [
   'Gestão da Manutenção',
   'Gestão de Estoque',
   'Gestão de EPIs',
+  'Gestão de Férias',
 ]
 
 const GESTAO_TERCEIROS_SUBMENUS = [
