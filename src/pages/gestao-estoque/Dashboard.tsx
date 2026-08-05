@@ -209,26 +209,6 @@ export default function DashboardEstoque() {
   const deliveredRequests = filteredRequests.filter((r) => r.status === 'Entregue')
   const pendingRequests = filteredRequests.filter((r) => r.status === 'Pendente')
 
-  const consumptionByAreaMap: Record<string, number> = {}
-  deliveredRequests.forEach((req) => {
-    const areaName = req.area?.name || 'Não Informado'
-    consumptionByAreaMap[areaName] = (consumptionByAreaMap[areaName] || 0) + (req.total_items || 0)
-  })
-
-  const chartData = Object.keys(consumptionByAreaMap)
-    .map((area) => ({ area, total: consumptionByAreaMap[area] }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10)
-
-  const topValueProducts = useMemo(
-    () =>
-      [...activeProducts]
-        .filter((p) => p.item_value != null && p.item_value > 0)
-        .sort((a, b) => (b.item_value || 0) - (a.item_value || 0))
-        .slice(0, 8),
-    [activeProducts],
-  )
-
   if (loading) {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -508,78 +488,6 @@ export default function DashboardEstoque() {
           )}
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Áreas por Consumo (Itens)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            {chartData.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-slate-500">
-                Nenhum pedido entregue no período selecionado.
-              </div>
-            ) : (
-              <ChartContainer
-                config={{ total: { label: 'Itens Consumidos', color: 'hsl(var(--primary))' } }}
-                className="h-full w-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
-                    <XAxis type="number" />
-                    <YAxis dataKey="area" type="category" width={100} tick={{ fontSize: 12 }} />
-                    <Tooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="total" fill="var(--color-total)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Produtos com Maior Valor</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 max-h-[300px] overflow-auto">
-              {topValueProducts.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100"
-                >
-                  <div className="flex items-center gap-3">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt="" className="w-10 h-10 rounded object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded bg-slate-200 flex items-center justify-center">
-                        <Package className="w-5 h-5 text-slate-400" />
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-medium text-slate-800">{p.name}</p>
-                      <p className="text-xs text-slate-500">{p.category || 'Sem categoria'}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-emerald-700 font-bold text-lg">
-                      {formatCurrency(p.item_value || 0)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {p.unit_of_measure ? `/ ${p.unit_of_measure}` : ''}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {topValueProducts.length === 0 && (
-                <div className="text-center py-10 text-slate-500">
-                  Nenhum produto com valor cadastrado.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PlantRankingCard
