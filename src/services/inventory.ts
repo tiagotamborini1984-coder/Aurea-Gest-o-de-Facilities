@@ -82,7 +82,9 @@ async function searchProducts(
 ): Promise<any[]> {
   let query = supabase.from('inventory_products').select('*').eq('client_id', clientId)
   if (search.trim()) {
-    query = query.or(`name.ilike.%${search.trim()}%,supply_code.ilike.%${search.trim()}%`)
+    query = query.or(
+      `name.ilike.%${search.trim()}%,supply_code.ilike.%${search.trim()}%,fs_code.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%`,
+    )
   }
   if (fsCodeSearch.trim()) query = query.ilike('fs_code', `%${fsCodeSearch.trim()}%`)
   const { data, error } = await query.order('name')
