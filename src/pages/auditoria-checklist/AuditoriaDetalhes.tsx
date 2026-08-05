@@ -151,37 +151,42 @@ function AuditoriaDetalhesInner() {
   const [currentPage, setCurrentPage] = useState(1)
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
   const [nonConformities, setNonConformities] = useState<any[]>([])
+  const [allAuditIds, setAllAuditIds] = useState<string[]>([])
 
   useEffect(() => {
     fetchData()
   }, [id])
 
+  const auditIdsKey = JSON.stringify(allAuditIds)
   useEffect(() => {
-    const auditId = execution?.audit_id || audit?.id
     const clientId = audit?.client_id
-    if (!auditId || !clientId) return
-    const channel = supabase
-      .channel(`audit-nc-${auditId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks', filter: `audit_id=eq.${auditId}` },
-        async () => {
-          const { data: ncData } = await supabase
-            .from('tasks')
-            .select(
-              'id, task_number, title, description, due_date, assignee_id, status_id, task_statuses(name, color), profiles!tasks_assignee_id_fkey(name)',
-            )
-            .eq('audit_id', auditId)
-            .eq('client_id', clientId)
-            .order('created_at', { ascending: false })
-          setNonConformities(ncData || [])
-        },
-      )
-      .subscribe()
+    if (!allAuditIds.length || !clientId) return
+
+    const channels = allAuditIds.map((auditId) =>
+      supabase
+        .channel(`audit-nc-${auditId}-${execution?.plant_id || ''}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'tasks', filter: `audit_id=eq.${auditId}` },
+          async () => {
+            const { data: ncData } = await supabase
+              .from('tasks')
+              .select(
+                'id, task_number, title, description, due_date, assignee_id, status_id, audit_id, task_statuses(name, color), profiles!tasks_assignee_id_fkey(name)',
+              )
+              .in('audit_id', allAuditIds)
+              .eq('client_id', clientId)
+              .order('created_at', { ascending: false })
+            setNonConformities(ncData || [])
+          },
+        )
+        .subscribe(),
+    )
+
     return () => {
-      supabase.removeChannel(channel)
+      channels.forEach((ch) => supabase.removeChannel(ch))
     }
-  }, [audit?.id, audit?.client_id, execution?.audit_id])
+  }, [auditIdsKey, audit?.client_id])
 
   const fetchData = async () => {
     if (!id) return
@@ -241,7 +246,16 @@ function AuditoriaDetalhesInner() {
         })
         setAnswers(ansMap)
 
-        // Fetch execution history for this audit (plant specific)
+        const rootAuditId = execData.audits?.parent_audit_id || execData.audit_id
+
+        const { data: childAudits } = await supabase
+          .from('audits')
+          .select('id')
+          .eq('parent_audit_id', rootAuditId)
+
+        const treeAuditIds = [rootAuditId, ...(childAudits || []).map((c: any) => c.id)]
+        setAllAuditIds(treeAuditIds)
+
         const { data: histData } = await supabase
           .from('audit_executions')
           .select(`
@@ -251,9 +265,10 @@ function AuditoriaDetalhesInner() {
             final_score,
             max_score,
             created_at,
+            audit_id,
             tasks ( task_number, due_date )
           `)
-          .eq('audit_id', execData.audit_id)
+          .in('audit_id', treeAuditIds)
           .eq('plant_id', execData.plant_id)
           .order('created_at', { ascending: false })
 
@@ -269,10 +284,11 @@ function AuditoriaDetalhesInner() {
             due_date,
             assignee_id,
             status_id,
+            audit_id,
             task_statuses(name, color),
             profiles!tasks_assignee_id_fkey(name)
           `)
-          .eq('audit_id', execData.audit_id)
+          .in('audit_id', treeAuditIds)
           .eq('client_id', execData.audits.client_id)
           .order('created_at', { ascending: false })
         setNonConformities(ncData || [])
