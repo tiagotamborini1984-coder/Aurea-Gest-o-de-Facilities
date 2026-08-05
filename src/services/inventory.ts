@@ -194,6 +194,67 @@ async function getPlantInventoryValue(clientId: string): Promise<any[]> {
   }))
 }
 
+async function getRequestCountByPlant(clientId: string): Promise<any[]> {
+  const { data: plants, error: plantsError } = await supabase
+    .from('plants')
+    .select('id, name, code, city')
+    .eq('client_id', clientId)
+    .order('name')
+  if (plantsError) throw plantsError
+  if (!plants || plants.length === 0) return []
+
+  const { data: requests, error: reqError } = await supabase
+    .from('inventory_requests')
+    .select('plant_id')
+    .eq('client_id', clientId)
+  if (reqError) throw reqError
+
+  const countMap: Record<string, number> = {}
+  ;(requests || []).forEach((req: any) => {
+    if (req.plant_id) {
+      countMap[req.plant_id] = (countMap[req.plant_id] || 0) + 1
+    }
+  })
+
+  return (plants || [])
+    .map((p) => ({ ...p, totalRequests: countMap[p.id] || 0 }))
+    .sort((a, b) => b.totalRequests - a.totalRequests)
+}
+
+async function getRequestValueByPlant(clientId: string): Promise<any[]> {
+  const { data: plants, error: plantsError } = await supabase
+    .from('plants')
+    .select('id, name, code, city')
+    .eq('client_id', clientId)
+    .order('name')
+  if (plantsError) throw plantsError
+  if (!plants || plants.length === 0) return []
+
+  const { data: requests, error: reqError } = await supabase
+    .from('inventory_requests')
+    .select(
+      'plant_id, items:inventory_request_items(quantity, product:inventory_products(item_value, is_active))',
+    )
+    .eq('client_id', clientId)
+  if (reqError) throw reqError
+
+  const valueMap: Record<string, number> = {}
+  ;(requests || []).forEach((req: any) => {
+    if (!req.plant_id) return
+    const itemsValue = (req.items || []).reduce((sum: number, item: any) => {
+      if (item.product?.is_active === false) return sum
+      const qty = item.quantity || 0
+      const val = item.product?.item_value || 0
+      return sum + qty * val
+    }, 0)
+    valueMap[req.plant_id] = (valueMap[req.plant_id] || 0) + itemsValue
+  })
+
+  return (plants || [])
+    .map((p) => ({ ...p, totalValue: valueMap[p.id] || 0 }))
+    .sort((a, b) => b.totalValue - a.totalValue)
+}
+
 async function deleteRequest(requestId: string): Promise<void> {
   const { error: itemsError } = await supabase
     .from('inventory_request_items')
@@ -376,6 +437,8 @@ export const inventoryService = {
   submitRequest,
   getRequests,
   getPlantInventoryValue,
+  getRequestCountByPlant,
+  getRequestValueByPlant,
   deleteRequest,
   updateRequestStatus,
   getImportLogs,

@@ -15,9 +15,11 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  ClipboardList,
 } from 'lucide-react'
 import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart'
+import { PlantRankingCard } from '@/components/gestao-estoque/PlantRankingCard'
 import {
   Select,
   SelectContent,
@@ -52,6 +54,12 @@ export default function DashboardEstoque() {
   const [plantsValue, setPlantsValue] = useState<any[]>([])
   const [plantsLoading, setPlantsLoading] = useState(false)
   const [plantsError, setPlantsError] = useState<string | null>(null)
+  const [requestsRanking, setRequestsRanking] = useState<any[]>([])
+  const [requestsRankingLoading, setRequestsRankingLoading] = useState(false)
+  const [requestsRankingError, setRequestsRankingError] = useState<string | null>(null)
+  const [valueRanking, setValueRanking] = useState<any[]>([])
+  const [valueRankingLoading, setValueRankingLoading] = useState(false)
+  const [valueRankingError, setValueRankingError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,10 +105,40 @@ export default function DashboardEstoque() {
     }
   }
 
+  const loadRequestsRanking = async () => {
+    if (!activeClient) return
+    setRequestsRankingLoading(true)
+    setRequestsRankingError(null)
+    try {
+      const data = await inventoryService.getRequestCountByPlant(activeClient.id)
+      setRequestsRanking(data)
+    } catch (err: any) {
+      setRequestsRankingError(err.message || 'Erro ao carregar ranking de pedidos')
+    } finally {
+      setRequestsRankingLoading(false)
+    }
+  }
+
+  const loadValueRanking = async () => {
+    if (!activeClient) return
+    setValueRankingLoading(true)
+    setValueRankingError(null)
+    try {
+      const data = await inventoryService.getRequestValueByPlant(activeClient.id)
+      setValueRanking(data)
+    } catch (err: any) {
+      setValueRankingError(err.message || 'Erro ao carregar ranking de valores')
+    } finally {
+      setValueRankingLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeClient) {
       loadData()
       loadPlantValues()
+      loadRequestsRanking()
+      loadValueRanking()
     } else {
       setLoading(false)
     }
@@ -541,6 +579,32 @@ export default function DashboardEstoque() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PlantRankingCard
+          title="Ranking de Pedidos por Planta"
+          icon={<ClipboardList className="w-5 h-5 text-blue-600" />}
+          accentColor="#3b82f6"
+          data={requestsRanking.map((p) => ({ ...p, value: p.totalRequests }))}
+          loading={requestsRankingLoading}
+          error={requestsRankingError}
+          onRetry={loadRequestsRanking}
+          valueLabel="Pedidos"
+          emptyMessage="Nenhuma planta com pedidos encontrada."
+        />
+        <PlantRankingCard
+          title="Ranking de Valores por Planta"
+          icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
+          accentColor="#10b981"
+          data={valueRanking.map((p) => ({ ...p, value: p.totalValue }))}
+          loading={valueRankingLoading}
+          error={valueRankingError}
+          onRetry={loadValueRanking}
+          formatValue={formatCurrency}
+          valueLabel="Valor Total"
+          emptyMessage="Nenhuma planta com valores encontrada."
+        />
       </div>
     </div>
   )
