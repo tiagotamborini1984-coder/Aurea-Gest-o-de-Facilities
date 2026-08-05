@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { inventoryService } from '@/services/inventory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,7 +30,7 @@ import {
 import { DatePickerWithRange } from '@/components/ui/date-range-picker'
 import { DateRange } from 'react-day-picker'
 import { addDays, isWithinInterval, parseISO } from 'date-fns'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const CHART_COLORS = [
@@ -69,6 +69,8 @@ export default function DashboardEstoque() {
   })
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
+  const [excludedCategories, setExcludedCategories] = useState<string[]>([])
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set())
 
   const loadData = async () => {
     if (!activeClient) return
@@ -205,6 +207,31 @@ export default function DashboardEstoque() {
       .map((category) => ({ category, count: map[category] }))
       .sort((a, b) => b.count - a.count)
   }, [activeProducts])
+
+  const visibleCategoryBreakdown = useMemo(
+    () => categoryBreakdown.filter((c) => !excludedCategories.includes(c.category)),
+    [categoryBreakdown, excludedCategories],
+  )
+
+  const toggleCategoryExclusion = (category: string) => {
+    setExcludedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category],
+    )
+  }
+
+  const visibleCategoryBreakdown = useMemo(
+    () => categoryBreakdown.filter((c) => !excludedCategories.has(c.category)),
+    [categoryBreakdown, excludedCategories],
+  )
+
+  const toggleCategoryExclusion = useCallback((category: string) => {
+    setExcludedCategories((prev) => {
+      const next = new Set(prev)
+      if (next.has(category)) next.delete(category)
+      else next.add(category)
+      return next
+    })
+  }, [])
 
   const deliveredRequests = filteredRequests.filter((r) => r.status === 'Entregue')
   const pendingRequests = filteredRequests.filter((r) => r.status === 'Pendente')
@@ -391,39 +418,78 @@ export default function DashboardEstoque() {
             Produtos por Categoria
           </CardTitle>
         </CardHeader>
-        <CardContent className="h-[300px]">
+        <CardContent>
           {categoryBreakdown.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500">
+            <div className="flex items-center justify-center h-[300px] text-slate-500">
               Nenhuma categoria encontrada.
             </div>
           ) : (
-            <ChartContainer
-              config={{ count: { label: 'Produtos', color: 'hsl(var(--primary))' } }}
-              className="h-full w-full"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryBreakdown} margin={{ left: 20, right: 20 }}>
-                  <XAxis
-                    dataKey="category"
-                    tick={{ fontSize: 11 }}
-                    interval={0}
-                    angle={-15}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                    {categoryBreakdown.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {categoryBreakdown.map((cat) => {
+                  const isExcluded = excludedCategories.has(cat.category)
+                  return (
+                    <button
+                      key={cat.category}
+                      onClick={() => toggleCategoryExclusion(cat.category)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all duration-200',
+                        isExcluded
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 line-through hover:bg-slate-200'
+                          : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+                      )}
+                    >
+                      {cat.category}
+                      <span className="text-[10px] opacity-70">({cat.count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {excludedCategories.size > 0 && (
+                <button
+                  onClick={() => setExcludedCategories(new Set())}
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline mb-3"
+                >
+                  Mostrar todas as categorias
+                </button>
+              )}
+              <div className="h-[300px]">
+                {visibleCategoryBreakdown.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-500">
+                    Todas as categorias foram excluídas. Clique em uma categoria acima para
+                    reativá-la.
+                  </div>
+                ) : (
+                  <ChartContainer
+                    config={{ count: { label: 'Produtos', color: 'hsl(var(--primary))' } }}
+                    className="h-full w-full"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={visibleCategoryBreakdown} margin={{ left: 20, right: 20 }}>
+                        <XAxis
+                          dataKey="category"
+                          tick={{ fontSize: 11 }}
+                          interval={0}
+                          angle={-15}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                          {visibleCategoryBreakdown.map((_, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={CHART_COLORS[index % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
