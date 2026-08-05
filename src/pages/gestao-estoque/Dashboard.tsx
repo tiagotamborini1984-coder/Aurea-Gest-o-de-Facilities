@@ -50,6 +50,8 @@ export default function DashboardEstoque() {
   const [products, setProducts] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [plantsValue, setPlantsValue] = useState<any[]>([])
+  const [plantsLoading, setPlantsLoading] = useState(false)
+  const [plantsError, setPlantsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,16 +67,14 @@ export default function DashboardEstoque() {
     setLoading(true)
     setError(null)
     try {
-      const [reqs, prods, cats, pv] = await Promise.all([
+      const [reqs, prods, cats] = await Promise.all([
         inventoryService.getRequests(activeClient.id),
         inventoryService.getProducts(activeClient.id, false),
         inventoryService.getCategories(activeClient.id),
-        inventoryService.getPlantInventoryValue(activeClient.id),
       ])
       setRequests(reqs)
       setProducts(prods)
       setCategories(cats)
-      setPlantsValue(pv)
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar dados do dashboard')
       toast.error('Erro ao carregar dashboard')
@@ -83,9 +83,24 @@ export default function DashboardEstoque() {
     }
   }
 
+  const loadPlantValues = async () => {
+    if (!activeClient) return
+    setPlantsLoading(true)
+    setPlantsError(null)
+    try {
+      const pv = await inventoryService.getPlantInventoryValue(activeClient.id)
+      setPlantsValue(pv)
+    } catch (err: any) {
+      setPlantsError(err.message || 'Erro ao carregar valores por planta')
+    } finally {
+      setPlantsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (activeClient) {
       loadData()
+      loadPlantValues()
     } else {
       setLoading(false)
     }
@@ -403,38 +418,56 @@ export default function DashboardEstoque() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 max-h-[350px] overflow-auto">
-            {plantsValue.length === 0 && (
-              <div className="text-center py-10 text-slate-500">
-                Nenhuma planta cadastrada para este cliente.
+          {plantsLoading ? (
+            <div className="flex items-center justify-center py-10 gap-3">
+              <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
+              <span className="text-sm text-slate-500">Carregando valores por planta...</span>
+            </div>
+          ) : plantsError ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+              <div className="p-2 bg-red-100 text-red-600 rounded-full">
+                <AlertCircle className="w-6 h-6" />
               </div>
-            )}
-            {plantsValue.map((p) => (
-              <div
-                key={p.id}
-                className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100/70 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
-                    <Building2 className="w-5 h-5" />
+              <p className="text-sm text-red-600">{plantsError}</p>
+              <Button onClick={loadPlantValues} variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Tentar novamente
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[350px] overflow-auto">
+              {plantsValue.length === 0 && (
+                <div className="text-center py-10 text-slate-500">
+                  Nenhuma planta cadastrada para este cliente.
+                </div>
+              )}
+              {plantsValue.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100/70 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {p.code ? `${p.code}` : ''}
+                        {p.city ? `${p.code ? ' · ' : ''}${p.city}` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {p.code ? `${p.code}` : ''}
-                      {p.city ? `${p.code ? ' · ' : ''}${p.city}` : ''}
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-emerald-700">
+                      {formatCurrency(p.totalValue || 0)}
                     </p>
+                    <p className="text-xs text-slate-500">Valor Entregue</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-emerald-700">
-                    {formatCurrency(p.totalValue || 0)}
-                  </p>
-                  <p className="text-xs text-slate-500">Valor Entregue</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

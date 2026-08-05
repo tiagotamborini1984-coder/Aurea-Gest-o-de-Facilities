@@ -169,7 +169,7 @@ async function getPlantInventoryValue(clientId: string): Promise<any[]> {
   const { data: requests, error: reqError } = await supabase
     .from('inventory_requests')
     .select(
-      'plant_id, status, items:inventory_request_items(quantity, product:inventory_products(item_value))',
+      'plant_id, status, items:inventory_request_items(quantity, product:inventory_products(item_value, is_active))',
     )
     .eq('client_id', clientId)
     .eq('status', 'Entregue')
@@ -180,6 +180,7 @@ async function getPlantInventoryValue(clientId: string): Promise<any[]> {
     const plantId = req.plant_id
     if (!plantId) return
     const itemsValue = (req.items || []).reduce((sum: number, item: any) => {
+      if (item.product?.is_active === false) return sum
       const qty = item.quantity || 0
       const val = item.product?.item_value || 0
       return sum + qty * val
