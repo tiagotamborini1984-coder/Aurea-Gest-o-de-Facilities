@@ -158,13 +158,39 @@ async function getRequests(clientId: string): Promise<any[]> {
 }
 
 async function getPlantInventoryValue(clientId: string): Promise<any[]> {
-  const { data, error } = await supabase
+  const { data: plants, error: plantsError } = await supabase
     .from('plants')
     .select('*')
     .eq('client_id', clientId)
     .order('name')
-  if (error) throw error
-  return (data || []).map((p) => ({ ...p, totalValue: 0 }))
+  if (plantsError) throw plantsError
+  if (!plants || plants.length === 0) return []
+
+  const { data: requests, error: reqError } = await supabase
+    .from('inventory_requests')
+    .select(
+      'plant_id, status, items:inventory_request_items(quantity, product:inventory_products(item_value))',
+    )
+    .eq('client_id', clientId)
+    .eq('status', 'Entregue')
+  if (reqError) throw reqError
+
+  const plantValues: Record<string, number> = {}
+  ;(requests || []).forEach((req: any) => {
+    const plantId = req.plant_id
+    if (!plantId) return
+    const itemsValue = (req.items || []).reduce((sum: number, item: any) => {
+      const qty = item.quantity || 0
+      const val = item.product?.item_value || 0
+      return sum + qty * val
+    }, 0)
+    plantValues[plantId] = (plantValues[plantId] || 0) + itemsValue
+  })
+
+  return (plants || []).map((p) => ({
+    ...p,
+    totalValue: plantValues[p.id] || 0,
+  }))
 }
 
 async function deleteRequest(requestId: string): Promise<void> {
