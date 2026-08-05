@@ -69,7 +69,6 @@ export default function DashboardEstoque() {
   })
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
-  const [excludedCategories, setExcludedCategories] = useState<string[]>([])
   const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set())
 
   const loadData = async () => {
@@ -207,17 +206,6 @@ export default function DashboardEstoque() {
       .map((category) => ({ category, count: map[category] }))
       .sort((a, b) => b.count - a.count)
   }, [activeProducts])
-
-  const visibleCategoryBreakdown = useMemo(
-    () => categoryBreakdown.filter((c) => !excludedCategories.includes(c.category)),
-    [categoryBreakdown, excludedCategories],
-  )
-
-  const toggleCategoryExclusion = (category: string) => {
-    setExcludedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category],
-    )
-  }
 
   const visibleCategoryBreakdown = useMemo(
     () => categoryBreakdown.filter((c) => !excludedCategories.has(c.category)),
