@@ -115,7 +115,8 @@ export default function DashboardBudget() {
   }
 
   const totalForecast = data?.totalForecast ?? 0
-  const variance = data ? totalForecast - data.totalRealized : 0
+  const variance = data ? data.totalBudgeted - data.totalRealized : 0
+  const forecastVariance = data ? totalForecast - data.totalRealized : 0
   const pctUsed = data?.totalBudgeted ? (data.totalRealized / data.totalBudgeted) * 100 : 0
 
   return (
@@ -298,7 +299,7 @@ export default function DashboardBudget() {
           </div>
 
           {/* KPIs */}
-          <div className="grid gap-4 md:grid-cols-5 mb-6">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6 mb-6">
             <Card className="shadow-sm border-blue-200/50 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10">
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
@@ -350,7 +351,7 @@ export default function DashboardBudget() {
                   <p
                     className={`text-sm font-semibold ${variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
                   >
-                    Diferença (Saldo)
+                    Saldo (Orçado − Realizado)
                   </p>
                   <div
                     className={`p-1.5 rounded-md ${variance < 0 ? 'bg-red-100 dark:bg-red-900/50' : 'bg-emerald-100 dark:bg-emerald-900/50'}`}
@@ -363,6 +364,30 @@ export default function DashboardBudget() {
                 <h3 className="text-2xl font-bold text-foreground">
                   {variance < 0 && '- '}
                   {formatBRL(Math.abs(variance))}
+                </h3>
+              </CardContent>
+            </Card>
+            <Card
+              className={`shadow-sm ${forecastVariance < 0 ? 'border-red-200/50 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10' : 'border-emerald-200/50 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-900/10'}`}
+            >
+              <CardContent className="pt-6 flex flex-col justify-between h-full">
+                <div className="flex justify-between items-start mb-4">
+                  <p
+                    className={`text-sm font-semibold ${forecastVariance < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
+                  >
+                    Saldo (Forecast − Realizado)
+                  </p>
+                  <div
+                    className={`p-1.5 rounded-md ${forecastVariance < 0 ? 'bg-red-100 dark:bg-red-900/50' : 'bg-emerald-100 dark:bg-emerald-900/50'}`}
+                  >
+                    <AlertTriangle
+                      className={`h-4 w-4 ${forecastVariance < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
+                    />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-foreground">
+                  {forecastVariance < 0 && '- '}
+                  {formatBRL(Math.abs(forecastVariance))}
                 </h3>
               </CardContent>
             </Card>
