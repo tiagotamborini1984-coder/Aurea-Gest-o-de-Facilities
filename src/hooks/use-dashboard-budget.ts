@@ -68,6 +68,7 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
 
         let totalBudgeted = 0
         let totalRealized = 0
+        let totalForecast = 0
 
         const monthlyDataMap: Record<
           string,
@@ -85,8 +86,10 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
           const budgeted = Number(entry.budgeted_amount) || 0
           const realized = Number(entry.realized_amount) || 0
 
+          const forecast = Number(entry.forecast_amount) || 0
           totalBudgeted += budgeted
           totalRealized += realized
+          totalForecast += forecast
 
           const month = entry.reference_month
           if (!monthlyDataMap[month]) monthlyDataMap[month] = { month, budgeted: 0, realized: 0 }
@@ -140,12 +143,13 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
             ? { cc: criticalCC, pct: (maxOver - 100).toFixed(1), account: criticalAcc }
             : null,
           warning: warningCC ? { cc: warningCC, pct: warnPct.toFixed(1) } : null,
-          forecast: totalRealized > 0 ? totalRealized * 1.05 : 0,
+          forecast: totalForecast,
         }
 
         setData({
           totalBudgeted,
           totalRealized,
+          totalForecast,
           monthlyData: Object.values(monthlyDataMap).sort((a, b) => a.month.localeCompare(b.month)),
           accountData: Object.values(accountDataMap).sort((a, b) => b.budgeted - a.budgeted),
           costCenterData: Object.values(costCenterDataMap).sort((a, b) => b.budgeted - a.budgeted),

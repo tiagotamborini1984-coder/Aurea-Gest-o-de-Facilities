@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Sparkles,
   AlertCircle,
+  LineChart,
 } from 'lucide-react'
 import {
   ChartContainer,
@@ -113,7 +114,8 @@ export default function DashboardBudget() {
     )
   }
 
-  const variance = data ? data.totalBudgeted - data.totalRealized : 0
+  const totalForecast = data?.totalForecast ?? 0
+  const variance = data ? totalForecast - data.totalRealized : 0
   const pctUsed = data?.totalBudgeted ? (data.totalRealized / data.totalBudgeted) * 100 : 0
 
   return (
@@ -280,8 +282,8 @@ export default function DashboardBudget() {
                     <TrendingUp className="h-4 w-4" /> Aurea AI Forecast (Mês Seguinte)
                   </h4>
                   <p className="text-sm text-muted-foreground mb-4 h-10 line-clamp-2">
-                    Projeção de gastos para o próximo mês: {formatBRL(data.insights.forecast)}.
-                    Baseado no KPI Orçado x Realizado atual.
+                    Valor de forecast cadastrado: {formatBRL(data.insights.forecast)}. Baseado nos
+                    lançamentos de forecast do período selecionado.
                   </p>
                   <Button
                     variant="outline"
@@ -296,7 +298,7 @@ export default function DashboardBudget() {
           </div>
 
           {/* KPIs */}
-          <div className="grid gap-4 md:grid-cols-4 mb-6">
+          <div className="grid gap-4 md:grid-cols-5 mb-6">
             <Card className="shadow-sm border-blue-200/50 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10">
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
@@ -325,6 +327,19 @@ export default function DashboardBudget() {
                 <h3 className="text-2xl font-bold text-foreground">
                   {formatBRL(data.totalRealized)}
                 </h3>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm border-purple-200/50 dark:border-purple-900/50 bg-purple-50/50 dark:bg-purple-900/10">
+              <CardContent className="pt-6 flex flex-col justify-between h-full">
+                <div className="flex justify-between items-start mb-4">
+                  <p className="text-sm font-semibold text-purple-700 dark:text-purple-400">
+                    Total Forecast
+                  </p>
+                  <div className="p-1.5 bg-purple-100 dark:bg-purple-900/50 rounded-md">
+                    <LineChart className="h-4 w-4 text-purple-700 dark:text-purple-400" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-foreground">{formatBRL(totalForecast)}</h3>
               </CardContent>
             </Card>
             <Card
