@@ -1,0 +1,1 @@
+ALTER TABLE public.budget_entries ADD COLUMN IF NOT EXISTS forecast_amount NUMERIC NOT NULL DEFAULT 0;

@@ -107,7 +107,9 @@ export default function Lancamentos() {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
   const [accPopoverOpen, setAccPopoverOpen] = useState(false)
 
-  const [entries, setEntries] = useState<Record<string, { budgeted: string; realized: string }>>({})
+  const [entries, setEntries] = useState<
+    Record<string, { budgeted: string; realized: string; forecast: string }>
+  >({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -234,20 +236,25 @@ export default function Lancamentos() {
       setGlobalLastUpdated(null)
     }
 
-    const map: Record<string, { budgeted: number; realized: number }> = {}
+    const map: Record<string, { budgeted: number; realized: number; forecast: number }> = {}
     if (data) {
       data.forEach((e) => {
         if (!map[e.account_id]) {
-          map[e.account_id] = { budgeted: 0, realized: 0 }
+          map[e.account_id] = { budgeted: 0, realized: 0, forecast: 0 }
         }
         map[e.account_id].budgeted += Number(e.budgeted_amount) || 0
         map[e.account_id].realized += Number(e.realized_amount) || 0
+        map[e.account_id].forecast += Number(e.forecast_amount) || 0
       })
     }
 
-    const stringMap: Record<string, { budgeted: string; realized: string }> = {}
+    const stringMap: Record<string, { budgeted: string; realized: string; forecast: string }> = {}
     for (const [key, val] of Object.entries(map)) {
-      stringMap[key] = { budgeted: val.budgeted.toString(), realized: val.realized.toString() }
+      stringMap[key] = {
+        budgeted: val.budgeted.toString(),
+        realized: val.realized.toString(),
+        forecast: val.forecast.toString(),
+      }
     }
 
     setEntries(stringMap)
@@ -263,7 +270,7 @@ export default function Lancamentos() {
     const referenceDate = `${selectedMonths[0]}-01`
 
     const payload = accounts.map((acc) => {
-      const vals = entries[acc.id] || { budgeted: '0', realized: '0' }
+      const vals = entries[acc.id] || { budgeted: '0', realized: '0', forecast: '0' }
       return {
         client_id: activeClientId,
         cost_center_id: singleCC,
@@ -271,6 +278,7 @@ export default function Lancamentos() {
         reference_month: referenceDate,
         budgeted_amount: parseFloat(vals.budgeted) || 0,
         realized_amount: parseFloat(vals.realized) || 0,
+        forecast_amount: parseFloat(vals.forecast) || 0,
       }
     })
 
@@ -289,13 +297,14 @@ export default function Lancamentos() {
     setSaving(false)
   }
 
-  const updateEntry = (accId: string, field: 'budgeted' | 'realized', val: string) => {
+  const updateEntry = (accId: string, field: 'budgeted' | 'realized' | 'forecast', val: string) => {
     if (isReadOnly) return
     setEntries((prev) => ({
       ...prev,
       [accId]: {
         budgeted: prev[accId]?.budgeted ?? '',
         realized: prev[accId]?.realized ?? '',
+        forecast: prev[accId]?.forecast ?? '',
         [field]: val,
       },
     }))
@@ -315,13 +324,14 @@ export default function Lancamentos() {
         const vals = entries[curr.id]
         acc.budgeted += parseFloat(vals?.budgeted || '0')
         acc.realized += parseFloat(vals?.realized || '0')
+        acc.forecast += parseFloat(vals?.forecast || '0')
         return acc
       },
-      { budgeted: 0, realized: 0 },
+      { budgeted: 0, realized: 0, forecast: 0 },
     )
   }, [filteredAccounts, entries])
 
-  const totalDifference = totals.budgeted - totals.realized
+  const totalDifference = totals.forecast - totals.realized
 
   const removeMonth = (m: string) => setSelectedMonths((prev) => prev.filter((x) => x !== m))
   const addMonth = () => {
@@ -657,6 +667,21 @@ export default function Lancamentos() {
                         {formatCurrency(totals.realized)}
                       </div>
                     </TableHead>
+                    <TableHead className="w-[200px] text-right font-semibold py-5">
+                      <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
+                        Forecast
+                      </div>
+                      <div
+                        className={cn(
+                          'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
+                          totals.realized > totals.forecast
+                            ? 'text-red-800 bg-red-100 border-red-300 dark:text-red-200 dark:bg-red-900/30 dark:border-red-800'
+                            : 'text-foreground bg-background border-border',
+                        )}
+                      >
+                        {formatCurrency(totals.forecast)}
+                      </div>
+                    </TableHead>
                     <TableHead className="w-[200px] pr-6 text-right font-semibold py-5">
                       <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
                         Diferença
@@ -678,8 +703,9 @@ export default function Lancamentos() {
                   {filteredAccounts.map((acc, idx) => {
                     const budgeted = parseFloat(entries[acc.id]?.budgeted || '0')
                     const realized = parseFloat(entries[acc.id]?.realized || '0')
-                    const difference = budgeted - realized
-                    const isNegative = difference < 0 // Realizado > Orçado (Diferença negativa)
+                    const forecast = parseFloat(entries[acc.id]?.forecast || '0')
+                    const difference = forecast - realized
+                    const isNegative = difference < 0 // Realizado > Forecast (Diferença negativa)
 
                     return (
                       <TableRow
@@ -749,6 +775,34 @@ export default function Lancamentos() {
                               step="0.01"
                               value={entries[acc.id]?.realized ?? ''}
                               onChange={(e) => updateEntry(acc.id, 'realized', e.target.value)}
+                              placeholder="0.00"
+                              className={cn(
+                                'text-right font-mono text-base h-11 shadow-none',
+                                isNegative
+                                  ? 'bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-800 text-red-900 dark:text-red-400 font-bold placeholder:text-red-400 dark:placeholder:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/40 focus:border-red-400 dark:focus:border-red-600'
+                                  : 'bg-background/70 border-input focus:bg-background',
+                              )}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right py-4">
+                          {isReadOnly ? (
+                            <span
+                              className={cn(
+                                'font-mono text-base block py-2',
+                                isNegative
+                                  ? 'text-red-700 dark:text-red-400 font-bold'
+                                  : 'text-foreground',
+                              )}
+                            >
+                              {formatCurrency(forecast)}
+                            </span>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={entries[acc.id]?.forecast ?? ''}
+                              onChange={(e) => updateEntry(acc.id, 'forecast', e.target.value)}
                               placeholder="0.00"
                               className={cn(
                                 'text-right font-mono text-base h-11 shadow-none',
