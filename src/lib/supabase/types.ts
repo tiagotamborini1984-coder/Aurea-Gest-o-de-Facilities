@@ -467,6 +467,7 @@ export type Database = {
           client_id: string
           cost_center_id: string
           created_at: string
+          forecast_amount: number
           id: string
           realized_amount: number
           reference_month: string
@@ -478,6 +479,7 @@ export type Database = {
           client_id: string
           cost_center_id: string
           created_at?: string
+          forecast_amount?: number
           id?: string
           realized_amount?: number
           reference_month: string
@@ -489,6 +491,7 @@ export type Database = {
           client_id?: string
           cost_center_id?: string
           created_at?: string
+          forecast_amount?: number
           id?: string
           realized_amount?: number
           reference_month?: string

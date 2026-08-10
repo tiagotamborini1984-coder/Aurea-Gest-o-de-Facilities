@@ -654,21 +654,6 @@ export default function Lancamentos() {
                     </TableHead>
                     <TableHead className="w-[200px] text-right font-semibold py-5">
                       <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
-                        Realizado
-                      </div>
-                      <div
-                        className={cn(
-                          'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
-                          totals.realized > totals.budgeted
-                            ? 'text-red-800 bg-red-100 border-red-300 dark:text-red-200 dark:bg-red-900/30 dark:border-red-800'
-                            : 'text-foreground bg-background border-border',
-                        )}
-                      >
-                        {formatCurrency(totals.realized)}
-                      </div>
-                    </TableHead>
-                    <TableHead className="w-[200px] text-right font-semibold py-5">
-                      <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
                         Forecast
                       </div>
                       <div
@@ -680,6 +665,21 @@ export default function Lancamentos() {
                         )}
                       >
                         {formatCurrency(totals.forecast)}
+                      </div>
+                    </TableHead>
+                    <TableHead className="w-[200px] text-right font-semibold py-5">
+                      <div className="text-foreground mb-2 text-[15px] uppercase tracking-wider">
+                        Realizado
+                      </div>
+                      <div
+                        className={cn(
+                          'text-[15px] font-bold px-3 py-1.5 rounded-md shadow-sm border inline-block',
+                          totals.realized > totals.budgeted
+                            ? 'text-red-800 bg-red-100 border-red-300 dark:text-red-200 dark:bg-red-900/30 dark:border-red-800'
+                            : 'text-foreground bg-background border-border',
+                        )}
+                      >
+                        {formatCurrency(totals.realized)}
                       </div>
                     </TableHead>
                     <TableHead className="w-[200px] pr-6 text-right font-semibold py-5">
@@ -767,14 +767,14 @@ export default function Lancamentos() {
                                   : 'text-foreground',
                               )}
                             >
-                              {formatCurrency(realized)}
+                              {formatCurrency(forecast)}
                             </span>
                           ) : (
                             <Input
                               type="number"
                               step="0.01"
-                              value={entries[acc.id]?.realized ?? ''}
-                              onChange={(e) => updateEntry(acc.id, 'realized', e.target.value)}
+                              value={entries[acc.id]?.forecast ?? ''}
+                              onChange={(e) => updateEntry(acc.id, 'forecast', e.target.value)}
                               placeholder="0.00"
                               className={cn(
                                 'text-right font-mono text-base h-11 shadow-none',
@@ -795,14 +795,14 @@ export default function Lancamentos() {
                                   : 'text-foreground',
                               )}
                             >
-                              {formatCurrency(forecast)}
+                              {formatCurrency(realized)}
                             </span>
                           ) : (
                             <Input
                               type="number"
                               step="0.01"
-                              value={entries[acc.id]?.forecast ?? ''}
-                              onChange={(e) => updateEntry(acc.id, 'forecast', e.target.value)}
+                              value={entries[acc.id]?.realized ?? ''}
+                              onChange={(e) => updateEntry(acc.id, 'realized', e.target.value)}
                               placeholder="0.00"
                               className={cn(
                                 'text-right font-mono text-base h-11 shadow-none',
