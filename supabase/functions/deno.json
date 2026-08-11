@@ -1,18 +1,18 @@
 {
   "_versions": {
     "create-user": 9,
-    "email-reports": 98,
-    "package-notifications": 98,
-    "update-user-password": 98,
-    "delete-user": 97,
-    "process-recurring-audits": 39,
+    "email-reports": 99,
+    "package-notifications": 99,
+    "update-user-password": 99,
+    "delete-user": 98,
+    "process-recurring-audits": 40,
     "process-preventive-maintenance": 5,
-    "handle-subscription-webhook": 97,
-    "maintenance-ai-advisor": 97,
-    "import-products": 100,
-    "import-tickets": 95,
-    "import-budget-entries": 52,
-    "diagnose-catalog": 34,
+    "handle-subscription-webhook": 98,
+    "maintenance-ai-advisor": 98,
+    "import-products": 101,
+    "import-tickets": 96,
+    "import-budget-entries": 53,
+    "diagnose-catalog": 35,
     "process-vacation-completion": 1
   }
 }
