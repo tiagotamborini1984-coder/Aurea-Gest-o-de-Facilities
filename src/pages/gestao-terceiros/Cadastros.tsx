@@ -431,7 +431,73 @@ export default function Cadastros() {
           return { success: false, error }
         }}
         onRemove={async (id: string) => {
-          if (type === 'colaboradores' || type === 'equipamentos') {
+          if (type === 'colaboradores') {
+            const { data: emp } = await supabase
+              .from('employees')
+              .select(
+                'name, registration_number, plant_id, company_name, client_id, company_id, function_id, location_id',
+              )
+              .eq('id', id)
+              .single()
+
+            if (emp) {
+              const refMonth = `${selectedMonth}-01`
+
+              let monthQuery = supabase
+                .from('employees')
+                .select('id')
+                .eq('plant_id', emp.plant_id)
+                .eq('reference_month', refMonth)
+
+              if (emp.registration_number) {
+                monthQuery = monthQuery.eq('registration_number', emp.registration_number)
+              } else {
+                monthQuery = monthQuery.eq('name', emp.name)
+              }
+
+              const { data: monthRecords } = await monthQuery
+
+              if (monthRecords && monthRecords.length > 0) {
+                let updateQuery = supabase
+                  .from('employees')
+                  .update({ status: 'Inativo', updated_at: new Date().toISOString() })
+                  .eq('plant_id', emp.plant_id)
+                  .eq('reference_month', refMonth)
+
+                if (emp.registration_number) {
+                  updateQuery = updateQuery.eq('registration_number', emp.registration_number)
+                } else {
+                  updateQuery = updateQuery.eq('name', emp.name)
+                  if (emp.company_name) {
+                    updateQuery = updateQuery.eq('company_name', emp.company_name)
+                  }
+                }
+
+                const { error: updateError } = await updateQuery
+                if (updateError) return { success: false, error: updateError }
+              } else {
+                const { error: insertError } = await supabase.from('employees').insert({
+                  client_id: emp.client_id,
+                  plant_id: emp.plant_id,
+                  name: emp.name,
+                  registration_number: emp.registration_number || null,
+                  company_name: emp.company_name || '',
+                  company_id: emp.company_id || null,
+                  function_id: emp.function_id || null,
+                  location_id: emp.location_id || null,
+                  reference_month: refMonth,
+                  status: 'Inativo',
+                })
+                if (insertError) return { success: false, error: insertError }
+              }
+
+              refetch()
+              return { success: true }
+            }
+            return { success: false, error: { message: 'Colaborador não encontrado.' } }
+          }
+
+          if (type === 'equipamentos') {
             const { error } = await supabase
               .from(config.tableName)
               .update({ status: 'Inativo' })

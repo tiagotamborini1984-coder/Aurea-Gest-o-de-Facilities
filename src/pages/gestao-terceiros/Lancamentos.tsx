@@ -220,7 +220,7 @@ export default function Lancamentos() {
             'id, name, company_name, company_id, function_id, status, registration_number, reference_month, location_id, created_at',
           )
           .eq('plant_id', selectedPlant)
-          .eq('status', 'Ativo')
+          .lte('reference_month', refMonth)
 
         const { data: emps, error: empsError } = await empsQuery
 
@@ -237,30 +237,32 @@ export default function Lancamentos() {
 
           const uniqueEmpsMap = new Map()
           Array.from(grouped.values()).forEach((group) => {
-            const activeGroup = group.filter((e) => e.status === 'Ativo')
-            if (activeGroup.length === 0) return
-
-            activeGroup.sort((a, b) => {
-              const aHasLog = staffLogIds.includes(a.id) ? 0 : 1
-              const bHasLog = staffLogIds.includes(b.id) ? 0 : 1
-              if (aHasLog !== bHasLog) return aHasLog - bHasLog
-
+            group.sort((a, b) => {
               const aRefMatch = a.reference_month === refMonth ? 0 : 1
               const bRefMatch = b.reference_month === refMonth ? 0 : 1
               if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
 
-              return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+              const aBefore = a.reference_month <= refMonth ? 0 : 1
+              const bBefore = b.reference_month <= refMonth ? 0 : 1
+              if (aBefore !== bBefore) return aBefore - bBefore
+
+              return (
+                new Date(b.reference_month || 0).getTime() -
+                new Date(a.reference_month || 0).getTime()
+              )
             })
 
-            uniqueEmpsMap.set(activeGroup[0].id, activeGroup[0])
+            const best = group[0]
+            if (best.status === 'Ativo') {
+              uniqueEmpsMap.set(best.id, best)
+            }
           })
           fetchedEmps = Array.from(uniqueEmpsMap.values())
         }
       }
 
       if (fetchedEmps && fetchedEmps.length > 0) {
-        const activeOnlyEmps = fetchedEmps.filter((e: any) => e?.status === 'Ativo')
-        const uniqueEmps = activeOnlyEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        const uniqueEmps = fetchedEmps.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         if (!isActive) return
         setEmployees(uniqueEmps)
         // Evaluate training statuses considering the historical selected date
