@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   CalendarIcon,
   Building2,
+  Sparkles,
+  Lock,
 } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
@@ -83,6 +85,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { ForecastAgentDialog } from '@/components/gestao-budget/ForecastAgentDialog'
 
 export default function Lancamentos() {
   const { profile } = useAppStore()
@@ -112,6 +115,7 @@ export default function Lancamentos() {
   >({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [forecastAgentOpen, setForecastAgentOpen] = useState(false)
 
   const activeClientId = profile?.role === 'Master' ? selectedClient : profile?.client_id
 
@@ -356,23 +360,42 @@ export default function Lancamentos() {
           </p>
         </div>
 
-        {profile?.role === 'Master' && (
-          <div className="flex items-center gap-3 bg-card p-2 rounded-lg border border-border shadow-sm w-full md:w-auto">
-            <Building2 className="h-5 w-5 text-muted-foreground ml-2 shrink-0" />
-            <Select value={selectedClient} onValueChange={setSelectedClient}>
-              <SelectTrigger className="w-full md:w-[280px] border-0 shadow-none focus:ring-0 text-base h-10 bg-transparent">
-                <SelectValue placeholder="Selecione um cliente..." />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="text-base py-2">
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+          {profile?.role === 'Master' && (
+            <div className="flex items-center gap-3 bg-card p-2 rounded-lg border border-border shadow-sm w-full md:w-auto">
+              <Building2 className="h-5 w-5 text-muted-foreground ml-2 shrink-0" />
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger className="w-full md:w-[280px] border-0 shadow-none focus:ring-0 text-base h-10 bg-transparent">
+                  <SelectValue placeholder="Selecione um cliente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id} className="text-base py-2">
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => setForecastAgentOpen(true)}
+            disabled={isReadOnlyProfile || selectedCCs.length === 0 || selectedMonths.length === 0}
+            title={
+              isReadOnlyProfile
+                ? 'Apenas administradores podem acionar o Agente de Previsão'
+                : selectedCCs.length === 0
+                  ? 'Selecione ao menos um centro de custo'
+                  : ''
+            }
+            className="bg-brand-vividBlue/5 border-brand-vividBlue/30 text-brand-vividBlue hover:bg-brand-vividBlue/10 h-11 px-5 whitespace-nowrap"
+          >
+            <Sparkles className="h-5 w-5 mr-2" />
+            Agente de Previsão
+            {isReadOnlyProfile && <Lock className="h-4 w-4 ml-2" />}
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-sm">
@@ -853,6 +876,18 @@ export default function Lancamentos() {
             </div>
           )}
       </Card>
+
+      <ForecastAgentDialog
+        open={forecastAgentOpen}
+        onOpenChange={setForecastAgentOpen}
+        clientId={activeClientId}
+        costCenterIds={selectedCCs}
+        accounts={accounts}
+        costCenters={costCenters}
+        selectedMonths={selectedMonths}
+        isAdmin={!isReadOnlyProfile}
+        onApplied={loadEntries}
+      />
     </div>
   )
 }
