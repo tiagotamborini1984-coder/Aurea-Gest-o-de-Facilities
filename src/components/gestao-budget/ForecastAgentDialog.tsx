@@ -143,8 +143,11 @@ export function ForecastAgentDialog({
             />
 
             <div>
-              <h3 className="text-base font-bold text-foreground mb-2">Previsão Detalhada</h3>
-              <ScrollArea className="max-h-[300px] rounded-md border">
+              <h3 className="text-base font-bold text-foreground mb-2">
+                Previsão Detalhada ({proposals.length} {proposals.length === 1 ? 'conta' : 'contas'}
+                )
+              </h3>
+              <ScrollArea className="max-h-[400px] rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/60">

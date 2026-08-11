@@ -9,6 +9,12 @@ import {
 
 export type { ForecastProposal, StudyAnalysis, ReallocationSuggestion }
 
+interface AccountRef {
+  id: string
+  name: string
+  code: string | null
+}
+
 export function useForecastAgent() {
   const [loading, setLoading] = useState(false)
   const [applying, setApplying] = useState(false)
@@ -22,8 +28,8 @@ export function useForecastAgent() {
     async (
       clientId: string,
       costCenterIds: string[],
-      accounts: { id: string; name: string; code: string | null }[],
-      costCenters: { id: string; name: string; code: string | null }[],
+      accounts: AccountRef[],
+      costCenters: AccountRef[],
       selectedMonths: string[],
     ) => {
       setLoading(true)
@@ -38,10 +44,41 @@ export function useForecastAgent() {
         .eq('client_id', clientId)
         .in('cost_center_id', costCenterIds)
 
+      const entryAccountIds = new Set((entries || []).map((e) => e.account_id))
+      const knownAccountIds = new Set(accounts.map((a) => a.id))
+      const missingAccountIds = Array.from(entryAccountIds).filter((id) => !knownAccountIds.has(id))
+
+      let mergedAccounts: AccountRef[] = accounts
+      if (missingAccountIds.length > 0) {
+        const { data: missingAccounts } = await supabase
+          .from('budget_accounts')
+          .select('id, name, code')
+          .in('id', missingAccountIds)
+
+        if (missingAccounts && missingAccounts.length > 0) {
+          const fetchedIds = new Set(missingAccounts.map((a) => a.id))
+          const stillMissing = missingAccountIds.filter((id) => !fetchedIds.has(id))
+          const stillMissingRefs: AccountRef[] = stillMissing.map((id) => ({
+            id,
+            name: `Conta ${id.substring(0, 8)}`,
+            code: null,
+          }))
+          mergedAccounts = [
+            ...accounts,
+            ...missingAccounts.map((a) => ({
+              id: a.id,
+              name: a.name,
+              code: a.code,
+            })),
+            ...stillMissingRefs,
+          ]
+        }
+      }
+
       const result = analyzeBudgetData(
         entries || [],
         costCenterIds,
-        accounts,
+        mergedAccounts,
         costCenters,
         selectedMonths,
       )

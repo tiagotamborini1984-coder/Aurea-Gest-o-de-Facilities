@@ -86,6 +86,18 @@ export function analyzeBudgetData(
     safraMonths.has((e.reference_month || '').substring(0, 7)),
   )
 
+  const entryAccountIds = new Set((entries || []).map((e) => e.account_id))
+  const accountMap = new Map<string, NameRef>()
+  for (const acc of accounts) {
+    accountMap.set(acc.id, acc)
+  }
+  for (const id of entryAccountIds) {
+    if (!accountMap.has(id)) {
+      accountMap.set(id, { id, name: `Conta ${id.substring(0, 8)}`, code: null })
+    }
+  }
+  const allAccounts = Array.from(accountMap.values())
+
   const groupMap: Record<string, { budgeted: number; realized: number; forecast: number }> = {}
   for (const e of safraEntries) {
     const key = `${e.cost_center_id}__${e.account_id}`
@@ -114,7 +126,7 @@ export function analyzeBudgetData(
       accounts: [],
     }
 
-    for (const acc of accounts) {
+    for (const acc of allAccounts) {
       const key = `${ccId}__${acc.id}`
       const g = groupMap[key] || { budgeted: 0, realized: 0, forecast: 0 }
       const remaining = Math.max(0, g.budgeted - g.realized)
