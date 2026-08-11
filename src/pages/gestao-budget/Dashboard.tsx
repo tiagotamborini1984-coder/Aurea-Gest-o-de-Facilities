@@ -299,7 +299,7 @@ export default function DashboardBudget() {
           </div>
 
           {/* KPIs */}
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6 mb-6">
+          <div className="grid gap-4 md:grid-cols-3 mb-6">
             <Card className="shadow-sm border-blue-200/50 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10">
               <CardContent className="pt-6 flex flex-col justify-between h-full">
                 <div className="flex justify-between items-start mb-4">
