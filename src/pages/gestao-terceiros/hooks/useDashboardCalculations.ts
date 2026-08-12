@@ -534,22 +534,22 @@ export function useDashboardCalculations(
         let dFallback = 0
 
         validPlants.forEach((pid) => {
+          const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
+            if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+              const validCompanyIds = new Set(
+                employees
+                  .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                  .map((e) => e.company_id),
+              )
+              if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+            }
+            return true
+          }).reduce((sum, c) => sum + c.quantity, 0)
+
+          dContracted += pCont
+          dFallback += fallbackCountByPlant.get(pid) || 0
+
           if (plantValidDatesMap[pid].has(date)) {
-            const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
-              if (selectedCompanies.length > 0 && c.type === 'colaborador') {
-                const validCompanyIds = new Set(
-                  employees
-                    .filter((e) => companiesSet.has(e.company_name) && e.company_id)
-                    .map((e) => e.company_id),
-                )
-                if (c.company_id && !validCompanyIds.has(c.company_id)) return false
-              }
-              return true
-            }).reduce((sum, c) => sum + c.quantity, 0)
-
-            dContracted += pCont
-            dFallback += fallbackCountByPlant.get(pid) || 0
-
             const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
             dPresentes += dayLogs.filter((l) => l.status).length
             dAusentes += dayLogs.filter((l) => !l.status).length
