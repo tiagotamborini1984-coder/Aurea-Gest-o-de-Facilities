@@ -47,8 +47,27 @@ export function ForecastStudySection({
   onToggleReallocation,
   isAdmin,
 }: ForecastStudySectionProps) {
+  const hasCritical = studies.some((s) => s.situation === 'critical')
+
   return (
     <div className="space-y-4">
+      {hasCritical && (
+        <div className="bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-lg p-4 animate-fade-in">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-red-900 dark:text-red-200">
+                Centros de custo com orçamento esgotado detectados
+              </p>
+              <p className="text-xs text-red-800 dark:text-red-300 mt-1">
+                Recomenda-se análise de todos os centros de custo para identificar excedentes que
+                possam ser remanejados para cobrir os déficits. Aceite as sugestões de remanejamento
+                abaixo antes de aplicar a previsão.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div>
         <h3 className="text-base font-bold text-foreground mb-3">Estudo por Centro de Custo</h3>
         <ScrollArea className="max-h-[220px] rounded-md border">
@@ -82,7 +101,12 @@ export function ForecastStudySection({
                     </div>
                     <div>
                       <span className="text-muted-foreground">Saldo: </span>
-                      <span className="font-mono font-medium text-emerald-600">
+                      <span
+                        className={cn(
+                          'font-mono font-medium',
+                          s.total_remaining > 0 ? 'text-emerald-600' : 'text-red-600',
+                        )}
+                      >
                         {formatCurrency(s.total_remaining)}
                       </span>
                     </div>

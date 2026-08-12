@@ -3,7 +3,6 @@ import { Sparkles, Loader2, Lock, CheckCircle2, AlertTriangle, CalendarDays } fr
 import { useForecastAgent } from '@/hooks/use-forecast-agent'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Dialog,
   DialogContent,
@@ -97,9 +96,9 @@ export function ForecastAgentDialog({
     }
   }
 
-  const totalRemaining = proposals.reduce((s, p) => s + p.remaining, 0)
   const totalBudgeted = proposals.reduce((s, p) => s + p.total_budgeted, 0)
   const totalRealized = proposals.reduce((s, p) => s + p.total_realized, 0)
+  const totalRemaining = Math.max(0, totalBudgeted - totalRealized)
   const numMonths = upcomingMonths.length || proposals[0]?.upcoming_months.length || 1
   const totalForecast = proposals.reduce((s, p) => s + p.monthly_forecast * numMonths, 0)
 
@@ -147,7 +146,7 @@ export function ForecastAgentDialog({
                 Previsão Detalhada ({proposals.length} {proposals.length === 1 ? 'conta' : 'contas'}
                 )
               </h3>
-              <ScrollArea className="max-h-[400px] rounded-md border">
+              <div className="max-h-[450px] overflow-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/60">
@@ -225,7 +224,7 @@ export function ForecastAgentDialog({
                     </TableRow>
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg">

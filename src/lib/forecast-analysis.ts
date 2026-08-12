@@ -126,10 +126,12 @@ export function analyzeBudgetData(
       accounts: [],
     }
 
+    const ccProposals: ForecastProposal[] = []
+
     for (const acc of allAccounts) {
       const key = `${ccId}__${acc.id}`
       const g = groupMap[key] || { budgeted: 0, realized: 0, forecast: 0 }
-      const remaining = Math.max(0, g.budgeted - g.realized)
+      const accountRemaining = Math.max(0, g.budgeted - g.realized)
       const utilRate = g.budgeted > 0 ? g.realized / g.budgeted : 0
       let monthlyForecast = 0
       let surplusAmt = 0
@@ -140,18 +142,18 @@ export function analyzeBudgetData(
         warning = 'Redução drástica necessária: 100% do orçado já realizado. Previsão zerada.'
       } else if (g.budgeted > 0 && utilRate > 0.8) {
         warning = `Atenção: ${(utilRate * 100).toFixed(0)}% do orçado já realizado. Redução necessária.`
-        monthlyForecast = upcomingMonths.length > 0 ? remaining / upcomingMonths.length : 0
+        monthlyForecast = upcomingMonths.length > 0 ? accountRemaining / upcomingMonths.length : 0
       } else if (g.budgeted > 0 && utilRate < 0.5) {
         hasSurplus = true
-        surplusAmt = remaining * (1 - utilRate)
+        surplusAmt = accountRemaining * (1 - utilRate)
         monthlyForecast =
-          upcomingMonths.length > 0 ? (remaining - surplusAmt) / upcomingMonths.length : 0
+          upcomingMonths.length > 0 ? (accountRemaining - surplusAmt) / upcomingMonths.length : 0
         warning = `Excedente de ${surplusAmt.toFixed(2)}: apenas ${(utilRate * 100).toFixed(0)}% utilizado. Possível remanejamento.`
       } else {
-        monthlyForecast = upcomingMonths.length > 0 ? remaining / upcomingMonths.length : 0
+        monthlyForecast = upcomingMonths.length > 0 ? accountRemaining / upcomingMonths.length : 0
       }
 
-      proposals.push({
+      const proposal: ForecastProposal = {
         cost_center_id: ccId,
         cost_center_name: ccName,
         account_id: acc.id,
@@ -159,17 +161,19 @@ export function analyzeBudgetData(
         account_code: acc.code,
         total_budgeted: g.budgeted,
         total_realized: g.realized,
-        remaining,
+        remaining: accountRemaining,
         monthly_forecast: monthlyForecast,
         upcoming_months: upcomingMonths,
         warning,
         has_surplus: hasSurplus,
-      })
+      }
+
+      proposals.push(proposal)
+      ccProposals.push(proposal)
 
       const s = ccMap[ccId]
       s.total_budgeted += g.budgeted
       s.total_realized += g.realized
-      s.total_remaining += remaining
       s.total_forecast += monthlyForecast * upcomingMonths.length
       s.total_surplus += surplusAmt
       s.accounts.push({
@@ -178,7 +182,7 @@ export function analyzeBudgetData(
         account_code: acc.code,
         budgeted: g.budgeted,
         realized: g.realized,
-        remaining,
+        remaining: accountRemaining,
         forecast: monthlyForecast,
         warning,
         has_surplus: hasSurplus,
@@ -188,15 +192,38 @@ export function analyzeBudgetData(
     }
 
     const s = ccMap[ccId]
+    s.total_remaining = Math.max(0, s.total_budgeted - s.total_realized)
+
     const ccUtil = s.total_budgeted > 0 ? s.total_realized / s.total_budgeted : 0
-    if (s.total_realized > s.total_budgeted && s.total_budgeted > 0) s.situation = 'critical'
-    else if (ccUtil > 0.8) s.situation = 'deficit'
-    else if (ccUtil < 0.5 && s.total_surplus > 0) s.situation = 'surplus'
-    else s.situation = 'healthy'
+    if (s.total_realized >= s.total_budgeted && s.total_budgeted > 0) {
+      s.situation = 'critical'
+      const overspentAmount = s.total_realized - s.total_budgeted
+      for (const p of ccProposals) {
+        p.remaining = 0
+        p.monthly_forecast = 0
+        p.warning = `Centro de custo sem saldo: realizado ≥ orçado. Déficit de R$ ${overspentAmount.toFixed(2)}.`
+      }
+      for (const acc of s.accounts) {
+        acc.remaining = 0
+        acc.forecast = 0
+      }
+      s.total_forecast = 0
+      s.warnings.push(
+        `Centro de custo ${s.cost_center_name}: orçamento totalmente consumido (déficit de R$ ${overspentAmount.toFixed(2)}). Recomenda-se análise de todos os centros de custo para identificar excedentes que possam ser remanejados para cobrir o déficit.`,
+      )
+    } else if (ccUtil > 0.8) {
+      s.situation = 'deficit'
+    } else if (ccUtil < 0.5 && s.total_surplus > 0) {
+      s.situation = 'surplus'
+    } else {
+      s.situation = 'healthy'
+    }
   }
 
   const reallocations: ReallocationSuggestion[] = []
-  const surplusCCs = Object.values(ccMap).filter((s) => s.total_surplus > 0)
+  const surplusCCs = Object.values(ccMap).filter(
+    (s) => s.total_surplus > 0 && s.situation !== 'critical',
+  )
   const deficitCCs = Object.values(ccMap).filter(
     (s) => s.situation === 'critical' || s.situation === 'deficit',
   )
@@ -204,7 +231,12 @@ export function analyzeBudgetData(
   for (const src of surplusCCs) {
     for (const dst of deficitCCs) {
       if (src.cost_center_id === dst.cost_center_id) continue
-      const dstDeficit = Math.max(0, dst.total_realized - dst.total_budgeted * 0.8)
+      let dstDeficit: number
+      if (dst.situation === 'critical') {
+        dstDeficit = Math.max(0, dst.total_realized - dst.total_budgeted)
+      } else {
+        dstDeficit = Math.max(0, dst.total_realized - dst.total_budgeted * 0.8)
+      }
       const amount = Math.min(src.total_surplus, dstDeficit)
       if (amount > 0) {
         reallocations.push({
@@ -214,7 +246,10 @@ export function analyzeBudgetData(
           to_cost_center_id: dst.cost_center_id,
           to_cost_center_name: dst.cost_center_name,
           amount,
-          reason: `${src.cost_center_name} possui excedente de ${src.total_surplus.toFixed(2)} e ${dst.cost_center_name} precisa de cobertura de ${dstDeficit.toFixed(2)}.`,
+          reason:
+            dst.situation === 'critical'
+              ? `${src.cost_center_name} possui excedente de R$ ${src.total_surplus.toFixed(2)} e ${dst.cost_center_name} está com déficit de R$ ${dstDeficit.toFixed(2)} (realizado superior ao orçado).`
+              : `${src.cost_center_name} possui excedente de R$ ${src.total_surplus.toFixed(2)} e ${dst.cost_center_name} precisa de cobertura de R$ ${dstDeficit.toFixed(2)}.`,
         })
       }
     }
