@@ -217,12 +217,31 @@ export default function Lancamentos() {
     setLoading(true)
     const referenceDates = selectedMonths.map((m) => `${m}-01`)
 
-    const { data } = await supabase
-      .from('budget_entries')
-      .select('*')
-      .eq('client_id', activeClientId)
-      .in('cost_center_id', selectedCCs)
-      .in('reference_month', referenceDates)
+    let allEntries: any[] = []
+    let page = 0
+    const pageSize = 1000
+    let hasMore = true
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('budget_entries')
+        .select('*')
+        .eq('client_id', activeClientId)
+        .in('cost_center_id', selectedCCs)
+        .in('reference_month', referenceDates)
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+
+      if (error || !data || data.length === 0) {
+        hasMore = false
+      } else {
+        allEntries = allEntries.concat(data)
+        if (data.length < pageSize) {
+          hasMore = false
+        } else {
+          page++
+        }
+      }
+    }
 
     const { data: lastUpdatedData } = await supabase
       .from('budget_entries')
@@ -240,24 +259,30 @@ export default function Lancamentos() {
       setGlobalLastUpdated(null)
     }
 
+    const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
+
     const map: Record<string, { budgeted: number; realized: number; forecast: number }> = {}
-    if (data) {
-      data.forEach((e) => {
-        if (!map[e.account_id]) {
-          map[e.account_id] = { budgeted: 0, realized: 0, forecast: 0 }
-        }
-        map[e.account_id].budgeted += Number(e.budgeted_amount) || 0
-        map[e.account_id].realized += Number(e.realized_amount) || 0
-        map[e.account_id].forecast += Number(e.forecast_amount) || 0
-      })
-    }
+    allEntries.forEach((e) => {
+      if (!map[e.account_id]) {
+        map[e.account_id] = { budgeted: 0, realized: 0, forecast: 0 }
+      }
+      map[e.account_id].budgeted = round2(
+        map[e.account_id].budgeted + (Number(e.budgeted_amount) || 0),
+      )
+      map[e.account_id].realized = round2(
+        map[e.account_id].realized + (Number(e.realized_amount) || 0),
+      )
+      map[e.account_id].forecast = round2(
+        map[e.account_id].forecast + (Number(e.forecast_amount) || 0),
+      )
+    })
 
     const stringMap: Record<string, { budgeted: string; realized: string; forecast: string }> = {}
     for (const [key, val] of Object.entries(map)) {
       stringMap[key] = {
-        budgeted: val.budgeted.toString(),
-        realized: val.realized.toString(),
-        forecast: val.forecast.toString(),
+        budgeted: val.budgeted.toFixed(2),
+        realized: val.realized.toFixed(2),
+        forecast: val.forecast.toFixed(2),
       }
     }
 
@@ -322,20 +347,27 @@ export default function Lancamentos() {
     return accounts.filter((a) => selectedAccounts.includes(a.id))
   }, [accounts, selectedAccounts])
 
+  const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
+
   const totals = useMemo(() => {
-    return filteredAccounts.reduce(
+    const raw = filteredAccounts.reduce(
       (acc, curr) => {
         const vals = entries[curr.id]
-        acc.budgeted += parseFloat(vals?.budgeted || '0')
-        acc.realized += parseFloat(vals?.realized || '0')
-        acc.forecast += parseFloat(vals?.forecast || '0')
+        acc.budgeted += parseFloat(vals?.budgeted || '0') || 0
+        acc.realized += parseFloat(vals?.realized || '0') || 0
+        acc.forecast += parseFloat(vals?.forecast || '0') || 0
         return acc
       },
       { budgeted: 0, realized: 0, forecast: 0 },
     )
+    return {
+      budgeted: round2(raw.budgeted),
+      realized: round2(raw.realized),
+      forecast: round2(raw.forecast),
+    }
   }, [filteredAccounts, entries])
 
-  const totalDifference = totals.forecast - totals.realized
+  const totalDifference = round2(totals.forecast - totals.realized)
 
   const removeMonth = (m: string) => setSelectedMonths((prev) => prev.filter((x) => x !== m))
   const addMonth = () => {
@@ -724,10 +756,10 @@ export default function Lancamentos() {
                 </TableHeader>
                 <TableBody>
                   {filteredAccounts.map((acc, idx) => {
-                    const budgeted = parseFloat(entries[acc.id]?.budgeted || '0')
-                    const realized = parseFloat(entries[acc.id]?.realized || '0')
-                    const forecast = parseFloat(entries[acc.id]?.forecast || '0')
-                    const difference = forecast - realized
+                    const budgeted = round2(parseFloat(entries[acc.id]?.budgeted || '0') || 0)
+                    const realized = round2(parseFloat(entries[acc.id]?.realized || '0') || 0)
+                    const forecast = round2(parseFloat(entries[acc.id]?.forecast || '0') || 0)
+                    const difference = round2(forecast - realized)
                     const isNegative = difference < 0 // Realizado > Forecast (Diferença negativa)
 
                     return (

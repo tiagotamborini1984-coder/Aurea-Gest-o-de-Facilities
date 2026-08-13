@@ -38,11 +38,30 @@ export function useForecastAgent() {
       setReallocations([])
       setAcceptedIds(new Set())
 
-      const { data: entries } = await supabase
-        .from('budget_entries')
-        .select('*')
-        .eq('client_id', clientId)
-        .in('cost_center_id', costCenterIds)
+      let entries: any[] = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: pageEntries } = await supabase
+          .from('budget_entries')
+          .select('*')
+          .eq('client_id', clientId)
+          .in('cost_center_id', costCenterIds)
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (!pageEntries || pageEntries.length === 0) {
+          hasMore = false
+        } else {
+          entries = entries.concat(pageEntries)
+          if (pageEntries.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
 
       const entryAccountIds = new Set((entries || []).map((e) => e.account_id))
       const knownAccountIds = new Set(accounts.map((a) => a.id))

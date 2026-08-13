@@ -100,12 +100,30 @@ export function useDashboardEstrategico(dateRange: DateRange | undefined) {
             .eq('client_id', activeClient.id)
             .gte('activity_date', startDateStr)
             .lte('activity_date', endDateStr),
-          supabase
-            .from('budget_entries')
-            .select('budgeted_amount, realized_amount')
-            .eq('client_id', activeClient.id)
-            .gte('reference_month', startDateStr)
-            .lte('reference_month', endDateStr),
+          (async () => {
+            let entries: any[] = []
+            let page = 0
+            const pageSize = 1000
+            let hasMore = true
+            while (hasMore) {
+              const { data: pageData } = await supabase
+                .from('budget_entries')
+                .select('budgeted_amount, realized_amount')
+                .eq('client_id', activeClient.id)
+                .gte('reference_month', startDateStr)
+                .lte('reference_month', endDateStr)
+                .range(page * pageSize, (page + 1) * pageSize - 1)
+
+              if (!pageData || pageData.length === 0) {
+                hasMore = false
+              } else {
+                entries = entries.concat(pageData)
+                if (pageData.length < pageSize) hasMore = false
+                else page++
+              }
+            }
+            return { data: entries }
+          })(),
           supabase.from('property_rooms').select('id, capacity').eq('client_id', activeClient.id),
           supabase
             .from('property_reservations')

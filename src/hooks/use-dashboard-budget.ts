@@ -44,27 +44,50 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
     const fetchData = async () => {
       setLoading(true)
       try {
-        let query = supabase
-          .from('budget_entries')
-          .select('*, budget_cost_centers(name), budget_accounts(name, type)')
-          .eq('client_id', activeClient.id)
+        let allEntries: any[] = []
+        let page = 0
+        const pageSize = 1000
+        let hasMore = true
 
-        if (selectedMonths.length > 0) {
-          query = query.in('reference_month', selectedMonths)
+        while (hasMore) {
+          let query = supabase
+            .from('budget_entries')
+            .select('*, budget_cost_centers(name), budget_accounts(name, type)')
+            .eq('client_id', activeClient.id)
+
+          if (selectedMonths.length > 0) {
+            query = query.in('reference_month', selectedMonths)
+          }
+
+          if (selectedCostCenters.length > 0) {
+            query = query.in('cost_center_id', selectedCostCenters)
+          }
+
+          const { data: pageEntries, error } = await query.range(
+            page * pageSize,
+            (page + 1) * pageSize - 1,
+          )
+
+          if (error) throw error
+
+          if (!pageEntries || pageEntries.length === 0) {
+            hasMore = false
+          } else {
+            allEntries = allEntries.concat(pageEntries)
+            if (pageEntries.length < pageSize) {
+              hasMore = false
+            } else {
+              page++
+            }
+          }
         }
 
-        if (selectedCostCenters.length > 0) {
-          query = query.in('cost_center_id', selectedCostCenters)
-        }
-
-        const { data: entries, error } = await query
-
-        if (error) throw error
-
-        if (!entries || entries.length === 0) {
+        if (allEntries.length === 0) {
           setData(null)
           return
         }
+
+        const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
 
         let totalBudgeted = 0
         let totalRealized = 0
@@ -82,34 +105,40 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
         > = {}
         const ccAccountMap: Record<string, Record<string, number>> = {}
 
-        entries.forEach((entry) => {
+        allEntries.forEach((entry) => {
           const budgeted = Number(entry.budgeted_amount) || 0
           const realized = Number(entry.realized_amount) || 0
 
           const forecast = Number(entry.forecast_amount) || 0
-          totalBudgeted += budgeted
-          totalRealized += realized
-          totalForecast += forecast
+          totalBudgeted = round2(totalBudgeted + budgeted)
+          totalRealized = round2(totalRealized + realized)
+          totalForecast = round2(totalForecast + forecast)
 
           const month = entry.reference_month
           if (!monthlyDataMap[month]) monthlyDataMap[month] = { month, budgeted: 0, realized: 0 }
-          monthlyDataMap[month].budgeted += budgeted
-          monthlyDataMap[month].realized += realized
+          monthlyDataMap[month].budgeted = round2(monthlyDataMap[month].budgeted + budgeted)
+          monthlyDataMap[month].realized = round2(monthlyDataMap[month].realized + realized)
 
           const accountName = (entry.budget_accounts as any)?.name || 'Desconhecida'
           if (!accountDataMap[accountName])
             accountDataMap[accountName] = { name: accountName, budgeted: 0, realized: 0 }
-          accountDataMap[accountName].budgeted += budgeted
-          accountDataMap[accountName].realized += realized
+          accountDataMap[accountName].budgeted = round2(
+            accountDataMap[accountName].budgeted + budgeted,
+          )
+          accountDataMap[accountName].realized = round2(
+            accountDataMap[accountName].realized + realized,
+          )
 
           const ccName = (entry.budget_cost_centers as any)?.name || 'Desconhecido'
           if (!costCenterDataMap[ccName])
             costCenterDataMap[ccName] = { name: ccName, budgeted: 0, realized: 0 }
-          costCenterDataMap[ccName].budgeted += budgeted
-          costCenterDataMap[ccName].realized += realized
+          costCenterDataMap[ccName].budgeted = round2(costCenterDataMap[ccName].budgeted + budgeted)
+          costCenterDataMap[ccName].realized = round2(costCenterDataMap[ccName].realized + realized)
 
           if (!ccAccountMap[ccName]) ccAccountMap[ccName] = {}
-          ccAccountMap[ccName][accountName] = (ccAccountMap[ccName][accountName] || 0) + realized
+          ccAccountMap[ccName][accountName] = round2(
+            (ccAccountMap[ccName][accountName] || 0) + realized,
+          )
         })
 
         let criticalCC = ''
