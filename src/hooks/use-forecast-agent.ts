@@ -130,14 +130,33 @@ export function useForecastAgent() {
       }
 
       const referenceDates = months.map((m) => `${m}-01`)
-      const { data: existing } = await supabase
-        .from('budget_entries')
-        .select('*')
-        .eq('client_id', clientId)
-        .in('reference_month', referenceDates)
+
+      // Paginação completa: busca todos os lançamentos existentes para os meses
+      // futuros, sem o limite padrão de 1.000, para não perder registros na
+      // montagem do existingMap (o que sobrescreveria valores com zero).
+      let existing: any[] = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+      while (hasMore) {
+        const { data: existingPage } = await supabase
+          .from('budget_entries')
+          .select('*')
+          .eq('client_id', clientId)
+          .in('reference_month', referenceDates)
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (!existingPage || existingPage.length === 0) {
+          hasMore = false
+        } else {
+          existing = existing.concat(existingPage)
+          if (existingPage.length < pageSize) hasMore = false
+          else page++
+        }
+      }
 
       const existingMap: Record<string, any> = {}
-      for (const e of existing || []) {
+      for (const e of existing) {
         existingMap[`${e.cost_center_id}__${e.account_id}__${e.reference_month}`] = e
       }
 
@@ -153,27 +172,31 @@ export function useForecastAgent() {
         ccAccCount[p.cost_center_id] = (ccAccCount[p.cost_center_id] || 0) + 1
       }
 
+      // round2 mantém a precisão de centavos ao dividir o remanejamento entre
+      // meses e contas, evitando drift acumulado que divergia do Lançamentos.
+      const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
+
       const payload = proposals.flatMap((p) => {
         const numAccs = ccAccCount[p.cost_center_id] || 1
         const ccAdjust = ccDelta[p.cost_center_id] || 0
         const rawAccDelta = ccAdjust / numAccs
-        const accDelta = Math.max(-p.remaining, rawAccDelta)
-        const adjRemaining = Math.max(0, p.remaining + accDelta)
-        const adjForecast = months.length > 0 ? adjRemaining / months.length : 0
-        const perMonthBudgetDelta = accDelta / months.length
+        const accDelta = round2(Math.max(-p.remaining, rawAccDelta))
+        const adjRemaining = round2(Math.max(0, p.remaining + accDelta))
+        const adjForecast = months.length > 0 ? round2(adjRemaining / months.length) : 0
+        const perMonthBudgetDelta = round2(accDelta / months.length)
 
         return months.map((month) => {
           const refDate = `${month}-01`
           const key = `${p.cost_center_id}__${p.account_id}__${refDate}`
           const ex = existingMap[key]
-          const baseBudgeted = Number(ex?.budgeted_amount ?? 0)
-          const realized = Number(ex?.realized_amount ?? 0)
+          const baseBudgeted = round2(Number(ex?.budgeted_amount ?? 0))
+          const realized = round2(Number(ex?.realized_amount ?? 0))
           return {
             client_id: clientId,
             cost_center_id: p.cost_center_id,
             account_id: p.account_id,
             reference_month: refDate,
-            budgeted_amount: Math.max(0, baseBudgeted + perMonthBudgetDelta),
+            budgeted_amount: round2(Math.max(0, baseBudgeted + perMonthBudgetDelta)),
             realized_amount: realized,
             forecast_amount: adjForecast,
           }

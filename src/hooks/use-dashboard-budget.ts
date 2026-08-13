@@ -13,13 +13,36 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
     if (!activeClient) return
 
     const fetchFilters = async () => {
-      const [{ data: ccData }, { data: mData }] = await Promise.all([
+      const [{ data: ccData }, mData] = await Promise.all([
         supabase
           .from('budget_cost_centers')
           .select('id, name')
           .eq('client_id', activeClient.id)
           .order('name'),
-        supabase.from('budget_entries').select('reference_month').eq('client_id', activeClient.id),
+        (async () => {
+          // Paginação completa: busca todos os registros de reference_month,
+          // sem o limite padrão de 1.000, para que nenhum mês suma do filtro.
+          let all: any[] = []
+          let page = 0
+          const pageSize = 1000
+          let hasMore = true
+          while (hasMore) {
+            const { data: pageData } = await supabase
+              .from('budget_entries')
+              .select('reference_month')
+              .eq('client_id', activeClient.id)
+              .range(page * pageSize, (page + 1) * pageSize - 1)
+
+            if (!pageData || pageData.length === 0) {
+              hasMore = false
+            } else {
+              all = all.concat(pageData)
+              if (pageData.length < pageSize) hasMore = false
+              else page++
+            }
+          }
+          return all
+        })(),
       ])
 
       setCostCenters(ccData || [])

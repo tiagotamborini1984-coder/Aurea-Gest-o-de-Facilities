@@ -78,6 +78,8 @@ export function analyzeBudgetData(
   upcomingMonths: string[]
   reallocations: ReallocationSuggestion[]
 } {
+  const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
+
   const latestMonth = [...selectedMonths].sort().pop() || new Date().toISOString().substring(0, 7)
   const upcomingMonths = generateUpcomingMonthsSafra(latestMonth)
   const safraMonths = new Set(getAgriculturalYearMonths(latestMonth))
@@ -102,9 +104,9 @@ export function analyzeBudgetData(
   for (const e of safraEntries) {
     const key = `${e.cost_center_id}__${e.account_id}`
     if (!groupMap[key]) groupMap[key] = { budgeted: 0, realized: 0, forecast: 0 }
-    groupMap[key].budgeted += Number(e.budgeted_amount) || 0
-    groupMap[key].realized += Number(e.realized_amount) || 0
-    groupMap[key].forecast += Number(e.forecast_amount) || 0
+    groupMap[key].budgeted = round2(groupMap[key].budgeted + (Number(e.budgeted_amount) || 0))
+    groupMap[key].realized = round2(groupMap[key].realized + (Number(e.realized_amount) || 0))
+    groupMap[key].forecast = round2(groupMap[key].forecast + (Number(e.forecast_amount) || 0))
   }
 
   const proposals: ForecastProposal[] = []
@@ -131,7 +133,7 @@ export function analyzeBudgetData(
     for (const acc of allAccounts) {
       const key = `${ccId}__${acc.id}`
       const g = groupMap[key] || { budgeted: 0, realized: 0, forecast: 0 }
-      const accountRemaining = Math.max(0, g.budgeted - g.realized)
+      const accountRemaining = round2(Math.max(0, g.budgeted - g.realized))
       const utilRate = g.budgeted > 0 ? g.realized / g.budgeted : 0
       let monthlyForecast = 0
       let surplusAmt = 0
@@ -142,15 +144,19 @@ export function analyzeBudgetData(
         warning = 'Redução drástica necessária: 100% do orçado já realizado. Previsão zerada.'
       } else if (g.budgeted > 0 && utilRate > 0.8) {
         warning = `Atenção: ${(utilRate * 100).toFixed(0)}% do orçado já realizado. Redução necessária.`
-        monthlyForecast = upcomingMonths.length > 0 ? accountRemaining / upcomingMonths.length : 0
+        monthlyForecast =
+          upcomingMonths.length > 0 ? round2(accountRemaining / upcomingMonths.length) : 0
       } else if (g.budgeted > 0 && utilRate < 0.5) {
         hasSurplus = true
-        surplusAmt = accountRemaining * (1 - utilRate)
+        surplusAmt = round2(accountRemaining * (1 - utilRate))
         monthlyForecast =
-          upcomingMonths.length > 0 ? (accountRemaining - surplusAmt) / upcomingMonths.length : 0
+          upcomingMonths.length > 0
+            ? round2((accountRemaining - surplusAmt) / upcomingMonths.length)
+            : 0
         warning = `Excedente de ${surplusAmt.toFixed(2)}: apenas ${(utilRate * 100).toFixed(0)}% utilizado. Possível remanejamento.`
       } else {
-        monthlyForecast = upcomingMonths.length > 0 ? accountRemaining / upcomingMonths.length : 0
+        monthlyForecast =
+          upcomingMonths.length > 0 ? round2(accountRemaining / upcomingMonths.length) : 0
       }
 
       const proposal: ForecastProposal = {
@@ -162,7 +168,7 @@ export function analyzeBudgetData(
         total_budgeted: g.budgeted,
         total_realized: g.realized,
         remaining: accountRemaining,
-        monthly_forecast: monthlyForecast,
+        monthly_forecast: round2(monthlyForecast),
         upcoming_months: upcomingMonths,
         warning,
         has_surplus: hasSurplus,
@@ -172,10 +178,10 @@ export function analyzeBudgetData(
       ccProposals.push(proposal)
 
       const s = ccMap[ccId]
-      s.total_budgeted += g.budgeted
-      s.total_realized += g.realized
-      s.total_forecast += monthlyForecast * upcomingMonths.length
-      s.total_surplus += surplusAmt
+      s.total_budgeted = round2(s.total_budgeted + g.budgeted)
+      s.total_realized = round2(s.total_realized + g.realized)
+      s.total_forecast = round2(s.total_forecast + monthlyForecast * upcomingMonths.length)
+      s.total_surplus = round2(s.total_surplus + surplusAmt)
       s.accounts.push({
         account_id: acc.id,
         account_name: acc.name,
@@ -192,7 +198,7 @@ export function analyzeBudgetData(
     }
 
     const s = ccMap[ccId]
-    s.total_remaining = Math.max(0, s.total_budgeted - s.total_realized)
+    s.total_remaining = round2(Math.max(0, s.total_budgeted - s.total_realized))
 
     const ccUtil = s.total_budgeted > 0 ? s.total_realized / s.total_budgeted : 0
     if (s.total_realized >= s.total_budgeted && s.total_budgeted > 0) {

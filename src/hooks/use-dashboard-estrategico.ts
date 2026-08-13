@@ -55,81 +55,111 @@ export function useDashboardEstrategico(dateRange: DateRange | undefined) {
         const startDateStr = startDate.split('T')[0]
         const endDateStr = endDate.split('T')[0]
 
-        // Fetching real data from Supabase across modules
-        const [
-          { data: plants },
-          { data: employees },
-          { data: dailyLogs },
-          { data: tasks },
-          { data: taskStatuses },
-          { data: accidents },
-          { data: cleaningSchedules },
-          { data: budgetEntries },
-          { data: propertyRooms },
-          { data: propertyReservations },
-        ] = await Promise.all([
-          supabase
-            .from('plants')
-            .select('id, name, city')
-            .eq('client_id', activeClient.id)
-            .order('name'),
-          supabase.from('employees').select('id, plant_id').eq('client_id', activeClient.id),
-          supabase
-            .from('daily_logs')
-            .select('date, plant_id, status')
-            .eq('client_id', activeClient.id)
-            .eq('type', 'staff')
-            .gte('date', startDateStr)
-            .lte('date', endDateStr),
-          supabase
-            .from('tasks')
-            .select('id, plant_id, status_id, due_date')
-            .eq('client_id', activeClient.id)
-            .gte('created_at', startDate)
-            .lte('created_at', endDate),
-          supabase.from('task_statuses').select('id, is_terminal').eq('client_id', activeClient.id),
-          supabase
-            .from('accidents')
-            .select('id, plant_id, severity')
-            .eq('client_id', activeClient.id)
-            .gte('event_date', startDate)
-            .lte('event_date', endDate),
-          supabase
-            .from('cleaning_gardening_schedules')
-            .select('id, plant_id, status')
-            .eq('client_id', activeClient.id)
-            .gte('activity_date', startDateStr)
-            .lte('activity_date', endDateStr),
-          (async () => {
-            let entries: any[] = []
-            let page = 0
-            const pageSize = 1000
-            let hasMore = true
-            while (hasMore) {
-              const { data: pageData } = await supabase
-                .from('budget_entries')
-                .select('budgeted_amount, realized_amount')
-                .eq('client_id', activeClient.id)
-                .gte('reference_month', startDateStr)
-                .lte('reference_month', endDateStr)
-                .range(page * pageSize, (page + 1) * pageSize - 1)
-
-              if (!pageData || pageData.length === 0) {
-                hasMore = false
-              } else {
-                entries = entries.concat(pageData)
-                if (pageData.length < pageSize) hasMore = false
-                else page++
-              }
+        // Busca paginada completa: o cliente Supabase limita cada resposta a
+        // 1.000 registros, então quaisquer dados além disso seriam silenciosamente
+        // ignorados, distorcendo contagens e somatórias. `fetchAll` pagina até o fim.
+        const fetchAll = async (builder: any): Promise<any[]> => {
+          let all: any[] = []
+          let page = 0
+          const pageSize = 1000
+          let hasMore = true
+          while (hasMore) {
+            const { data: pageData, error } = await builder.range(
+              page * pageSize,
+              (page + 1) * pageSize - 1,
+            )
+            if (error) throw error
+            if (!pageData || pageData.length === 0) {
+              hasMore = false
+            } else {
+              all = all.concat(pageData)
+              if (pageData.length < pageSize) hasMore = false
+              else page++
             }
-            return { data: entries }
-          })(),
-          supabase.from('property_rooms').select('id, capacity').eq('client_id', activeClient.id),
-          supabase
-            .from('property_reservations')
-            .select('room_id, check_in_date, check_out_date, status')
-            .eq('client_id', activeClient.id)
-            .eq('status', 'Confirmada'),
+          }
+          return all
+        }
+
+        // Fetching real data from Supabase across modules (paginação completa)
+        const [
+          plants,
+          employees,
+          dailyLogs,
+          tasks,
+          taskStatuses,
+          accidents,
+          cleaningSchedules,
+          budgetEntries,
+          propertyRooms,
+          propertyReservations,
+        ] = await Promise.all([
+          fetchAll(
+            supabase
+              .from('plants')
+              .select('id, name, city')
+              .eq('client_id', activeClient.id)
+              .order('name'),
+          ),
+          fetchAll(
+            supabase.from('employees').select('id, plant_id').eq('client_id', activeClient.id),
+          ),
+          fetchAll(
+            supabase
+              .from('daily_logs')
+              .select('date, plant_id, status')
+              .eq('client_id', activeClient.id)
+              .eq('type', 'staff')
+              .gte('date', startDateStr)
+              .lte('date', endDateStr),
+          ),
+          fetchAll(
+            supabase
+              .from('tasks')
+              .select('id, plant_id, status_id, due_date')
+              .eq('client_id', activeClient.id)
+              .gte('created_at', startDate)
+              .lte('created_at', endDate),
+          ),
+          fetchAll(
+            supabase
+              .from('task_statuses')
+              .select('id, is_terminal')
+              .eq('client_id', activeClient.id),
+          ),
+          fetchAll(
+            supabase
+              .from('accidents')
+              .select('id, plant_id, severity')
+              .eq('client_id', activeClient.id)
+              .gte('event_date', startDate)
+              .lte('event_date', endDate),
+          ),
+          fetchAll(
+            supabase
+              .from('cleaning_gardening_schedules')
+              .select('id, plant_id, status')
+              .eq('client_id', activeClient.id)
+              .gte('activity_date', startDateStr)
+              .lte('activity_date', endDateStr),
+          ),
+          fetchAll(
+            supabase
+              .from('budget_entries')
+              .select('budgeted_amount, realized_amount')
+              .eq('client_id', activeClient.id)
+              .gte('reference_month', startDateStr)
+              .lte('reference_month', endDateStr),
+          ),
+          fetchAll(
+            supabase.from('property_rooms').select('id, capacity').eq('client_id', activeClient.id),
+          ),
+          fetchAll(
+            supabase
+              .from('property_reservations')
+              .select('room_id, check_in_date, check_out_date, status')
+              .eq('client_id', activeClient.id)
+              .eq('status', 'Confirmada'),
+          ),
         ])
 
         if (!plants || plants.length === 0) {
@@ -141,15 +171,16 @@ export function useDashboardEstrategico(dateRange: DateRange | undefined) {
           taskStatuses?.filter((s) => s.is_terminal).map((s) => s.id) || [],
         )
 
-        // Global Budget
+        // Global Budget (round2 mantém a precisão de centavos nas somatórias)
+        const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
         let totalOrcado = 0
         let totalRealizado = 0
         budgetEntries?.forEach((b) => {
-          totalOrcado += Number(b.budgeted_amount || 0)
-          totalRealizado += Number(b.realized_amount || 0)
+          totalOrcado = round2(totalOrcado + (Number(b.budgeted_amount) || 0))
+          totalRealizado = round2(totalRealizado + (Number(b.realized_amount) || 0))
         })
-        const orcadoPerPlant = plants.length > 0 ? totalOrcado / plants.length : 0
-        const realizadoPerPlant = plants.length > 0 ? totalRealizado / plants.length : 0
+        const orcadoPerPlant = plants.length > 0 ? round2(totalOrcado / plants.length) : 0
+        const realizadoPerPlant = plants.length > 0 ? round2(totalRealizado / plants.length) : 0
 
         // Global Properties Occupation
         let totalCapacity = 0
