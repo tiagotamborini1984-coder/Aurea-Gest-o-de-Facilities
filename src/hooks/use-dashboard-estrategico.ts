@@ -114,11 +114,13 @@ export function useDashboardEstrategico(dateRange: DateRange | undefined) {
           ),
           fetchAll(
             supabase
-              .from('tasks')
-              .select('id, plant_id, status_id, due_date')
+              .from('budget_entries')
+              .select('budgeted_amount, realized_amount')
               .eq('client_id', activeClient.id)
-              .gte('created_at', startDate)
-              .lte('created_at', endDate),
+              .gte('reference_month', startDateStr)
+              .lte('reference_month', endDateStr)
+              // Ordenação determinística pela PK é obrigatória ao paginar com .range().
+              .order('id'),
           ),
           fetchAll(
             supabase

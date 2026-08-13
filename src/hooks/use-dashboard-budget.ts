@@ -31,6 +31,11 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
               .from('budget_entries')
               .select('reference_month')
               .eq('client_id', activeClient.id)
+              // Ordenação determinística (pela PK) é OBRIGATÓRIA ao paginar com
+              // .range(): sem ORDER BY o Postgres pode devolver linhas em ordem
+              // distinta a cada requisição, duplicando/omitindo registros entre
+              // páginas e distorcendo as somatórias dos KPIs.
+              .order('id')
               .range(page * pageSize, (page + 1) * pageSize - 1)
 
             if (!pageData || pageData.length === 0) {
@@ -77,6 +82,11 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
             .from('budget_entries')
             .select('*, budget_cost_centers(name), budget_accounts(name, type)')
             .eq('client_id', activeClient.id)
+            // Ordenação determinística (pela PK) é OBRIGATÓRIA ao paginar com
+            // .range(): sem ORDER BY o Postgres pode devolver linhas em ordem
+            // distinta a cada requisição, duplicando/omitindo registros entre
+            // páginas e distorcendo as somatórias dos KPIs.
+            .order('id')
 
           if (selectedMonths.length > 0) {
             query = query.in('reference_month', selectedMonths)
@@ -110,6 +120,17 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
           return
         }
 
+        // Defensivo: caso a paginação ainda traga algum registro duplicado,
+        // eliminamos pela PK antes de somar. Cada lançamento deve ser contado
+        // exatamente uma vez, independentemente de quantos centros de custo e
+        // meses estejam selecionados.
+        const seenIds = new Set<string>()
+        const uniqueEntries = allEntries.filter((entry) => {
+          if (entry.id && seenIds.has(entry.id)) return false
+          if (entry.id) seenIds.add(entry.id)
+          return true
+        })
+
         const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100
 
         let totalBudgeted = 0
@@ -128,7 +149,7 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
         > = {}
         const ccAccountMap: Record<string, Record<string, number>> = {}
 
-        allEntries.forEach((entry) => {
+        uniqueEntries.forEach((entry) => {
           const budgeted = Number(entry.budgeted_amount) || 0
           const realized = Number(entry.realized_amount) || 0
 
@@ -205,6 +226,7 @@ export function useDashboardBudget(selectedMonths: string[], selectedCostCenters
           monthlyData: Object.values(monthlyDataMap).sort((a, b) => a.month.localeCompare(b.month)),
           accountData: Object.values(accountDataMap).sort((a, b) => b.budgeted - a.budgeted),
           costCenterData: Object.values(costCenterDataMap).sort((a, b) => b.budgeted - a.budgeted),
+          entryCount: uniqueEntries.length,
           insights,
         })
       } catch (error) {

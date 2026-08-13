@@ -49,6 +49,8 @@ export function useForecastAgent() {
           .select('*')
           .eq('client_id', clientId)
           .in('cost_center_id', costCenterIds)
+          // Ordenação determinística pela PK é obrigatória ao paginar com .range().
+          .order('id')
           .range(page * pageSize, (page + 1) * pageSize - 1)
 
         if (!pageEntries || pageEntries.length === 0) {
@@ -144,6 +146,8 @@ export function useForecastAgent() {
           .select('*')
           .eq('client_id', clientId)
           .in('reference_month', referenceDates)
+          // Ordenação determinística pela PK é obrigatória ao paginar com .range().
+          .order('id')
           .range(page * pageSize, (page + 1) * pageSize - 1)
 
         if (!existingPage || existingPage.length === 0) {

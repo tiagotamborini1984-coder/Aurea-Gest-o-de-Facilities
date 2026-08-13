@@ -229,6 +229,9 @@ export default function Lancamentos() {
         .eq('client_id', activeClientId)
         .in('cost_center_id', selectedCCs)
         .in('reference_month', referenceDates)
+        // Ordenação determinística pela PK é obrigatória ao paginar com .range()
+        // para evitar duplicação/omissão de registros entre páginas.
+        .order('id')
         .range(page * pageSize, (page + 1) * pageSize - 1)
 
       if (error || !data || data.length === 0) {
