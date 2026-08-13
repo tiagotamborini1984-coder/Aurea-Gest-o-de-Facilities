@@ -247,6 +247,10 @@ export default function Lancamentos() {
           const uniqueEmpsMap = new Map()
           Array.from(grouped.values()).forEach((group) => {
             group.sort((a, b) => {
+              const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+              const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+              if (aActive !== bActive) return aActive - bActive
+
               const aRefMatch = a.reference_month === refMonth ? 0 : 1
               const bRefMatch = b.reference_month === refMonth ? 0 : 1
               if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
