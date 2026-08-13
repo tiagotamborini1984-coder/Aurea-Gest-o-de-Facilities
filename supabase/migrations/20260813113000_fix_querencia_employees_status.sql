@@ -42,20 +42,20 @@ BEGIN
       LIMIT 1;
 
       IF v_existing_id IS NOT NULL THEN
+        -- Re-link any daily_logs pointing to emp_record to v_existing_id
+        UPDATE public.daily_logs
+        SET reference_id = v_existing_id
+        WHERE reference_id = emp_record.id;
+
+        -- Delete conflicting duplicate record first to avoid trigger check_duplicate_employee failure
+        DELETE FROM public.employees WHERE id = emp_record.id;
+
         -- Update existing record in v_plant_id to 'Ativo'
         UPDATE public.employees
         SET status = 'Ativo',
             client_id = COALESCE(client_id, v_client_id),
             updated_at = NOW()
         WHERE id = v_existing_id;
-
-        -- Re-link any daily_logs pointing to emp_record to v_existing_id
-        UPDATE public.daily_logs
-        SET reference_id = v_existing_id
-        WHERE reference_id = emp_record.id;
-
-        -- Delete conflicting duplicate record
-        DELETE FROM public.employees WHERE id = emp_record.id;
       ELSE
         -- Update employee to 'Ativo' and link to Querência plant
         UPDATE public.employees
