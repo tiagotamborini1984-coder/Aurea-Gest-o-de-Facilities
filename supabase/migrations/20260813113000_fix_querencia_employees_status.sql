@@ -6,6 +6,7 @@ DECLARE
   v_plant_id uuid;
   v_client_id uuid;
   emp_record RECORD;
+  v_existing_id uuid;
 BEGIN
   -- Get Querência plant ID and client ID
   SELECT id, client_id INTO v_plant_id, v_client_id
@@ -17,7 +18,7 @@ BEGIN
   IF v_plant_id IS NOT NULL THEN
     -- Loop through matching target employees
     FOR emp_record IN
-      SELECT id, name, registration_number, reference_month, status
+      SELECT id, name, registration_number, reference_month, status, plant_id
       FROM public.employees
       WHERE (
         UPPER(TRIM(name)) LIKE '%ESEQUIAS BORGES DE ASSIS%'
@@ -25,17 +26,35 @@ BEGIN
         OR UPPER(TRIM(name)) LIKE '%REINAM QUADRO DE ASSIS%'
       )
       AND (plant_id = v_plant_id OR plant_id IS NULL)
+      ORDER BY
+        CASE WHEN plant_id = v_plant_id THEN 0 ELSE 1 END,
+        CASE WHEN UPPER(TRIM(status)) = 'ATIVO' THEN 0 ELSE 1 END,
+        created_at ASC
     LOOP
-      -- Check if another active record already exists for the same employee, plant, and reference_month
-      IF EXISTS (
-        SELECT 1 FROM public.employees e
-        WHERE e.id <> emp_record.id
-          AND e.plant_id = v_plant_id
-          AND e.reference_month = emp_record.reference_month
-          AND UPPER(TRIM(e.status)) = 'ATIVO'
-          AND COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name))) = COALESCE(NULLIF(TRIM(emp_record.registration_number), ''), LOWER(TRIM(emp_record.name)))
-      ) THEN
-        -- Delete conflicting duplicate record to avoid unique constraint violations
+      -- Check if another record already exists for the same employee, plant, and reference_month (regardless of status)
+      SELECT e.id INTO v_existing_id
+      FROM public.employees e
+      WHERE e.id <> emp_record.id
+        AND e.plant_id = v_plant_id
+        AND e.reference_month = emp_record.reference_month
+        AND COALESCE(NULLIF(TRIM(e.registration_number), ''), LOWER(TRIM(e.name))) =
+            COALESCE(NULLIF(TRIM(emp_record.registration_number), ''), LOWER(TRIM(emp_record.name)))
+      LIMIT 1;
+
+      IF v_existing_id IS NOT NULL THEN
+        -- Update existing record in v_plant_id to 'Ativo'
+        UPDATE public.employees
+        SET status = 'Ativo',
+            client_id = COALESCE(client_id, v_client_id),
+            updated_at = NOW()
+        WHERE id = v_existing_id;
+
+        -- Re-link any daily_logs pointing to emp_record to v_existing_id
+        UPDATE public.daily_logs
+        SET reference_id = v_existing_id
+        WHERE reference_id = emp_record.id;
+
+        -- Delete conflicting duplicate record
         DELETE FROM public.employees WHERE id = emp_record.id;
       ELSE
         -- Update employee to 'Ativo' and link to Querência plant
@@ -48,19 +67,30 @@ BEGIN
       END IF;
     END LOOP;
 
-    -- Cleanup any remaining duplicate active records for the plant
-    DELETE FROM public.employees e1
-    WHERE e1.plant_id = v_plant_id
-      AND UPPER(TRIM(e1.status)) = 'ATIVO'
-      AND EXISTS (
-        SELECT 1 FROM public.employees e2
-        WHERE e2.id <> e1.id
-          AND e2.plant_id = e1.plant_id
-          AND e2.reference_month = e1.reference_month
-          AND COALESCE(NULLIF(TRIM(e2.registration_number), ''), LOWER(TRIM(e2.name))) = COALESCE(NULLIF(TRIM(e1.registration_number), ''), LOWER(TRIM(e1.name)))
-          AND UPPER(TRIM(e2.status)) = 'ATIVO'
-          AND (e2.updated_at > e1.updated_at OR (e2.updated_at = e1.updated_at AND e2.id > e1.id))
-      );
+    -- Cleanup any remaining duplicate records for the plant
+    FOR emp_record IN
+      SELECT e1.id, e2.id as target_id
+      FROM public.employees e1
+      JOIN public.employees e2 ON e2.id <> e1.id
+        AND e2.plant_id = e1.plant_id
+        AND e2.reference_month = e1.reference_month
+        AND COALESCE(NULLIF(TRIM(e2.registration_number), ''), LOWER(TRIM(e2.name))) =
+            COALESCE(NULLIF(TRIM(e1.registration_number), ''), LOWER(TRIM(e1.name)))
+      WHERE e1.plant_id = v_plant_id
+        AND (
+          (UPPER(TRIM(e2.status)) = 'ATIVO' AND UPPER(TRIM(e1.status)) <> 'ATIVO')
+          OR (
+            UPPER(TRIM(e2.status)) = UPPER(TRIM(e1.status))
+            AND (e2.updated_at > e1.updated_at OR (e2.updated_at = e1.updated_at AND e2.id > e1.id))
+          )
+        )
+    LOOP
+      UPDATE public.daily_logs
+      SET reference_id = emp_record.target_id
+      WHERE reference_id = emp_record.id;
+
+      DELETE FROM public.employees WHERE id = emp_record.id;
+    END LOOP;
   END IF;
 END $$;
 
