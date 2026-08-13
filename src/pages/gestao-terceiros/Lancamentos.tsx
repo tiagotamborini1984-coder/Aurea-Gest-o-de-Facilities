@@ -206,7 +206,9 @@ export default function Lancamentos() {
       if (!isActive) return
 
       if (!rpcError && rpcEmps) {
-        fetchedEmps = (rpcEmps as any[]).filter((e: any) => e?.status === 'Ativo')
+        // RPC already filters by TRIM(UPPER(status)) = 'ATIVO' and derives
+        // client_id from the plant — no need to re-filter in the frontend.
+        fetchedEmps = rpcEmps as any[]
       } else {
         // Fallback to standard query if RPC fails or doesn't exist yet
         console.warn(
@@ -214,13 +216,20 @@ export default function Lancamentos() {
           rpcError,
         )
 
+        // Derive client_id from the plant so we query the correct tenant
+        const currentPlantObj = plants.find((p) => p.id === selectedPlant)
+        const fallbackClientId = currentPlantObj?.client_id
+
         let empsQuery = supabase
           .from('employees')
           .select(
             'id, name, company_name, company_id, function_id, status, registration_number, reference_month, location_id, created_at',
           )
           .eq('plant_id', selectedPlant)
-          .lte('reference_month', refMonth)
+
+        if (fallbackClientId) {
+          empsQuery = empsQuery.eq('client_id', fallbackClientId)
+        }
 
         const { data: emps, error: empsError } = await empsQuery
 
@@ -242,10 +251,6 @@ export default function Lancamentos() {
               const bRefMatch = b.reference_month === refMonth ? 0 : 1
               if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
 
-              const aBefore = a.reference_month <= refMonth ? 0 : 1
-              const bBefore = b.reference_month <= refMonth ? 0 : 1
-              if (aBefore !== bBefore) return aBefore - bBefore
-
               return (
                 new Date(b.reference_month || 0).getTime() -
                 new Date(a.reference_month || 0).getTime()
@@ -253,7 +258,8 @@ export default function Lancamentos() {
             })
 
             const best = group[0]
-            if (best.status === 'Ativo') {
+            const bestStatus = best.status?.trim().toUpperCase()
+            if (bestStatus === 'ATIVO') {
               uniqueEmpsMap.set(best.id, best)
             }
           })
