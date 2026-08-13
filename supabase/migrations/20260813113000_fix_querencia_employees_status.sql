@@ -113,7 +113,7 @@ BEGIN
     AND (v_client_id IS NULL OR e.client_id = v_client_id)
     AND UPPER(TRIM(e.status)) = 'ATIVO';
 END;
-$;
+$$;
 
 -- Overload 2: (p_plant_id uuid, p_reference_month date, p_staff_log_ids uuid[])
 CREATE OR REPLACE FUNCTION public.get_attendance_employees(
@@ -163,7 +163,7 @@ BEGIN
     AND UPPER(TRIM(re.status)) = 'ATIVO'
   ORDER BY re.name ASC;
 END;
-$;
+$$;
 
 -- Overload 3: (p_plant_id uuid, p_reference_month character varying, p_staff_log_ids uuid[])
 CREATE OR REPLACE FUNCTION public.get_attendance_employees(
@@ -216,4 +216,4 @@ BEGIN
     AND UPPER(TRIM(re.status)) = 'ATIVO'
   ORDER BY re.name ASC;
 END;
-$;
+$$;
