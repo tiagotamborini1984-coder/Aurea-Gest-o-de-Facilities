@@ -2,34 +2,53 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 
-function addFrequency(date: Date, frequency: string): Date {
-  const d = new Date(date)
-  switch (frequency) {
-    case 'Diária':
-      d.setUTCDate(d.getUTCDate() + 1)
-      break
-    case 'Semanal':
-      d.setUTCDate(d.getUTCDate() + 7)
-      break
-    case 'Quinzenal':
-      d.setUTCDate(d.getUTCDate() + 15)
-      break
-    case 'Mensal':
-      d.setUTCMonth(d.getUTCMonth() + 1)
-      break
-    case 'Trimestral':
-      d.setUTCMonth(d.getUTCMonth() + 3)
-      break
-    case 'Semestral':
-      d.setUTCMonth(d.getUTCMonth() + 6)
-      break
-    case 'Anual':
-      d.setUTCFullYear(d.getUTCFullYear() + 1)
-      break
-    default:
-      break
-  }
+function addDaysUTC(date: Date, days: number): Date {
+  const d = new Date(date.getTime())
+  d.setUTCDate(d.getUTCDate() + days)
   return d
+}
+
+function addMonthsUTC(date: Date, months: number): Date {
+  const d = new Date(date.getTime())
+  const originalDay = d.getUTCDate()
+  d.setUTCMonth(d.getUTCMonth() + months, 1)
+  const maxDayInMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+  d.setUTCDate(Math.min(originalDay, maxDayInMonth))
+  return d
+}
+
+function addYearsUTC(date: Date, years: number): Date {
+  const d = new Date(date.getTime())
+  const originalDay = d.getUTCDate()
+  d.setUTCFullYear(d.getUTCFullYear() + years, d.getUTCMonth(), 1)
+  const maxDayInMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+  d.setUTCDate(Math.min(originalDay, maxDayInMonth))
+  return d
+}
+
+function addFrequency(date: Date, frequency: string): Date {
+  const norm = (frequency || '').trim().toLowerCase()
+  switch (norm) {
+    case 'diária':
+    case 'diaria':
+      return addDaysUTC(date, 1)
+    case 'semanal':
+      return addDaysUTC(date, 7)
+    case 'quinzenal':
+      return addDaysUTC(date, 15)
+    case 'mensal':
+      return addMonthsUTC(date, 1)
+    case 'bimestral':
+      return addMonthsUTC(date, 2)
+    case 'trimestral':
+      return addMonthsUTC(date, 3)
+    case 'semestral':
+      return addMonthsUTC(date, 6)
+    case 'anual':
+      return addYearsUTC(date, 1)
+    default:
+      return new Date(date.getTime())
+  }
 }
 
 function fmtDate(d: Date): string {
@@ -229,9 +248,16 @@ Deno.serve(async (req: Request) => {
         .in('audit_id', allIds)
         .order('created_at', { ascending: false })
 
-      const finalized = (execs || []).filter(
-        (e: any) => e.status === 'Finalizado' || e.status === 'Finalizada',
-      )
+      const finalized = (execs || [])
+        .filter((e: any) => e.status === 'Finalizado' || e.status === 'Finalizada')
+        .sort((a: any, b: any) => {
+          if (a.realization_date && b.realization_date) {
+            return new Date(b.realization_date).getTime() - new Date(a.realization_date).getTime()
+          }
+          if (a.realization_date) return -1
+          if (b.realization_date) return 1
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        })
       const lastExec = finalized[0]
       const pendingOnParent = (execs || []).find(
         (e: any) => e.audit_id === audit.id && (e.status === 'Pendente' || e.status === 'Rascunho'),
@@ -239,10 +265,20 @@ Deno.serve(async (req: Request) => {
 
       let nextDue: Date
       if (lastExec) {
-        const baseStr = lastExec.realization_date || lastExec.created_at.split('T')[0]
+        if (!lastExec.realization_date) {
+          console.log(
+            `[process-recurring-audits] Last finalized execution (${lastExec.id}) for "${audit.title}" has no realization_date. Skipping recurrence generation until realization_date is set.`,
+          )
+          skipped++
+          continue
+        }
+        const baseStr = lastExec.realization_date.split('T')[0]
         nextDue = addFrequency(new Date(baseStr + 'T00:00:00Z'), audit.frequency)
       } else {
         if (!audit.start_date) {
+          console.log(
+            `[process-recurring-audits] Audit "${audit.title}" has no start_date and no previous executions. Skipping.`,
+          )
           skipped++
           continue
         }
