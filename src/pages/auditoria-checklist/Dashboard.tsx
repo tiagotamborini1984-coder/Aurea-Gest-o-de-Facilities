@@ -43,7 +43,7 @@ import { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 
 export default function AuditoriaDashboard() {
-  const { profile } = useAppStore()
+  const { profile, activeClient } = useAppStore()
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Auditoria e Checklist')
 
@@ -57,12 +57,15 @@ export default function AuditoriaDashboard() {
 
   useEffect(() => {
     if (!profile) return
+    const targetClientId = activeClient?.id || profile.client_id
+    if (!targetClientId) return
+
     const load = async () => {
       setLoading(true)
       let query = supabase
         .from('audit_executions')
         .select('*, audits!inner(*)')
-        .eq('audits.client_id', profile.client_id)
+        .eq('audits.client_id', targetClientId)
 
       if (profile.role !== 'Administrador' && profile.role !== 'Master') {
         const authPlants = profile.authorized_plants || []
@@ -78,7 +81,7 @@ export default function AuditoriaDashboard() {
       setLoading(false)
     }
     load()
-  }, [profile])
+  }, [profile, activeClient])
 
   const filtered = useMemo(() => {
     return executions.filter((e) => {

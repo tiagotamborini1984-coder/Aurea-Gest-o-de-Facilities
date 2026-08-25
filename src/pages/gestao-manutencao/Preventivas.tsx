@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { useAppStore } from '@/store/AppContext'
 
 export default function PreventivasManutencao() {
   const [plans, setPlans] = useState<any[]>([])
@@ -34,6 +35,7 @@ export default function PreventivasManutencao() {
   const [open, setOpen] = useState(false)
   const [editPlanId, setEditPlanId] = useState<string | null>(null)
   const { user } = useAuth()
+  const { activeClient } = useAppStore()
   const [profile, setProfile] = useState<{ role: string; client_id: string } | null>(null)
 
   const [plants, setPlants] = useState<any[]>([])
@@ -70,7 +72,7 @@ export default function PreventivasManutencao() {
       loadPlans()
       loadAuxData()
     }
-  }, [user])
+  }, [user, activeClient])
 
   const loadAuxData = async () => {
     if (!user) return
@@ -84,25 +86,34 @@ export default function PreventivasManutencao() {
     if (userProfile) {
       setProfile(userProfile)
 
+      const clientId = activeClient?.id || userProfile.client_id
+
+      let pQ = supabase.from('plants').select('id, name').order('name')
+      let aQ = supabase.from('maintenance_areas').select('id, name, plant_id').order('name')
+      let asQ = supabase
+        .from('maintenance_assets')
+        .select('id, name, plant_id, area_id')
+        .order('name')
+      let typesQ = supabase.from('maintenance_types').select('id, name').order('name')
+      let prioQ = supabase.from('maintenance_priorities').select('id, name').order('name')
+      let assigneesQ = supabase.from('profiles').select('id, name, role').order('name')
+
+      if (clientId) {
+        pQ = pQ.eq('client_id', clientId)
+        aQ = aQ.eq('client_id', clientId)
+        asQ = asQ.eq('client_id', clientId)
+        typesQ = typesQ.eq('client_id', clientId)
+        prioQ = prioQ.eq('client_id', clientId)
+        assigneesQ = assigneesQ.eq('client_id', clientId)
+      }
+
       const [pRes, aRes, asRes, typesRes, prioRes, assigneesRes] = await Promise.all([
-        supabase.from('plants').select('id, name').order('name'),
-        supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
-        supabase.from('maintenance_assets').select('id, name, plant_id, area_id').order('name'),
-        supabase
-          .from('maintenance_types')
-          .select('id, name')
-          .eq('client_id', userProfile.client_id)
-          .order('name'),
-        supabase
-          .from('maintenance_priorities')
-          .select('id, name')
-          .eq('client_id', userProfile.client_id)
-          .order('name'),
-        supabase
-          .from('profiles')
-          .select('id, name, role')
-          .eq('client_id', userProfile.client_id)
-          .order('name'),
+        pQ,
+        aQ,
+        asQ,
+        typesQ,
+        prioQ,
+        assigneesQ,
       ])
 
       if (pRes.data) setPlants(pRes.data)
@@ -118,10 +129,16 @@ export default function PreventivasManutencao() {
 
   const loadPlans = async () => {
     setLoading(true)
-    const { data } = await supabase
+    let q = supabase
       .from('maintenance_preventive_plans')
       .select('*, maintenance_assets(name), maintenance_areas(name)')
       .order('created_at', { ascending: false })
+
+    if (activeClient?.id) {
+      q = q.eq('client_id', activeClient.id)
+    }
+
+    const { data } = await q
     setPlans(data || [])
     setLoading(false)
   }

@@ -71,6 +71,8 @@ export default function Lancamentos() {
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
 
+  const { selectedMasterClient } = useAppStore()
+
   useEffect(() => {
     const fetchPlants = async () => {
       if (!profile) return
@@ -80,8 +82,14 @@ export default function Lancamentos() {
 
       if (isAdmin) {
         let query = supabase.from('plants').select('id, name, client_id').order('name')
-        if (profile.role === 'Administrador' && profile.client_id) {
-          query = query.eq('client_id', profile.client_id)
+        const targetClientId =
+          profile.role === 'Master'
+            ? selectedMasterClient !== 'all'
+              ? selectedMasterClient
+              : null
+            : profile.client_id
+        if (targetClientId) {
+          query = query.eq('client_id', targetClientId)
         }
         const { data } = await query
         plantList = data || []
@@ -107,7 +115,7 @@ export default function Lancamentos() {
       }
     }
     fetchPlants()
-  }, [profile])
+  }, [profile, selectedMasterClient])
 
   useEffect(() => {
     let isActive = true

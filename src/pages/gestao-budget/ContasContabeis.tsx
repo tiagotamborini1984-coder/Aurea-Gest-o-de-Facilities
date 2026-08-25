@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 export default function ContasContabeis() {
-  const { profile } = useAppStore()
+  const { profile, activeClient, selectedMasterClient } = useAppStore()
   const { toast } = useToast()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,15 +52,22 @@ export default function ContasContabeis() {
 
   const [form, setForm] = useState({ code: '', name: '', type: 'Despesa' })
 
+  const targetClientId =
+    profile?.role === 'Master'
+      ? selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : null
+      : activeClient?.id || profile?.client_id
+
   const fetchData = async () => {
-    if (!profile?.client_id) return
     setLoading(true)
 
-    const accountsRes = await supabase
-      .from('budget_accounts')
-      .select('*')
-      .eq('client_id', profile.client_id)
-      .order('name')
+    let query = supabase.from('budget_accounts').select('*').order('name')
+    if (targetClientId) {
+      query = query.eq('client_id', targetClientId)
+    }
+
+    const accountsRes = await query
 
     if (accountsRes.error) {
       toast({ variant: 'destructive', title: 'Erro', description: accountsRes.error.message })
@@ -73,11 +80,20 @@ export default function ContasContabeis() {
 
   useEffect(() => {
     fetchData()
-  }, [profile?.client_id])
+  }, [profile, activeClient, selectedMasterClient])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name || !form.type || !profile?.client_id) {
+    if (!targetClientId) {
+      toast({
+        variant: 'destructive',
+        title: 'Atenção',
+        description: 'Você precisa selecionar um cliente específico para salvar contas contábeis.',
+      })
+      return
+    }
+
+    if (!form.name || !form.type) {
       toast({
         variant: 'destructive',
         title: 'Campos obrigatórios',
@@ -90,7 +106,7 @@ export default function ContasContabeis() {
       const { data: existing } = await supabase
         .from('budget_accounts')
         .select('id')
-        .eq('client_id', profile.client_id)
+        .eq('client_id', targetClientId)
         .eq('code', form.code)
         .maybeSingle()
 
@@ -105,7 +121,7 @@ export default function ContasContabeis() {
     }
 
     const payload = {
-      client_id: profile.client_id,
+      client_id: targetClientId,
       code: form.code || null,
       name: form.name,
       type: form.type,

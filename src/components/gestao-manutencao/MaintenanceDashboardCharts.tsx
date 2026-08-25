@@ -6,6 +6,7 @@ import { GaugeChart } from '@/components/gestao-manutencao/GaugeChart'
 import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
 import { ChartContainer } from '@/components/ui/chart'
 import { Target, CheckCircle2, BarChart3 } from 'lucide-react'
+import { useAppStore } from '@/store/AppContext'
 
 interface AreaData {
   area_id: string | null
@@ -43,6 +44,7 @@ export function MaintenanceDashboardCharts({
   dateStart: string
   dateEnd: string
 }) {
+  const { activeClient } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
 
@@ -51,7 +53,7 @@ export function MaintenanceDashboardCharts({
     const fetchData = async () => {
       setLoading(true)
       const { data, error } = await (supabase as any).rpc('get_maintenance_dashboard_metrics', {
-        p_client_id: null,
+        p_client_id: activeClient?.id || null,
         p_plant_id: selectedPlant === 'all' ? null : selectedPlant,
         p_date_start: dateStart,
         p_date_end: dateEnd,
@@ -66,7 +68,7 @@ export function MaintenanceDashboardCharts({
     return () => {
       cancelled = true
     }
-  }, [selectedPlant, dateStart, dateEnd])
+  }, [selectedPlant, dateStart, dateEnd, activeClient])
 
   const pieData = (metrics?.completed_by_area || []).filter((a) => a.count > 0)
 

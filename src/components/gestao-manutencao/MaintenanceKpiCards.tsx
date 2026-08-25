@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { supabase } from '@/lib/supabase/client'
 import { AlertCircle, Target, Clock, Wrench } from 'lucide-react'
+import { useAppStore } from '@/store/AppContext'
 
 interface KpiData {
   sla_adherence: number | null
@@ -32,6 +33,7 @@ export function MaintenanceKpiCards({
   dateStart: string
   dateEnd: string
 }) {
+  const { activeClient } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [kpi, setKpi] = useState<KpiData | null>(null)
@@ -42,7 +44,7 @@ export function MaintenanceKpiCards({
       setLoading(true)
       setError(false)
       const { data, error: err } = await supabase.rpc('get_maintenance_kpis', {
-        p_client_id: null,
+        p_client_id: activeClient?.id || null,
         p_plant_id: selectedPlant === 'all' ? null : selectedPlant,
         p_date_start: dateStart,
         p_date_end: dateEnd,
@@ -60,7 +62,7 @@ export function MaintenanceKpiCards({
     return () => {
       cancelled = true
     }
-  }, [selectedPlant, dateStart, dateEnd])
+  }, [selectedPlant, dateStart, dateEnd, activeClient])
 
   const errorContent = (
     <div className="flex items-center gap-2 text-red-500 text-sm">

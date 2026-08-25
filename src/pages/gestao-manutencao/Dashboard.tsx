@@ -17,8 +17,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { MaintenanceKpiCards } from '@/components/gestao-manutencao/MaintenanceKpiCards'
 import { MaintenanceDashboardCharts } from '@/components/gestao-manutencao/MaintenanceDashboardCharts'
 import { Input } from '@/components/ui/input'
+import { useAppStore } from '@/store/AppContext'
 
 export default function DashboardManutencao() {
+  const { activeClient } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, open: 0, planned: 0, completed: 0 })
   const [aderencia, setAderencia] = useState({
@@ -47,17 +49,21 @@ export default function DashboardManutencao() {
 
   useEffect(() => {
     loadAuxData()
-  }, [])
+  }, [activeClient])
 
   useEffect(() => {
     fetchStats()
-  }, [selectedPlant, selectedArea, dateStart, dateEnd])
+  }, [selectedPlant, selectedArea, dateStart, dateEnd, activeClient])
 
   const loadAuxData = async () => {
-    const [pRes, aRes] = await Promise.all([
-      supabase.from('plants').select('id, name').order('name'),
-      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
-    ])
+    const clientId = activeClient?.id
+    let pQ = supabase.from('plants').select('id, name').order('name')
+    let aQ = supabase.from('maintenance_areas').select('id, name, plant_id').order('name')
+    if (clientId) {
+      pQ = pQ.eq('client_id', clientId)
+      aQ = aQ.eq('client_id', clientId)
+    }
+    const [pRes, aRes] = await Promise.all([pQ, aQ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
   }
@@ -72,6 +78,7 @@ export default function DashboardManutencao() {
           priority:maintenance_priorities(sla_hours)`,
       )
 
+      if (activeClient?.id) query = query.eq('client_id', activeClient.id)
       if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
       if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
       query = query.gte('reported_at', dateStart)

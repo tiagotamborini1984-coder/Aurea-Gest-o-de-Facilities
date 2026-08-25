@@ -256,7 +256,7 @@ export function AppSidebar() {
       navItems
         .map((item) => {
           if (item.title === 'Gestão de Clientes') {
-            if (role !== 'Master') return null
+            if (role !== 'Master' || selectedMasterClient !== 'all') return null
             return item
           }
 

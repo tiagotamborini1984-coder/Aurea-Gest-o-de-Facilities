@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store/AppContext'
 
 const toLocalDatetime = (utcStr: string | null) => {
   if (!utcStr) return ''
@@ -33,6 +34,7 @@ const toLocalDatetime = (utcStr: string | null) => {
 }
 
 export default function PlanejamentoManutencao() {
+  const { activeClient } = useAppStore()
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [currentWeek, setCurrentWeek] = useState(new Date())
@@ -68,11 +70,11 @@ export default function PlanejamentoManutencao() {
 
   useEffect(() => {
     loadAuxData()
-  }, [])
+  }, [activeClient])
 
   useEffect(() => {
     loadTickets()
-  }, [selectedPlant, selectedArea, selectedAssignee])
+  }, [selectedPlant, selectedArea, selectedAssignee, activeClient])
 
   useEffect(() => {
     if (selectedTicket) {
@@ -85,11 +87,16 @@ export default function PlanejamentoManutencao() {
   }, [selectedTicket])
 
   const loadAuxData = async () => {
-    const [pRes, aRes, assignRes] = await Promise.all([
-      supabase.from('plants').select('id, name').order('name'),
-      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
-      supabase.from('profiles').select('id, name, role').order('name'),
-    ])
+    const clientId = activeClient?.id
+    let pQ = supabase.from('plants').select('id, name').order('name')
+    let aQ = supabase.from('maintenance_areas').select('id, name, plant_id').order('name')
+    let assignQ = supabase.from('profiles').select('id, name, role').order('name')
+    if (clientId) {
+      pQ = pQ.eq('client_id', clientId)
+      aQ = aQ.eq('client_id', clientId)
+      assignQ = assignQ.eq('client_id', clientId)
+    }
+    const [pRes, aRes, assignRes] = await Promise.all([pQ, aQ, assignQ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
     if (assignRes.data) setAssignees(assignRes.data)
@@ -110,6 +117,7 @@ export default function PlanejamentoManutencao() {
     `)
       .not('status.step', 'eq', 'Concluído')
 
+    if (activeClient?.id) query = query.eq('client_id', activeClient.id)
     if (selectedPlant !== 'all') query = query.eq('plant_id', selectedPlant)
     if (selectedArea !== 'all') query = query.eq('area_id', selectedArea)
     if (selectedAssignee !== 'all') query = query.eq('assignee_id', selectedAssignee)

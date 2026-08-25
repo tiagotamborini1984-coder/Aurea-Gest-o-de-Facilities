@@ -33,13 +33,20 @@ export function DocumentosForm({
     file_url: initialData?.file_url || '',
   })
 
+  const { activeClient } = useAppStore()
+
   useEffect(() => {
     const fetchPlants = async () => {
-      const { data } = await supabase.from('plants').select('id, name')
+      if (!activeClient) return
+      const { data } = await supabase
+        .from('plants')
+        .select('id, name')
+        .eq('client_id', activeClient.id)
+        .order('name')
       if (data) setPlants(data)
     }
     fetchPlants()
-  }, [])
+  }, [activeClient])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

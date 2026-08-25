@@ -53,9 +53,14 @@ export default function MeusPedidosFerias() {
   const isAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
 
   const loadPlants = useCallback(async () => {
-    const { data } = await supabase.from('plants').select('id, name').order('name')
+    if (!activeClient) return
+    const { data } = await supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient.id)
+      .order('name')
     if (data) setPlants(data)
-  }, [])
+  }, [activeClient])
 
   useEffect(() => {
     loadPlants()

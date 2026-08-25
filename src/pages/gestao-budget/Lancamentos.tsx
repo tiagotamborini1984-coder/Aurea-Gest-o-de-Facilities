@@ -88,7 +88,7 @@ import { cn } from '@/lib/utils'
 import { ForecastAgentDialog } from '@/components/gestao-budget/ForecastAgentDialog'
 
 export default function Lancamentos() {
-  const { profile } = useAppStore()
+  const { profile, activeClient, selectedMasterClient } = useAppStore()
   const { toast } = useToast()
 
   const isReadOnlyProfile = profile?.role !== 'Master' && profile?.role !== 'Administrador'
@@ -117,7 +117,12 @@ export default function Lancamentos() {
   const [saving, setSaving] = useState(false)
   const [forecastAgentOpen, setForecastAgentOpen] = useState(false)
 
-  const activeClientId = profile?.role === 'Master' ? selectedClient : profile?.client_id
+  const activeClientId =
+    profile?.role === 'Master'
+      ? selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : selectedClient
+      : activeClient?.id || profile?.client_id
 
   // Desabilita edição quando seleciona mais de 1 centro de custo ou mais de 1 mês
   const isMultiSelection = selectedCCs.length > 1 || selectedMonths.length > 1
@@ -125,23 +130,27 @@ export default function Lancamentos() {
 
   useEffect(() => {
     if (profile?.role === 'Master') {
-      supabase
-        .from('clients')
-        .select('id, name')
-        .eq('status', 'Ativo')
-        .order('name')
-        .then(({ data }) => {
-          if (data) {
-            setClients(data)
-            if (data.length > 0 && !selectedClient) {
-              setSelectedClient(data[0].id)
+      if (selectedMasterClient !== 'all' && selectedMasterClient) {
+        setSelectedClient(selectedMasterClient)
+      } else {
+        supabase
+          .from('clients')
+          .select('id, name')
+          .eq('status', 'Ativo')
+          .order('name')
+          .then(({ data }) => {
+            if (data) {
+              setClients(data)
+              if (data.length > 0 && !selectedClient) {
+                setSelectedClient(data[0].id)
+              }
             }
-          }
-        })
-    } else if (profile?.client_id) {
-      setSelectedClient(profile.client_id)
+          })
+      }
+    } else if (activeClient?.id || profile?.client_id) {
+      setSelectedClient(activeClient?.id || profile?.client_id || '')
     }
-  }, [profile, selectedClient])
+  }, [profile, selectedMasterClient, activeClient])
 
   useEffect(() => {
     if (!activeClientId) {

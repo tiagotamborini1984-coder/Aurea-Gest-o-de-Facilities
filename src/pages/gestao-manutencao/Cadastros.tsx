@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useAppStore } from '@/store/AppContext'
 
 const DISCIPLINES = [
   'Manutentor',
@@ -61,6 +62,7 @@ type Worker = {
 
 export default function CadastrosManutencao() {
   const { user } = useAuth()
+  const { activeClient } = useAppStore()
   const [areas, setAreas] = useState<any[]>([])
   const [subareas, setSubareas] = useState<any[]>([])
   const [plants, setPlants] = useState<any[]>([])
@@ -94,24 +96,47 @@ export default function CadastrosManutencao() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [activeClient])
 
   const loadData = async () => {
     setLoading(true)
+    const clientId = activeClient?.id
+
+    let plantsQuery = supabase.from('plants').select('id, name').order('name')
+    let areasQuery = supabase
+      .from('maintenance_areas')
+      .select('*, plant:plants(name)')
+      .order('name')
+    let subareasQuery = supabase
+      .from('maintenance_sublocations')
+      .select('*, area:maintenance_areas(name, plant:plants(name))')
+      .order('name')
+    let typesQuery = supabase.from('maintenance_types').select('*').order('name')
+    let prioritiesQuery = supabase.from('maintenance_priorities').select('*').order('sla_hours')
+    let workersQuery = supabase
+      .from('maintenance_workers')
+      .select('*, plant:plants(name)')
+      .order('created_at', { ascending: false })
+    let statusesQuery = supabase.from('maintenance_statuses').select('*').order('order_index')
+
+    if (clientId) {
+      plantsQuery = plantsQuery.eq('client_id', clientId)
+      areasQuery = areasQuery.eq('client_id', clientId)
+      subareasQuery = subareasQuery.eq('client_id', clientId)
+      typesQuery = typesQuery.eq('client_id', clientId)
+      prioritiesQuery = prioritiesQuery.eq('client_id', clientId)
+      workersQuery = workersQuery.eq('client_id', clientId)
+      statusesQuery = statusesQuery.eq('client_id', clientId)
+    }
+
     const [pRes, aRes, sRes, tRes, prRes, wRes, statRes] = await Promise.all([
-      supabase.from('plants').select('id, name').order('name'),
-      supabase.from('maintenance_areas').select('*, plant:plants(name)').order('name'),
-      supabase
-        .from('maintenance_sublocations')
-        .select('*, area:maintenance_areas(name, plant:plants(name))')
-        .order('name'),
-      supabase.from('maintenance_types').select('*').order('name'),
-      supabase.from('maintenance_priorities').select('*').order('sla_hours'),
-      supabase
-        .from('maintenance_workers')
-        .select('*, plant:plants(name)')
-        .order('created_at', { ascending: false }),
-      supabase.from('maintenance_statuses').select('*').order('order_index'),
+      plantsQuery,
+      areasQuery,
+      subareasQuery,
+      typesQuery,
+      prioritiesQuery,
+      workersQuery,
+      statusesQuery,
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
@@ -124,6 +149,7 @@ export default function CadastrosManutencao() {
   }
 
   const getClientId = async () => {
+    if (activeClient?.id) return activeClient.id
     const { data: profile } = await supabase
       .from('profiles')
       .select('client_id')

@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 export default function CentrosCusto() {
-  const { profile } = useAppStore()
+  const { profile, activeClient, selectedMasterClient } = useAppStore()
   const { toast } = useToast()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,16 +47,18 @@ export default function CentrosCusto() {
   const [form, setForm] = useState({ code: '', name: '' })
 
   const fetchItems = async () => {
-    const clientId = profile?.client_id || (profile?.role === 'Master' ? null : undefined)
-
-    // Evita loop de loading caso os dados do perfil ainda estejam carregando
-    if (clientId === undefined) return
+    const targetClientId =
+      profile?.role === 'Master'
+        ? selectedMasterClient !== 'all'
+          ? selectedMasterClient
+          : null
+        : activeClient?.id || profile?.client_id
 
     setLoading(true)
     let query = supabase.from('budget_cost_centers').select('*').order('name')
 
-    if (clientId) {
-      query = query.eq('client_id', clientId)
+    if (targetClientId) {
+      query = query.eq('client_id', targetClientId)
     }
 
     const { data, error } = await query
@@ -73,15 +75,24 @@ export default function CentrosCusto() {
     if (profile) {
       fetchItems()
     }
-  }, [profile])
+  }, [profile, activeClient, selectedMasterClient])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const clientId = profile?.client_id
+    const targetClientId =
+      profile?.role === 'Master'
+        ? selectedMasterClient !== 'all'
+          ? selectedMasterClient
+          : null
+        : activeClient?.id || profile?.client_id
 
-    if (!clientId && profile?.role !== 'Master') {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Cliente não identificado.' })
+    if (!targetClientId) {
+      toast({
+        variant: 'destructive',
+        title: 'Atenção',
+        description: 'Você precisa selecionar um cliente específico para salvar centros de custo.',
+      })
       return
     }
 
@@ -90,17 +101,8 @@ export default function CentrosCusto() {
       return
     }
 
-    if (!clientId) {
-      toast({
-        variant: 'destructive',
-        title: 'Atenção',
-        description: 'Você precisa estar vinculado a um cliente para salvar centros de custo.',
-      })
-      return
-    }
-
     setIsSaving(true)
-    const payload = { client_id: clientId, code: form.code, name: form.name }
+    const payload = { client_id: targetClientId, code: form.code, name: form.name }
 
     if (selectedItem) {
       const { error } = await supabase

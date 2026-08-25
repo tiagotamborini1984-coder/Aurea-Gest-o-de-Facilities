@@ -27,9 +27,14 @@ export default function FeriasDashboard() {
   const [allVacations, setAllVacations] = useState<Vacation[]>([])
 
   const loadPlants = useCallback(async () => {
-    const { data } = await supabase.from('plants').select('id, name').order('name')
+    if (!activeClient) return
+    const { data } = await supabase
+      .from('plants')
+      .select('id, name')
+      .eq('client_id', activeClient.id)
+      .order('name')
     if (data) setPlants(data)
-  }, [])
+  }, [activeClient])
 
   const loadData = useCallback(async () => {
     if (!activeClient) return

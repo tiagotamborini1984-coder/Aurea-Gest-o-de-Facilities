@@ -40,6 +40,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { useAppStore } from '@/store/AppContext'
 import { ImportTicketsDialog } from '@/components/gestao-manutencao/ImportTicketsDialog'
 import { TicketLogModal } from '@/components/gestao-manutencao/TicketLogModal'
 import { generateTicketPdf } from '@/components/gestao-manutencao/generate-ticket-pdf'
@@ -120,6 +121,7 @@ export default function ChamadosManutencao() {
   const [open, setOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const { user } = useAuth()
+  const { activeClient } = useAppStore()
   const [submitting, setSubmitting] = useState(false)
 
   const [plants, setPlants] = useState<any[]>([])
@@ -290,7 +292,7 @@ export default function ChamadosManutencao() {
 
   useEffect(() => {
     loadAuxData()
-  }, [])
+  }, [activeClient])
 
   useEffect(() => {
     if (user?.id) {
@@ -322,7 +324,7 @@ export default function ChamadosManutencao() {
     return () => {
       supabase.removeChannel(subscription)
     }
-  }, [selectedPlant])
+  }, [selectedPlant, activeClient])
 
   useEffect(() => {
     if (selectedTicket) {
@@ -358,18 +360,40 @@ export default function ChamadosManutencao() {
   }, [editForm.planned_start, editForm.planned_end, statuses])
 
   const loadAuxData = async () => {
+    const clientId = activeClient?.id
+
+    let pQ = supabase.from('plants').select('id, name').order('name')
+    let aQ = supabase.from('maintenance_areas').select('id, name, plant_id').order('name')
+    let subQ = supabase.from('maintenance_sublocations').select('id, name, area_id').order('name')
+    let asQ = supabase
+      .from('maintenance_assets')
+      .select('id, name, plant_id, area_id, sublocation_id')
+      .order('name')
+    let prioQ = supabase.from('maintenance_priorities').select('*').order('name')
+    let statQ = supabase.from('maintenance_statuses').select('*').order('order_index')
+    let tQ = supabase.from('maintenance_types').select('*').order('name')
+    let assignQ = supabase.from('profiles').select('id, name, role').order('name')
+
+    if (clientId) {
+      pQ = pQ.eq('client_id', clientId)
+      aQ = aQ.eq('client_id', clientId)
+      subQ = subQ.eq('client_id', clientId)
+      asQ = asQ.eq('client_id', clientId)
+      prioQ = prioQ.eq('client_id', clientId)
+      statQ = statQ.eq('client_id', clientId)
+      tQ = tQ.eq('client_id', clientId)
+      assignQ = assignQ.eq('client_id', clientId)
+    }
+
     const [pRes, aRes, subRes, asRes, prioRes, statRes, tRes, assignRes] = await Promise.all([
-      supabase.from('plants').select('id, name').order('name'),
-      supabase.from('maintenance_areas').select('id, name, plant_id').order('name'),
-      supabase.from('maintenance_sublocations').select('id, name, area_id').order('name'),
-      supabase
-        .from('maintenance_assets')
-        .select('id, name, plant_id, area_id, sublocation_id')
-        .order('name'),
-      supabase.from('maintenance_priorities').select('*').order('name'),
-      supabase.from('maintenance_statuses').select('*').order('order_index'),
-      supabase.from('maintenance_types').select('*').order('name'),
-      supabase.from('profiles').select('id, name, role').order('name'),
+      pQ,
+      aQ,
+      subQ,
+      asQ,
+      prioQ,
+      statQ,
+      tQ,
+      assignQ,
     ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
@@ -393,6 +417,7 @@ export default function ChamadosManutencao() {
     `)
       .order('created_at', { ascending: false })
 
+    if (activeClient?.id) q = q.eq('client_id', activeClient.id)
     if (selectedPlant !== 'all') q = q.eq('plant_id', selectedPlant)
 
     const { data } = await q
