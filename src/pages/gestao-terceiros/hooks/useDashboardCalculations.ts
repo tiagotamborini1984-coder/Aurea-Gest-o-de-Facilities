@@ -174,10 +174,11 @@ export function useDashboardCalculations(
     // O divisor do cálculo será composto exclusivamente pelo número de dias em que houve lançamentos salvos
     const globalDays = allValidDatesSet.size
 
-    // Conta total bruto de logs ativos (sem perder registros em loops de intersecção)
-    const totalPresentCount = activeLogs.filter((l) => l.status).length
-    const totalAbsentCount = activeLogs.filter((l) => !l.status).length
-    const totalLancadoCount = activeLogs.length
+    // Conta total de logs ativos considerando apenas dias úteis por planta
+    const validActiveLogs = activeLogs.filter((l) => !isPlantDateNonWorking(l.plant_id, l.date))
+    const totalPresentCount = validActiveLogs.filter((l) => l.status).length
+    const totalAbsentCount = validActiveLogs.filter((l) => !l.status).length
+    const totalLancadoCount = validActiveLogs.length
 
     let totalContractedSum = 0
     Array.from(allValidDatesSet).forEach((date) => {
@@ -709,7 +710,7 @@ export function useDashboardCalculations(
         notaGeral: count > 0 ? (sum / count).toFixed(1) : '0.0',
         absenteeismTarget,
       },
-      activeLogs,
+      activeLogs: validActiveLogs,
     }
   }, [
     logs,
