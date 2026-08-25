@@ -23,10 +23,28 @@ export function useDashboardCalculations(
   return useMemo(() => {
     // Normaliza datas para garantir que logs com timestamp sejam considerados corretamente e lidar com timezone offsets
     const normalizeDate = (d: string) => {
+      if (!d) return ''
       if (d.includes('T')) {
         return format(parseISO(d), 'yyyy-MM-dd')
       }
       return d
+    }
+
+    // Mapeamento de datas não úteis por planta
+    const nonWorkingDatesByPlant: Record<string, Set<string>> = {}
+    if (nonWorkingDays && nonWorkingDays.length > 0) {
+      nonWorkingDays.forEach((nwd: any) => {
+        if (!nwd.plant_id || !nwd.date) return
+        const nDate = normalizeDate(nwd.date)
+        if (!nonWorkingDatesByPlant[nwd.plant_id]) {
+          nonWorkingDatesByPlant[nwd.plant_id] = new Set<string>()
+        }
+        nonWorkingDatesByPlant[nwd.plant_id].add(nDate)
+      })
+    }
+
+    const isPlantDateNonWorking = (plantId: string, date: string) => {
+      return nonWorkingDatesByPlant[plantId]?.has(date) ?? false
     }
 
     const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
@@ -106,6 +124,7 @@ export function useDashboardCalculations(
     const getValidDatesForPlant = (pid: string) => {
       const valid = new Set<string>()
       allDatesInPeriod.forEach((date) => {
+        if (isPlantDateNonWorking(pid, date)) return
         const hasLogs = plantDateHasLogs[`${pid}_${date}`]
         if (hasLogs) {
           valid.add(date)
@@ -273,6 +292,7 @@ export function useDashboardCalculations(
         }
 
         const dailyTrend = Array.from(pValidDates)
+          .filter((date) => !isPlantDateNonWorking(plant.id, date))
           .sort()
           .map((date) => {
             const dCont = getApplicableContracted(plant.id, typeCont, date, (c) => {
@@ -384,6 +404,7 @@ export function useDashboardCalculations(
         }
 
         const dailyTrend = Array.from(pValidDates || [])
+          .filter((date) => !isPlantDateNonWorking(plantId, date))
           .sort()
           .map((date) => {
             const dCont = getApplicableContracted(
@@ -526,6 +547,11 @@ export function useDashboardCalculations(
           })()
 
     const dailyTrend = Array.from(allValidDatesSet)
+      .filter((date) => {
+        // Se a data for não útil para todas as plantas válidas, pular essa data
+        const allPlantsNonWorking = validPlants.every((pid) => isPlantDateNonWorking(pid, date))
+        return !allPlantsNonWorking
+      })
       .sort()
       .map((date) => {
         let dContracted = 0
@@ -534,6 +560,8 @@ export function useDashboardCalculations(
         let dFallback = 0
 
         validPlants.forEach((pid) => {
+          if (isPlantDateNonWorking(pid, date)) return
+
           const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
             if (selectedCompanies.length > 0 && c.type === 'colaborador') {
               const validCompanyIds = new Set(
