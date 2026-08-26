@@ -63,13 +63,36 @@ export default function DashboardGestor() {
   useEffect(() => {
     async function fetchNWD() {
       if (!activeClient?.id) return
-      const { data } = await supabase
-        .from('plant_non_working_days')
-        .select('*')
-        .eq('client_id', activeClient.id)
-        .gte('date', dateFrom)
-        .lte('date', dateTo)
-      if (data) setNonWorkingDays(data)
+      const allNwd: any[] = []
+      const pageSize = 1000
+      let page = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('plant_non_working_days')
+          .select('*')
+          .eq('client_id', activeClient.id)
+          .gte('date', dateFrom)
+          .lte('date', dateTo)
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) {
+          console.error('Erro ao carregar plant_non_working_days:', error)
+          break
+        }
+
+        if (data && data.length > 0) {
+          allNwd.push(...data)
+          page++
+        }
+
+        if (!data || data.length < pageSize) {
+          hasMore = false
+        }
+      }
+
+      setNonWorkingDays(allNwd)
     }
     fetchNWD()
   }, [activeClient?.id, dateFrom, dateTo, selectedMasterClient])

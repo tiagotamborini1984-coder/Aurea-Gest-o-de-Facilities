@@ -29,60 +29,62 @@ export function useMasterData() {
     const isAdmin = profile.role === 'Administrador' || profile.role === 'Master'
     const authorizedPlants = profile.authorized_plants || []
 
-    const query = async (tableName: string) => {
-      const allData: any[] = []
+    async function query(table: string) {
+      const allRows: any[] = []
       const pageSize = 1000
       let page = 0
       let hasMore = true
 
       while (hasMore) {
-        let q = supabase
-          .from(tableName as any)
+        const start = page * pageSize
+        const end = start + pageSize - 1
+        const { data, error } = await supabase
+          .from(table as any)
           .select('*')
-
-        if (profile.role === 'Master') {
-          if (selectedMasterClient !== 'all') {
-            q = q.eq('client_id', selectedMasterClient)
-          }
-        } else {
-          q = q.eq('client_id', profile.client_id)
-        }
-
-        const { data, error } = await q.range(page * pageSize, (page + 1) * pageSize - 1)
-
+          .range(start, end)
         if (error) {
-          console.error(`Erro ao carregar dados da tabela ${tableName}:`, error)
-          break
+          console.error(`Erro ao carregar dados da tabela ${table}: ${error.message}`)
+          return []
         }
-
         if (data && data.length > 0) {
-          allData.push(...data)
+          allRows.push(...data)
           page++
         }
-
         if (!data || data.length < pageSize) {
           hasMore = false
         }
       }
 
-      return allData
+      return allRows
     }
 
-    const [pData, fData, eData, gData, empData, cData, lData, tData, frtData, etrData, compData, ptData] =
-      await Promise.all([
-        query('plants'),
-        query('functions'),
-        query('equipment'),
-        query('goals_book'),
-        query('employees'),
-        query('contracted_headcount'),
-        query('locations'),
-        query('trainings'),
-        query('function_required_trainings'),
-        query('employee_training_records'),
-        query('companies'),
-        query('package_types'),
-      ])
+    const [
+      pData,
+      fData,
+      eData,
+      gData,
+      empData,
+      cData,
+      lData,
+      tData,
+      frtData,
+      etrData,
+      compData,
+      ptData,
+    ] = await Promise.all([
+      query('plants'),
+      query('functions'),
+      query('equipment'),
+      query('goals_book'),
+      query('employees'),
+      query('contracted_headcount'),
+      query('locations'),
+      query('trainings'),
+      query('function_required_trainings'),
+      query('employee_training_records'),
+      query('companies'),
+      query('package_types'),
+    ])
 
     let plantsData = pData || []
     if (!isAdmin) {
