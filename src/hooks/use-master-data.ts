@@ -29,19 +29,46 @@ export function useMasterData() {
     const isAdmin = profile.role === 'Administrador' || profile.role === 'Master'
     const authorizedPlants = profile.authorized_plants || []
 
-    const query = (tableName: string) => {
-      let q = supabase.from(tableName as any).select('*')
-      if (profile.role === 'Master') {
-        if (selectedMasterClient !== 'all') {
-          q = q.eq('client_id', selectedMasterClient)
+    const query = async (tableName: string) => {
+      const allData: any[] = []
+      const pageSize = 1000
+      let page = 0
+      let hasMore = true
+
+      while (hasMore) {
+        let q = supabase
+          .from(tableName as any)
+          .select('*')
+
+        if (profile.role === 'Master') {
+          if (selectedMasterClient !== 'all') {
+            q = q.eq('client_id', selectedMasterClient)
+          }
+        } else {
+          q = q.eq('client_id', profile.client_id)
         }
-      } else {
-        q = q.eq('client_id', profile.client_id)
+
+        const { data, error } = await q.range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) {
+          console.error(`Erro ao carregar dados da tabela ${tableName}:`, error)
+          break
+        }
+
+        if (data && data.length > 0) {
+          allData.push(...data)
+          page++
+        }
+
+        if (!data || data.length < pageSize) {
+          hasMore = false
+        }
       }
-      return q
+
+      return allData
     }
 
-    const [pRes, fRes, eRes, gRes, empRes, cRes, lRes, tRes, frtRes, etrRes, compRes, ptRes] =
+    const [pData, fData, eData, gData, empData, cData, lData, tData, frtData, etrData, compData, ptData] =
       await Promise.all([
         query('plants'),
         query('functions'),
@@ -57,7 +84,7 @@ export function useMasterData() {
         query('package_types'),
       ])
 
-    let plantsData = pRes.data || []
+    let plantsData = pData || []
     if (!isAdmin) {
       plantsData = plantsData.filter((p: any) => authorizedPlants.includes(p.id))
     }
@@ -69,29 +96,29 @@ export function useMasterData() {
     }
 
     setPlants(plantsData)
-    setFunctions(fRes.data || [])
+    setFunctions(fData || [])
 
-    const equipmentData = filterByPlant(eRes.data || [])
+    const equipmentData = filterByPlant(eData || [])
     setEquipment(equipmentData)
-    setGoals(gRes.data || [])
+    setGoals(gData || [])
 
-    const employeesData = filterByPlant(empRes.data || [])
+    const employeesData = filterByPlant(empData || [])
     setEmployees(employeesData.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')))
 
-    setContracted(filterByPlant(cRes.data || []))
-    setLocations(filterByPlant(lRes.data || []))
+    setContracted(filterByPlant(cData || []))
+    setLocations(filterByPlant(lData || []))
 
-    setTrainings(tRes.data || [])
-    setFunctionRequiredTrainings(frtRes.data || [])
+    setTrainings(tData || [])
+    setFunctionRequiredTrainings(frtData || [])
 
     const validEmployeeIds = employeesData.map((e: any) => e.id)
     const filteredTrainingRecords = isAdmin
-      ? etrRes.data || []
-      : (etrRes.data || []).filter((r: any) => validEmployeeIds.includes(r.employee_id))
+      ? etrData || []
+      : (etrData || []).filter((r: any) => validEmployeeIds.includes(r.employee_id))
     setEmployeeTrainingRecords(filteredTrainingRecords)
 
-    setCompanies(compRes.data || [])
-    setPackageTypes(ptRes.data || [])
+    setCompanies(compData || [])
+    setPackageTypes(ptData || [])
 
     setLoading(false)
   }, [profile, selectedMasterClient])
