@@ -260,6 +260,7 @@ export function useDashboardCalculations(
         const pAbs = pDays > 0 ? pValidLogs.filter((l) => !l.status).length / pDays : 0
 
         let pCont = 0
+        let hasContracted = false
         if (typeCont === 'equipamento') {
           const monthsInPeriod = eachMonthOfInterval({
             start: parseISO(dateFrom),
@@ -273,7 +274,8 @@ export function useDashboardCalculations(
               0,
             )
           })
-          pCont = monthsInPeriod.length > 0 ? Math.round(sumContratado / monthsInPeriod.length) : 0
+          hasContracted = sumContratado > 0
+          pCont = monthsInPeriod.length > 0 ? sumContratado / monthsInPeriod.length : 0
         } else {
           let sumContratado = 0
           pValidDates.forEach((date) => {
@@ -289,7 +291,8 @@ export function useDashboardCalculations(
               return true
             }).reduce((sum, c) => sum + c.quantity, 0)
           })
-          pCont = pDays > 0 ? Math.round(sumContratado / pDays) : 0
+          hasContracted = sumContratado > 0
+          pCont = pDays > 0 ? sumContratado / pDays : 0
         }
 
         const dailyTrend = Array.from(pValidDates)
@@ -320,25 +323,20 @@ export function useDashboardCalculations(
             }
           })
 
+        const plantDenominator = hasContracted ? pCont : fallbackCountByPlant.get(plant.id) || 0
+
         return {
           id: plant.id,
           name: plant.name,
           presentes: formatStr(pPres),
           ausentes: formatStr(pAbs),
-          contratado: pCont,
+          contratado: formatStr(pCont),
           absenteismo:
             pDays === 0
               ? 0
-              : Math.max(
-                  0,
-                  pCont > 0
-                    ? ((pCont - pPres) / pCont) * 100
-                    : (fallbackCountByPlant.get(plant.id) || 0) > 0
-                      ? (((fallbackCountByPlant.get(plant.id) || 1) - pPres) /
-                          (fallbackCountByPlant.get(plant.id) || 1)) *
-                        100
-                      : 0,
-                ),
+              : plantDenominator > 0
+                ? Math.max(0, ((plantDenominator - pPres) / plantDenominator) * 100)
+                : 0,
           dailyTrend,
         }
       })
@@ -370,6 +368,7 @@ export function useDashboardCalculations(
         const lAbs = lDays > 0 ? lLogs.filter((l) => !l.status).length / lDays : 0
 
         let lCont = 0
+        let hasLocationContracted = false
         if (typeCont === 'equipamento') {
           const monthsInPeriod = eachMonthOfInterval({
             start: parseISO(dateFrom),
@@ -385,10 +384,8 @@ export function useDashboardCalculations(
               (c) => c.location_id === loc.id,
             ).reduce((sum, c) => sum + c.quantity, 0)
           })
-          lCont =
-            monthsInPeriod.length > 0
-              ? Math.round(sumLocationContratado / monthsInPeriod.length)
-              : 0
+          hasLocationContracted = sumLocationContratado > 0
+          lCont = monthsInPeriod.length > 0 ? sumLocationContratado / monthsInPeriod.length : 0
         } else {
           let sumLocationContratado = 0
           if (pValidDates) {
@@ -401,7 +398,8 @@ export function useDashboardCalculations(
               ).reduce((sum, c) => sum + c.quantity, 0)
             })
           }
-          lCont = lDays > 0 ? Math.round(sumLocationContratado / lDays) : 0
+          hasLocationContracted = sumLocationContratado > 0
+          lCont = lDays > 0 ? sumLocationContratado / lDays : 0
         }
 
         const dailyTrend = Array.from(pValidDates || [])
@@ -433,9 +431,14 @@ export function useDashboardCalculations(
           plantName: plants.find((p) => p.id === loc.plant_id)?.name,
           presentes: formatStr(lPres),
           ausentes: formatStr(lAbs),
-          contratado: lCont,
+          contratado: formatStr(lCont),
           absenteismo:
-            lDays === 0 ? 0 : Math.max(0, lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0),
+            lDays === 0
+              ? 0
+              : Math.max(
+                  0,
+                  hasLocationContracted && lCont > 0 ? ((lCont - lPres) / lCont) * 100 : 0,
+                ),
           dailyTrend,
         }
       })
@@ -446,7 +449,7 @@ export function useDashboardCalculations(
             n.date.split('T')[0] >= dateFrom &&
             n.date.split('T')[0] <= dateTo,
         )
-        return l.contratado > 0 || parseFloat(l.presentes) > 0 || isNonWorking
+        return parseFloat(l.contratado) > 0 || parseFloat(l.presentes) > 0 || isNonWorking
       })
 
     const equipmentStats =
