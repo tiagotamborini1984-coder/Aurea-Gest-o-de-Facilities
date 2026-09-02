@@ -47,12 +47,15 @@ const routeMenuMap: Record<string, string> = {
   '/organograma/fluxogramas': 'Organograma e Fluxos:Fluxogramas',
   '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-epis': 'Gestão de EPIs',
+  '/pesquisa-satisfacao': 'Pesquisa de Satisfação',
+  '/pesquisa-satisfacao/dashboard': 'Pesquisa de Satisfação',
 }
 
 const moduleRouteMap: Record<string, string> = {
   '/ferias': 'Gestão de Férias',
   '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-epis': 'Gestão de EPIs',
+  '/pesquisa-satisfacao': 'Pesquisa de Satisfação',
 }
 
 export function AccessGuard() {

@@ -40,6 +40,7 @@ const MODULES = [
   'Log de Auditoria',
   'Dashboard Estratégico',
   'Gestão de Férias',
+  'Pesquisa de Satisfação',
 ]
 
 export default function Clientes() {

@@ -41,6 +41,7 @@ const AVAILABLE_MODULES = [
   'Gestão de Estoque',
   'Gestão de EPIs',
   'Gestão de Férias',
+  'Pesquisa de Satisfação',
 ]
 
 export function EditClientDialog({

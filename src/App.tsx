@@ -117,6 +117,11 @@ import HistoricoImportacoes from './pages/gestao-estoque/HistoricoImportacoes'
 import DashboardEstoque from './pages/gestao-estoque/Dashboard'
 import AreasEstoque from './pages/gestao-estoque/Areas'
 
+// Pesquisa de Satisfação
+import PesquisasSatisfacaoList from './pages/pesquisa-satisfacao/PesquisasSatisfacaoList'
+import PesquisaSatisfacaoDashboard from './pages/pesquisa-satisfacao/PesquisaSatisfacaoDashboard'
+import PublicSurveyForm from './pages/pesquisa-satisfacao/public/PublicSurveyForm'
+
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
     <AuthProvider>
@@ -135,6 +140,9 @@ const App = () => (
               <Route path="/m/:slug/entrar" element={<LoginPublico />} />
               <Route path="/m/:slug/meus-chamados" element={<MeusChamadosPublico />} />
               <Route path="/m/:slug/chamado/:ticketId" element={<DetalheChamadoPublico />} />
+
+              {/* Rota pública para formulário de Pesquisa de Satisfação (Totem / QR Code / Tablet) */}
+              <Route path="/p/:id" element={<PublicSurveyForm />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<SubscriptionGuard />}>
@@ -282,6 +290,13 @@ const App = () => (
 
                       {/* Gestão de EPIs */}
                       <Route path="/gestao-epis" element={<GestaoEPIs />} />
+
+                      {/* Pesquisa de Satisfação */}
+                      <Route path="/pesquisa-satisfacao" element={<PesquisasSatisfacaoList />} />
+                      <Route
+                        path="/pesquisa-satisfacao/dashboard"
+                        element={<PesquisaSatisfacaoDashboard />}
+                      />
 
                       {/* Gestão de Encomendas */}
                       <Route path="/gestao-terceiros/encomendas" element={<Encomendas />} />

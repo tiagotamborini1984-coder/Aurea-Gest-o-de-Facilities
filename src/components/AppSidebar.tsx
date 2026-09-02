@@ -24,6 +24,7 @@ import {
   Hammer,
   HardHat,
   Plane,
+  HeartHandshake,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -159,6 +160,14 @@ export function AppSidebar() {
         title: 'Gestão de Ferramentas',
         icon: Hammer,
         path: '/gestao-ferramentas',
+      },
+      {
+        title: 'Pesquisa de Satisfação',
+        icon: HeartHandshake,
+        subItems: [
+          { title: 'Pesquisas', path: '/pesquisa-satisfacao' },
+          { title: 'Dashboard de Resultados', path: '/pesquisa-satisfacao/dashboard' },
+        ],
       },
       {
         title: 'Gestão de Férias',
@@ -308,6 +317,7 @@ export function AppSidebar() {
               'Gestão de Documentos',
               'Gestão de Ferramentas',
               'Gestão de Férias',
+              'Pesquisa de Satisfação',
             ]
           }
 
@@ -380,6 +390,14 @@ export function AppSidebar() {
               }
             } else if (item.title === 'Gestão de Lockers') {
               filteredSubItems = userMenus.includes('Gestão de Lockers') ? item.subItems : []
+            } else if (item.title === 'Pesquisa de Satisfação') {
+              filteredSubItems =
+                userMenus.includes('Pesquisa de Satisfação') ||
+                userMenus.includes('Pesquisas') ||
+                userMenus.includes('Pesquisa de Satisfação:Pesquisas') ||
+                userMenus.includes('Pesquisa de Satisfação:Dashboard de Resultados')
+                  ? item.subItems
+                  : []
             } else if (item.title === 'Gestão de Férias') {
               filteredSubItems = userMenus.includes('Gestão de Férias') ? item.subItems : []
             } else if (item.title === 'Gestão da Manutenção') {
