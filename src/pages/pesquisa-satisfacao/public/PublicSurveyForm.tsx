@@ -219,62 +219,166 @@ export function PublicSurveyForm() {
     loadSurvey()
   }, [id])
 
-  // Atualizar resposta numérica (0-10 ou 1-5)
+  // Helper para obter a profundidade de encadeamento de uma pergunta
+  const getQuestionDepth = (q: SurveyQuestion, allQuestions: SurveyQuestion[]): number => {
+    if (!q.is_conditional || !q.parent_question_id) return 0
+    let depth = 0
+    let currentParentId: string | null = q.parent_question_id
+    const visited = new Set<string>()
+
+    while (currentParentId && !visited.has(currentParentId) && depth < 20) {
+      visited.add(currentParentId)
+      const parentQ = allQuestions.find(
+        (pq) =>
+          (pq.id && pq.id === currentParentId) || (pq.temp_id && pq.temp_id === currentParentId),
+      )
+      if (!parentQ) break
+      depth += 1
+      if (parentQ.is_conditional && parentQ.parent_question_id) {
+        currentParentId = parentQ.parent_question_id
+      } else {
+        break
+      }
+    }
+    return depth
+  }
+
+  // Helper recursivo para verificar se a pergunta e TODA a sua cadeia ancestral estão visíveis
+  const isQuestionVisibleWithState = (
+    q: SurveyQuestion,
+    currentAnswers: Record<string, { numeric_value?: number | null; text_value?: string | null }>,
+    allQuestions: SurveyQuestion[],
+  ): boolean => {
+    if (!q.is_conditional || !q.parent_question_id) {
+      return true
+    }
+
+    // Encontrar a pergunta pai
+    const parentQ = allQuestions.find(
+      (pq) =>
+        (pq.id && pq.id === q.parent_question_id) ||
+        (pq.temp_id && pq.temp_id === q.parent_question_id),
+    )
+    if (!parentQ) return false
+
+    // Recursão: o pai também PRECISA estar visível
+    const isParentVisible = isQuestionVisibleWithState(parentQ, currentAnswers, allQuestions)
+    if (!isParentVisible) return false
+
+    // Buscar a resposta da pergunta pai
+    const parentAnswer =
+      currentAnswers[q.parent_question_id] || (parentQ.id ? currentAnswers[parentQ.id] : undefined)
+    if (!parentAnswer) return false
+
+    const triggers = q.trigger_values || []
+    // Se não há gatilhos definidos, exibe se o pai tiver qualquer resposta
+    if (triggers.length === 0) {
+      return (
+        (parentAnswer.numeric_value !== null && parentAnswer.numeric_value !== undefined) ||
+        Boolean(parentAnswer.text_value && parentAnswer.text_value.trim() !== '')
+      )
+    }
+
+    // Se o gatilho for '*', qualquer resposta preenchida na pergunta pai satisfaz
+    if (triggers.includes('*')) {
+      return (
+        (parentAnswer.numeric_value !== null && parentAnswer.numeric_value !== undefined) ||
+        Boolean(parentAnswer.text_value && parentAnswer.text_value.trim() !== '')
+      )
+    }
+
+    // Verificar se o valor numérico corresponde
+    const hasNumericMatch =
+      parentAnswer.numeric_value !== null &&
+      parentAnswer.numeric_value !== undefined &&
+      (triggers.includes(Number(parentAnswer.numeric_value)) ||
+        triggers.includes(String(parentAnswer.numeric_value)))
+
+    // Verificar se o texto corresponde
+    const hasTextMatch =
+      Boolean(parentAnswer.text_value) &&
+      triggers.some(
+        (t) =>
+          String(t).trim().toLowerCase() === String(parentAnswer.text_value).trim().toLowerCase(),
+      )
+
+    return Boolean(hasNumericMatch || hasTextMatch)
+  }
+
+  // Wrapper para checagem com o estado atual de answers
+  const isQuestionVisible = (q: SurveyQuestion): boolean => {
+    return isQuestionVisibleWithState(q, answers, survey?.questions || [])
+  }
+
+  // Helper para limpar recursivamente respostas de perguntas que se tornaram invisíveis
+  const cleanupHiddenAnswers = (
+    nextAnswers: Record<string, { numeric_value?: number | null; text_value?: string | null }>,
+  ): Record<string, { numeric_value?: number | null; text_value?: string | null }> => {
+    const questions = survey?.questions || []
+    const cleaned = { ...nextAnswers }
+
+    // Repetir até estabilizar para remover descendentes em qualquer profundidade
+    let changed = true
+    let safetyCounter = 0
+    while (changed && safetyCounter < 10) {
+      changed = false
+      safetyCounter++
+      for (const q of questions) {
+        const qKey = q.id || q.temp_id
+        if (!qKey) continue
+        const visible = isQuestionVisibleWithState(q, cleaned, questions)
+        if (!visible) {
+          const cur = cleaned[qKey]
+          if (cur && (cur.numeric_value !== null || cur.text_value !== null)) {
+            cleaned[qKey] = { numeric_value: null, text_value: null }
+            changed = true
+          }
+        }
+      }
+    }
+    return cleaned
+  }
+
+  // Atualizar resposta numérica (0-10 ou 1-5 ou smiley_5)
   const handleRatingSelect = (questionId: string, value: number) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        ...prev[questionId],
-        numeric_value: value,
-      },
-    }))
+    setAnswers((prev) => {
+      const updated = {
+        ...prev,
+        [questionId]: {
+          ...prev[questionId],
+          numeric_value: value,
+        },
+      }
+      return cleanupHiddenAnswers(updated)
+    })
   }
 
   // Atualizar resposta de múltipla escolha
   const handleOptionSelect = (questionId: string, option: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        ...prev[questionId],
-        text_value: option,
-      },
-    }))
+    setAnswers((prev) => {
+      const updated = {
+        ...prev,
+        [questionId]: {
+          ...prev[questionId],
+          text_value: option,
+        },
+      }
+      return cleanupHiddenAnswers(updated)
+    })
   }
 
   // Atualizar resposta textual
   const handleTextChange = (questionId: string, text: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        ...prev[questionId],
-        text_value: text,
-      },
-    }))
-  }
-
-  // Submeter formulário
-  // Helper para verificar se a pergunta está visível baseado em condições
-  const isQuestionVisible = (q: SurveyQuestion): boolean => {
-    if (!q.is_conditional || !q.parent_question_id) {
-      return true
-    }
-    // Buscar a pergunta pai
-    const parentAnswer = answers[q.parent_question_id]
-    if (!parentAnswer) return false
-
-    const triggers = q.trigger_values || []
-    if (triggers.length === 0) return true
-
-    // Verificar se o valor numérico ou de texto corresponde a algum gatilho
-    const hasNumericMatch =
-      parentAnswer.numeric_value !== null &&
-      parentAnswer.numeric_value !== undefined &&
-      triggers.includes(Number(parentAnswer.numeric_value))
-
-    const hasTextMatch =
-      Boolean(parentAnswer.text_value) && triggers.includes(parentAnswer.text_value)
-
-    return Boolean(hasNumericMatch || hasTextMatch)
+    setAnswers((prev) => {
+      const updated = {
+        ...prev,
+        [questionId]: {
+          ...prev[questionId],
+          text_value: text,
+        },
+      }
+      return cleanupHiddenAnswers(updated)
+    })
   }
 
   // Submeter formulário
@@ -535,19 +639,24 @@ export function PublicSurveyForm() {
                     ? 'border-l-4 border-l-brand-vividBlue'
                     : '',
                   q.is_conditional
-                    ? 'border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/20 dark:bg-blue-950/10'
+                    ? 'border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/20 dark:bg-blue-950/10 ml-0 sm:ml-4'
                     : '',
                 )}
               >
                 <CardContent className="p-5 sm:p-6 space-y-4">
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <h2 className="text-base sm:text-lg font-semibold text-foreground flex items-baseline gap-2">
+                      <h2 className="text-base sm:text-lg font-semibold text-foreground flex items-baseline gap-2 flex-wrap">
                         <span className="text-brand-vividBlue font-bold">{idx + 1}.</span>
                         {q.title}
                         {q.is_required && (
                           <span className="text-red-500 font-bold ml-0.5" title="Obrigatória">
                             *
+                          </span>
+                        )}
+                        {q.is_conditional && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950 px-2 py-0.5 rounded-full">
+                            Subpergunta Nv.{getQuestionDepth(q, survey.questions || [])}
                           </span>
                         )}
                       </h2>

@@ -108,6 +108,10 @@ export interface SurveyDashboardMetrics {
     questionTitle: string
     questionType: QuestionType
     surveyTitle: string
+    isConditional?: boolean
+    parentQuestionId?: string | null
+    parentQuestionTitle?: string | null
+    triggerValues?: any[]
     totalAnswers: number
     avgRating?: number | null
     distribution?: { label: string; count: number; percentage: number }[]

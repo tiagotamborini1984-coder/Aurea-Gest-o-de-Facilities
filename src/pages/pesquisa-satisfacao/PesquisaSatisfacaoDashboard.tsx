@@ -41,6 +41,7 @@ import {
   Sparkles,
   CheckCircle2,
   Layers,
+  GitBranch,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -693,12 +694,28 @@ export function PesquisaSatisfacaoDashboard() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {qm.surveyTitle}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {qm.surveyTitle}
+                        </Badge>
+                        {qm.isConditional && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 gap-1"
+                          >
+                            <GitBranch className="h-2.5 w-2.5" />
+                            Subpergunta Condicional
+                          </Badge>
+                        )}
+                      </div>
                       <CardTitle className="text-sm font-semibold leading-snug text-foreground">
                         {idx + 1}. {qm.questionTitle}
                       </CardTitle>
+                      {qm.isConditional && qm.parentQuestionTitle && (
+                        <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                          ↳ Disparada por: "{qm.parentQuestionTitle}"
+                        </p>
+                      )}
                     </div>
                     <span className="text-[11px] font-semibold text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full shrink-0">
                       {qm.totalAnswers} respostas

@@ -248,31 +248,129 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
     }
   }, [open, survey])
 
-  // Adicionar Pergunta
-  const addQuestion = (type: QuestionType = 'smiley_5') => {
+  // Adicionar Pergunta (opcionalmente como subpergunta de uma pergunta existente)
+  const addQuestion = (type: QuestionType = 'smiley_5', parentIndex?: number) => {
     const defaultOptions = type === 'multiple_choice' ? ['Opção 1', 'Opção 2', 'Opção 3'] : []
     const newTempId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
 
-    setQuestions((prev) => [
-      ...prev,
-      {
+    setQuestions((prev) => {
+      let isCond = false
+      let parentId: string | null = null
+      let defaultTriggers: any[] = []
+
+      if (parentIndex !== undefined && parentIndex >= 0 && parentIndex < prev.length) {
+        const parentQ = prev[parentIndex]
+        isCond = true
+        parentId = parentQ.id || parentQ.temp_id || null
+
+        if (parentQ.question_type === 'smiley_5') {
+          defaultTriggers = [1, 2, 3]
+        } else if (parentQ.question_type === 'rating_10') {
+          defaultTriggers = [0, 1, 2, 3, 4, 5, 6]
+        } else if (parentQ.question_type === 'rating_5') {
+          defaultTriggers = [1, 2, 3]
+        } else if (parentQ.question_type === 'multiple_choice') {
+          defaultTriggers = parentQ.options?.slice(0, 1) || []
+        } else if (parentQ.question_type === 'text') {
+          defaultTriggers = ['*']
+        }
+      }
+
+      const newQ: SurveyQuestion = {
         temp_id: newTempId,
         title: '',
         description: '',
         question_type: type,
         options: defaultOptions,
-        is_required: true,
+        is_required: isCond ? false : true,
         order_index: prev.length + 1,
-        is_conditional: false,
-        parent_question_id: null,
-        trigger_values: [],
-      },
-    ])
+        is_conditional: isCond,
+        parent_question_id: parentId,
+        trigger_values: defaultTriggers,
+      }
+
+      if (parentIndex !== undefined && parentIndex >= 0) {
+        // Inserir logo após a pergunta pai
+        const nextList = [...prev]
+        nextList.splice(parentIndex + 1, 0, newQ)
+        return nextList.map((item, idx) => ({ ...item, order_index: idx + 1 }))
+      }
+
+      return [...prev, newQ]
+    })
   }
 
-  // Remover Pergunta
+  // Helper para obter a profundidade de encadeamento de uma pergunta (nível 0 = pergunta principal)
+  const getQuestionDepth = (q: SurveyQuestion, allQuestions: SurveyQuestion[]): number => {
+    if (!q.is_conditional || !q.parent_question_id) return 0
+    let depth = 0
+    let currentParentId: string | null = q.parent_question_id
+    const visited = new Set<string>()
+
+    while (currentParentId && !visited.has(currentParentId) && depth < 20) {
+      visited.add(currentParentId)
+      const parentQ = allQuestions.find(
+        (pq) =>
+          (pq.id && pq.id === currentParentId) || (pq.temp_id && pq.temp_id === currentParentId),
+      )
+      if (!parentQ) break
+      depth += 1
+      if (parentQ.is_conditional && parentQ.parent_question_id) {
+        currentParentId = parentQ.parent_question_id
+      } else {
+        break
+      }
+    }
+    return depth
+  }
+
+  // Helper para obter todos os ancestrais de uma pergunta
+  const getAncestorIndices = (qIndex: number, allQuestions: SurveyQuestion[]): number[] => {
+    const ancestors: number[] = []
+    const q = allQuestions[qIndex]
+    if (!q || !q.is_conditional || !q.parent_question_id) return ancestors
+
+    let currentParentId: string | null = q.parent_question_id
+    const visited = new Set<string>()
+
+    while (currentParentId && !visited.has(currentParentId)) {
+      visited.add(currentParentId)
+      const pIdx = allQuestions.findIndex(
+        (pq) =>
+          (pq.id && pq.id === currentParentId) || (pq.temp_id && pq.temp_id === currentParentId),
+      )
+      if (pIdx === -1) break
+      ancestors.unshift(pIdx)
+      const parentQ = allQuestions[pIdx]
+      if (parentQ.is_conditional && parentQ.parent_question_id) {
+        currentParentId = parentQ.parent_question_id
+      } else {
+        break
+      }
+    }
+    return ancestors
+  }
+
+  // Remover Pergunta (e limpar o parent_question_id de filhas que apontavam para ela)
   const removeQuestion = (index: number) => {
-    setQuestions((prev) => prev.filter((_, i) => i !== index))
+    const targetQ = questions[index]
+    const targetKey = targetQ.id || targetQ.temp_id
+
+    setQuestions((prev) => {
+      const remaining = prev.filter((_, i) => i !== index)
+      // Ajustar perguntas que apontavam para esta pergunta removida
+      return remaining.map((q) => {
+        if (q.parent_question_id === targetKey) {
+          return {
+            ...q,
+            is_conditional: false,
+            parent_question_id: null,
+            trigger_values: [],
+          }
+        }
+        return q
+      })
+    })
   }
 
   // Atualizar campo de Pergunta
@@ -772,6 +870,19 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                         <Button
                           type="button"
                           variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 gap-1 border border-blue-200 dark:border-blue-800"
+                          onClick={() => addQuestion('text', qIndex)}
+                          title="Adicionar subpergunta dependente desta pergunta"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <GitBranch className="h-3 w-3" />
+                          <span className="hidden sm:inline">Subpergunta</span>
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-red-500 hover:bg-red-50"
                           onClick={() => removeQuestion(qIndex)}
@@ -847,18 +958,29 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                         </div>
                       </div>
                     )}
-                    {/* CONFIGURAÇÃO DE LÓGICA CONDICIONAL (SUBPERGUNTA) */}
+                    {/* CONFIGURAÇÃO DE LÓGICA CONDICIONAL (SUBPERGUNTA MULTINÍVEL) */}
                     {qIndex > 0 && (
                       <div className="pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <GitBranch className="h-4 w-4 text-blue-600" />
-                            <Label className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5">
-                              Subpergunta Condicional
-                              <span className="text-[10px] text-muted-foreground font-normal">
-                                (Exibir somente se uma pergunta anterior tiver determinada resposta)
-                              </span>
-                            </Label>
+                            <div>
+                              <Label className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5">
+                                Subpergunta Condicional (Multinível)
+                                {q.is_conditional && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] bg-blue-50 text-blue-700 border-blue-200"
+                                  >
+                                    Nível {getQuestionDepth(q, questions)}
+                                  </Badge>
+                                )}
+                              </Label>
+                              <p className="text-[10px] text-muted-foreground font-normal">
+                                Permite encadear esta pergunta a qualquer pergunta anterior
+                                (incluindo outras subperguntas).
+                              </p>
+                            </div>
                           </div>
                           <Switch
                             checked={Boolean(q.is_conditional)}
@@ -869,7 +991,6 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                               let defaultTriggers: any[] = []
 
                               if (previousQuestion.question_type === 'smiley_5') {
-                                // Default para insatisfação / regular
                                 defaultTriggers = [1, 2, 3]
                               } else if (previousQuestion.question_type === 'rating_10') {
                                 defaultTriggers = [0, 1, 2, 3, 4, 5, 6]
@@ -877,6 +998,8 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                 defaultTriggers = [1, 2, 3]
                               } else if (previousQuestion.question_type === 'multiple_choice') {
                                 defaultTriggers = previousQuestion.options?.slice(0, 1) || []
+                              } else if (previousQuestion.question_type === 'text') {
+                                defaultTriggers = ['*'] // qualquer preenchimento
                               }
 
                               updateQuestion(qIndex, {
@@ -889,11 +1012,48 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                         </div>
 
                         {q.is_conditional && (
-                          <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900 space-y-3">
+                          <div className="p-3.5 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900 space-y-3">
+                            {/* Breadcrumb visual da cadeia de ancestrais se for multinível */}
+                            {(() => {
+                              const ancestorIndices = getAncestorIndices(qIndex, questions)
+                              if (ancestorIndices.length > 0) {
+                                return (
+                                  <div className="flex items-center gap-1.5 flex-wrap text-[11px] bg-white/80 dark:bg-slate-900/80 p-2 rounded-lg border border-blue-100 dark:border-blue-900/60">
+                                    <span className="font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-1">
+                                      <GitBranch className="h-3 w-3" /> Cadeia de disparo:
+                                    </span>
+                                    {ancestorIndices.map((aIdx, i) => {
+                                      const ancQ = questions[aIdx]
+                                      return (
+                                        <span
+                                          key={aIdx}
+                                          className="flex items-center gap-1 text-slate-700 dark:text-slate-300"
+                                        >
+                                          <span className="font-semibold underline">
+                                            #{aIdx + 1}{' '}
+                                            {ancQ.title
+                                              ? ancQ.title.length > 20
+                                                ? ancQ.title.slice(0, 20) + '...'
+                                                : ancQ.title
+                                              : `Pergunta ${aIdx + 1}`}
+                                          </span>
+                                          <span className="text-muted-foreground">→</span>
+                                        </span>
+                                      )
+                                    })}
+                                    <span className="font-bold text-blue-700 dark:text-blue-400">
+                                      Esta (#{qIndex + 1})
+                                    </span>
+                                  </div>
+                                )
+                              }
+                              return null
+                            })()}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="space-y-1">
                                 <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
-                                  Pergunta Pai (Gatilho)
+                                  Pergunta Pai / Gatilho Antecessor
                                 </Label>
                                 <Select
                                   value={q.parent_question_id || ''}
@@ -908,6 +1068,10 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                       newTriggers = [0, 1, 2, 3, 4, 5, 6]
                                     } else if (targetParent?.question_type === 'rating_5') {
                                       newTriggers = [1, 2, 3]
+                                    } else if (targetParent?.question_type === 'multiple_choice') {
+                                      newTriggers = targetParent.options?.slice(0, 1) || []
+                                    } else if (targetParent?.question_type === 'text') {
+                                      newTriggers = ['*']
                                     }
                                     updateQuestion(qIndex, {
                                       parent_question_id: val,
@@ -921,6 +1085,7 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                   <SelectContent>
                                     {questions.slice(0, qIndex).map((pq, pIdx) => {
                                       const pKey = pq.id || pq.temp_id || `q_temp_${pIdx}`
+                                      const pDepth = getQuestionDepth(pq, questions)
                                       return (
                                         <SelectItem key={pKey} value={pKey}>
                                           #{pIdx + 1}: {pq.title || `Pergunta ${pIdx + 1}`} (
@@ -933,7 +1098,7 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                                 : pq.question_type === 'multiple_choice'
                                                   ? 'Múltipla Escolha'
                                                   : 'Texto'}
-                                          )
+                                          {pDepth > 0 ? ` • Subpergunta Nv.${pDepth}` : ''})
                                         </SelectItem>
                                       )
                                     })}
@@ -959,12 +1124,16 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                         updateQuestion(qIndex, {
                                           trigger_values: [0, 1, 2, 3, 4, 5, 6],
                                         })
+                                      } else if (parentQ?.question_type === 'multiple_choice') {
+                                        updateQuestion(qIndex, {
+                                          trigger_values: parentQ.options?.slice(0, 1) || [],
+                                        })
                                       } else {
                                         updateQuestion(qIndex, { trigger_values: [1, 2, 3] })
                                       }
                                     }}
                                   >
-                                    Negativas e Regular (Crítico)
+                                    Crítico / Negativo
                                   </Button>
                                   <Button
                                     type="button"
@@ -977,12 +1146,16 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                       )
                                       if (parentQ?.question_type === 'rating_10') {
                                         updateQuestion(qIndex, { trigger_values: [7, 8, 9, 10] })
+                                      } else if (parentQ?.question_type === 'multiple_choice') {
+                                        updateQuestion(qIndex, {
+                                          trigger_values: parentQ.options || [],
+                                        })
                                       } else {
                                         updateQuestion(qIndex, { trigger_values: [4, 5] })
                                       }
                                     }}
                                   >
-                                    Positivas (Satisfeito)
+                                    Positivo / Todas opções
                                   </Button>
                                 </div>
                               </div>
@@ -1114,31 +1287,60 @@ export function SurveyFormDialog({ survey, open, onOpenChange, onSuccess }: Surv
                                 return (
                                   <div className="space-y-1.5">
                                     <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                      Exibir quando a opção escolhida for:
+                                      Exibir quando a opção escolhida na pergunta pai (#
+                                      {questions.findIndex(
+                                        (p) =>
+                                          (p.id || p.temp_id) === (parentQ.id || parentQ.temp_id),
+                                      ) + 1}
+                                      ) for:
                                     </Label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                      {(parentQ.options || []).map((opt, oIdx) => {
-                                        const checked = currentTriggers.includes(opt)
-                                        return (
-                                          <label
-                                            key={oIdx}
-                                            className="flex items-center gap-2 p-2 bg-white dark:bg-slate-950 rounded-lg border text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
-                                          >
-                                            <Checkbox
-                                              checked={checked}
-                                              onCheckedChange={(c) => {
-                                                const next = c
-                                                  ? [...currentTriggers, opt]
-                                                  : currentTriggers.filter((v) => v !== opt)
-                                                updateQuestion(qIndex, { trigger_values: next })
-                                              }}
-                                            />
-                                            <span className="font-medium text-foreground">
-                                              {opt}
-                                            </span>
-                                          </label>
-                                        )
-                                      })}
+                                    {(parentQ.options || []).length === 0 ? (
+                                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        A pergunta pai ainda não possui opções cadastradas. Adicione
+                                        opções a ela primeiro.
+                                      </p>
+                                    ) : (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {(parentQ.options || []).map((opt, oIdx) => {
+                                          const checked = currentTriggers.includes(opt)
+                                          return (
+                                            <label
+                                              key={oIdx}
+                                              className="flex items-center gap-2 p-2 bg-white dark:bg-slate-950 rounded-lg border text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
+                                            >
+                                              <Checkbox
+                                                checked={checked}
+                                                onCheckedChange={(c) => {
+                                                  const next = c
+                                                    ? [...currentTriggers, opt]
+                                                    : currentTriggers.filter((v) => v !== opt)
+                                                  updateQuestion(qIndex, { trigger_values: next })
+                                                }}
+                                              />
+                                              <span className="font-medium text-foreground">
+                                                {opt}
+                                              </span>
+                                            </label>
+                                          )
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              }
+
+                              if (parentQ.question_type === 'text') {
+                                return (
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                      Condição de exibição para pergunta de texto:
+                                    </Label>
+                                    <div className="p-2.5 bg-white dark:bg-slate-950 rounded-lg border text-xs text-muted-foreground flex items-center gap-2">
+                                      <Info className="h-4 w-4 text-blue-500 shrink-0" />
+                                      <span>
+                                        Esta subpergunta será exibida sempre que o usuário digitar
+                                        qualquer resposta na pergunta anterior.
+                                      </span>
                                     </div>
                                   </div>
                                 )

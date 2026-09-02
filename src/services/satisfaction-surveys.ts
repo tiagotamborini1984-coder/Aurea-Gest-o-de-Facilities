@@ -291,14 +291,20 @@ export const satisfactionSurveyService = {
     }
 
     if (questions.length > 0) {
-      const mainQuestions = questions.filter((q) => !q.is_conditional)
-      const conditionalQuestions = questions.filter((q) => q.is_conditional)
-
-      // 1. Processar perguntas principais (INSERT ou UPDATE)
-      for (const q of mainQuestions) {
+      // Como perguntas condicionais anteriores sempre antecedem perguntas filhas no array (ou perguntas com parent já salvo),
+      // iteramos sequencialmente na ordem do array (1..N). Cada pergunta que for salva mapeia sua chave (id ou temp_id)
+      // no `idMap`, permitindo que perguntas seguintes que a referenciem como pai (mesmo sendo sub-subperguntas)
+      // obtenham o UUID correto no banco.
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i]
         const tempKey = q.id || q.temp_id
-        const orderIdx = questions.indexOf(q) + 1
+        const orderIdx = i + 1
         const isExisting = Boolean(q.id && UUID_REGEX.test(q.id) && existingIdsInDb.has(q.id))
+
+        let mappedParentId: string | null = null
+        if (q.is_conditional && q.parent_question_id) {
+          mappedParentId = idMap.get(q.parent_question_id) || q.parent_question_id
+        }
 
         const questionPayload = {
           survey_id: surveyId,
@@ -306,11 +312,11 @@ export const satisfactionSurveyService = {
           description: q.description || null,
           question_type: q.question_type || 'rating_10',
           options: q.options || [],
-          is_required: q.is_required ?? true,
+          is_required: q.is_required ?? (q.is_conditional ? false : true),
           order_index: orderIdx,
-          is_conditional: false,
-          parent_question_id: null,
-          trigger_values: [],
+          is_conditional: Boolean(q.is_conditional && mappedParentId),
+          parent_question_id: mappedParentId,
+          trigger_values: q.is_conditional ? q.trigger_values || [] : [],
         }
 
         if (isExisting && q.id) {
@@ -321,6 +327,8 @@ export const satisfactionSurveyService = {
 
           if (updateQErr) throw updateQErr
           if (tempKey) idMap.set(tempKey, q.id)
+          if (q.id) idMap.set(q.id, q.id)
+          if (q.temp_id) idMap.set(q.temp_id, q.id)
         } else {
           const { data: inserted, error: insertQErr } = await supabase
             .from('satisfaction_survey_questions')
@@ -329,54 +337,10 @@ export const satisfactionSurveyService = {
             .single()
 
           if (insertQErr) throw insertQErr
-          if (tempKey && inserted) {
-            idMap.set(tempKey, inserted.id)
-          }
-        }
-      }
-
-      // 2. Processar perguntas condicionais (INSERT ou UPDATE com parent_question_id mapeado)
-      for (const q of conditionalQuestions) {
-        const tempKey = q.id || q.temp_id
-        const orderIdx = questions.indexOf(q) + 1
-        const isExisting = Boolean(q.id && UUID_REGEX.test(q.id) && existingIdsInDb.has(q.id))
-
-        let mappedParentId: string | null = null
-        if (q.parent_question_id) {
-          mappedParentId = idMap.get(q.parent_question_id) || q.parent_question_id
-        }
-
-        const questionPayload = {
-          survey_id: surveyId,
-          title: q.title || 'Pergunta',
-          description: q.description || null,
-          question_type: q.question_type || 'text',
-          options: q.options || [],
-          is_required: q.is_required ?? false,
-          order_index: orderIdx,
-          is_conditional: true,
-          parent_question_id: mappedParentId,
-          trigger_values: q.trigger_values || [],
-        }
-
-        if (isExisting && q.id) {
-          const { error: updateCondErr } = await supabase
-            .from('satisfaction_survey_questions')
-            .update(questionPayload)
-            .eq('id', q.id)
-
-          if (updateCondErr) throw updateCondErr
-          if (tempKey) idMap.set(tempKey, q.id)
-        } else {
-          const { data: insertedCond, error: insertCondErr } = await supabase
-            .from('satisfaction_survey_questions')
-            .insert(questionPayload)
-            .select('id')
-            .single()
-
-          if (insertCondErr) throw insertCondErr
-          if (tempKey && insertedCond) {
-            idMap.set(tempKey, insertedCond.id)
+          if (inserted) {
+            if (tempKey) idMap.set(tempKey, inserted.id)
+            if (q.id) idMap.set(q.id, inserted.id)
+            if (q.temp_id) idMap.set(q.temp_id, inserted.id)
           }
         }
       }
@@ -544,6 +508,10 @@ export const satisfactionSurveyService = {
         questionType: any
         surveyTitle: string
         orderIndex: number
+        isConditional?: boolean
+        parentQuestionId?: string | null
+        parentQuestionTitle?: string | null
+        triggerValues?: any[]
         totalAnswers: number
         sumScores: number
         countScores: number
@@ -584,6 +552,10 @@ export const satisfactionSurveyService = {
             questionType: q.question_type,
             surveyTitle: sTitle,
             orderIndex: q.order_index || 0,
+            isConditional: q.is_conditional ?? false,
+            parentQuestionId: q.parent_question_id || null,
+            parentQuestionTitle: null,
+            triggerValues: q.trigger_values || [],
             totalAnswers: 0,
             sumScores: 0,
             countScores: 0,
@@ -736,11 +708,21 @@ export const satisfactionSurveyService = {
           }
         }
 
+        // Encontrar título da pergunta pai caso seja condicional
+        let parentTitle: string | null = null
+        if (q.parentQuestionId && questionMap[q.parentQuestionId]) {
+          parentTitle = questionMap[q.parentQuestionId].questionTitle
+        }
+
         return {
           questionId: q.questionId,
           questionTitle: q.questionTitle,
           questionType: q.questionType,
           surveyTitle: q.surveyTitle,
+          isConditional: q.isConditional,
+          parentQuestionId: q.parentQuestionId,
+          parentQuestionTitle: parentTitle,
+          triggerValues: q.triggerValues,
           totalAnswers: q.totalAnswers,
           avgRating: q.countScores > 0 ? Number((q.sumScores / q.countScores).toFixed(1)) : null,
           distribution,
