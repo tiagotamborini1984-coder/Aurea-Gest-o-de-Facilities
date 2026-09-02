@@ -98,7 +98,7 @@ export const satisfactionSurveyService = {
         updated_at,
         plants:plant_id(id, name, code),
         schedules:satisfaction_survey_schedules(id, survey_id, start_time, end_time, days_of_week, description),
-        questions:satisfaction_survey_questions(id, survey_id, title, description, question_type, options, is_required, order_index)
+        questions:satisfaction_survey_questions(id, survey_id, title, description, question_type, options, is_required, order_index, is_conditional, parent_question_id, trigger_values)
       `)
       .eq('id', id)
       .maybeSingle()
@@ -245,21 +245,66 @@ export const satisfactionSurveyService = {
     }
 
     if (questions.length > 0) {
-      const questionsToInsert = questions.map((q, idx) => ({
-        survey_id: surveyId,
-        title: q.title || 'Pergunta',
-        description: q.description || null,
-        question_type: q.question_type || 'rating_10',
-        options: q.options || [],
-        is_required: q.is_required ?? true,
-        order_index: idx + 1,
-      }))
+      // 1. Inserir primeiro as perguntas principais para obter seus novos IDs
+      // Mapear temporariamente usando temp_id ou id original
+      const mainQuestions = questions.filter((q) => !q.is_conditional)
+      const conditionalQuestions = questions.filter((q) => q.is_conditional)
 
-      const { error: questionsError } = await supabase
-        .from('satisfaction_survey_questions')
-        .insert(questionsToInsert)
+      // Guardar mapa de id antigo/temp -> novo ID inserido
+      const idMap = new Map<string, string>()
 
-      if (questionsError) throw questionsError
+      // Inserir perguntas principais
+      for (const q of mainQuestions) {
+        const tempKey = q.id || q.temp_id
+        const orderIdx = questions.indexOf(q) + 1
+        const { data: inserted, error: insertQErr } = await supabase
+          .from('satisfaction_survey_questions')
+          .insert({
+            survey_id: surveyId,
+            title: q.title || 'Pergunta',
+            description: q.description || null,
+            question_type: q.question_type || 'rating_10',
+            options: q.options || [],
+            is_required: q.is_required ?? true,
+            order_index: orderIdx,
+            is_conditional: false,
+            parent_question_id: null,
+            trigger_values: [],
+          })
+          .select('id')
+          .single()
+
+        if (insertQErr) throw insertQErr
+        if (tempKey && inserted) {
+          idMap.set(tempKey, inserted.id)
+        }
+      }
+
+      // Inserir perguntas condicionais mapeando o parent_question_id
+      for (const q of conditionalQuestions) {
+        const orderIdx = questions.indexOf(q) + 1
+        let mappedParentId: string | null = null
+        if (q.parent_question_id) {
+          mappedParentId = idMap.get(q.parent_question_id) || q.parent_question_id
+        }
+
+        const { error: insertCondErr } = await supabase
+          .from('satisfaction_survey_questions')
+          .insert({
+            survey_id: surveyId,
+            title: q.title || 'Pergunta',
+            description: q.description || null,
+            question_type: q.question_type || 'text',
+            options: q.options || [],
+            is_required: q.is_required ?? false,
+            order_index: orderIdx,
+            is_conditional: true,
+            parent_question_id: mappedParentId,
+            trigger_values: q.trigger_values || [],
+          })
+
+        if (insertCondErr) throw insertCondErr
+      }
     }
 
     // Salvar Faixas de Horário
@@ -345,7 +390,7 @@ export const satisfactionSurveyService = {
           question_id,
           numeric_value,
           text_value,
-          question:satisfaction_survey_questions(id, title, question_type, options, order_index)
+          question:satisfaction_survey_questions(id, title, question_type, options, order_index, is_conditional, parent_question_id, trigger_values)
         )
       `)
       .order('submitted_at', { ascending: false })
@@ -468,8 +513,11 @@ export const satisfactionSurveyService = {
         // Tratar notas
         if (ans.numeric_value !== null && ans.numeric_value !== undefined) {
           const rawVal = Number(ans.numeric_value)
-          // Normalizar para 0-10 se for 1-5 estrelas
-          const normalizedVal = q.question_type === 'rating_5' ? (rawVal / 5) * 10 : rawVal
+          // Normalizar para 0-10 se for 1-5 estrelas ou rostinhos (smiley_5)
+          const normalizedVal =
+            q.question_type === 'rating_5' || q.question_type === 'smiley_5'
+              ? (rawVal / 5) * 10
+              : rawVal
 
           numericSum += normalizedVal
           numericCount += 1

@@ -105,20 +105,50 @@ export function PublicSurveyForm() {
   }
 
   // Submeter formulário
+  // Helper para verificar se a pergunta está visível baseado em condições
+  const isQuestionVisible = (q: SurveyQuestion): boolean => {
+    if (!q.is_conditional || !q.parent_question_id) {
+      return true
+    }
+    // Buscar a pergunta pai
+    const parentAnswer = answers[q.parent_question_id]
+    if (!parentAnswer) return false
+
+    const triggers = q.trigger_values || []
+    if (triggers.length === 0) return true
+
+    // Verificar se o valor numérico ou de texto corresponde a algum gatilho
+    const hasNumericMatch =
+      parentAnswer.numeric_value !== null &&
+      parentAnswer.numeric_value !== undefined &&
+      triggers.includes(Number(parentAnswer.numeric_value))
+
+    const hasTextMatch =
+      Boolean(parentAnswer.text_value) && triggers.includes(parentAnswer.text_value)
+
+    return Boolean(hasNumericMatch || hasTextMatch)
+  }
+
+  // Submeter formulário
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!survey || !id) return
 
-    // Validar perguntas obrigatórias
+    // Validar perguntas obrigatórias (apenas as que estão visíveis)
     const questions = survey.questions || []
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i]
       const qId = q.id || ''
       const ans = answers[qId]
 
+      const isVisible = isQuestionVisible(q)
+      if (!isVisible) continue // Se não estiver visível pela condição, não valida nem exige
+
       if (q.is_required) {
         if (
-          (q.question_type === 'rating_10' || q.question_type === 'rating_5') &&
+          (q.question_type === 'rating_10' ||
+            q.question_type === 'rating_5' ||
+            q.question_type === 'smiley_5') &&
           (ans?.numeric_value === null || ans?.numeric_value === undefined)
         ) {
           toast.error(`Por favor, responda à pergunta #${i + 1}.`)
@@ -138,11 +168,16 @@ export function PublicSurveyForm() {
     setSubmitting(true)
 
     try {
+      // Filtrar apenas respostas de perguntas visíveis
+      const visibleQuestionIds = new Set(
+        (survey.questions || []).filter((q) => isQuestionVisible(q)).map((q) => q.id),
+      )
+
       const formattedAnswers = Object.entries(answers)
-        .filter(
-          ([_, val]) =>
-            val.numeric_value !== null || (val.text_value && val.text_value.trim() !== ''),
-        )
+        .filter(([qId, val]) => {
+          if (!visibleQuestionIds.has(qId)) return false
+          return val.numeric_value !== null || (val.text_value && val.text_value.trim() !== '')
+        })
         .map(([qId, val]) => ({
           question_id: qId,
           numeric_value: val.numeric_value ?? null,
@@ -326,14 +361,20 @@ export function PublicSurveyForm() {
           {(survey.questions || []).map((q, idx) => {
             const qId = q.id || ''
             const ans = answers[qId] || {}
+            const isVisible = isQuestionVisible(q)
+
+            if (!isVisible) return null
 
             return (
               <Card
                 key={qId}
                 className={cn(
-                  'border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-slate-900 transition-all duration-200 overflow-hidden',
+                  'border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-slate-900 transition-all duration-300 overflow-hidden animate-in fade-in slide-in-from-top-2',
                   ans.numeric_value !== null || ans.text_value
                     ? 'border-l-4 border-l-brand-vividBlue'
+                    : '',
+                  q.is_conditional
+                    ? 'border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/20 dark:bg-blue-950/10'
                     : '',
                 )}
               >
@@ -355,6 +396,252 @@ export function PublicSurveyForm() {
                       <p className="text-xs text-muted-foreground mt-1">{q.description}</p>
                     )}
                   </div>
+
+                  {/* CASO 0: ESCALA DE ROSTINHOS (SMILEY_5) */}
+                  {q.question_type === 'smiley_5' && (
+                    <div className="space-y-4 pt-1">
+                      <div className="grid grid-cols-5 gap-2 sm:gap-4 py-2">
+                        {/* 1 - Muito Insatisfeito */}
+                        <button
+                          type="button"
+                          onClick={() => handleRatingSelect(qId, 1)}
+                          className={cn(
+                            'flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl border-2 transition-all duration-200 group active:scale-95',
+                            ans.numeric_value === 1
+                              ? 'bg-red-50 dark:bg-red-950/40 border-[#ef4444] shadow-lg shadow-red-500/10 scale-105 ring-2 ring-red-400/40'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-red-300 hover:bg-red-50/50 dark:hover:bg-red-950/20',
+                          )}
+                        >
+                          <svg
+                            viewBox="0 0 64 64"
+                            className="w-12 h-12 sm:w-16 sm:h-16 transition-transform group-hover:scale-110 drop-shadow-sm"
+                          >
+                            <circle
+                              cx="32"
+                              cy="32"
+                              r="30"
+                              fill="#ef4444"
+                              stroke="#b91c1c"
+                              strokeWidth="1.5"
+                            />
+                            {/* Olhos pretos com brilho */}
+                            <ellipse cx="22" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            <ellipse cx="42" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            {/* Boca muito triste/curvada para baixo */}
+                            <path
+                              d="M 18 46 Q 32 30 46 46"
+                              fill="none"
+                              stroke="#111827"
+                              strokeWidth="4"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span
+                            className={cn(
+                              'text-xs sm:text-sm font-bold text-center mt-2.5 leading-tight transition-colors',
+                              ans.numeric_value === 1
+                                ? 'text-[#ef4444]'
+                                : 'text-slate-700 dark:text-slate-300 group-hover:text-[#ef4444]',
+                            )}
+                          >
+                            Muito
+                            <br className="sm:hidden" /> Insatisfeito
+                          </span>
+                        </button>
+
+                        {/* 2 - Insatisfeito */}
+                        <button
+                          type="button"
+                          onClick={() => handleRatingSelect(qId, 2)}
+                          className={cn(
+                            'flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl border-2 transition-all duration-200 group active:scale-95',
+                            ans.numeric_value === 2
+                              ? 'bg-orange-50 dark:bg-orange-950/40 border-[#f97316] shadow-lg shadow-orange-500/10 scale-105 ring-2 ring-orange-400/40'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-orange-300 hover:bg-orange-50/50 dark:hover:bg-orange-950/20',
+                          )}
+                        >
+                          <svg
+                            viewBox="0 0 64 64"
+                            className="w-12 h-12 sm:w-16 sm:h-16 transition-transform group-hover:scale-110 drop-shadow-sm"
+                          >
+                            <circle
+                              cx="32"
+                              cy="32"
+                              r="30"
+                              fill="#f97316"
+                              stroke="#c2410c"
+                              strokeWidth="1.5"
+                            />
+                            {/* Olhos pretos */}
+                            <ellipse cx="22" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            <ellipse cx="42" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            {/* Boca levemente triste */}
+                            <path
+                              d="M 21 44 Q 32 34 43 44"
+                              fill="none"
+                              stroke="#111827"
+                              strokeWidth="3.8"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span
+                            className={cn(
+                              'text-xs sm:text-sm font-bold text-center mt-2.5 leading-tight transition-colors',
+                              ans.numeric_value === 2
+                                ? 'text-[#f97316]'
+                                : 'text-slate-700 dark:text-slate-300 group-hover:text-[#f97316]',
+                            )}
+                          >
+                            Insatisfeito
+                          </span>
+                        </button>
+
+                        {/* 3 - Regular */}
+                        <button
+                          type="button"
+                          onClick={() => handleRatingSelect(qId, 3)}
+                          className={cn(
+                            'flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl border-2 transition-all duration-200 group active:scale-95',
+                            ans.numeric_value === 3
+                              ? 'bg-yellow-50 dark:bg-yellow-950/40 border-[#eab308] shadow-lg shadow-yellow-500/10 scale-105 ring-2 ring-yellow-400/40'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-yellow-300 hover:bg-yellow-50/50 dark:hover:bg-yellow-950/20',
+                          )}
+                        >
+                          <svg
+                            viewBox="0 0 64 64"
+                            className="w-12 h-12 sm:w-16 sm:h-16 transition-transform group-hover:scale-110 drop-shadow-sm"
+                          >
+                            <circle
+                              cx="32"
+                              cy="32"
+                              r="30"
+                              fill="#eab308"
+                              stroke="#a16207"
+                              strokeWidth="1.5"
+                            />
+                            {/* Olhos pretos */}
+                            <ellipse cx="22" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            <ellipse cx="42" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            {/* Boca neutra reta */}
+                            <line
+                              x1="20"
+                              y1="42"
+                              x2="44"
+                              y2="42"
+                              stroke="#111827"
+                              strokeWidth="4"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span
+                            className={cn(
+                              'text-xs sm:text-sm font-bold text-center mt-2.5 leading-tight transition-colors',
+                              ans.numeric_value === 3
+                                ? 'text-[#ca8a04] dark:text-[#facc15]'
+                                : 'text-slate-700 dark:text-slate-300 group-hover:text-[#ca8a04]',
+                            )}
+                          >
+                            Regular
+                          </span>
+                        </button>
+
+                        {/* 4 - Satisfeito */}
+                        <button
+                          type="button"
+                          onClick={() => handleRatingSelect(qId, 4)}
+                          className={cn(
+                            'flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl border-2 transition-all duration-200 group active:scale-95',
+                            ans.numeric_value === 4
+                              ? 'bg-lime-50 dark:bg-lime-950/40 border-[#a3e635] shadow-lg shadow-lime-500/10 scale-105 ring-2 ring-lime-400/40'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-lime-300 hover:bg-lime-50/50 dark:hover:bg-lime-950/20',
+                          )}
+                        >
+                          <svg
+                            viewBox="0 0 64 64"
+                            className="w-12 h-12 sm:w-16 sm:h-16 transition-transform group-hover:scale-110 drop-shadow-sm"
+                          >
+                            <circle
+                              cx="32"
+                              cy="32"
+                              r="30"
+                              fill="#a3e635"
+                              stroke="#65a30d"
+                              strokeWidth="1.5"
+                            />
+                            {/* Olhos pretos */}
+                            <ellipse cx="22" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            <ellipse cx="42" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            {/* Boca levemente sorridente */}
+                            <path
+                              d="M 21 38 Q 32 48 43 38"
+                              fill="none"
+                              stroke="#111827"
+                              strokeWidth="3.8"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span
+                            className={cn(
+                              'text-xs sm:text-sm font-bold text-center mt-2.5 leading-tight transition-colors',
+                              ans.numeric_value === 4
+                                ? 'text-[#65a30d] dark:text-[#a3e635]'
+                                : 'text-slate-700 dark:text-slate-300 group-hover:text-[#65a30d]',
+                            )}
+                          >
+                            Satisfeito
+                          </span>
+                        </button>
+
+                        {/* 5 - Muito Satisfeito */}
+                        <button
+                          type="button"
+                          onClick={() => handleRatingSelect(qId, 5)}
+                          className={cn(
+                            'flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl border-2 transition-all duration-200 group active:scale-95',
+                            ans.numeric_value === 5
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-[#22c55e] shadow-lg shadow-emerald-500/10 scale-105 ring-2 ring-emerald-400/40'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20',
+                          )}
+                        >
+                          <svg
+                            viewBox="0 0 64 64"
+                            className="w-12 h-12 sm:w-16 sm:h-16 transition-transform group-hover:scale-110 drop-shadow-sm"
+                          >
+                            <circle
+                              cx="32"
+                              cy="32"
+                              r="30"
+                              fill="#22c55e"
+                              stroke="#15803d"
+                              strokeWidth="1.5"
+                            />
+                            {/* Olhos pretos */}
+                            <ellipse cx="22" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            <ellipse cx="42" cy="24" rx="3.5" ry="5" fill="#111827" />
+                            {/* Boca muito sorridente */}
+                            <path
+                              d="M 18 36 Q 32 54 46 36"
+                              fill="none"
+                              stroke="#111827"
+                              strokeWidth="4"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span
+                            className={cn(
+                              'text-xs sm:text-sm font-bold text-center mt-2.5 leading-tight transition-colors',
+                              ans.numeric_value === 5
+                                ? 'text-[#16a34a] dark:text-[#22c55e]'
+                                : 'text-slate-700 dark:text-slate-300 group-hover:text-[#16a34a]',
+                            )}
+                          >
+                            Muito
+                            <br className="sm:hidden" /> Satisfeito
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* CASO 1: NOTA DE 0 A 10 */}
                   {q.question_type === 'rating_10' && (

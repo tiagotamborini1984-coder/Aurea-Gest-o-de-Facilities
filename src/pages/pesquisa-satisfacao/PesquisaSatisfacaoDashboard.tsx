@@ -32,6 +32,7 @@ import {
   Building2,
   Filter,
   Star,
+  Smile,
   Users,
   Award,
   ArrowLeft,
@@ -521,23 +522,47 @@ export function PesquisaSatisfacaoDashboard() {
                 </CardHeader>
 
                 <CardContent className="pt-0 flex-1 flex flex-col justify-between">
-                  {/* CASO A: PERGUNTA NUMÉRICA (0-10 OU 1-5 ESTRELAS) */}
-                  {(qm.questionType === 'rating_10' || qm.questionType === 'rating_5') && (
+                  {/* CASO A: PERGUNTA NUMÉRICA (0-10, 1-5 ESTRELAS OU ESCALA DE ROSTINHOS) */}
+                  {(qm.questionType === 'rating_10' ||
+                    qm.questionType === 'rating_5' ||
+                    qm.questionType === 'smiley_5') && (
                     <div className="py-4 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border">
                       <div className="flex items-center gap-2">
-                        <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
+                        {qm.questionType === 'smiley_5' ? (
+                          <Smile className="h-6 w-6 text-emerald-600" />
+                        ) : (
+                          <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
+                        )}
                         <span className="text-3xl font-extrabold text-foreground">
                           {qm.avgRating !== null && qm.avgRating !== undefined
                             ? qm.avgRating.toFixed(1)
                             : '--'}
                         </span>
                         <span className="text-sm text-muted-foreground font-semibold">
-                          / {qm.questionType === 'rating_5' ? '5.0 estrelas' : '10.0'}
+                          / {qm.questionType === 'rating_10' ? '10.0' : '5.0'}
+                          {qm.questionType === 'smiley_5'
+                            ? ' (Rostinhos)'
+                            : qm.questionType === 'rating_5'
+                              ? ' estrelas'
+                              : ''}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Média apurada entre todas as submissões
                       </p>
+                      {qm.questionType === 'smiley_5' && qm.avgRating !== null && (
+                        <div className="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          {qm.avgRating >= 4.5
+                            ? 'Muito Satisfeito'
+                            : qm.avgRating >= 3.5
+                              ? 'Satisfeito'
+                              : qm.avgRating >= 2.5
+                                ? 'Regular'
+                                : qm.avgRating >= 1.5
+                                  ? 'Insatisfeito'
+                                  : 'Muito Insatisfeito'}
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -1,4 +1,4 @@
-export type QuestionType = 'rating_10' | 'rating_5' | 'multiple_choice' | 'text'
+export type QuestionType = 'rating_10' | 'rating_5' | 'smiley_5' | 'multiple_choice' | 'text'
 
 export interface SurveySchedule {
   id?: string
@@ -18,6 +18,11 @@ export interface SurveyQuestion {
   options: string[]
   is_required: boolean
   order_index: number
+  is_conditional?: boolean
+  parent_question_id?: string | null
+  trigger_values?: any[]
+  // Helper for UI temporary IDs when building new questions before DB insertion
+  temp_id?: string
 }
 
 export interface SatisfactionSurvey {
