@@ -238,72 +238,147 @@ export const satisfactionSurveyService = {
 
     if (!surveyId) throw new Error('Não foi possível identificar o ID da pesquisa.')
 
-    // Salvar Perguntas (Substituição ou Atualização)
-    // Deletar perguntas antigas não inclusas e inserir/atualizar as atuais
-    if (isUpdating) {
-      await supabase.from('satisfaction_survey_questions').delete().eq('survey_id', surveyId)
+    // Salvar Perguntas (Preservando IDs existentes para não apagar respostas em cascata)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+    // Buscar perguntas existentes no banco para saber o que atualizar, manter ou excluir
+    const { data: existingQuestionsData, error: fetchQError } = await supabase
+      .from('satisfaction_survey_questions')
+      .select('id')
+      .eq('survey_id', surveyId)
+
+    if (fetchQError) {
+      console.error('Error fetching existing questions for survey:', fetchQError)
+      throw fetchQError
+    }
+
+    const existingIdsInDb = new Set((existingQuestionsData || []).map((q) => q.id))
+
+    // Identificar quais perguntas do payload já existem no banco
+    const currentPayloadRealIds = new Set<string>()
+    for (const q of questions) {
+      if (q.id && UUID_REGEX.test(q.id) && existingIdsInDb.has(q.id)) {
+        currentPayloadRealIds.add(q.id)
+      }
+    }
+
+    // Perguntas que existiam no banco mas foram removidas pelo usuário nesta edição
+    const idsToDelete = [...existingIdsInDb].filter((id) => !currentPayloadRealIds.has(id))
+    if (idsToDelete.length > 0) {
+      const { error: deleteOldError } = await supabase
+        .from('satisfaction_survey_questions')
+        .delete()
+        .in('id', idsToDelete)
+
+      if (deleteOldError) {
+        console.error('Error deleting removed questions:', deleteOldError)
+        throw deleteOldError
+      }
+    }
+
+    // Mapa para resolver parent_question_id: chave antiga (id ou temp_id) -> id final no banco
+    const idMap = new Map<string, string>()
+
+    // Para perguntas já existentes, o ID no banco é seu próprio id
+    for (const q of questions) {
+      const isExisting = q.id && UUID_REGEX.test(q.id) && existingIdsInDb.has(q.id)
+      if (isExisting && q.id) {
+        idMap.set(q.id, q.id)
+        if (q.temp_id) {
+          idMap.set(q.temp_id, q.id)
+        }
+      }
     }
 
     if (questions.length > 0) {
-      // 1. Inserir primeiro as perguntas principais para obter seus novos IDs
-      // Mapear temporariamente usando temp_id ou id original
       const mainQuestions = questions.filter((q) => !q.is_conditional)
       const conditionalQuestions = questions.filter((q) => q.is_conditional)
 
-      // Guardar mapa de id antigo/temp -> novo ID inserido
-      const idMap = new Map<string, string>()
-
-      // Inserir perguntas principais
+      // 1. Processar perguntas principais (INSERT ou UPDATE)
       for (const q of mainQuestions) {
         const tempKey = q.id || q.temp_id
         const orderIdx = questions.indexOf(q) + 1
-        const { data: inserted, error: insertQErr } = await supabase
-          .from('satisfaction_survey_questions')
-          .insert({
-            survey_id: surveyId,
-            title: q.title || 'Pergunta',
-            description: q.description || null,
-            question_type: q.question_type || 'rating_10',
-            options: q.options || [],
-            is_required: q.is_required ?? true,
-            order_index: orderIdx,
-            is_conditional: false,
-            parent_question_id: null,
-            trigger_values: [],
-          })
-          .select('id')
-          .single()
+        const isExisting = Boolean(q.id && UUID_REGEX.test(q.id) && existingIdsInDb.has(q.id))
 
-        if (insertQErr) throw insertQErr
-        if (tempKey && inserted) {
-          idMap.set(tempKey, inserted.id)
+        const questionPayload = {
+          survey_id: surveyId,
+          title: q.title || 'Pergunta',
+          description: q.description || null,
+          question_type: q.question_type || 'rating_10',
+          options: q.options || [],
+          is_required: q.is_required ?? true,
+          order_index: orderIdx,
+          is_conditional: false,
+          parent_question_id: null,
+          trigger_values: [],
+        }
+
+        if (isExisting && q.id) {
+          const { error: updateQErr } = await supabase
+            .from('satisfaction_survey_questions')
+            .update(questionPayload)
+            .eq('id', q.id)
+
+          if (updateQErr) throw updateQErr
+          if (tempKey) idMap.set(tempKey, q.id)
+        } else {
+          const { data: inserted, error: insertQErr } = await supabase
+            .from('satisfaction_survey_questions')
+            .insert(questionPayload)
+            .select('id')
+            .single()
+
+          if (insertQErr) throw insertQErr
+          if (tempKey && inserted) {
+            idMap.set(tempKey, inserted.id)
+          }
         }
       }
 
-      // Inserir perguntas condicionais mapeando o parent_question_id
+      // 2. Processar perguntas condicionais (INSERT ou UPDATE com parent_question_id mapeado)
       for (const q of conditionalQuestions) {
+        const tempKey = q.id || q.temp_id
         const orderIdx = questions.indexOf(q) + 1
+        const isExisting = Boolean(q.id && UUID_REGEX.test(q.id) && existingIdsInDb.has(q.id))
+
         let mappedParentId: string | null = null
         if (q.parent_question_id) {
           mappedParentId = idMap.get(q.parent_question_id) || q.parent_question_id
         }
 
-        const { error: insertCondErr } = await supabase
-          .from('satisfaction_survey_questions')
-          .insert({
-            survey_id: surveyId,
-            title: q.title || 'Pergunta',
-            description: q.description || null,
-            question_type: q.question_type || 'text',
-            options: q.options || [],
-            is_required: q.is_required ?? false,
-            order_index: orderIdx,
-            is_conditional: true,
-            parent_question_id: mappedParentId,
-            trigger_values: q.trigger_values || [],
-          })
+        const questionPayload = {
+          survey_id: surveyId,
+          title: q.title || 'Pergunta',
+          description: q.description || null,
+          question_type: q.question_type || 'text',
+          options: q.options || [],
+          is_required: q.is_required ?? false,
+          order_index: orderIdx,
+          is_conditional: true,
+          parent_question_id: mappedParentId,
+          trigger_values: q.trigger_values || [],
+        }
 
-        if (insertCondErr) throw insertCondErr
+        if (isExisting && q.id) {
+          const { error: updateCondErr } = await supabase
+            .from('satisfaction_survey_questions')
+            .update(questionPayload)
+            .eq('id', q.id)
+
+          if (updateCondErr) throw updateCondErr
+          if (tempKey) idMap.set(tempKey, q.id)
+        } else {
+          const { data: insertedCond, error: insertCondErr } = await supabase
+            .from('satisfaction_survey_questions')
+            .insert(questionPayload)
+            .select('id')
+            .single()
+
+          if (insertCondErr) throw insertCondErr
+          if (tempKey && insertedCond) {
+            idMap.set(tempKey, insertedCond.id)
+          }
+        }
       }
     }
 
