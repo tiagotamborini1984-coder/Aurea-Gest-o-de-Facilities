@@ -74,9 +74,26 @@ export interface SurveyDashboardFilters {
   endDate?: string
 }
 
+export interface SmileyMetrics {
+  totalSmileyAnswers: number
+  satisfiedCount: number // respostas 4 (Satisfeito) + 5 (Muito Satisfeito)
+  satisfiedPercentage: number // % de 4 + 5
+  verySatisfiedCount: number // respostas 5
+  verySatisfiedPercentage: number
+  satisfiedOnlyCount: number // respostas 4
+  satisfiedOnlyPercentage: number
+  neutralCount: number // respostas 3 (Regular)
+  neutralPercentage: number
+  dissatisfiedCount: number // respostas 2 (Insatisfeito)
+  dissatisfiedPercentage: number
+  veryDissatisfiedCount: number // respostas 1 (Muito Insatisfeito)
+  veryDissatisfiedPercentage: number
+}
+
 export interface SurveyDashboardMetrics {
   totalResponses: number
   overallAvgScore: number | null // Escala 0-10 normalizada
+  smileyMetrics?: SmileyMetrics | null // Métricas consolidadas de rostinhos (smiley_5)
   scoreDistribution: { scoreRange: string; count: number; percentage: number }[]
   surveysBreakdown: {
     surveyId: string
@@ -95,5 +112,6 @@ export interface SurveyDashboardMetrics {
     avgRating?: number | null
     distribution?: { label: string; count: number; percentage: number }[]
     textAnswers?: { text: string; date: string; location?: string }[]
+    smileyMetrics?: SmileyMetrics | null
   }[]
 }

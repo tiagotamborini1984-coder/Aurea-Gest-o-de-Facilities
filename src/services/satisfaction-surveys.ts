@@ -431,6 +431,15 @@ export const satisfactionSurveyService = {
     // Calcular notas e distribuições
     let numericSum = 0
     let numericCount = 0
+
+    // Contadores para métricas de rostinhos gerais (smiley_5)
+    let globalSmileyCount = 0
+    let globalSmiley1 = 0 // Muito Insatisfeito
+    let globalSmiley2 = 0 // Insatisfeito
+    let globalSmiley3 = 0 // Regular
+    let globalSmiley4 = 0 // Satisfeito
+    let globalSmiley5 = 0 // Muito Satisfeito
+
     const scoreBuckets: Record<string, number> = {
       '0-2 (Muito Crítico)': 0,
       '3-4 (Crítico)': 0,
@@ -463,6 +472,7 @@ export const satisfactionSurveyService = {
         totalAnswers: number
         sumScores: number
         countScores: number
+        smileyCounts: { 1: number; 2: number; 3: number; 4: number; 5: number }
         optionCounts: Record<string, number>
         textAnswers: { text: string; date: string; location?: string }[]
       }
@@ -502,6 +512,7 @@ export const satisfactionSurveyService = {
             totalAnswers: 0,
             sumScores: 0,
             countScores: 0,
+            smileyCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
             optionCounts: {},
             textAnswers: [],
           }
@@ -524,6 +535,27 @@ export const satisfactionSurveyService = {
 
           qStat.sumScores += rawVal
           qStat.countScores += 1
+
+          // Métricas de rostinhos (smiley_5)
+          if (q.question_type === 'smiley_5') {
+            globalSmileyCount += 1
+            if (rawVal === 1) {
+              globalSmiley1 += 1
+              qStat.smileyCounts[1] += 1
+            } else if (rawVal === 2) {
+              globalSmiley2 += 1
+              qStat.smileyCounts[2] += 1
+            } else if (rawVal === 3) {
+              globalSmiley3 += 1
+              qStat.smileyCounts[3] += 1
+            } else if (rawVal === 4) {
+              globalSmiley4 += 1
+              qStat.smileyCounts[4] += 1
+            } else if (rawVal === 5) {
+              globalSmiley5 += 1
+              qStat.smileyCounts[5] += 1
+            }
+          }
 
           surveyBreakdownMap[sId].scoreSum += normalizedVal
           surveyBreakdownMap[sId].scoreCount += 1
@@ -554,6 +586,27 @@ export const satisfactionSurveyService = {
 
     const overallAvgScore = numericCount > 0 ? Number((numericSum / numericCount).toFixed(1)) : null
 
+    const smileyMetrics =
+      globalSmileyCount > 0
+        ? {
+            totalSmileyAnswers: globalSmileyCount,
+            satisfiedCount: globalSmiley4 + globalSmiley5,
+            satisfiedPercentage: Math.round(
+              ((globalSmiley4 + globalSmiley5) / globalSmileyCount) * 100,
+            ),
+            verySatisfiedCount: globalSmiley5,
+            verySatisfiedPercentage: Math.round((globalSmiley5 / globalSmileyCount) * 100),
+            satisfiedOnlyCount: globalSmiley4,
+            satisfiedOnlyPercentage: Math.round((globalSmiley4 / globalSmileyCount) * 100),
+            neutralCount: globalSmiley3,
+            neutralPercentage: Math.round((globalSmiley3 / globalSmileyCount) * 100),
+            dissatisfiedCount: globalSmiley2,
+            dissatisfiedPercentage: Math.round((globalSmiley2 / globalSmileyCount) * 100),
+            veryDissatisfiedCount: globalSmiley1,
+            veryDissatisfiedPercentage: Math.round((globalSmiley1 / globalSmileyCount) * 100),
+          }
+        : null
+
     const scoreDistribution = Object.entries(scoreBuckets).map(([scoreRange, count]) => ({
       scoreRange,
       count,
@@ -583,6 +636,31 @@ export const satisfactionSurveyService = {
           }))
         }
 
+        let qSmileyMetrics = null
+        if (q.questionType === 'smiley_5' && q.countScores > 0) {
+          const s1 = q.smileyCounts[1] || 0
+          const s2 = q.smileyCounts[2] || 0
+          const s3 = q.smileyCounts[3] || 0
+          const s4 = q.smileyCounts[4] || 0
+          const s5 = q.smileyCounts[5] || 0
+          const total = q.countScores
+          qSmileyMetrics = {
+            totalSmileyAnswers: total,
+            satisfiedCount: s4 + s5,
+            satisfiedPercentage: Math.round(((s4 + s5) / total) * 100),
+            verySatisfiedCount: s5,
+            verySatisfiedPercentage: Math.round((s5 / total) * 100),
+            satisfiedOnlyCount: s4,
+            satisfiedOnlyPercentage: Math.round((s4 / total) * 100),
+            neutralCount: s3,
+            neutralPercentage: Math.round((s3 / total) * 100),
+            dissatisfiedCount: s2,
+            dissatisfiedPercentage: Math.round((s2 / total) * 100),
+            veryDissatisfiedCount: s1,
+            veryDissatisfiedPercentage: Math.round((s1 / total) * 100),
+          }
+        }
+
         return {
           questionId: q.questionId,
           questionTitle: q.questionTitle,
@@ -592,12 +670,14 @@ export const satisfactionSurveyService = {
           avgRating: q.countScores > 0 ? Number((q.sumScores / q.countScores).toFixed(1)) : null,
           distribution,
           textAnswers: q.textAnswers,
+          smileyMetrics: qSmileyMetrics,
         }
       })
 
     return {
       totalResponses,
       overallAvgScore,
+      smileyMetrics,
       scoreDistribution,
       surveysBreakdown,
       questionMetrics,

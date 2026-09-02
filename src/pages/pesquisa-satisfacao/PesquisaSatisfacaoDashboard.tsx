@@ -284,7 +284,11 @@ export function PesquisaSatisfacaoDashboard() {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div
+        className={`grid grid-cols-1 ${
+          metrics?.smileyMetrics ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'
+        } gap-4`}
+      >
         {/* Total de Respostas */}
         <Card className="border shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-5 flex items-center justify-between">
@@ -304,6 +308,36 @@ export function PesquisaSatisfacaoDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Nível de Satisfação (Rostinhos: Satisfeito + Muito Satisfeito) */}
+        {metrics?.smileyMetrics && (
+          <Card className="border shadow-sm bg-white dark:bg-slate-900 relative overflow-hidden border-emerald-200 dark:border-emerald-900/60">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-lime-400" />
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                  <Smile className="h-3.5 w-3.5" />
+                  Nível de Satisfação
+                </p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {metrics.smileyMetrics.satisfiedPercentage}%
+                  </span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    ({metrics.smileyMetrics.satisfiedCount} de{' '}
+                    {metrics.smileyMetrics.totalSmileyAnswers})
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Satisfeito ou Muito Satisfeito
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <Smile className="h-6 w-6" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Média Geral de Satisfação */}
         <Card className="border shadow-sm bg-white dark:bg-slate-900">
@@ -366,6 +400,157 @@ export function PesquisaSatisfacaoDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Seção Informativa de Nível de Satisfação (Rostinhos) quando presente */}
+      {metrics?.smileyMetrics && (
+        <Card className="border shadow-sm bg-gradient-to-br from-emerald-50/50 via-white to-lime-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20 border-emerald-100 dark:border-emerald-900/40">
+          <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                  <Smile className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+                    Nível de Satisfação Detalhado (Escala de Rostinhos)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Percentual de aprovação apurado: respostas Satisfeito (4) e Muito Satisfeito (5)
+                  </CardDescription>
+                </div>
+              </div>
+              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1 self-start sm:self-auto shadow-sm">
+                {metrics.smileyMetrics.satisfiedPercentage}% de Satisfação Positiva
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 sm:px-6 pb-4 pt-0">
+            {/* Barra de Progresso Segmentada */}
+            <div className="space-y-2">
+              <div className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 flex overflow-hidden shadow-inner">
+                {metrics.smileyMetrics.veryDissatisfiedPercentage > 0 && (
+                  <div
+                    style={{ width: `${metrics.smileyMetrics.veryDissatisfiedPercentage}%` }}
+                    className="bg-red-500 transition-all duration-300"
+                    title={`Muito Insatisfeito: ${metrics.smileyMetrics.veryDissatisfiedCount} (${metrics.smileyMetrics.veryDissatisfiedPercentage}%)`}
+                  />
+                )}
+                {metrics.smileyMetrics.dissatisfiedPercentage > 0 && (
+                  <div
+                    style={{ width: `${metrics.smileyMetrics.dissatisfiedPercentage}%` }}
+                    className="bg-orange-500 transition-all duration-300"
+                    title={`Insatisfeito: ${metrics.smileyMetrics.dissatisfiedCount} (${metrics.smileyMetrics.dissatisfiedPercentage}%)`}
+                  />
+                )}
+                {metrics.smileyMetrics.neutralPercentage > 0 && (
+                  <div
+                    style={{ width: `${metrics.smileyMetrics.neutralPercentage}%` }}
+                    className="bg-yellow-500 transition-all duration-300"
+                    title={`Regular: ${metrics.smileyMetrics.neutralCount} (${metrics.smileyMetrics.neutralPercentage}%)`}
+                  />
+                )}
+                {metrics.smileyMetrics.satisfiedOnlyPercentage > 0 && (
+                  <div
+                    style={{ width: `${metrics.smileyMetrics.satisfiedOnlyPercentage}%` }}
+                    className="bg-lime-500 transition-all duration-300"
+                    title={`Satisfeito: ${metrics.smileyMetrics.satisfiedOnlyCount} (${metrics.smileyMetrics.satisfiedOnlyPercentage}%)`}
+                  />
+                )}
+                {metrics.smileyMetrics.verySatisfiedPercentage > 0 && (
+                  <div
+                    style={{ width: `${metrics.smileyMetrics.verySatisfiedPercentage}%` }}
+                    className="bg-emerald-600 transition-all duration-300"
+                    title={`Muito Satisfeito: ${metrics.smileyMetrics.verySatisfiedCount} (${metrics.smileyMetrics.verySatisfiedPercentage}%)`}
+                  />
+                )}
+              </div>
+
+              {/* Grid com cada sentimento */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
+                {/* 1 - Muito Insatisfeito */}
+                <div className="p-2.5 rounded-xl border bg-white/70 dark:bg-slate-800/60 flex flex-col items-center text-center">
+                  <span className="text-base mb-0.5">😡</span>
+                  <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">
+                    Muito Insatisfeito
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-base font-bold text-foreground">
+                      {metrics.smileyMetrics.veryDissatisfiedCount}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      ({metrics.smileyMetrics.veryDissatisfiedPercentage}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2 - Insatisfeito */}
+                <div className="p-2.5 rounded-xl border bg-white/70 dark:bg-slate-800/60 flex flex-col items-center text-center">
+                  <span className="text-base mb-0.5">🙁</span>
+                  <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+                    Insatisfeito
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-base font-bold text-foreground">
+                      {metrics.smileyMetrics.dissatisfiedCount}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      ({metrics.smileyMetrics.dissatisfiedPercentage}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3 - Regular */}
+                <div className="p-2.5 rounded-xl border bg-white/70 dark:bg-slate-800/60 flex flex-col items-center text-center">
+                  <span className="text-base mb-0.5">😐</span>
+                  <span className="text-[11px] font-semibold text-yellow-600 dark:text-yellow-400">
+                    Regular
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-base font-bold text-foreground">
+                      {metrics.smileyMetrics.neutralCount}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      ({metrics.smileyMetrics.neutralPercentage}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4 - Satisfeito */}
+                <div className="p-2.5 rounded-xl border border-lime-200 dark:border-lime-900/60 bg-lime-50/50 dark:bg-lime-950/20 flex flex-col items-center text-center">
+                  <span className="text-base mb-0.5">🙂</span>
+                  <span className="text-[11px] font-semibold text-lime-700 dark:text-lime-400">
+                    Satisfeito
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-base font-bold text-lime-800 dark:text-lime-300">
+                      {metrics.smileyMetrics.satisfiedOnlyCount}
+                    </span>
+                    <span className="text-[10px] text-lime-700 dark:text-lime-400">
+                      ({metrics.smileyMetrics.satisfiedOnlyPercentage}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5 - Muito Satisfeito */}
+                <div className="p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 flex flex-col items-center text-center col-span-2 sm:col-span-1">
+                  <span className="text-base mb-0.5">😄</span>
+                  <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    Muito Satisfeito
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-base font-bold text-emerald-800 dark:text-emerald-300">
+                      {metrics.smileyMetrics.verySatisfiedCount}
+                    </span>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                      ({metrics.smileyMetrics.verySatisfiedPercentage}%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Gráfico 1: Distribuição Geral por Faixa de Nota */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -526,41 +711,116 @@ export function PesquisaSatisfacaoDashboard() {
                   {(qm.questionType === 'rating_10' ||
                     qm.questionType === 'rating_5' ||
                     qm.questionType === 'smiley_5') && (
-                    <div className="py-4 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border">
-                      <div className="flex items-center gap-2">
-                        {qm.questionType === 'smiley_5' ? (
-                          <Smile className="h-6 w-6 text-emerald-600" />
-                        ) : (
-                          <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
+                    <div className="space-y-3">
+                      <div className="py-4 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border">
+                        <div className="flex items-center gap-2">
+                          {qm.questionType === 'smiley_5' ? (
+                            <Smile className="h-6 w-6 text-emerald-600" />
+                          ) : (
+                            <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
+                          )}
+                          <span className="text-3xl font-extrabold text-foreground">
+                            {qm.avgRating !== null && qm.avgRating !== undefined
+                              ? qm.avgRating.toFixed(1)
+                              : '--'}
+                          </span>
+                          <span className="text-sm text-muted-foreground font-semibold">
+                            / {qm.questionType === 'rating_10' ? '10.0' : '5.0'}
+                            {qm.questionType === 'smiley_5'
+                              ? ' (Rostinhos)'
+                              : qm.questionType === 'rating_5'
+                                ? ' estrelas'
+                                : ''}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Média apurada entre todas as submissões
+                        </p>
+                        {qm.questionType === 'smiley_5' && qm.avgRating !== null && (
+                          <div className="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            {qm.avgRating >= 4.5
+                              ? 'Muito Satisfeito'
+                              : qm.avgRating >= 3.5
+                                ? 'Satisfeito'
+                                : qm.avgRating >= 2.5
+                                  ? 'Regular'
+                                  : qm.avgRating >= 1.5
+                                    ? 'Insatisfeito'
+                                    : 'Muito Insatisfeito'}
+                          </div>
                         )}
-                        <span className="text-3xl font-extrabold text-foreground">
-                          {qm.avgRating !== null && qm.avgRating !== undefined
-                            ? qm.avgRating.toFixed(1)
-                            : '--'}
-                        </span>
-                        <span className="text-sm text-muted-foreground font-semibold">
-                          / {qm.questionType === 'rating_10' ? '10.0' : '5.0'}
-                          {qm.questionType === 'smiley_5'
-                            ? ' (Rostinhos)'
-                            : qm.questionType === 'rating_5'
-                              ? ' estrelas'
-                              : ''}
-                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Média apurada entre todas as submissões
-                      </p>
-                      {qm.questionType === 'smiley_5' && qm.avgRating !== null && (
-                        <div className="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                          {qm.avgRating >= 4.5
-                            ? 'Muito Satisfeito'
-                            : qm.avgRating >= 3.5
-                              ? 'Satisfeito'
-                              : qm.avgRating >= 2.5
-                                ? 'Regular'
-                                : qm.avgRating >= 1.5
-                                  ? 'Insatisfeito'
-                                  : 'Muito Insatisfeito'}
+
+                      {/* Nível de Satisfação específico da pergunta smiley_5 */}
+                      {qm.questionType === 'smiley_5' && qm.smileyMetrics && (
+                        <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                              <Smile className="h-3.5 w-3.5" />
+                              Nível de Satisfação (Satisfeito + Muito Satisfeito):
+                            </span>
+                            <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                              {qm.smileyMetrics.satisfiedPercentage}% (
+                              {qm.smileyMetrics.satisfiedCount}/
+                              {qm.smileyMetrics.totalSmileyAnswers})
+                            </span>
+                          </div>
+
+                          <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 flex overflow-hidden">
+                            {qm.smileyMetrics.veryDissatisfiedPercentage > 0 && (
+                              <div
+                                style={{ width: `${qm.smileyMetrics.veryDissatisfiedPercentage}%` }}
+                                className="bg-red-500"
+                                title={`Muito Insatisfeito: ${qm.smileyMetrics.veryDissatisfiedCount} (${qm.smileyMetrics.veryDissatisfiedPercentage}%)`}
+                              />
+                            )}
+                            {qm.smileyMetrics.dissatisfiedPercentage > 0 && (
+                              <div
+                                style={{ width: `${qm.smileyMetrics.dissatisfiedPercentage}%` }}
+                                className="bg-orange-500"
+                                title={`Insatisfeito: ${qm.smileyMetrics.dissatisfiedCount} (${qm.smileyMetrics.dissatisfiedPercentage}%)`}
+                              />
+                            )}
+                            {qm.smileyMetrics.neutralPercentage > 0 && (
+                              <div
+                                style={{ width: `${qm.smileyMetrics.neutralPercentage}%` }}
+                                className="bg-yellow-500"
+                                title={`Regular: ${qm.smileyMetrics.neutralCount} (${qm.smileyMetrics.neutralPercentage}%)`}
+                              />
+                            )}
+                            {qm.smileyMetrics.satisfiedOnlyPercentage > 0 && (
+                              <div
+                                style={{ width: `${qm.smileyMetrics.satisfiedOnlyPercentage}%` }}
+                                className="bg-lime-500"
+                                title={`Satisfeito: ${qm.smileyMetrics.satisfiedOnlyCount} (${qm.smileyMetrics.satisfiedOnlyPercentage}%)`}
+                              />
+                            )}
+                            {qm.smileyMetrics.verySatisfiedPercentage > 0 && (
+                              <div
+                                style={{ width: `${qm.smileyMetrics.verySatisfiedPercentage}%` }}
+                                className="bg-emerald-600"
+                                title={`Muito Satisfeito: ${qm.smileyMetrics.verySatisfiedCount} (${qm.smileyMetrics.verySatisfiedPercentage}%)`}
+                              />
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-5 gap-1 pt-1 text-[10px] text-center">
+                            <span className="text-red-600 dark:text-red-400 font-medium">
+                              😡 {qm.smileyMetrics.veryDissatisfiedCount}
+                            </span>
+                            <span className="text-orange-600 dark:text-orange-400 font-medium">
+                              🙁 {qm.smileyMetrics.dissatisfiedCount}
+                            </span>
+                            <span className="text-yellow-600 dark:text-yellow-400 font-medium">
+                              😐 {qm.smileyMetrics.neutralCount}
+                            </span>
+                            <span className="text-lime-700 dark:text-lime-400 font-medium">
+                              🙂 {qm.smileyMetrics.satisfiedOnlyCount}
+                            </span>
+                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                              😄 {qm.smileyMetrics.verySatisfiedCount}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
