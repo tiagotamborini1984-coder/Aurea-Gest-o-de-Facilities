@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams } from 'react-router-dom'
 import { SatisfactionSurvey, SurveyQuestion } from '@/types/satisfaction-surveys'
 import { satisfactionSurveyService } from '@/services/satisfaction-surveys'
 import { Button } from '@/components/ui/button'
@@ -9,16 +9,19 @@ import {
   Star,
   CheckCircle,
   Clock,
-  AlertCircle,
   Tablet,
   Sparkles,
   Send,
   Loader2,
   Building2,
   RotateCcw,
+  Timer,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+const INACTIVITY_TIMEOUT_SECONDS = 10
+const SUCCESS_REDIRECT_SECONDS = 3
 
 export function PublicSurveyForm() {
   const { id } = useParams<{ id: string }>()
@@ -34,8 +37,153 @@ export function PublicSurveyForm() {
     Record<string, { numeric_value?: number | null; text_value?: string | null }>
   >({})
 
-  // Estado de sucesso pós-envio
+  // Estado de sucesso pós-envio e contadores visuais
   const [submittedSuccess, setSubmittedSuccess] = useState(false)
+  const [successCountdown, setSuccessCountdown] = useState(SUCCESS_REDIRECT_SECONDS)
+  const [inactivityCountdown, setInactivityCountdown] = useState(INACTIVITY_TIMEOUT_SECONDS)
+
+  // Refs para controle de timers de inatividade e pós-envio
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const inactivityIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const successIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Helper para verificar se há alguma resposta preenchida no formulário
+  const hasInteractedAnswers = useCallback(
+    (
+      currentAnswers: Record<string, { numeric_value?: number | null; text_value?: string | null }>,
+    ) => {
+      return Object.values(currentAnswers).some(
+        (ans) =>
+          (ans.numeric_value !== null && ans.numeric_value !== undefined) ||
+          (ans.text_value !== null && ans.text_value !== undefined && ans.text_value.trim() !== ''),
+      )
+    },
+    [],
+  )
+
+  const hasInteractedRef = useRef(false)
+  hasInteractedRef.current = hasInteractedAnswers(answers)
+
+  // Limpar formulário e resetar estado inicial
+  const resetFormState = useCallback(() => {
+    if (survey) {
+      const initialAnswers: Record<string, any> = {}
+      survey.questions?.forEach((q) => {
+        initialAnswers[q.id || ''] = {
+          numeric_value: null,
+          text_value: null,
+        }
+      })
+      setAnswers(initialAnswers)
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [survey])
+
+  // Reiniciar formulário completo para o próximo usuário
+  const handleResetForNext = useCallback(() => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current)
+    if (successIntervalRef.current) clearInterval(successIntervalRef.current)
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+    if (inactivityIntervalRef.current) clearInterval(inactivityIntervalRef.current)
+
+    setSubmittedSuccess(false)
+    setInactivityCountdown(INACTIVITY_TIMEOUT_SECONDS)
+    resetFormState()
+    // Revalidar disponibilidade
+    loadSurvey()
+  }, [resetFormState])
+
+  // Limpar timers de inatividade
+  const clearInactivityTimers = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current)
+      inactivityTimerRef.current = null
+    }
+    if (inactivityIntervalRef.current) {
+      clearInterval(inactivityIntervalRef.current)
+      inactivityIntervalRef.current = null
+    }
+  }, [])
+
+  // Iniciar / resetar timer de inatividade de 10 segundos
+  const resetInactivityTimer = useCallback(() => {
+    clearInactivityTimers()
+
+    // Se já estiver na tela de sucesso ou enviando ou não disponível, não rodar timer de inatividade do form
+    if (submittedSuccess || submitting || !isAvailable) {
+      return
+    }
+
+    setInactivityCountdown(INACTIVITY_TIMEOUT_SECONDS)
+
+    // Se houver dados preenchidos, aciona contagem regressiva para expirar
+    inactivityIntervalRef.current = setInterval(() => {
+      setInactivityCountdown((prev) => {
+        if (prev <= 1) {
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    inactivityTimerRef.current = setTimeout(() => {
+      // Se o usuário interagiu ou começou a preencher e ficou inativo 10s: descartar e resetar
+      if (hasInteractedRef.current) {
+        toast.info('Tempo limite de inatividade atingido (10s). O formulário foi resetado.')
+        resetFormState()
+      }
+      setInactivityCountdown(INACTIVITY_TIMEOUT_SECONDS)
+      clearInactivityTimers()
+    }, INACTIVITY_TIMEOUT_SECONDS * 1000)
+  }, [submittedSuccess, submitting, isAvailable, clearInactivityTimers, resetFormState])
+
+  // Ouvintes globais de atividade no totem (toque, clique, teclado, scroll)
+  useEffect(() => {
+    if (submittedSuccess || submitting || !isAvailable) {
+      clearInactivityTimers()
+      return
+    }
+
+    const handleUserActivity = () => {
+      // Só inicia/reseta o timer de inatividade se o formulário estiver com alguma resposta iniciada
+      if (hasInteractedRef.current) {
+        resetInactivityTimer()
+      } else {
+        clearInactivityTimers()
+        setInactivityCountdown(INACTIVITY_TIMEOUT_SECONDS)
+      }
+    }
+
+    const events = ['mousedown', 'mousemove', 'touchstart', 'touchmove', 'keydown', 'scroll']
+    events.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }))
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, handleUserActivity))
+      clearInactivityTimers()
+    }
+  }, [submittedSuccess, submitting, isAvailable, resetInactivityTimer, clearInactivityTimers])
+
+  // Efeito ao trocar o estado de submittedSuccess: contagem de 3s e retorno automático para novo preenchimento
+  useEffect(() => {
+    if (submittedSuccess) {
+      clearInactivityTimers()
+      setSuccessCountdown(SUCCESS_REDIRECT_SECONDS)
+
+      successIntervalRef.current = setInterval(() => {
+        setSuccessCountdown((prev) => (prev > 1 ? prev - 1 : 1))
+      }, 1000)
+
+      successTimerRef.current = setTimeout(() => {
+        handleResetForNext()
+      }, SUCCESS_REDIRECT_SECONDS * 1000)
+    }
+
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current)
+      if (successIntervalRef.current) clearInterval(successIntervalRef.current)
+    }
+  }, [submittedSuccess, handleResetForNext, clearInactivityTimers])
 
   // Carregar pesquisa e checar disponibilidade
   const loadSurvey = async () => {
@@ -210,23 +358,6 @@ export function PublicSurveyForm() {
     }
   }
 
-  // Reiniciar formulário para nova resposta no tablet
-  const handleResetForNext = () => {
-    setSubmittedSuccess(false)
-    if (survey) {
-      const initialAnswers: Record<string, any> = {}
-      survey.questions?.forEach((q) => {
-        initialAnswers[q.id || ''] = {
-          numeric_value: null,
-          text_value: null,
-        }
-      })
-      setAnswers(initialAnswers)
-    }
-    // Revalidar disponibilidade
-    loadSurvey()
-  }
-
   // Loading State
   if (loading) {
     return (
@@ -310,37 +441,67 @@ export function PublicSurveyForm() {
               a qualidade de nossas instalações e serviços.
             </p>
 
-            {survey.allow_multiple_responses && (
-              <Button
-                onClick={handleResetForNext}
-                size="lg"
-                className="w-full bg-brand-deepBlue hover:bg-brand-vividBlue text-white font-semibold shadow-lg shadow-blue-500/20 h-12 rounded-xl text-sm gap-2"
-              >
-                <Tablet className="h-4 w-4" />
-                Nova Avaliação (Próximo Usuário)
-              </Button>
-            )}
+            {/* Aviso visual de retorno automático para o totem */}
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-4 flex items-center justify-center gap-2.5 text-emerald-700 dark:text-emerald-300">
+              <Timer className="h-4 w-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs sm:text-sm font-semibold">
+                Reiniciando para o próximo usuário em{' '}
+                <span className="font-bold font-mono text-base">{successCountdown}s</span>...
+              </span>
+            </div>
+
+            <Button
+              onClick={handleResetForNext}
+              size="lg"
+              className="w-full bg-brand-deepBlue hover:bg-brand-vividBlue text-white font-semibold shadow-lg shadow-blue-500/20 h-12 rounded-xl text-sm gap-2"
+            >
+              <Tablet className="h-4 w-4" />
+              Próxima Avaliação Agora
+            </Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
+  const isFormInteracted = hasInteractedRef.current
+
   // Formulário Público de Preenchimento (Otimizado para Tablets & Celulares)
   return (
     <div className="min-h-screen bg-slate-100/80 dark:bg-slate-950 py-6 px-3 sm:px-6 flex flex-col justify-between">
       <div className="max-w-2xl w-full mx-auto space-y-6">
         {/* Cabeçalho da Pesquisa */}
-        <div className="bg-white dark:bg-slate-900 border rounded-2xl p-5 sm:p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-              <Sparkles className="h-3 w-3" />
-              {survey.survey_type}
-            </span>
-            {survey.location_name && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
-                <Building2 className="h-3 w-3 text-slate-400" />
-                {survey.location_name}
+        <div className="bg-white dark:bg-slate-900 border rounded-2xl p-5 sm:p-6 shadow-sm relative overflow-hidden">
+          {/* Indicador sutil de atividade e auto-reset quando em preenchimento */}
+          {isFormInteracted && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-amber-100 dark:bg-amber-950/50">
+              <div
+                className="h-full bg-amber-500 transition-all duration-1000 ease-linear"
+                style={{
+                  width: `${(inactivityCountdown / INACTIVITY_TIMEOUT_SECONDS) * 100}%`,
+                }}
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                <Sparkles className="h-3 w-3" />
+                {survey.survey_type}
+              </span>
+              {survey.location_name && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
+                  <Building2 className="h-3 w-3 text-slate-400" />
+                  {survey.location_name}
+                </span>
+              )}
+            </div>
+
+            {isFormInteracted && inactivityCountdown <= 5 && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 animate-pulse">
+                <Timer className="h-3 w-3" />
+                Reset em {inactivityCountdown}s por inatividade
               </span>
             )}
           </div>
