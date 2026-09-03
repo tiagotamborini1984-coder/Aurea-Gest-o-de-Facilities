@@ -311,7 +311,7 @@ export function SurveyShareDialog({
               variant="default"
               size="sm"
               asChild
-              className="w-full flex items-center justify-center gap-1.5 text-xs bg-brand-deepBlue hover:bg-brand-vividBlue"
+              className="w-full flex items-center justify-center gap-1.5 text-xs bg-brand-deepBlue hover:bg-brand-vividBlue text-white"
             >
               <a href={publicUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
