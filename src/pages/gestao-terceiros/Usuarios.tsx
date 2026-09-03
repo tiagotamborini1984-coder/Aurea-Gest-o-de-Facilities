@@ -38,6 +38,7 @@ const ALL_MODULES = [
   'Gestão de Ferramentas',
   'Gestão de EPIs',
   'Gestão de Férias',
+  'Pesquisa de Satisfação',
   'BI',
 ]
 

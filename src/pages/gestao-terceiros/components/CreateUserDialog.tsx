@@ -36,6 +36,7 @@ const MAIN_MENUS = [
   'Gestão de Estoque',
   'Gestão de EPIs',
   'Gestão de Férias',
+  'Pesquisa de Satisfação',
 ]
 
 const GESTAO_TERCEIROS_SUBMENUS = [
