@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 
 const INACTIVITY_TIMEOUT_SECONDS = 10
 const SUCCESS_REDIRECT_SECONDS = 3
+const AUTO_REFRESH_INTERVAL_SECONDS = 60
 
 export function PublicSurveyForm() {
   const { id } = useParams<{ id: string }>()
@@ -90,8 +91,8 @@ export function PublicSurveyForm() {
     setSubmittedSuccess(false)
     setInactivityCountdown(INACTIVITY_TIMEOUT_SECONDS)
     resetFormState()
-    // Revalidar disponibilidade
-    loadSurvey()
+    // Revalidar disponibilidade (com reset completo)
+    loadSurvey(false)
   }, [resetFormState])
 
   // Limpar timers de inatividade
@@ -186,38 +187,78 @@ export function PublicSurveyForm() {
   }, [submittedSuccess, handleResetForNext, clearInactivityTimers])
 
   // Carregar pesquisa e checar disponibilidade
-  const loadSurvey = async () => {
-    if (!id) return
-    setLoading(true)
-    try {
-      const result = await satisfactionSurveyService.getPublicSurvey(id)
-      setSurvey(result.survey)
-      setIsAvailable(result.isAvailable)
-      setStatusReason(result.statusReason)
-
-      if (result.survey) {
-        // Inicializar estado de respostas vazio
-        const initialAnswers: Record<string, any> = {}
-        result.survey.questions?.forEach((q) => {
-          initialAnswers[q.id || ''] = {
-            numeric_value: null,
-            text_value: null,
-          }
-        })
-        setAnswers(initialAnswers)
+  // isSilent: quando true (auto-refresh no totem), não mostra spinner de tela cheia
+  const loadSurvey = useCallback(
+    async (isSilent = false) => {
+      if (!id) return
+      if (!isSilent) {
+        setLoading(true)
       }
-    } catch (err) {
-      console.error('Erro ao carregar pesquisa:', err)
-      setIsAvailable(false)
-      setStatusReason('Erro inesperado ao carregar o formulário.')
-    } finally {
-      setLoading(false)
-    }
-  }
+
+      try {
+        const result = await satisfactionSurveyService.getPublicSurvey(id)
+        setSurvey(result.survey)
+        setIsAvailable(result.isAvailable)
+        setStatusReason(result.statusReason)
+
+        if (result.survey) {
+          // Inicializar/reconciliar estado de respostas
+          const initialAnswers: Record<string, any> = {}
+          result.survey.questions?.forEach((q) => {
+            const qKey = q.id || q.temp_id || ''
+            if (qKey) {
+              initialAnswers[qKey] = {
+                numeric_value: null,
+                text_value: null,
+              }
+            }
+          })
+          setAnswers(initialAnswers)
+        }
+      } catch (err) {
+        console.error('Erro ao carregar pesquisa:', err)
+        // No modo silencioso, se a rede falhar temporariamente, não bloquear a tela se já temos uma pesquisa carregada
+        if (!isSilent) {
+          setIsAvailable(false)
+          setStatusReason('Erro inesperado ao carregar o formulário.')
+        }
+      } finally {
+        if (!isSilent) {
+          setLoading(false)
+        }
+      }
+    },
+    [id],
+  )
 
   useEffect(() => {
-    loadSurvey()
-  }, [id])
+    loadSurvey(false)
+  }, [loadSurvey])
+
+  // Polling automático para atualizar o formulário em tablet/totem sem intervenção manual
+  // Intervalo padrão de 60 segundos (AUTO_REFRESH_INTERVAL_SECONDS)
+  useEffect(() => {
+    if (!id) return
+
+    const intervalId = setInterval(() => {
+      // Guarda: se o usuário estiver preenchendo (interagiu com o form),
+      // ou se o timer de inatividade estiver rodando (countdown < 10),
+      // ou estiver enviando, ou na tela de agradecimento pós-envio, NÃO atualizar agora.
+      if (
+        hasInteractedRef.current ||
+        inactivityCountdown < INACTIVITY_TIMEOUT_SECONDS ||
+        submitting ||
+        submittedSuccess
+      ) {
+        return
+      }
+
+      // Tela ociosa e sem resposta em andamento: recarregar silenciosamente os dados da pesquisa
+      loadSurvey(true)
+    }, AUTO_REFRESH_INTERVAL_SECONDS * 1000)
+
+    return () => clearInterval(intervalId)
+  }, [id, submitting, submittedSuccess, inactivityCountdown, loadSurvey])
 
   // Helper para obter a profundidade de encadeamento de uma pergunta
   const getQuestionDepth = (q: SurveyQuestion, allQuestions: SurveyQuestion[]): number => {
@@ -515,7 +556,11 @@ export function PublicSurveyForm() {
               </div>
             )}
 
-            <Button variant="outline" onClick={loadSurvey} className="w-full gap-2 text-xs">
+            <Button
+              variant="outline"
+              onClick={() => loadSurvey(false)}
+              className="w-full gap-2 text-xs"
+            >
               <RotateCcw className="h-3.5 w-3.5" />
               Tentar Novamente
             </Button>
