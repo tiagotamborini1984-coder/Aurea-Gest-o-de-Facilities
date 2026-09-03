@@ -695,7 +695,7 @@ export function PesquisaSatisfacaoDashboard() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[10px] text-white">
                           {qm.surveyTitle}
                         </Badge>
                         {qm.isConditional && (

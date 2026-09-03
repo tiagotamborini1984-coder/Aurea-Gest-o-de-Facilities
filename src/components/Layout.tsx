@@ -37,9 +37,11 @@ export default function Layout() {
       if (client?.secondaryColor) {
         const secondaryHsl = hexToHsl(client.secondaryColor)
         document.documentElement.style.setProperty('--secondary', secondaryHsl)
+        document.documentElement.style.setProperty('--secondary-foreground', '0 0% 100%')
         document.documentElement.style.setProperty('--sidebar-primary', secondaryHsl)
       } else {
         document.documentElement.style.removeProperty('--secondary')
+        document.documentElement.style.removeProperty('--secondary-foreground')
         document.documentElement.style.removeProperty('--sidebar-primary')
       }
     },
