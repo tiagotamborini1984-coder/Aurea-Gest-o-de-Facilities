@@ -8,6 +8,8 @@ import {
   SurveyDashboardMetrics,
   DetailedSurveyResponse,
   SurveyDetailedReportFilters,
+  DissatisfactionOffender,
+  PlantSatisfactionComparison,
 } from '@/types/satisfaction-surveys'
 
 export const satisfactionSurveyService = {
@@ -819,6 +821,197 @@ export const satisfactionSurveyService = {
       avgScore: item.scoreCount > 0 ? Number((item.scoreSum / item.scoreCount).toFixed(1)) : null,
     }))
 
+    // ---------------------------------------------------------------------------------
+    // RANKING DE OFENSORES (Subperguntas condicionais disparadas por insatisfação/regular)
+    // ---------------------------------------------------------------------------------
+    // Agrupa os motivos mais citados nas subperguntas condicionais (respostas de múltipla escolha
+    // e texto disparadas por Regular (3), Insatisfeito (2), Muito Insatisfeito (1) ou notas baixas).
+    const isNegativeOrNeutralTrigger = (triggers?: any[]) => {
+      if (!triggers || !Array.isArray(triggers) || triggers.length === 0) return true
+      return triggers.some((t) => {
+        const num = Number(t)
+        if (!isNaN(num)) {
+          // Smiley: 1 (Muito Insatisfeito), 2 (Insatisfeito), 3 (Regular)
+          // Rating 5: 1, 2, 3
+          // Rating 10: 0 a 6
+          return num <= 6
+        }
+        if (typeof t === 'string') {
+          const lower = t.toLowerCase()
+          return (
+            lower.includes('insatisfeito') ||
+            lower.includes('ruim') ||
+            lower.includes('regular') ||
+            lower.includes('péssimo') ||
+            lower.includes('critico')
+          )
+        }
+        return false
+      })
+    }
+
+    const offenderCountMap: Record<
+      string,
+      {
+        reason: string
+        questionTitle: string
+        parentQuestionTitle?: string | null
+        surveyTitle: string
+        count: number
+        type: 'multiple_choice' | 'text'
+      }
+    > = {}
+
+    let totalOffenderOccurrences = 0
+
+    for (const resp of filteredResponses) {
+      const sTitle = resp.survey?.title || 'Pesquisa'
+      for (const ans of resp.answers || []) {
+        const q = ans.question
+        if (!q) continue
+
+        // Verificar se é condicional e relacionada a insatisfação
+        if (q.is_conditional) {
+          const parentTitle =
+            q.parent_question_id && questionMap[q.parent_question_id]
+              ? questionMap[q.parent_question_id].questionTitle
+              : null
+
+          // Apenas subperguntas de insatisfação/regular
+          if (isNegativeOrNeutralTrigger(q.trigger_values)) {
+            if (q.question_type === 'multiple_choice' && ans.text_value && ans.text_value.trim()) {
+              const opt = ans.text_value.trim()
+              const key = `mc_${q.id}_${opt.toLowerCase()}`
+              if (!offenderCountMap[key]) {
+                offenderCountMap[key] = {
+                  reason: opt,
+                  questionTitle: q.title,
+                  parentQuestionTitle: parentTitle,
+                  surveyTitle: sTitle,
+                  count: 0,
+                  type: 'multiple_choice',
+                }
+              }
+              offenderCountMap[key].count += 1
+              totalOffenderOccurrences += 1
+            } else if (q.question_type === 'text' && ans.text_value && ans.text_value.trim()) {
+              const textVal = ans.text_value.trim()
+              const key = `txt_${q.id}_${textVal.toLowerCase()}`
+              if (!offenderCountMap[key]) {
+                offenderCountMap[key] = {
+                  reason: textVal,
+                  questionTitle: q.title,
+                  parentQuestionTitle: parentTitle,
+                  surveyTitle: sTitle,
+                  count: 0,
+                  type: 'text',
+                }
+              }
+              offenderCountMap[key].count += 1
+              totalOffenderOccurrences += 1
+            }
+          }
+        }
+      }
+    }
+
+    const offendersRanking: DissatisfactionOffender[] = Object.entries(offenderCountMap)
+      .map(([id, item]) => ({
+        id,
+        reason: item.reason,
+        questionTitle: item.questionTitle,
+        parentQuestionTitle: item.parentQuestionTitle,
+        surveyTitle: item.surveyTitle,
+        count: item.count,
+        percentage:
+          totalOffenderOccurrences > 0
+            ? Math.round((item.count / totalOffenderOccurrences) * 100)
+            : 0,
+        type: item.type,
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    // ---------------------------------------------------------------------------------
+    // COMPARATIVO ENTRE PLANTAS (Nível de satisfação, total de respostas e nota média)
+    // ---------------------------------------------------------------------------------
+    const plantMap: Record<
+      string,
+      {
+        plantId: string
+        plantName: string
+        plantCode?: string | null
+        totalResponses: number
+        scoreSum: number
+        scoreCount: number
+        smileySatisfiedCount: number
+        smileyTotalCount: number
+      }
+    > = {}
+
+    for (const resp of filteredResponses) {
+      const pId = resp.plant_id || resp.survey?.plant_id || 'unassigned'
+      const pName = resp.plant?.name || resp.survey?.plants?.name || 'Não Identificada'
+      const pCode = resp.plant?.code || resp.survey?.plants?.code || null
+
+      if (!plantMap[pId]) {
+        plantMap[pId] = {
+          plantId: pId,
+          plantName: pName,
+          plantCode: pCode,
+          totalResponses: 0,
+          scoreSum: 0,
+          scoreCount: 0,
+          smileySatisfiedCount: 0,
+          smileyTotalCount: 0,
+        }
+      }
+
+      plantMap[pId].totalResponses += 1
+
+      for (const ans of resp.answers || []) {
+        if (ans.numeric_value !== null && ans.numeric_value !== undefined) {
+          const rawVal = Number(ans.numeric_value)
+          const qType = ans.question?.question_type
+          const normVal = qType === 'rating_5' || qType === 'smiley_5' ? (rawVal / 5) * 10 : rawVal
+          plantMap[pId].scoreSum += normVal
+          plantMap[pId].scoreCount += 1
+
+          if (qType === 'smiley_5') {
+            plantMap[pId].smileyTotalCount += 1
+            if (rawVal >= 4) {
+              plantMap[pId].smileySatisfiedCount += 1
+            }
+          }
+        }
+      }
+    }
+
+    const plantComparisons: PlantSatisfactionComparison[] = Object.values(plantMap)
+      .map((p) => {
+        const avgScore = p.scoreCount > 0 ? Number((p.scoreSum / p.scoreCount).toFixed(1)) : null
+        const satisfactionRate =
+          p.smileyTotalCount > 0
+            ? Math.round((p.smileySatisfiedCount / p.smileyTotalCount) * 100)
+            : null
+
+        return {
+          plantId: p.plantId,
+          plantName: p.plantName,
+          plantCode: p.plantCode,
+          totalResponses: p.totalResponses,
+          satisfiedCount: p.smileySatisfiedCount,
+          satisfactionRate,
+          avgScore,
+        }
+      })
+      .sort((a, b) => {
+        // Ordenar prioritariamente por maior % de satisfação, depois por nota média
+        const satA = a.satisfactionRate ?? -1
+        const satB = b.satisfactionRate ?? -1
+        if (satB !== satA) return satB - satA
+        return (b.avgScore ?? -1) - (a.avgScore ?? -1)
+      })
+
     const questionMetrics = Object.values(questionMap)
       .sort((a, b) => a.orderIndex - b.orderIndex)
       .map((q) => {
@@ -888,6 +1081,8 @@ export const satisfactionSurveyService = {
       scoreDistribution,
       surveysBreakdown,
       questionMetrics,
+      offendersRanking,
+      plantComparisons,
     }
   },
 }

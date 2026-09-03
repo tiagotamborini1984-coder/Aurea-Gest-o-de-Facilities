@@ -120,6 +120,27 @@ export interface SmileyMetrics {
   veryDissatisfiedPercentage: number
 }
 
+export interface DissatisfactionOffender {
+  id: string
+  reason: string // texto da opção ou comentário
+  questionTitle: string
+  parentQuestionTitle?: string | null
+  surveyTitle: string
+  count: number
+  percentage: number // % sobre o total de apontamentos de ofensores
+  type: 'multiple_choice' | 'text'
+}
+
+export interface PlantSatisfactionComparison {
+  plantId: string
+  plantName: string
+  plantCode?: string | null
+  totalResponses: number
+  satisfiedCount: number
+  satisfactionRate: number | null // % de satisfeitos (4+5) sobre respostas smiley
+  avgScore: number | null // Nota média normalizada 0 a 10
+}
+
 export interface SurveyDashboardMetrics {
   totalResponses: number
   overallAvgScore: number | null // Escala 0-10 normalizada
@@ -148,4 +169,6 @@ export interface SurveyDashboardMetrics {
     textAnswers?: { text: string; date: string; location?: string }[]
     smileyMetrics?: SmileyMetrics | null
   }[]
+  offendersRanking?: DissatisfactionOffender[]
+  plantComparisons?: PlantSatisfactionComparison[]
 }

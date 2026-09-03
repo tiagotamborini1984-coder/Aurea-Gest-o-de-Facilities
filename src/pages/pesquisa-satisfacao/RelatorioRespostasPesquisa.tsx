@@ -63,7 +63,9 @@ import {
   TableProperties,
   BarChart3,
   SlidersHorizontal,
+  Printer,
 } from 'lucide-react'
+import { generateSurveyReportPdf } from './utils/survey-pdf-export'
 import { toast } from 'sonner'
 
 export function RelatorioRespostasPesquisa() {
@@ -261,6 +263,45 @@ export function RelatorioRespostasPesquisa() {
     }
   }
 
+  const handleExportPdf = () => {
+    if (!currentSurvey || responses.length === 0) {
+      toast.error('Nenhuma resposta para exportar em PDF.')
+      return
+    }
+    try {
+      const selectedPlant = plants.find((p) => p.id === plantId)
+      const plantLabel =
+        plantId === 'all'
+          ? 'Todas as Plantas'
+          : selectedPlant
+            ? `${selectedPlant.name}${selectedPlant.code ? ` (${selectedPlant.code})` : ''}`
+            : currentSurvey.plants?.name || 'Todas as Plantas'
+
+      let periodLabel = 'Todo o histórico'
+      if (startDate && endDate) {
+        periodLabel = `${new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR')} até ${new Date(endDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
+      } else if (startDate) {
+        periodLabel = `A partir de ${new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
+      } else if (endDate) {
+        periodLabel = `Até ${new Date(endDate + 'T00:00:00').toLocaleDateString('pt-BR')}`
+      }
+
+      generateSurveyReportPdf({
+        survey: currentSurvey,
+        plantName: plantLabel,
+        periodLabel,
+        stats,
+        hierarchy: questionsHierarchy,
+        responses,
+        clientName: activeClient?.name,
+      })
+      toast.success('Janela de impressão em PDF aberta!')
+    } catch (e: any) {
+      console.error(e)
+      toast.error(e.message || 'Erro ao gerar PDF.')
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Cabeçalho */}
@@ -311,6 +352,17 @@ export function RelatorioRespostasPesquisa() {
             Atualizar
           </Button>
 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={loading || responses.length === 0}
+            className="gap-1.5 text-xs border-blue-200 text-brand-deepBlue hover:bg-blue-50 dark:hover:bg-blue-950"
+          >
+            <Printer className="h-3.5 w-3.5 text-brand-vividBlue" />
+            Exportar PDF
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -323,6 +375,15 @@ export function RelatorioRespostasPesquisa() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleExportPdf} className="cursor-pointer gap-2">
+                <Printer className="h-4 w-4 text-brand-vividBlue" />
+                <div>
+                  <p className="font-semibold text-xs">Exportar Relatório em PDF</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Layout de impressão com KPIs e respostas
+                  </p>
+                </div>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportXlsx} className="cursor-pointer gap-2">
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
                 <div>

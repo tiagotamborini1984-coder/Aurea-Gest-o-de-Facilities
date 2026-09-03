@@ -43,6 +43,9 @@ import {
   Layers,
   GitBranch,
   TableProperties,
+  AlertTriangle,
+  TrendingUp,
+  Percent,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -567,7 +570,338 @@ export function PesquisaSatisfacaoDashboard() {
         </Card>
       )}
 
-      {/* Gráfico 1: Distribuição Geral por Faixa de Nota */}
+      {/* SEÇÃO 1: COMPARATIVO ENTRE PLANTAS (Nível de Satisfação, Volume e Nota Média) */}
+      <Card className="border shadow-sm bg-white dark:bg-slate-900">
+        <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-brand-vividBlue dark:text-blue-300">
+                <Building2 className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+                  Comparativo de Nível de Satisfação entre Plantas
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Comparação lado a lado do volume de respostas, taxa de satisfação positiva (%
+                  Satisfeito + Muito Satisfeito) e nota média geral por unidade
+                </CardDescription>
+              </div>
+            </div>
+            {metrics?.plantComparisons && metrics.plantComparisons.length > 0 && (
+              <Badge variant="outline" className="text-xs self-start sm:self-auto font-normal">
+                {metrics.plantComparisons.length}{' '}
+                {metrics.plantComparisons.length === 1 ? 'planta avaliada' : 'plantas avaliadas'}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 sm:px-6 pb-6 pt-0 space-y-6">
+          {metrics?.plantComparisons && metrics.plantComparisons.length > 0 ? (
+            <>
+              {/* Gráfico Comparativo: % Satisfeitos x Nota Média */}
+              <div className="h-72 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={metrics.plantComparisons.map((p) => ({
+                      name: p.plantCode || p.plantName.slice(0, 14),
+                      fullName: p.plantName,
+                      satisfactionRate: p.satisfactionRate ?? 0,
+                      avgScoreNorm: p.avgScore !== null ? Number((p.avgScore * 10).toFixed(0)) : 0, // converte 0-10 em % para escala uniforme
+                      avgScoreOriginal: p.avgScore,
+                      total: p.totalResponses,
+                    }))}
+                    margin={{ top: 20, right: 20, left: -10, bottom: 25 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+                    <Tooltip
+                      formatter={(val: any, name: any, item: any) => {
+                        if (name === 'satisfactionRate') {
+                          return [`${val}% de satisfeitos`, '% Satisfação']
+                        }
+                        return [
+                          `${item.payload.avgScoreOriginal !== null ? item.payload.avgScoreOriginal.toFixed(1) : '--'} / 10.0`,
+                          'Nota Média Geral',
+                        ]
+                      }}
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ''}
+                    />
+                    <Bar
+                      name="satisfactionRate"
+                      dataKey="satisfactionRate"
+                      fill="#10b981"
+                      radius={[6, 6, 0, 0]}
+                    >
+                      <LabelList
+                        dataKey="satisfactionRate"
+                        position="top"
+                        formatter={(v: any) => `${v}%`}
+                        style={{ fontSize: 10, fontWeight: 'bold', fill: '#059669' }}
+                      />
+                    </Bar>
+                    <Bar
+                      name="avgScoreNorm"
+                      dataKey="avgScoreNorm"
+                      fill="#2563eb"
+                      radius={[6, 6, 0, 0]}
+                    >
+                      <LabelList
+                        dataKey="avgScoreOriginal"
+                        position="top"
+                        formatter={(v: any) =>
+                          v !== null && v !== undefined ? `${Number(v).toFixed(1)}★` : ''
+                        }
+                        style={{ fontSize: 10, fontWeight: 'bold', fill: '#1d4ed8' }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legenda do Gráfico */}
+              <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground pt-1 border-t">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-emerald-500" />
+                  <span>% de Satisfeitos (Rostinhos 4 e 5)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-blue-600" />
+                  <span>Nota Média Geral (escala convertida / 10★)</span>
+                </div>
+              </div>
+
+              {/* Tabela Comparativa Detalhada */}
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-muted-foreground uppercase text-[10px] tracking-wider border-b">
+                    <tr>
+                      <th className="py-2.5 px-3">Planta / Unidade</th>
+                      <th className="py-2.5 px-3 text-center">Total de Respostas</th>
+                      <th className="py-2.5 px-3 text-center">% de Satisfeitos</th>
+                      <th className="py-2.5 px-3 text-center">Nota Média Geral</th>
+                      <th className="py-2.5 px-3 text-right">Classificação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {metrics.plantComparisons.map((plant, pIdx) => {
+                      const satRate = plant.satisfactionRate
+                      const avg = plant.avgScore
+
+                      return (
+                        <tr
+                          key={plant.plantId}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="py-2.5 px-3 font-semibold text-foreground flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-muted-foreground inline-flex items-center justify-center">
+                              {pIdx + 1}
+                            </span>
+                            <div>
+                              <div>{plant.plantName}</div>
+                              {plant.plantCode && (
+                                <div className="text-[10px] text-muted-foreground font-normal">
+                                  Cód: {plant.plantCode}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-foreground">
+                            {plant.totalResponses}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {satRate !== null ? (
+                              <div className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                                <Smile className="h-3 w-3" />
+                                <span>{satRate}%</span>
+                                <span className="text-[10px] text-muted-foreground font-normal">
+                                  ({plant.satisfiedCount})
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {avg !== null ? (
+                              <div className="inline-flex items-center gap-1 font-bold text-foreground">
+                                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                <span>{avg.toFixed(1)}</span>
+                                <span className="text-[10px] text-muted-foreground font-normal">
+                                  / 10
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {satRate !== null ? (
+                              <Badge
+                                className={
+                                  satRate >= 80
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]'
+                                    : satRate >= 60
+                                      ? 'bg-blue-100 text-blue-800 border-blue-200 text-[10px]'
+                                      : satRate >= 40
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200 text-[10px]'
+                                        : 'bg-red-100 text-red-800 border-red-200 text-[10px]'
+                                }
+                              >
+                                {satRate >= 80
+                                  ? 'Zona Excelente'
+                                  : satRate >= 60
+                                    ? 'Zona de Qualidade'
+                                    : satRate >= 40
+                                      ? 'Zona de Atenção'
+                                      : 'Zona Crítica'}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              Nenhuma planta com respostas no período e filtros selecionados.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO 2: RANKING DE OFENSORES (Subperguntas condicionais de insatisfação) */}
+      <Card className="border shadow-sm bg-white dark:bg-slate-900 border-amber-200/70 dark:border-amber-900/50">
+        <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+                  Ranking de Ofensores (Motivos de Insatisfação)
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Agrupamento dos motivos e apontamentos mais citados nas subperguntas condicionais
+                  acionadas por Regular, Insatisfeito ou Muito Insatisfeito
+                </CardDescription>
+              </div>
+            </div>
+            {metrics?.offendersRanking && metrics.offendersRanking.length > 0 && (
+              <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs self-start sm:self-auto">
+                {metrics.offendersRanking.length}{' '}
+                {metrics.offendersRanking.length === 1
+                  ? 'motivo identificado'
+                  : 'motivos identificados'}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 sm:px-6 pb-6 pt-0">
+          {metrics?.offendersRanking && metrics.offendersRanking.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {metrics.offendersRanking.map((offender, oIdx) => {
+                  return (
+                    <div
+                      key={offender.id}
+                      className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between gap-2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <span
+                            className={`w-6 h-6 rounded-lg text-xs font-bold inline-flex items-center justify-center shrink-0 ${
+                              oIdx === 0
+                                ? 'bg-red-600 text-white'
+                                : oIdx === 1
+                                  ? 'bg-orange-500 text-white'
+                                  : oIdx === 2
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {oIdx + 1}º
+                          </span>
+                          <div className="space-y-0.5 min-w-0">
+                            <h4 className="font-bold text-sm text-foreground break-words leading-tight">
+                              {offender.reason}
+                            </h4>
+                            <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-muted-foreground pt-0.5">
+                              <span className="font-medium text-brand-deepBlue dark:text-blue-400">
+                                {offender.questionTitle}
+                              </span>
+                              {offender.parentQuestionTitle && (
+                                <span className="text-[10px] italic text-slate-400">
+                                  (↳ acionada por: {offender.parentQuestionTitle})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-extrabold text-foreground">
+                            {offender.count} {offender.count === 1 ? 'citação' : 'citações'}
+                          </div>
+                          <div className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                            {offender.percentage}% dos ofensores
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barra de progresso de ocorrência */}
+                      <div className="space-y-1 pt-1">
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              oIdx === 0
+                                ? 'bg-red-500'
+                                : oIdx === 1
+                                  ? 'bg-orange-500'
+                                  : oIdx === 2
+                                    ? 'bg-amber-500'
+                                    : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${Math.max(offender.percentage, 4)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 uppercase">
+                            {offender.type === 'multiple_choice'
+                              ? 'Múltipla Escolha'
+                              : 'Texto Livre'}
+                          </Badge>
+                          <span>Pesquisa: {offender.surveyTitle}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-muted-foreground text-xs flex flex-col items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 mb-2">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <p className="font-semibold text-foreground text-sm">Nenhum ofensor registrado!</p>
+              <p className="text-muted-foreground max-w-sm mt-1">
+                Não foram computadas respostas negativas nas subperguntas condicionais para o
+                período e filtros atuais, ou as perguntas condicionais ainda não foram acionadas.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gráfico: Distribuição Geral por Faixa de Nota e Desempenho Consolidado por Pesquisa */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
