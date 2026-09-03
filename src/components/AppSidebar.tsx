@@ -166,6 +166,7 @@ export function AppSidebar() {
         icon: HeartHandshake,
         subItems: [
           { title: 'Pesquisas', path: '/pesquisa-satisfacao' },
+          { title: 'Relatório de Respostas', path: '/pesquisa-satisfacao/relatorio' },
           { title: 'Dashboard de Resultados', path: '/pesquisa-satisfacao/dashboard' },
         ],
       },
@@ -395,6 +396,7 @@ export function AppSidebar() {
                 userMenus.includes('Pesquisa de Satisfação') ||
                 userMenus.includes('Pesquisas') ||
                 userMenus.includes('Pesquisa de Satisfação:Pesquisas') ||
+                userMenus.includes('Pesquisa de Satisfação:Relatório de Respostas') ||
                 userMenus.includes('Pesquisa de Satisfação:Dashboard de Resultados')
                   ? item.subItems
                   : []

@@ -6,9 +6,108 @@ import {
   SurveyResponseSubmission,
   SurveyDashboardFilters,
   SurveyDashboardMetrics,
+  DetailedSurveyResponse,
+  SurveyDetailedReportFilters,
 } from '@/types/satisfaction-surveys'
 
 export const satisfactionSurveyService = {
+  // 1.1 Obter todas as respostas detalhadas de uma pesquisa (Relatório Detalhado)
+  async getDetailedSurveyResponses(filters: SurveyDetailedReportFilters): Promise<{
+    survey: SatisfactionSurvey | null
+    responses: DetailedSurveyResponse[]
+  }> {
+    // 1. Carregar a pesquisa com suas perguntas ordenadas
+    const survey = await this.getSurveyById(filters.surveyId)
+
+    // 2. Carregar as respostas com respostas individuais
+    let query = supabase
+      .from('satisfaction_survey_responses')
+      .select(`
+        id,
+        survey_id,
+        client_id,
+        plant_id,
+        location_name,
+        submitted_at,
+        device_info,
+        plant:plant_id(id, name, code),
+        survey:satisfaction_surveys(
+          id,
+          title,
+          survey_type,
+          plant_id,
+          location_name,
+          plants:plant_id(id, name, code)
+        ),
+        answers:satisfaction_survey_response_answers(
+          id,
+          response_id,
+          question_id,
+          numeric_value,
+          text_value,
+          question:satisfaction_survey_questions(
+            id,
+            survey_id,
+            title,
+            description,
+            question_type,
+            options,
+            is_required,
+            order_index,
+            is_conditional,
+            parent_question_id,
+            trigger_values
+          )
+        )
+      `)
+      .eq('survey_id', filters.surveyId)
+      .order('submitted_at', { ascending: false })
+
+    if (filters.clientId) {
+      query = query.eq('client_id', filters.clientId)
+    }
+    if (filters.plantId && filters.plantId !== 'all') {
+      query = query.eq('plant_id', filters.plantId)
+    }
+    if (filters.startDate) {
+      query = query.gte('submitted_at', `${filters.startDate}T00:00:00`)
+    }
+    if (filters.endDate) {
+      query = query.lte('submitted_at', `${filters.endDate}T23:59:59`)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching detailed survey responses:', error)
+      throw error
+    }
+
+    let responses: DetailedSurveyResponse[] = (data || []).map((r: any) => ({
+      ...r,
+      answers: (r.answers || []).sort(
+        (a: any, b: any) => (a.question?.order_index || 0) - (b.question?.order_index || 0),
+      ),
+    }))
+
+    // Filtro adicional por busca textual (termo no comentário, texto ou local)
+    if (filters.searchTerm && filters.searchTerm.trim()) {
+      const term = filters.searchTerm.toLowerCase().trim()
+      responses = responses.filter((r) => {
+        const matchLocation = r.location_name?.toLowerCase().includes(term)
+        const matchPlant = r.plant?.name?.toLowerCase().includes(term)
+        const matchAnswers = r.answers.some((a) =>
+          a.text_value ? a.text_value.toLowerCase().includes(term) : false,
+        )
+        return matchLocation || matchPlant || matchAnswers
+      })
+    }
+
+    return {
+      survey,
+      responses,
+    }
+  },
   // 1. Listar pesquisas (com contagem de respostas)
   async getSurveys(clientId?: string, plantId?: string): Promise<SatisfactionSurvey[]> {
     let query = supabase

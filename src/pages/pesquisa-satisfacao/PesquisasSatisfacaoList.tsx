@@ -59,6 +59,7 @@ import {
   XCircle,
   RefreshCw,
   Building2,
+  TableProperties,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -195,6 +196,13 @@ export function PesquisasSatisfacaoList() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
+            <Link to="/pesquisa-satisfacao/relatorio">
+              <Building2 className="h-4 w-4 text-primary" />
+              Relatório de Respostas
+            </Link>
+          </Button>
+
           <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
             <Link to="/pesquisa-satisfacao/dashboard">
               <BarChart3 className="h-4 w-4 text-primary" />
@@ -478,9 +486,16 @@ export function PesquisasSatisfacaoList() {
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild className="cursor-pointer gap-2">
+                              <Link to={`/pesquisa-satisfacao/relatorio?surveyId=${survey.id}`}>
+                                <TableProperties className="h-4 w-4 text-brand-vividBlue" />
+                                Ver Todas as Respostas
+                              </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild className="cursor-pointer gap-2">
                               <Link to={`/pesquisa-satisfacao/dashboard?surveyId=${survey.id}`}>
                                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                                Ver Resultados
+                                Ver Dashboard de Métricas
                               </Link>
                             </DropdownMenuItem>
 

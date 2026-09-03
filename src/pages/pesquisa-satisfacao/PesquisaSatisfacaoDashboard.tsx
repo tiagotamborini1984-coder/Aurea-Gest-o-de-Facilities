@@ -42,6 +42,7 @@ import {
   CheckCircle2,
   Layers,
   GitBranch,
+  TableProperties,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -163,6 +164,19 @@ export function PesquisaSatisfacaoDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
+            <Link
+              to={
+                surveyId && surveyId !== 'all'
+                  ? `/pesquisa-satisfacao/relatorio?surveyId=${surveyId}`
+                  : '/pesquisa-satisfacao/relatorio'
+              }
+            >
+              <TableProperties className="h-4 w-4 text-brand-vividBlue" />
+              Ver Relatório Detalhado de Respostas
+            </Link>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -646,16 +660,30 @@ export function PesquisaSatisfacaoDashboard() {
                       </p>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center justify-end gap-1">
-                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        <span className="font-bold text-sm text-foreground">
-                          {s.avgScore !== null ? s.avgScore.toFixed(1) : '--'}
-                        </span>
+                    <div className="text-right shrink-0 flex items-center gap-2">
+                      <div>
+                        <div className="flex items-center justify-end gap-1">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-bold text-sm text-foreground">
+                            {s.avgScore !== null ? s.avgScore.toFixed(1) : '--'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {s.responsesCount} {s.responsesCount === 1 ? 'resposta' : 'respostas'}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {s.responsesCount} {s.responsesCount === 1 ? 'resposta' : 'respostas'}
-                      </p>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        className="h-8 w-8 text-brand-deepBlue hover:bg-blue-50"
+                        title="Ver Respostas Detalhadas desta Pesquisa"
+                      >
+                        <Link to={`/pesquisa-satisfacao/relatorio?surveyId=${s.surveyId}`}>
+                          <TableProperties className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </div>
                   </div>
                 ))}

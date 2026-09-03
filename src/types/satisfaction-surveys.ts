@@ -51,6 +51,36 @@ export interface SurveyResponseAnswer {
   question_id: string
   numeric_value?: number | null
   text_value?: string | null
+  question?: SurveyQuestion
+}
+
+export interface DetailedSurveyResponse {
+  id: string
+  survey_id: string
+  client_id: string
+  plant_id?: string | null
+  location_name?: string | null
+  submitted_at: string
+  device_info?: Record<string, any>
+  plant?: { id: string; name: string; code?: string } | null
+  survey?: {
+    id: string
+    title: string
+    survey_type: string
+    plant_id?: string | null
+    location_name?: string | null
+    plants?: { id: string; name: string; code?: string } | null
+  } | null
+  answers: SurveyResponseAnswer[]
+}
+
+export interface SurveyDetailedReportFilters {
+  surveyId: string
+  clientId?: string
+  plantId?: string
+  startDate?: string
+  endDate?: string
+  searchTerm?: string
 }
 
 export interface SurveyResponseSubmission {

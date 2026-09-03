@@ -120,6 +120,7 @@ import AreasEstoque from './pages/gestao-estoque/Areas'
 // Pesquisa de Satisfação
 import PesquisasSatisfacaoList from './pages/pesquisa-satisfacao/PesquisasSatisfacaoList'
 import PesquisaSatisfacaoDashboard from './pages/pesquisa-satisfacao/PesquisaSatisfacaoDashboard'
+import RelatorioRespostasPesquisa from './pages/pesquisa-satisfacao/RelatorioRespostasPesquisa'
 import PublicSurveyForm from './pages/pesquisa-satisfacao/public/PublicSurveyForm'
 
 const App = () => (
@@ -293,6 +294,10 @@ const App = () => (
 
                       {/* Pesquisa de Satisfação */}
                       <Route path="/pesquisa-satisfacao" element={<PesquisasSatisfacaoList />} />
+                      <Route
+                        path="/pesquisa-satisfacao/relatorio"
+                        element={<RelatorioRespostasPesquisa />}
+                      />
                       <Route
                         path="/pesquisa-satisfacao/dashboard"
                         element={<PesquisaSatisfacaoDashboard />}
