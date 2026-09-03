@@ -376,7 +376,7 @@ export function PesquisasSatisfacaoList() {
                     </TableCell>
 
                     <TableCell>
-                      <Badge variant="secondary" className="text-[11px] font-medium">
+                      <Badge variant="secondary" className="text-[11px] font-medium text-white">
                         {survey.survey_type}
                       </Badge>
                     </TableCell>
