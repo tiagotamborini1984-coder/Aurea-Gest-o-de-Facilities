@@ -397,21 +397,22 @@ export function PublicSurveyForm() {
       if (!isVisible) continue // Se não estiver visível pela condição, não valida nem exige
 
       if (q.is_required) {
+        const questionLabel = q.title ? `"${q.title}"` : 'obrigatória'
         if (
           (q.question_type === 'rating_10' ||
             q.question_type === 'rating_5' ||
             q.question_type === 'smiley_5') &&
           (ans?.numeric_value === null || ans?.numeric_value === undefined)
         ) {
-          toast.error(`Por favor, responda à pergunta #${i + 1}.`)
+          toast.error(`Por favor, responda à pergunta: ${questionLabel}`)
           return
         }
         if (q.question_type === 'multiple_choice' && !ans?.text_value) {
-          toast.error(`Por favor, selecione uma opção na pergunta #${i + 1}.`)
+          toast.error(`Por favor, selecione uma opção em: ${questionLabel}`)
           return
         }
         if (q.question_type === 'text' && (!ans?.text_value || !ans.text_value.trim())) {
-          toast.error(`Por favor, preencha o campo na pergunta #${i + 1}.`)
+          toast.error(`Por favor, preencha o campo: ${questionLabel}`)
           return
         }
       }
@@ -623,7 +624,7 @@ export function PublicSurveyForm() {
 
         {/* Formulário com as Perguntas */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {(survey.questions || []).map((q, idx) => {
+          {(survey.questions || []).map((q) => {
             const qId = q.id || ''
             const ans = answers[qId] || {}
             const isVisible = isQuestionVisible(q)
@@ -647,7 +648,6 @@ export function PublicSurveyForm() {
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <h2 className="text-base sm:text-lg font-semibold text-foreground flex items-baseline gap-2 flex-wrap">
-                        <span className="text-brand-vividBlue font-bold">{idx + 1}.</span>
                         {q.title}
                         {q.is_required && (
                           <span className="text-red-500 font-bold ml-0.5" title="Obrigatória">
