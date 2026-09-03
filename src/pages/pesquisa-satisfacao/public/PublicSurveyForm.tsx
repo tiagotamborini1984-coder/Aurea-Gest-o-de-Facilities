@@ -654,11 +654,6 @@ export function PublicSurveyForm() {
                             *
                           </span>
                         )}
-                        {q.is_conditional && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950 px-2 py-0.5 rounded-full">
-                            Subpergunta Nv.{getQuestionDepth(q, survey.questions || [])}
-                          </span>
-                        )}
                       </h2>
                     </div>
 
