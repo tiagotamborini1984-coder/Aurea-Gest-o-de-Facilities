@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { SatisfactionSurvey, SurveyQuestion } from '@/types/satisfaction-surveys'
 import { satisfactionSurveyService } from '@/services/satisfaction-surveys'
 import { Button } from '@/components/ui/button'
@@ -26,10 +26,16 @@ const AUTO_REFRESH_INTERVAL_SECONDS = 60
 
 export function PublicSurveyForm() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [survey, setSurvey] = useState<SatisfactionSurvey | null>(null)
+  const [resolvedPlant, setResolvedPlant] = useState<{
+    id: string
+    name: string
+    code?: string
+  } | null>(null)
   const [isAvailable, setIsAvailable] = useState(true)
   const [statusReason, setStatusReason] = useState<string | undefined>()
 
@@ -202,6 +208,22 @@ export function PublicSurveyForm() {
         setStatusReason(result.statusReason)
 
         if (result.survey) {
+          // Resolver planta via parâmetro URL '?planta=' se presente
+          const plantaParam = searchParams.get('planta') || searchParams.get('plant')
+          if (plantaParam) {
+            try {
+              const matchedPlant = await satisfactionSurveyService.resolvePlant(
+                plantaParam,
+                result.survey.client_id,
+              )
+              setResolvedPlant(matchedPlant)
+            } catch (pErr) {
+              console.warn('Erro ao resolver planta do parâmetro de URL:', pErr)
+            }
+          } else {
+            setResolvedPlant(null)
+          }
+
           // Inicializar/reconciliar estado de respostas
           const initialAnswers: Record<string, any> = {}
           result.survey.questions?.forEach((q) => {
@@ -480,7 +502,7 @@ export function PublicSurveyForm() {
 
       const result = await satisfactionSurveyService.submitResponse({
         survey_id: id,
-        plant_id: survey.plant_id,
+        plant_id: resolvedPlant?.id || survey.plant_id,
         location_name: survey.location_name,
         answers: formattedAnswers,
         device_info: {
@@ -635,15 +657,20 @@ export function PublicSurveyForm() {
           )}
 
           <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
                 <Sparkles className="h-3 w-3" />
                 {survey.survey_type}
               </span>
+              {(resolvedPlant?.name || survey.plants?.name) && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-foreground">
+                  <Building2 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  {resolvedPlant?.name || survey.plants?.name}
+                </span>
+              )}
               {survey.location_name && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
-                  <Building2 className="h-3 w-3 text-slate-400" />
-                  {survey.location_name}
+                  • {survey.location_name}
                 </span>
               )}
             </div>

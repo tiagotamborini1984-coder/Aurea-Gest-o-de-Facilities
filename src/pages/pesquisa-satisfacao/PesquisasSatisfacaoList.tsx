@@ -521,6 +521,7 @@ export function PesquisasSatisfacaoList() {
         survey={sharingSurvey}
         open={shareDialogOpen}
         onOpenChange={setShareDialogOpen}
+        plants={plants}
       />
 
       {/* Alerta de Confirmação de Exclusão */}

@@ -74,6 +74,53 @@ export const satisfactionSurveyService = {
     }
   },
 
+  // 2.1 Resolver planta por ID ou Slug/Código/Nome
+  async resolvePlant(
+    param: string | null | undefined,
+    clientId?: string,
+  ): Promise<{ id: string; name: string; code?: string } | null> {
+    if (!param) return null
+    const trimmed = param.trim()
+    if (!trimmed) return null
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (UUID_REGEX.test(trimmed)) {
+      let q = supabase.from('plants').select('id, name, code').eq('id', trimmed)
+      if (clientId) q = q.eq('client_id', clientId)
+      const { data } = await q.maybeSingle()
+      if (data) return data
+    }
+
+    // Buscar todas as plantas (filtradas por clientId se fornecido)
+    let qAll = supabase.from('plants').select('id, name, code')
+    if (clientId) qAll = qAll.eq('client_id', clientId)
+    const { data: allPlants } = await qAll
+    if (!allPlants || allPlants.length === 0) return null
+
+    const normalize = (s?: string | null) =>
+      (s || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+
+    const target = normalize(trimmed)
+    if (!target) return null
+
+    // 1. Match exato pelo código (ex: "SPA", "QUE", "CAC")
+    const codeMatch = allPlants.find((p) => normalize(p.code) === target)
+    if (codeMatch) return codeMatch
+
+    // 2. Match gerado por slug do nome (ex: "SPA - SÃO PAULO" -> "spa-sao-paulo" / "querencia")
+    const nameMatch = allPlants.find((p) => {
+      const pNorm = normalize(p.name)
+      return pNorm === target || pNorm.includes(target) || target.includes(pNorm)
+    })
+    if (nameMatch) return nameMatch
+
+    return null
+  },
+
   // 3. Buscar pesquisa pública por ID (para exibição no tablet/QRCode, sem auth necessária)
   async getPublicSurvey(id: string): Promise<{
     survey: SatisfactionSurvey | null
@@ -423,6 +470,7 @@ export const satisfactionSurveyService = {
         plant_id,
         location_name,
         submitted_at,
+        plant:plant_id(id, name, code),
         survey:satisfaction_surveys(id, title, survey_type, plant_id, plants:plant_id(name)),
         answers:satisfaction_survey_response_answers(
           id,
@@ -494,6 +542,7 @@ export const satisfactionSurveyService = {
         title: string
         type: string
         plantName: string
+        plantId?: string | null
         responsesCount: number
         scoreSum: number
         scoreCount: number
@@ -525,7 +574,7 @@ export const satisfactionSurveyService = {
       const sId = resp.survey_id
       const sTitle = resp.survey?.title || 'Pesquisa'
       const sType = resp.survey?.survey_type || 'Geral'
-      const pName = resp.survey?.plants?.name || 'Todas as Plantas'
+      const pName = resp.plant?.name || resp.survey?.plants?.name || 'Todas as Plantas'
 
       if (!surveyBreakdownMap[sId]) {
         surveyBreakdownMap[sId] = {
@@ -533,6 +582,7 @@ export const satisfactionSurveyService = {
           title: sTitle,
           type: sType,
           plantName: pName,
+          plantId: resp.plant_id || resp.survey?.plant_id,
           responsesCount: 0,
           scoreSum: 0,
           scoreCount: 0,
@@ -665,6 +715,7 @@ export const satisfactionSurveyService = {
       title: item.title,
       type: item.type,
       plantName: item.plantName,
+      plantId: (item as any).plantId,
       responsesCount: item.responsesCount,
       avgScore: item.scoreCount > 0 ? Number((item.scoreSum / item.scoreCount).toFixed(1)) : null,
     }))
