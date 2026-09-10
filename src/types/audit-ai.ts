@@ -57,6 +57,7 @@ export interface AuditAiReportData {
   id?: string
   clientId: string
   plantId?: string
+  plantName?: string
   auditType: string
   auditTitle?: string
   periodLabel: string

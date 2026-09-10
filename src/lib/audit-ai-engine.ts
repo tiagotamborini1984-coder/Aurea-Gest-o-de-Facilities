@@ -246,9 +246,14 @@ export function analyzeAuditExecutions(
   const totalExecutions = sortedExecs.length
 
   if (totalExecutions === 0) {
+    const scopeDesc = plantName
+      ? `para o tipo de auditoria selecionado na planta "${plantName}" neste período.`
+      : 'para o tipo de auditoria selecionado neste período.'
+
     return {
       clientId,
       plantId,
+      plantName,
       auditType,
       periodLabel,
       generatedAt: new Date().toISOString(),
@@ -262,8 +267,7 @@ export function analyzeAuditExecutions(
           id: 'insight-empty',
           type: 'improvement',
           title: 'Nenhuma auditoria realizada no recorte',
-          description:
-            'Não foram encontradas execuções concluídas para o tipo de auditoria selecionado neste período.',
+          description: `Não foram encontradas execuções concluídas ${scopeDesc}`,
           severity: 'low',
           badgeText: 'Sem dados',
         },
@@ -612,6 +616,7 @@ export function analyzeAuditExecutions(
   return {
     clientId,
     plantId,
+    plantName,
     auditType,
     periodLabel,
     generatedAt: new Date().toISOString(),

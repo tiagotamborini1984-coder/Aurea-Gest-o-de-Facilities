@@ -18,8 +18,10 @@ export function generateAuditAiReportPdf({
   report,
   clientName = 'Sistema Aurea',
   logoUrl,
-  plantName = 'Todas as Plantas',
+  plantName: customPlantName,
 }: GenerateAuditAiPdfParams): void {
+  const effectivePlantName = customPlantName || report.plantName || 'Todas as Plantas'
+
   const generatedAt = new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'medium',
@@ -495,7 +497,7 @@ export function generateAuditAiReportPdf({
   <div class="header-box">
     <div class="header-left">
       <h1>Laudo Técnico de Auditorias — Agente de Inteligência Operacional</h1>
-      <div class="subtitle">Tipo de Auditoria: ${esc(report.auditType)}</div>
+      <div class="subtitle">Tipo de Auditoria: ${esc(report.auditType)}${report.plantName ? ` • Planta: ${esc(report.plantName)}` : ''}</div>
       <div class="meta-desc">Diagnóstico determinístico de recorrência, riscos e plano de ação estruturado</div>
     </div>
     <div class="header-right">
@@ -512,7 +514,7 @@ export function generateAuditAiReportPdf({
     </div>
     <div class="filter-item">
       <span class="filter-label">Planta / Unidade</span>
-      <span class="filter-val">${esc(plantName)}</span>
+      <span class="filter-val">${esc(effectivePlantName)}</span>
     </div>
     <div class="filter-item">
       <span class="filter-label">Período Varrido</span>

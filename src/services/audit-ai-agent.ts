@@ -170,16 +170,19 @@ export const auditAiService = {
    * Salva o laudo gerado na tabela audit_ai_reports
    */
   async saveReport(report: AuditAiReportData, userId?: string): Promise<string> {
-    const title = `Laudo IA - Auditorias de ${report.auditType} (${report.periodLabel})`
+    const plantSuffix = report.plantName ? ` - ${report.plantName}` : ''
+    const title = `Laudo IA - Auditorias de ${report.auditType}${plantSuffix} (${report.periodLabel})`
 
     const { data, error } = await supabase
       .from('audit_ai_reports')
       .insert({
         client_id: report.clientId,
-        plant_id: report.plantId || null,
+        plant_id: report.plantId && report.plantId !== 'all' ? report.plantId : null,
         audit_type: report.auditType,
         title,
         summary: {
+          plantId: report.plantId && report.plantId !== 'all' ? report.plantId : null,
+          plantName: report.plantName || null,
           totalExecutions: report.totalExecutions,
           totalEvaluations: report.totalEvaluations,
           totalNonConformities: report.totalNonConformities,
@@ -225,18 +228,20 @@ export const auditAiService = {
   /**
    * Lista o histórico de laudos gerados
    */
-  async listSavedReports(clientId: string, auditType?: string) {
+  async listSavedReports(clientId: string, auditType?: string, plantId?: string) {
     let query = supabase
       .from('audit_ai_reports')
       .select(`
         id,
         title,
         audit_type,
+        plant_id,
         period_label,
         total_executions,
         conformity_score,
         created_at,
         created_by,
+        plants ( name ),
         profiles ( name )
       `)
       .eq('client_id', clientId)
@@ -244,6 +249,10 @@ export const auditAiService = {
 
     if (auditType && auditType !== 'all') {
       query = query.eq('audit_type', auditType)
+    }
+
+    if (plantId && plantId !== 'all') {
+      query = query.eq('plant_id', plantId)
     }
 
     const { data, error } = await query
@@ -257,18 +266,20 @@ export const auditAiService = {
   async getSavedReport(reportId: string): Promise<AuditAiReportData | null> {
     const { data, error } = await supabase
       .from('audit_ai_reports')
-      .select('*')
+      .select('*, plants(id, name)')
       .eq('id', reportId)
       .single()
 
     if (error || !data) return null
 
-    const summary = data.summary || {}
+    const summary = (data.summary as any) || {}
+    const plantName = data.plants?.name || summary.plantName || undefined
 
     return {
       id: data.id,
       clientId: data.client_id,
-      plantId: data.plant_id,
+      plantId: data.plant_id || summary.plantId || undefined,
+      plantName,
       auditType: data.audit_type,
       title: data.title,
       periodLabel: data.period_label || 'Período Geral',

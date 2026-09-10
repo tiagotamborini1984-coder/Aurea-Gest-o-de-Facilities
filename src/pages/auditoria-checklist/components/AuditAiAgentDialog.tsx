@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Sparkles,
   Bot,
@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
+  ChevronsUpDown,
 } from 'lucide-react'
 import {
   Dialog,
@@ -31,16 +32,20 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { useAppStore } from '@/store/AppContext'
+import { useMasterData } from '@/hooks/use-master-data'
+import { supabase } from '@/lib/supabase/client'
 import { auditAiService } from '@/services/audit-ai-agent'
 import { generateAuditAiReportPdf } from '@/pages/auditoria-checklist/utils/audit-ai-pdf-export'
 import { AuditAiReportData, NonConformityRankItem, PriorityLevel } from '@/types/audit-ai'
@@ -57,14 +62,25 @@ export function AuditAiAgentDialog({
   availableTypes,
   selectedType: initialType,
   dateRange,
+  onTypeChange,
 }: AuditAiAgentDialogProps) {
   const { toast } = useToast()
-  const { activeClient, selectedPlant, profile } = useAppStore()
+  const { activeClient, selectedPlant: globalSelectedPlant, profile } = useAppStore()
+  const { plants: masterPlants } = useMasterData()
 
   const [open, setOpen] = useState(false)
   const [targetType, setTargetType] = useState<string>(
     initialType && initialType !== 'all' ? initialType : 'all',
   )
+  const [typePopoverOpen, setTypePopoverOpen] = useState(false)
+
+  // Planta selecionada no escopo do Agente de IA
+  const [targetPlantId, setTargetPlantId] = useState<string>('all')
+  const [plantPopoverOpen, setPlantPopoverOpen] = useState(false)
+  const [clientPlants, setClientPlants] = useState<{ id: string; name: string; code?: string }[]>(
+    [],
+  )
+
   const [analyzing, setAnalyzing] = useState(false)
   const [currentStep, setCurrentStep] = useState<string>('')
   const [progressValue, setProgressValue] = useState<number>(0)
@@ -73,6 +89,69 @@ export function AuditAiAgentDialog({
   const [savedReportId, setSavedReportId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
+
+  // Manter sincronizado caso initialType mude externamente
+  useEffect(() => {
+    if (initialType && initialType !== 'all') {
+      setTargetType(initialType)
+    }
+  }, [initialType])
+
+  // Inicializar planta ao abrir ou quando globalSelectedPlant mudar
+  useEffect(() => {
+    if (globalSelectedPlant && globalSelectedPlant !== 'all') {
+      setTargetPlantId(globalSelectedPlant)
+    }
+  }, [globalSelectedPlant, open])
+
+  // Carregar lista de plantas do cliente ativo com RLS / tenant isolation
+  useEffect(() => {
+    let isMounted = true
+    const loadPlants = async () => {
+      if (!activeClient?.id) {
+        setClientPlants([])
+        return
+      }
+
+      // Se masterPlants já tiver dados do mesmo cliente, aproveitamos
+      if (masterPlants && masterPlants.length > 0) {
+        const filtered = masterPlants.filter(
+          (p: any) => !p.client_id || p.client_id === activeClient.id,
+        )
+        if (filtered.length > 0) {
+          setClientPlants(filtered)
+          return
+        }
+      }
+
+      // Consulta direta garantindo o cliente ativo
+      try {
+        const { data, error } = await supabase
+          .from('plants')
+          .select('id, name, code')
+          .eq('client_id', activeClient.id)
+          .order('name')
+
+        if (!error && data && isMounted) {
+          setClientPlants(data)
+        }
+      } catch (err) {
+        console.error('Erro ao buscar plantas do cliente para o Agente de IA:', err)
+      }
+    }
+
+    loadPlants()
+    return () => {
+      isMounted = false
+    }
+  }, [activeClient?.id, masterPlants])
+
+  // Obter nome da planta selecionada
+  const selectedPlantObject =
+    targetPlantId && targetPlantId !== 'all'
+      ? clientPlants.find((p) => p.id === targetPlantId)
+      : null
+  const targetPlantName = selectedPlantObject?.name
 
   // Iniciar varredura inteligente
   const handleStartScan = async () => {
@@ -90,10 +169,13 @@ export function AuditAiAgentDialog({
       setProgressValue(10)
       setCurrentStep('Iniciando o agente de IA...')
 
+      const effectivePlantId = targetPlantId && targetPlantId !== 'all' ? targetPlantId : undefined
+
       const result = await auditAiService.runAuditScan({
         clientId: activeClient.id,
         auditType: targetType,
-        plantId: selectedPlant,
+        plantId: effectivePlantId,
+        plantName: targetPlantName,
         dateRange,
         onProgress: (step, pct) => {
           setCurrentStep(step)
@@ -180,6 +262,7 @@ export function AuditAiAgentDialog({
         report,
         clientName: activeClient?.name || 'Sistema Aurea',
         logoUrl: activeClient?.logo_url,
+        plantName: report.plantName || targetPlantName || 'Todas as Plantas',
       })
     } catch (err: any) {
       toast({
@@ -313,21 +396,170 @@ export function AuditAiAgentDialog({
 
           {/* Barra de Filtros e Acionador da Varredura */}
           <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3">
+            {/* Campo 1: Tipo de Auditoria com busca por digitação (Combobox) */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-indigo-200">Tipo de Auditoria:</span>
-              <Select value={targetType} onValueChange={setTargetType}>
-                <SelectTrigger className="w-48 h-8 bg-white/10 border-white/20 text-white text-xs">
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Tipos</SelectItem>
-                  {availableTypes.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-xs font-medium text-indigo-200 whitespace-nowrap">
+                Tipo de Auditoria:
+              </span>
+              <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={typePopoverOpen}
+                    className="w-52 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
+                  >
+                    <span className="truncate">
+                      {targetType === 'all'
+                        ? 'Todos os Tipos'
+                        : availableTypes.find(
+                            (t) => t.toLowerCase() === targetType.toLowerCase(),
+                          ) || targetType}
+                    </span>
+                    <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Digitar para buscar tipo..."
+                      className="h-9 text-xs"
+                    />
+                    <CommandList>
+                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                        Nenhum tipo de auditoria encontrado.
+                      </CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="all Todos os Tipos"
+                          onSelect={() => {
+                            setTargetType('all')
+                            onTypeChange?.('all')
+                            setTypePopoverOpen(false)
+                          }}
+                          className="cursor-pointer text-xs"
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-3.5 w-3.5',
+                              targetType === 'all' ? 'opacity-100' : 'opacity-0',
+                            )}
+                          />
+                          <span>Todos os Tipos</span>
+                        </CommandItem>
+                        {availableTypes.map((t) => {
+                          const isSelected = targetType.toLowerCase() === t.toLowerCase()
+                          return (
+                            <CommandItem
+                              key={t}
+                              value={t}
+                              onSelect={() => {
+                                setTargetType(t)
+                                onTypeChange?.(t)
+                                setTypePopoverOpen(false)
+                              }}
+                              className="cursor-pointer text-xs"
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-3.5 w-3.5',
+                                  isSelected ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              <span className="truncate">{t}</span>
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Campo 2: Planta com busca por digitação (Combobox) */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-indigo-200 whitespace-nowrap">Planta:</span>
+              <Popover open={plantPopoverOpen} onOpenChange={setPlantPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={plantPopoverOpen}
+                    className="w-52 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
+                  >
+                    <span className="truncate">
+                      {targetPlantId === 'all' || !targetPlantId
+                        ? 'Todas as Plantas'
+                        : clientPlants.find((p) => p.id === targetPlantId)?.name ||
+                          'Todas as Plantas'}
+                    </span>
+                    <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Digitar para buscar planta..."
+                      className="h-9 text-xs"
+                    />
+                    <CommandList>
+                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                        Nenhuma planta encontrada.
+                      </CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="all Todas as Plantas"
+                          onSelect={() => {
+                            setTargetPlantId('all')
+                            setPlantPopoverOpen(false)
+                          }}
+                          className="cursor-pointer text-xs"
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-3.5 w-3.5',
+                              targetPlantId === 'all' || !targetPlantId
+                                ? 'opacity-100'
+                                : 'opacity-0',
+                            )}
+                          />
+                          <span>Todas as Plantas</span>
+                        </CommandItem>
+                        {clientPlants.map((plant) => {
+                          const isSelected = targetPlantId === plant.id
+                          return (
+                            <CommandItem
+                              key={plant.id}
+                              value={`${plant.code ? plant.code + ' ' : ''}${plant.name}`}
+                              onSelect={() => {
+                                setTargetPlantId(plant.id)
+                                setPlantPopoverOpen(false)
+                              }}
+                              className="cursor-pointer text-xs"
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-3.5 w-3.5',
+                                  isSelected ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              <span className="truncate">
+                                {plant.code ? (
+                                  <span className="font-semibold text-muted-foreground mr-1.5">
+                                    [{plant.code}]
+                                  </span>
+                                ) : null}
+                                {plant.name}
+                              </span>
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <Button
@@ -515,21 +747,44 @@ export function AuditAiAgentDialog({
                 <TabsContent value="laudo" className="space-y-6 mt-4">
                   <Card className="border-slate-200">
                     <CardHeader className="py-4 border-b bg-slate-50/50">
-                      <CardTitle className="text-base text-slate-800 flex items-center justify-between">
-                        <span>Resumo Executivo do Laudo Técnico</span>
-                        <Badge variant="outline" className="text-xs font-normal">
-                          Tipo: {report.auditType}
-                        </Badge>
-                      </CardTitle>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <CardTitle className="text-base text-slate-800 flex items-center gap-2">
+                          <span>Resumo Executivo do Laudo Técnico</span>
+                        </CardTitle>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="text-xs font-normal">
+                            Tipo: {report.auditType}
+                          </Badge>
+                          {report.plantName ? (
+                            <Badge className="bg-sky-100 text-sky-800 border-sky-300 hover:bg-sky-200 text-xs font-medium">
+                              <Building2 className="w-3 h-3 mr-1" />
+                              Planta: {report.plantName}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              Todas as Plantas
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-6 space-y-4 text-xs text-slate-700 leading-relaxed">
                       <p>
                         Este laudo consolida a análise determinística de{' '}
                         <strong>{report.totalExecutions} execuções de auditorias</strong> do tipo{' '}
-                        <strong>"{report.auditType}"</strong> realizadas no período de{' '}
-                        <strong>{report.periodLabel}</strong>. No total, foram avaliados{' '}
-                        <strong>{report.totalEvaluations} itens</strong> pelo time de campo, com
-                        índice global de conformidade atingindo{' '}
+                        <strong>"{report.auditType}"</strong>
+                        {report.plantName ? (
+                          <>
+                            {' '}
+                            filtradas especificamente para a planta{' '}
+                            <strong>"{report.plantName}"</strong>
+                          </>
+                        ) : (
+                          ' considerando todas as plantas'
+                        )}{' '}
+                        realizadas no período de <strong>{report.periodLabel}</strong>. No total,
+                        foram avaliados <strong>{report.totalEvaluations} itens</strong> pelo time
+                        de campo, com índice global de conformidade atingindo{' '}
                         <strong>{report.overallConformityScore}%</strong>
                         {report.scoreDelta !== undefined && (
                           <span>
