@@ -326,6 +326,11 @@ export default function AuditoriaRealizadas() {
     new Set(audits.map((a) => a.audits?.type).filter(Boolean)),
   ) as string[]
 
+  // Lista de títulos de auditoria presentes nas execuções
+  const availableTitles = Array.from(
+    new Set(audits.map((a) => a.audits?.title).filter(Boolean)),
+  ) as string[]
+
   const filteredAudits = audits.filter((audit) => {
     const searchLower = searchTerm.toLowerCase()
     const matchesType = selectedType === 'all' || audit.audits?.type === selectedType
@@ -350,8 +355,10 @@ export default function AuditoriaRealizadas() {
         <div className="flex items-center gap-3">
           <AuditAiAgentDialog
             availableTypes={availableTypes}
+            availableTitles={availableTitles}
             selectedType={selectedType}
             dateRange={dateRange?.from ? { from: dateRange.from, to: dateRange.to } : undefined}
+            selectedPlantProp={selectedPlant}
             onTypeChange={(t) => setSelectedType(t)}
           />
         </div>

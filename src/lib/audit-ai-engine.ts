@@ -229,12 +229,20 @@ export function analyzeAuditExecutions(
   options: {
     clientId: string
     auditType: string
+    auditTitle?: string
     plantId?: string
     plantName?: string
     periodLabel?: string
   },
 ): AuditAiReportData {
-  const { clientId, auditType, plantId, plantName, periodLabel = 'Todo o Histórico' } = options
+  const {
+    clientId,
+    auditType,
+    auditTitle,
+    plantId,
+    plantName,
+    periodLabel = 'Todo o Histórico',
+  } = options
 
   // Ordenar cronologicamente por realization_date ou created_at
   const sortedExecs = [...executions].sort((a, b) => {
@@ -255,6 +263,7 @@ export function analyzeAuditExecutions(
       plantId,
       plantName,
       auditType,
+      auditTitle,
       periodLabel,
       generatedAt: new Date().toISOString(),
       totalExecutions: 0,
@@ -618,6 +627,7 @@ export function analyzeAuditExecutions(
     plantId,
     plantName,
     auditType,
+    auditTitle,
     periodLabel,
     generatedAt: new Date().toISOString(),
     totalExecutions,

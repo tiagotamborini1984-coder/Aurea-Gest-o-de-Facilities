@@ -509,9 +509,17 @@ export function generateAuditAiReportPdf({
 
   <div class="filters-summary">
     <div class="filter-item">
-      <span class="filter-label">Recorte de Auditoria</span>
+      <span class="filter-label">Tipo de Auditoria</span>
       <span class="filter-val">${esc(report.auditType)}</span>
     </div>
+    ${
+      report.auditTitle
+        ? `<div class="filter-item">
+            <span class="filter-label">Título da Auditoria</span>
+            <span class="filter-val">${esc(report.auditTitle)}</span>
+          </div>`
+        : ''
+    }
     <div class="filter-item">
       <span class="filter-label">Planta / Unidade</span>
       <span class="filter-val">${esc(effectivePlantName)}</span>

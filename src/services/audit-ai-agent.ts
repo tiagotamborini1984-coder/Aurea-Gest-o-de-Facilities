@@ -5,6 +5,7 @@ import { analyzeAuditExecutions } from '@/lib/audit-ai-engine'
 export interface RunAuditScanParams {
   clientId: string
   auditType: string // ex: "Qualidade", "Geral" ou "all"
+  auditTitle?: string // ex: título específico de auditoria ou "all"
   plantId?: string // ex: uuid de uma planta ou "all"
   plantName?: string
   dateRange?: { from: Date; to?: Date }
@@ -16,7 +17,7 @@ export const auditAiService = {
    * Executa a varredura das auditorias realizadas com estágios simulados de progresso
    */
   async runAuditScan(params: RunAuditScanParams): Promise<AuditAiReportData> {
-    const { clientId, auditType, plantId, plantName, dateRange, onProgress } = params
+    const { clientId, auditType, auditTitle, plantId, plantName, dateRange, onProgress } = params
 
     // Etapa 1: Varrendo execuções
     onProgress?.('Varrendo histórico de execuções finalizadas...', 20)
@@ -69,6 +70,10 @@ export const auditAiService = {
 
     if (auditType && auditType !== 'all') {
       query = query.eq('audits.type', auditType)
+    }
+
+    if (auditTitle && auditTitle !== 'all') {
+      query = query.eq('audits.title', auditTitle)
     }
 
     if (plantId && plantId !== 'all') {
@@ -152,6 +157,7 @@ export const auditAiService = {
     const report = analyzeAuditExecutions(formatted, {
       clientId,
       auditType: auditType === 'all' ? 'Todos os Tipos' : auditType,
+      auditTitle: auditTitle && auditTitle !== 'all' ? auditTitle : undefined,
       plantId: plantId === 'all' ? undefined : plantId,
       plantName,
       periodLabel,
@@ -171,7 +177,10 @@ export const auditAiService = {
    */
   async saveReport(report: AuditAiReportData, userId?: string): Promise<string> {
     const plantSuffix = report.plantName ? ` - ${report.plantName}` : ''
-    const title = `Laudo IA - Auditorias de ${report.auditType}${plantSuffix} (${report.periodLabel})`
+    const titlePrefix = report.auditTitle
+      ? `"${report.auditTitle}" (${report.auditType})`
+      : report.auditType
+    const title = `Laudo IA - ${titlePrefix}${plantSuffix} (${report.periodLabel})`
 
     const { data, error } = await supabase
       .from('audit_ai_reports')

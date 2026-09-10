@@ -12,8 +12,6 @@ import {
   TrendingDown,
   Minus,
   Building2,
-  Layers,
-  Calendar,
   ShieldAlert,
   ClipboardList,
   ChevronDown,
@@ -52,16 +50,20 @@ import { AuditAiReportData, NonConformityRankItem, PriorityLevel } from '@/types
 import { cn } from '@/lib/utils'
 
 interface AuditAiAgentDialogProps {
-  availableTypes: string[]
+  availableTypes?: string[]
+  availableTitles?: string[]
   selectedType?: string
   dateRange?: { from: Date; to?: Date }
+  selectedPlantProp?: string
   onTypeChange?: (type: string) => void
 }
 
 export function AuditAiAgentDialog({
-  availableTypes,
+  availableTypes: propAvailableTypes,
+  availableTitles: propAvailableTitles,
   selectedType: initialType,
   dateRange,
+  selectedPlantProp,
   onTypeChange,
 }: AuditAiAgentDialogProps) {
   const { toast } = useToast()
@@ -69,14 +71,25 @@ export function AuditAiAgentDialog({
   const { plants: masterPlants } = useMasterData()
 
   const [open, setOpen] = useState(false)
+
+  // 1. Tipo de Auditoria
+  const [typesList, setTypesList] = useState<string[]>([])
   const [targetType, setTargetType] = useState<string>(
     initialType && initialType !== 'all' ? initialType : 'all',
   )
   const [typePopoverOpen, setTypePopoverOpen] = useState(false)
+  const [typeSearchTerm, setTypeSearchTerm] = useState('')
 
-  // Planta selecionada no escopo do Agente de IA
+  // 2. Título do Modelo de Auditoria
+  const [titlesList, setTitlesList] = useState<string[]>([])
+  const [targetTitle, setTargetTitle] = useState<string>('all')
+  const [titlePopoverOpen, setTitlePopoverOpen] = useState(false)
+  const [titleSearchTerm, setTitleSearchTerm] = useState('')
+
+  // 3. Planta selecionada
   const [targetPlantId, setTargetPlantId] = useState<string>('all')
   const [plantPopoverOpen, setPlantPopoverOpen] = useState(false)
+  const [plantSearchTerm, setPlantSearchTerm] = useState('')
   const [clientPlants, setClientPlants] = useState<{ id: string; name: string; code?: string }[]>(
     [],
   )
@@ -90,21 +103,22 @@ export function AuditAiAgentDialog({
   const [isSaving, setIsSaving] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
 
-  // Manter sincronizado caso initialType mude externamente
+  // Sincronizar Tipo inicial se vier de fora
   useEffect(() => {
     if (initialType && initialType !== 'all') {
       setTargetType(initialType)
     }
   }, [initialType])
 
-  // Inicializar planta ao abrir ou quando globalSelectedPlant mudar
+  // Inicializar planta ao abrir ou quando planta global mudar
   useEffect(() => {
-    if (globalSelectedPlant && globalSelectedPlant !== 'all') {
-      setTargetPlantId(globalSelectedPlant)
+    const effectivePlant = selectedPlantProp || globalSelectedPlant
+    if (effectivePlant && effectivePlant !== 'all') {
+      setTargetPlantId(effectivePlant)
     }
-  }, [globalSelectedPlant, open])
+  }, [globalSelectedPlant, selectedPlantProp, open])
 
-  // Carregar lista de plantas do cliente ativo com RLS / tenant isolation
+  // Carregar lista de Plantas do cliente ativo com isolamento multi-tenant
   useEffect(() => {
     let isMounted = true
     const loadPlants = async () => {
@@ -113,7 +127,6 @@ export function AuditAiAgentDialog({
         return
       }
 
-      // Se masterPlants já tiver dados do mesmo cliente, aproveitamos
       if (masterPlants && masterPlants.length > 0) {
         const filtered = masterPlants.filter(
           (p: any) => !p.client_id || p.client_id === activeClient.id,
@@ -124,7 +137,6 @@ export function AuditAiAgentDialog({
         }
       }
 
-      // Consulta direta garantindo o cliente ativo
       try {
         const { data, error } = await supabase
           .from('plants')
@@ -145,6 +157,55 @@ export function AuditAiAgentDialog({
       isMounted = false
     }
   }, [activeClient?.id, masterPlants])
+
+  // Carregar lista de Tipos e Títulos disponíveis para o cliente ativo
+  useEffect(() => {
+    let isMounted = true
+
+    const loadAuditsMetadata = async () => {
+      if (!activeClient?.id) {
+        setTypesList([])
+        setTitlesList([])
+        return
+      }
+
+      // Se já foram passados por props com valores populados, começamos com eles
+      const initialTypesSet = new Set<string>(propAvailableTypes || [])
+      const initialTitlesSet = new Set<string>(propAvailableTitles || [])
+
+      try {
+        // Buscar modelos de auditoria cadastrados no cliente
+        const { data, error } = await supabase
+          .from('audits')
+          .select('id, title, type')
+          .eq('client_id', activeClient.id)
+          .order('title')
+
+        if (!error && data) {
+          for (const item of data) {
+            if (item.type && item.type.trim()) {
+              initialTypesSet.add(item.type.trim())
+            }
+            if (item.title && item.title.trim()) {
+              initialTitlesSet.add(item.title.trim())
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar tipos e títulos de auditoria:', err)
+      }
+
+      if (isMounted) {
+        setTypesList(Array.from(initialTypesSet).sort((a, b) => a.localeCompare(b)))
+        setTitlesList(Array.from(initialTitlesSet).sort((a, b) => a.localeCompare(b)))
+      }
+    }
+
+    loadAuditsMetadata()
+    return () => {
+      isMounted = false
+    }
+  }, [activeClient?.id, propAvailableTypes, propAvailableTitles])
 
   // Obter nome da planta selecionada
   const selectedPlantObject =
@@ -174,6 +235,7 @@ export function AuditAiAgentDialog({
       const result = await auditAiService.runAuditScan({
         clientId: activeClient.id,
         auditType: targetType,
+        auditTitle: targetTitle && targetTitle !== 'all' ? targetTitle : undefined,
         plantId: effectivePlantId,
         plantName: targetPlantName,
         dateRange,
@@ -243,7 +305,6 @@ export function AuditAiAgentDialog({
     const updatedReport = { ...report, actionPlan: updatedPlan }
     setReport(updatedReport)
 
-    // Se já estiver salvo no banco, atualizar lá também
     const reportId = savedReportId || report.id
     if (reportId) {
       try {
@@ -323,6 +384,18 @@ export function AuditAiAgentDialog({
 
   const completedActionsCount = report?.actionPlan.filter((a) => a.completed).length || 0
 
+  // Filtros controlados para busca em tempo real
+  const filteredTypes = typesList.filter((t) =>
+    t.toLowerCase().includes(typeSearchTerm.trim().toLowerCase()),
+  )
+  const filteredTitles = titlesList.filter((t) =>
+    t.toLowerCase().includes(titleSearchTerm.trim().toLowerCase()),
+  )
+  const filteredPlants = clientPlants.filter((p) => {
+    const term = plantSearchTerm.trim().toLowerCase()
+    return p.name.toLowerCase().includes(term) || (p.code && p.code.toLowerCase().includes(term))
+  })
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -396,39 +469,40 @@ export function AuditAiAgentDialog({
 
           {/* Barra de Filtros e Acionador da Varredura */}
           <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3">
-            {/* Campo 1: Tipo de Auditoria com busca por digitação (Combobox) */}
+            {/* Campo 1: Tipo de Auditoria (Combobox com busca digitável) */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-indigo-200 whitespace-nowrap">
-                Tipo de Auditoria:
-              </span>
+              <span className="text-xs font-medium text-indigo-200 whitespace-nowrap">Tipo:</span>
               <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={typePopoverOpen}
-                    className="w-52 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
+                    className="w-44 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
                   >
                     <span className="truncate">
                       {targetType === 'all'
                         ? 'Todos os Tipos'
-                        : availableTypes.find(
-                            (t) => t.toLowerCase() === targetType.toLowerCase(),
-                          ) || targetType}
+                        : typesList.find((t) => t.toLowerCase() === targetType.toLowerCase()) ||
+                          targetType}
                     </span>
                     <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 p-0" align="start">
+                <PopoverContent className="w-64 p-0 z-[60]" align="start">
                   <Command>
                     <CommandInput
                       placeholder="Digitar para buscar tipo..."
+                      value={typeSearchTerm}
+                      onValueChange={setTypeSearchTerm}
                       className="h-9 text-xs"
                     />
                     <CommandList>
-                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-                        Nenhum tipo de auditoria encontrado.
-                      </CommandEmpty>
+                      {filteredTypes.length === 0 && typeSearchTerm.trim() !== '' ? (
+                        <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                          Nenhum tipo de auditoria encontrado.
+                        </CommandEmpty>
+                      ) : null}
                       <CommandGroup>
                         <CommandItem
                           value="all Todos os Tipos"
@@ -436,6 +510,7 @@ export function AuditAiAgentDialog({
                             setTargetType('all')
                             onTypeChange?.('all')
                             setTypePopoverOpen(false)
+                            setTypeSearchTerm('')
                           }}
                           className="cursor-pointer text-xs"
                         >
@@ -447,7 +522,7 @@ export function AuditAiAgentDialog({
                           />
                           <span>Todos os Tipos</span>
                         </CommandItem>
-                        {availableTypes.map((t) => {
+                        {filteredTypes.map((t) => {
                           const isSelected = targetType.toLowerCase() === t.toLowerCase()
                           return (
                             <CommandItem
@@ -457,6 +532,7 @@ export function AuditAiAgentDialog({
                                 setTargetType(t)
                                 onTypeChange?.(t)
                                 setTypePopoverOpen(false)
+                                setTypeSearchTerm('')
                               }}
                               className="cursor-pointer text-xs"
                             >
@@ -477,7 +553,91 @@ export function AuditAiAgentDialog({
               </Popover>
             </div>
 
-            {/* Campo 2: Planta com busca por digitação (Combobox) */}
+            {/* Campo 2: Título da Auditoria (Combobox com busca digitável e lista suspensa) */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-indigo-200 whitespace-nowrap">Título:</span>
+              <Popover open={titlePopoverOpen} onOpenChange={setTitlePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={titlePopoverOpen}
+                    className="w-56 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
+                  >
+                    <span className="truncate">
+                      {targetTitle === 'all'
+                        ? 'Todos os Títulos'
+                        : titlesList.find((t) => t.toLowerCase() === targetTitle.toLowerCase()) ||
+                          targetTitle}
+                    </span>
+                    <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0 z-[60]" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Digitar título da auditoria..."
+                      value={titleSearchTerm}
+                      onValueChange={setTitleSearchTerm}
+                      className="h-9 text-xs"
+                    />
+                    <CommandList>
+                      {filteredTitles.length === 0 && titleSearchTerm.trim() !== '' ? (
+                        <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                          Nenhum título encontrado.
+                        </CommandEmpty>
+                      ) : null}
+                      <CommandGroup>
+                        <CommandItem
+                          value="all Todos os Títulos"
+                          onSelect={() => {
+                            setTargetTitle('all')
+                            setTitlePopoverOpen(false)
+                            setTitleSearchTerm('')
+                          }}
+                          className="cursor-pointer text-xs"
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-3.5 w-3.5',
+                              targetTitle === 'all' ? 'opacity-100' : 'opacity-0',
+                            )}
+                          />
+                          <span>Todos os Títulos</span>
+                        </CommandItem>
+                        {filteredTitles.map((t) => {
+                          const isSelected = targetTitle.toLowerCase() === t.toLowerCase()
+                          return (
+                            <CommandItem
+                              key={t}
+                              value={t}
+                              onSelect={() => {
+                                setTargetTitle(t)
+                                setTitlePopoverOpen(false)
+                                setTitleSearchTerm('')
+                              }}
+                              className="cursor-pointer text-xs"
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-3.5 w-3.5',
+                                  isSelected ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              <span className="truncate" title={t}>
+                                {t}
+                              </span>
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Campo 3: Planta com busca digitável (Combobox) */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-indigo-200 whitespace-nowrap">Planta:</span>
               <Popover open={plantPopoverOpen} onOpenChange={setPlantPopoverOpen}>
@@ -486,7 +646,7 @@ export function AuditAiAgentDialog({
                     variant="outline"
                     role="combobox"
                     aria-expanded={plantPopoverOpen}
-                    className="w-52 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
+                    className="w-48 h-8 justify-between bg-white/10 hover:bg-white/20 border-white/20 text-white text-xs font-normal"
                   >
                     <span className="truncate">
                       {targetPlantId === 'all' || !targetPlantId
@@ -497,22 +657,27 @@ export function AuditAiAgentDialog({
                     <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 p-0" align="start">
+                <PopoverContent className="w-64 p-0 z-[60]" align="start">
                   <Command>
                     <CommandInput
                       placeholder="Digitar para buscar planta..."
+                      value={plantSearchTerm}
+                      onValueChange={setPlantSearchTerm}
                       className="h-9 text-xs"
                     />
                     <CommandList>
-                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-                        Nenhuma planta encontrada.
-                      </CommandEmpty>
+                      {filteredPlants.length === 0 && plantSearchTerm.trim() !== '' ? (
+                        <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                          Nenhuma planta encontrada.
+                        </CommandEmpty>
+                      ) : null}
                       <CommandGroup>
                         <CommandItem
                           value="all Todas as Plantas"
                           onSelect={() => {
                             setTargetPlantId('all')
                             setPlantPopoverOpen(false)
+                            setPlantSearchTerm('')
                           }}
                           className="cursor-pointer text-xs"
                         >
@@ -526,7 +691,7 @@ export function AuditAiAgentDialog({
                           />
                           <span>Todas as Plantas</span>
                         </CommandItem>
-                        {clientPlants.map((plant) => {
+                        {filteredPlants.map((plant) => {
                           const isSelected = targetPlantId === plant.id
                           return (
                             <CommandItem
@@ -535,6 +700,7 @@ export function AuditAiAgentDialog({
                               onSelect={() => {
                                 setTargetPlantId(plant.id)
                                 setPlantPopoverOpen(false)
+                                setPlantSearchTerm('')
                               }}
                               className="cursor-pointer text-xs"
                             >
@@ -625,9 +791,9 @@ export function AuditAiAgentDialog({
                 Nenhuma análise ativa
               </h3>
               <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                Selecione o tipo de auditoria acima e clique em <strong>"Iniciar Varredura"</strong>{' '}
-                para o agente analisar todas as execuções, priorizar as não conformidades e montar o
-                plano de ação de cobrança.
+                Selecione o <strong>tipo</strong> e/ou <strong>título</strong> da auditoria acima e
+                clique em <strong>"Iniciar Varredura"</strong> para o agente analisar todas as
+                execuções, priorizar as não conformidades e montar o plano de ação de cobrança.
               </p>
               <Button
                 onClick={handleStartScan}
@@ -755,6 +921,15 @@ export function AuditAiAgentDialog({
                           <Badge variant="outline" className="text-xs font-normal">
                             Tipo: {report.auditType}
                           </Badge>
+                          {report.auditTitle && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-medium max-w-xs truncate"
+                              title={report.auditTitle}
+                            >
+                              Título: {report.auditTitle}
+                            </Badge>
+                          )}
                           {report.plantName ? (
                             <Badge className="bg-sky-100 text-sky-800 border-sky-300 hover:bg-sky-200 text-xs font-medium">
                               <Building2 className="w-3 h-3 mr-1" />
@@ -773,6 +948,12 @@ export function AuditAiAgentDialog({
                         Este laudo consolida a análise determinística de{' '}
                         <strong>{report.totalExecutions} execuções de auditorias</strong> do tipo{' '}
                         <strong>"{report.auditType}"</strong>
+                        {report.auditTitle ? (
+                          <>
+                            {' '}
+                            com o título <strong>"{report.auditTitle}"</strong>
+                          </>
+                        ) : null}
                         {report.plantName ? (
                           <>
                             {' '}
