@@ -22,6 +22,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { AuditAiAgentDialog } from '@/pages/auditoria-checklist/components/AuditAiAgentDialog'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -104,6 +112,7 @@ export default function AuditoriaRealizadas() {
   const [searchTerm, setSearchTerm] = useState('')
   const [userRole, setUserRole] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const [selectedType, setSelectedType] = useState<string>('all')
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -312,24 +321,39 @@ export default function AuditoriaRealizadas() {
     }
   }
 
+  // Lista de tipos de auditoria presentes nas execuções
+  const availableTypes = Array.from(
+    new Set(audits.map((a) => a.audits?.type).filter(Boolean)),
+  ) as string[]
+
   const filteredAudits = audits.filter((audit) => {
     const searchLower = searchTerm.toLowerCase()
-    return (
+    const matchesType = selectedType === 'all' || audit.audits?.type === selectedType
+    const matchesSearch =
       audit.audits?.title?.toLowerCase().includes(searchLower) ||
       audit.plants?.name?.toLowerCase().includes(searchLower) ||
       audit.profiles?.name?.toLowerCase().includes(searchLower) ||
       audit.tasks?.task_number?.toLowerCase().includes(searchLower)
-    )
+
+    return matchesType && matchesSearch
   })
 
   const canDelete = userRole === 'Master' || userRole === 'Administrador'
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Auditorias Realizadas</h2>
           <p className="text-muted-foreground">Histórico de todas as auditorias finalizadas</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <AuditAiAgentDialog
+            availableTypes={availableTypes}
+            selectedType={selectedType}
+            dateRange={dateRange?.from ? { from: dateRange.from, to: dateRange.to } : undefined}
+            onTypeChange={(t) => setSelectedType(t)}
+          />
         </div>
       </div>
 
@@ -338,6 +362,19 @@ export default function AuditoriaRealizadas() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Listagem</CardTitle>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-full sm:w-44">
+                  <SelectValue placeholder="Tipo de Auditoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  {availableTypes.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <DatePickerWithRange date={dateRange} setDate={setDateRange} />
               <div className="relative w-72">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
