@@ -239,6 +239,11 @@ Deno.serve(async (req: Request) => {
         .from('audits')
         .select('id, start_date')
         .eq('parent_audit_id', audit.id)
+      const childList = (children || []).filter((c: any) => !!c.start_date)
+      childList.sort((a: any, b: any) =>
+        a.start_date > b.start_date ? -1 : a.start_date < b.start_date ? 1 : 0,
+      )
+      const latestChild = childList[0]
       const childIds = (children || []).map((c: any) => c.id)
       const allIds = [audit.id, ...childIds]
 
@@ -264,20 +269,19 @@ Deno.serve(async (req: Request) => {
       )
 
       let nextDue: Date
-      if (lastExec) {
-        if (!lastExec.realization_date) {
-          console.log(
-            `[process-recurring-audits] Last finalized execution (${lastExec.id}) for "${audit.title}" has no realization_date. Skipping recurrence generation until realization_date is set.`,
-          )
-          skipped++
-          continue
-        }
+      if (latestChild && latestChild.start_date) {
+        // Regra primária: ancorar na start_date do child mais recente existente
+        const baseStr = latestChild.start_date.split('T')[0]
+        nextDue = addFrequency(new Date(baseStr + 'T00:00:00Z'), audit.frequency)
+      } else if (lastExec && lastExec.realization_date) {
+        // Fallback 1: se não houver nenhum child, usar a realization_date da última execução finalizada
         const baseStr = lastExec.realization_date.split('T')[0]
         nextDue = addFrequency(new Date(baseStr + 'T00:00:00Z'), audit.frequency)
       } else {
+        // Fallback 2: audit.start_date do template
         if (!audit.start_date) {
           console.log(
-            `[process-recurring-audits] Audit "${audit.title}" has no start_date and no previous executions. Skipping.`,
+            `[process-recurring-audits] Audit "${audit.title}" has no start_date and no previous children or executions. Skipping.`,
           )
           skipped++
           continue
