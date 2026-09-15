@@ -40,11 +40,12 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import {
   Wrench,
   Plus,
-  Edit2,
+  Pencil,
   Trash2,
   Loader2,
   Search,
@@ -242,10 +243,6 @@ export default function DashboardFerramentas() {
     }
   }
 
-  const canDelete = useMemo(() => {
-    return profile?.role === 'Master' || profile?.role === 'Administrador'
-  }, [profile])
-
   const handleDelete = async () => {
     if (!deleteTarget) return
     setIsDeleting(true)
@@ -256,7 +253,15 @@ export default function DashboardFerramentas() {
       setDeleteTarget(null)
       fetchTools()
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao excluir ferramenta')
+      if (
+        err?.code === '23503' ||
+        err?.message?.toLowerCase().includes('foreign key') ||
+        err?.message?.toLowerCase().includes('violates foreign key')
+      ) {
+        toast.error('Não é possível excluir esta ferramenta pois ela possui vínculos no sistema.')
+      } else {
+        toast.error(err?.message || 'Erro ao excluir ferramenta')
+      }
     } finally {
       setIsDeleting(false)
     }
@@ -486,18 +491,35 @@ export default function DashboardFerramentas() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(tool)}>
-                              <Edit2 className="w-4 h-4 text-blue-600" />
-                            </Button>
-                            {canDelete && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteTarget(tool)}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEdit(tool)}
+                                  aria-label="Editar ferramenta"
+                                  className="text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar ferramenta</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeleteTarget(tool)}
+                                  aria-label="Excluir ferramenta"
+                                  className="text-slate-500 hover:text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Excluir ferramenta</TooltipContent>
+                            </Tooltip>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -603,7 +625,13 @@ export default function DashboardFerramentas() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Ferramenta</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir esta ferramenta? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir a ferramenta{' '}
+              {deleteTarget?.description ? (
+                <strong>"{deleteTarget.description}"</strong>
+              ) : (
+                'selecionada'
+              )}
+              ? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
