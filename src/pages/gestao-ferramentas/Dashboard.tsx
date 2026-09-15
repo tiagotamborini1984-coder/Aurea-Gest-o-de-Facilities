@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -272,6 +272,60 @@ export default function DashboardFerramentas() {
     return plants.find((p) => p.id === filterPlant)?.name || 'Todas as Plantas'
   }, [filterPlant, plants])
 
+  // Refs e estado para sincronização de rolagem horizontal superior
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const topScrollRef = useRef<HTMLDivElement>(null)
+  const [scrollWidth, setScrollWidth] = useState(0)
+  const [isOverflowing, setIsOverflowing] = useState(false)
+  const isSyncingScroll = useRef(false)
+
+  // Medir overflow e scrollWidth da tabela sempre que os dados mudarem ou na montagem
+  useEffect(() => {
+    const checkOverflow = () => {
+      const el = tableContainerRef.current
+      if (el) {
+        const hasOverflow = el.scrollWidth > el.clientWidth + 2
+        setIsOverflowing(hasOverflow)
+        setScrollWidth(el.scrollWidth)
+      }
+    }
+
+    checkOverflow()
+    const resizeObserver = new ResizeObserver(checkOverflow)
+    if (tableContainerRef.current) {
+      resizeObserver.observe(tableContainerRef.current)
+    }
+
+    window.addEventListener('resize', checkOverflow)
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', checkOverflow)
+    }
+  }, [filteredTools, loading])
+
+  // Sincronizar rolagem entre a barra do topo e o contêiner da tabela
+  const handleTopScroll = () => {
+    if (isSyncingScroll.current) return
+    isSyncingScroll.current = true
+    if (tableContainerRef.current && topScrollRef.current) {
+      tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft
+    }
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false
+    })
+  }
+
+  const handleTableScroll = () => {
+    if (isSyncingScroll.current) return
+    isSyncingScroll.current = true
+    if (topScrollRef.current && tableContainerRef.current) {
+      topScrollRef.current.scrollLeft = tableContainerRef.current.scrollLeft
+    }
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false
+    })
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -431,102 +485,156 @@ export default function DashboardFerramentas() {
               </Select>
             </div>
 
-            <div className="overflow-auto max-h-[400px] rounded-md border border-slate-100">
-              <Table>
-                <TableHeader className="bg-slate-50/80 sticky top-0">
-                  <TableRow>
-                    <TableHead className="font-semibold">Ativo</TableHead>
-                    <TableHead className="font-semibold">Descrição</TableHead>
-                    <TableHead className="font-semibold">Planta</TableHead>
-                    <TableHead className="font-semibold">Uso</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10">
-                        <Loader2 className="w-6 h-6 animate-spin text-brand-vividBlue mx-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredTools.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                        {filterPlant !== 'all'
-                          ? 'Nenhuma ferramenta encontrada para esta planta.'
-                          : 'Nenhuma ferramenta encontrada.'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredTools.map((tool) => (
-                      <TableRow key={tool.id} className="hover:bg-slate-50/50">
-                        <TableCell className="font-medium text-slate-700">
-                          {tool.asset_number || '-'}
-                        </TableCell>
-                        <TableCell className="text-slate-700">{tool.description}</TableCell>
-                        <TableCell className="text-slate-600">{tool.plant?.name || '-'}</TableCell>
-                        <TableCell className="text-slate-600 max-w-[200px] truncate">
-                          {tool.usage_instructions}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={tool.status}
-                            onValueChange={(v) => handleStatusChange(tool, v as ToolStatus)}
-                          >
-                            <SelectTrigger className="h-8 w-[150px]">
-                              <Badge
-                                variant="outline"
-                                className={`text-xs border ${STATUS_COLORS[tool.status] || ''}`}
-                              >
-                                {tool.status}
-                              </Badge>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Operando">Operando</SelectItem>
-                              <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
-                              <SelectItem value="Indisponível">Indisponível</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openEdit(tool)}
-                                  aria-label="Editar ferramenta"
-                                  className="text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Editar ferramenta</TooltipContent>
-                            </Tooltip>
+            {/* Contêiner da Tabela com Barra de Rolagem Sincronizada e Coluna de Ações Congelada */}
+            <div className="relative rounded-md border border-slate-200 dark:border-slate-800 bg-card overflow-hidden">
+              {/* Barra de rolagem horizontal superior sincronizada quando a tabela transborda */}
+              {isOverflowing && (
+                <div
+                  ref={topScrollRef}
+                  onScroll={handleTopScroll}
+                  className="overflow-x-auto border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
+                  style={{ scrollbarWidth: 'thin' }}
+                  title="Barra de rolagem horizontal rápida"
+                >
+                  <div style={{ width: `${scrollWidth}px`, height: '10px' }} />
+                </div>
+              )}
 
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeleteTarget(tool)}
-                                  aria-label="Excluir ferramenta"
-                                  className="text-slate-500 hover:text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Excluir ferramenta</TooltipContent>
-                            </Tooltip>
-                          </div>
+              <div
+                ref={tableContainerRef}
+                onScroll={handleTableScroll}
+                className="overflow-auto max-h-[460px]"
+                style={{ scrollbarWidth: 'thin' }}
+              >
+                <Table className="min-w-[760px] w-full">
+                  <TableHeader className="bg-slate-50 dark:bg-slate-900 sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] dark:shadow-[0_1px_0_0_#334155]">
+                    <TableRow>
+                      <TableHead className="font-semibold w-[120px] whitespace-nowrap">
+                        Ativo
+                      </TableHead>
+                      <TableHead className="font-semibold min-w-[200px]">Descrição</TableHead>
+                      <TableHead className="font-semibold w-[160px] whitespace-nowrap">
+                        Planta
+                      </TableHead>
+                      <TableHead className="font-semibold min-w-[220px]">Uso</TableHead>
+                      <TableHead className="font-semibold w-[170px] whitespace-nowrap">
+                        Status
+                      </TableHead>
+                      <TableHead className="font-semibold text-right w-[110px] min-w-[110px] sticky right-0 bg-slate-50 dark:bg-slate-900 z-30 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.3)]">
+                        Ações
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-10">
+                          <Loader2 className="w-6 h-6 animate-spin text-brand-vividBlue mx-auto" />
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : filteredTools.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                          {filterPlant !== 'all'
+                            ? 'Nenhuma ferramenta encontrada para esta planta.'
+                            : 'Nenhuma ferramenta encontrada.'}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredTools.map((tool) => (
+                        <TableRow
+                          key={tool.id}
+                          className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                        >
+                          <TableCell className="font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                            {tool.asset_number || '-'}
+                          </TableCell>
+                          <TableCell className="text-slate-700 dark:text-slate-200">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block max-w-[240px] truncate cursor-default">
+                                  {tool.description}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs break-words">
+                                {tool.description}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell className="text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            {tool.plant?.name || '-'}
+                          </TableCell>
+                          <TableCell className="text-slate-600 dark:text-slate-300">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block max-w-[260px] truncate cursor-default">
+                                  {tool.usage_instructions}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs break-words">
+                                {tool.usage_instructions}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Select
+                              value={tool.status}
+                              onValueChange={(v) => handleStatusChange(tool, v as ToolStatus)}
+                            >
+                              <SelectTrigger className="h-8 w-[150px]">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs border ${STATUS_COLORS[tool.status] || ''}`}
+                                >
+                                  {tool.status}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Operando">Operando</SelectItem>
+                                <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
+                                <SelectItem value="Indisponível">Indisponível</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right sticky right-0 bg-white dark:bg-card group-hover:bg-slate-50 dark:group-hover:bg-slate-800/60 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.3)] transition-colors">
+                            <div className="flex items-center justify-end gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEdit(tool)}
+                                    aria-label="Editar ferramenta"
+                                    className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Editar ferramenta</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setDeleteTarget(tool)}
+                                    aria-label="Excluir ferramenta"
+                                    className="text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Excluir ferramenta</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </CardContent>
         </Card>
