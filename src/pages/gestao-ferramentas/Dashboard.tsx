@@ -485,7 +485,7 @@ export default function DashboardFerramentas() {
               </Select>
             </div>
 
-            {/* Contêiner da Tabela com Barra de Rolagem Sincronizada e Coluna de Ações Congelada */}
+            {/* Contêiner da Tabela com Barra de Rolagem Sincronizada e Coluna de Ações Congelada (Sticky) */}
             <div className="relative rounded-md border border-slate-200 dark:border-slate-800 bg-card overflow-hidden">
               {/* Barra de rolagem horizontal superior sincronizada quando a tabela transborda */}
               {isOverflowing && (
