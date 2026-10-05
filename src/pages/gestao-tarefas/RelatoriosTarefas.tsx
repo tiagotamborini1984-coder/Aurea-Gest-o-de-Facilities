@@ -328,6 +328,7 @@ export default function RelatoriosTarefas() {
         sumToRC: number
         sumGrossRC: number
         sumFrozenRC: number
+        sumToPO: number
         sumCadastro: number
         countToRC: number
         countToPO: number

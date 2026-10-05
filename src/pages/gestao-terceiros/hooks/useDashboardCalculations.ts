@@ -55,8 +55,6 @@ export function useDashboardCalculations(
         ? new Set(employees.filter((e) => companiesSet.has(e.company_name)).map((e) => e.id))
         : new Set(employees.map((e) => e.id))
 
-    const validEqIds = new Set(equipment.map((e) => e.id))
-
     const sortedLogsForDedup = [...logs].sort((a, b) =>
       (b.created_at || '').localeCompare(a.created_at || ''),
     )
@@ -82,7 +80,7 @@ export function useDashboardCalculations(
     if (typeCont === 'colaborador') {
       const seenEmpKeys = new Set<string>()
       employees.forEach((e) => {
-        if (e.status !== 'Ativo') return
+        if (e.status?.trim().toLowerCase() !== 'ativo') return
         if (selectedCompanies.length > 0 && !companiesSet.has(e.company_name)) return
         const regNum = e.registration_number?.trim()
         const name = e.name?.toLowerCase().trim()
@@ -93,7 +91,7 @@ export function useDashboardCalculations(
       })
     } else {
       equipment.forEach((e) => {
-        if (e.status !== 'Ativo') return
+        if (e.status?.trim().toLowerCase() !== 'ativo') return
         fallbackCountByPlant.set(e.plant_id, (fallbackCountByPlant.get(e.plant_id) || 0) + 1)
       })
     }
@@ -300,7 +298,7 @@ export function useDashboardCalculations(
             const seen = new Set<string>()
             const list: any[] = []
             employees.forEach((e) => {
-              if (e.status !== 'Ativo') return
+              if (e.status?.trim().toLowerCase() !== 'ativo') return
               if (selectedPlants.length > 0 && !validPlants.includes(e.plant_id)) return
               if (selectedCompanies.length > 0 && !companiesSet.has(e.company_name)) return
               const regNum = e.registration_number?.trim()
@@ -323,6 +321,17 @@ export function useDashboardCalculations(
       const explicitAbsentRefIds = new Set(
         dayLogs.filter((l) => l.status === false).map((l) => l.reference_id),
       )
+
+      // Também indexamos os IDs de referência presentes/explícitos resolvendo agrupamento por matrícula/nome
+      const registeredRefKeys = new Set<string>()
+      dayLogs.forEach((l) => {
+        const emp = employees.find((e) => e.id === l.reference_id)
+        if (emp) {
+          const regNum = emp.registration_number?.trim()
+          const name = emp.name?.toLowerCase().trim()
+          registeredRefKeys.add(`${regNum || name || emp.id}-${l.plant_id}`)
+        }
+      })
 
       const result: Array<{
         id: string
@@ -355,6 +364,11 @@ export function useDashboardCalculations(
       validActiveEmployeesForAudit.forEach((emp) => {
         if (isPlantDateNonWorking(emp.plant_id, date)) return
         if (presentRefIds.has(emp.id) || explicitAbsentRefIds.has(emp.id)) return
+        const regNum = emp.registration_number?.trim()
+        const name = emp.name?.toLowerCase().trim()
+        const empKey = `${regNum || name || emp.id}-${emp.plant_id}`
+        if (registeredRefKeys.has(empKey)) return
+
         const plant = plants.find((p) => p.id === emp.plant_id)
         result.push({
           id: `imp-${emp.id}-${date}`,
