@@ -1,5 +1,15 @@
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, FileText, ClipboardCheck, XCircle, TrendingDown, Eye } from 'lucide-react'
+import {
+  Users,
+  FileText,
+  ClipboardCheck,
+  XCircle,
+  TrendingDown,
+  Eye,
+  Calendar,
+  CalendarRange,
+} from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -30,6 +40,8 @@ export default function DashboardMetricsCards({
   selectedPlants = [],
   selectedCompanies = [],
 }: any) {
+  const [absentAuditView, setAbsentAuditView] = useState<'today' | 'period'>('today')
+
   const renderAuditButton = (metricType: 'presentes' | 'ausentes' | 'all') => {
     const typeFiltered = logs.filter(
       (l: any) => l.type === (activeTab === 'colaboradores' ? 'staff' : 'equipment'),
@@ -46,72 +58,13 @@ export default function DashboardMetricsCards({
       }
       return true
     })
-    // Se for auditoria de ausentes de colaboradores, incluir tanto ausentes com log explícito (status=false)
-    // quanto colaboradores ativos sem lançamento de presença na data (ausência implícita de Hoje ou dias do filtro)
+    // Se for auditoria de ausentes de colaboradores, utilizar os dados unificados do hook
+    // que garantem correspondência idêntica entre o badge "Hoje: X", a média do card e a listagem.
     if (metricType === 'ausentes' && activeTab === 'colaboradores') {
-      const datesWithLogs = Array.from(new Set(companyFiltered.map((l: any) => l.date))).sort(
-        (a: any, b: any) => b.localeCompare(a),
-      )
-
-      // Identificar quem está ativo por planta
-      const validEmps = employees.filter((e: any) => {
-        if (e.status !== 'Ativo') return false
-        if (selectedPlants.length > 0 && !selectedPlants.includes(e.plant_id)) return false
-        if (
-          selectedCompanies.length > 0 &&
-          (!e.company_id || !selectedCompanies.includes(e.company_id))
-        ) {
-          return false
-        }
-        return true
-      })
-
-      // Para cada data com logs, verificar ausências
-      const absentRecords: Array<{
-        id: string
-        date: string
-        refName: string
-        type: 'explicit' | 'implicit'
-      }> = []
-
-      datesWithLogs.forEach((dStr: string) => {
-        const dayLogs = companyFiltered.filter((l: any) => l.date === dStr)
-        const presentRefIds = new Set(
-          dayLogs.filter((l: any) => l.status === true).map((l: any) => l.reference_id),
-        )
-        const explicitAbsentRefIds = new Set(
-          dayLogs.filter((l: any) => l.status === false).map((l: any) => l.reference_id),
-        )
-
-        // 1. Ausentes explícitos com log
-        dayLogs
-          .filter((l: any) => l.status === false)
-          .forEach((l: any) => {
-            const emp = employees.find((e: any) => e.id === l.reference_id)
-            absentRecords.push({
-              id: `exp-${l.id || l.reference_id}-${dStr}`,
-              date: dStr,
-              refName: emp?.name || 'Desconhecido',
-              type: 'explicit',
-            })
-          })
-
-        // 2. Colaboradores ativos sem presença marcada naquele dia
-        // Dedup por matrícula/nome para não listar duplicatas cadastrais
-        const seenKeys = new Set<string>()
-        validEmps.forEach((emp: any) => {
-          if (presentRefIds.has(emp.id) || explicitAbsentRefIds.has(emp.id)) return
-          const key = emp.registration_number?.trim() || emp.name?.toLowerCase().trim() || emp.id
-          if (seenKeys.has(key)) return
-          seenKeys.add(key)
-          absentRecords.push({
-            id: `imp-${emp.id}-${dStr}`,
-            date: dStr,
-            refName: emp.name,
-            type: 'implicit',
-          })
-        })
-      })
+      const todayList: any[] = metrics.todayAbsentsList || []
+      const periodList: any[] = metrics.periodAbsentsList || []
+      const currentList = absentAuditView === 'today' ? todayList : periodList
+      const totalDays = metrics.validDatesCount || 1
 
       return (
         <Sheet>
@@ -125,12 +78,59 @@ export default function DashboardMetricsCards({
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full sm:max-w-md md:max-w-lg flex flex-col p-0">
-            <SheetHeader className="p-6 pb-2 border-b border-border/50">
-              <SheetTitle>Auditoria de Ausências</SheetTitle>
-              <SheetDescription>
-                Colaboradores sem presença marcada ou com ausência registrada (
-                {absentRecords.length})
-              </SheetDescription>
+            <SheetHeader className="p-6 pb-3 border-b border-border/50 space-y-3">
+              <div>
+                <SheetTitle className="text-lg">Auditoria de Ausências</SheetTitle>
+                <SheetDescription className="text-xs mt-1">
+                  {absentAuditView === 'today' ? (
+                    <>
+                      Mostrando colaboradores ausentes em{' '}
+                      <strong>
+                        Hoje (
+                        {metrics.todayDateStr
+                          ? format(new Date(metrics.todayDateStr + 'T12:00:00Z'), 'dd/MM/yyyy')
+                          : 'data atual'}
+                        )
+                      </strong>
+                      : <strong>{todayList.length} pessoas</strong> (bate exatamente com o badge{' '}
+                      <em>Hoje: {metrics.todayAusente}</em>).
+                    </>
+                  ) : (
+                    <>
+                      Mostrando total acumulado de ausências no período selecionado:{' '}
+                      <strong>{periodList.length} ocorrências</strong> em{' '}
+                      <strong>
+                        {totalDays} {totalDays === 1 ? 'dia com logs' : 'dias com logs'}
+                      </strong>{' '}
+                      (média exibida no card: <strong>{metrics.ausente}</strong>).
+                    </>
+                  )}
+                </SheetDescription>
+              </div>
+
+              {/* Botões para alternar entre "Hoje" e "Todo o Período" */}
+              <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-lg w-fit">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={absentAuditView === 'today' ? 'default' : 'ghost'}
+                  onClick={() => setAbsentAuditView('today')}
+                  className="h-7 text-xs px-2.5 gap-1.5 shadow-none"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Hoje ({todayList.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={absentAuditView === 'period' ? 'default' : 'ghost'}
+                  onClick={() => setAbsentAuditView('period')}
+                  className="h-7 text-xs px-2.5 gap-1.5 shadow-none"
+                >
+                  <CalendarRange className="h-3.5 w-3.5" />
+                  Todo o Período ({periodList.length})
+                </Button>
+              </div>
             </SheetHeader>
             <ScrollArea className="flex-1">
               <div className="p-6 pt-2">
@@ -139,31 +139,42 @@ export default function DashboardMetricsCards({
                     <TableRow>
                       <TableHead>Data</TableHead>
                       <TableHead>Colaborador</TableHead>
+                      <TableHead>Planta / Empresa</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {absentRecords.length === 0 ? (
+                    {currentList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                          Nenhum colaborador ausente registrado no período.
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          {absentAuditView === 'today'
+                            ? 'Nenhum colaborador ausente registrado hoje.'
+                            : 'Nenhum colaborador ausente registrado no período.'}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      absentRecords.map((item) => (
+                      currentList.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap text-xs">
                             {format(new Date(item.date + 'T12:00:00Z'), 'dd/MM/yyyy')}
                           </TableCell>
-                          <TableCell className="font-medium">{item.refName}</TableCell>
+                          <TableCell className="font-medium text-xs">{item.refName}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            <div>{item.plantName || '-'}</div>
+                            {item.companyName && (
+                              <div className="text-[10px] text-muted-foreground/80">
+                                {item.companyName}
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className="bg-red-500/10 text-red-600 border-red-500/20"
+                              className="bg-red-500/10 text-red-600 border-red-500/20 text-[10px] whitespace-nowrap"
                               title={
                                 item.type === 'implicit'
                                   ? 'Sem presença lançada no dia'
-                                  : 'Ausência lançada'
+                                  : 'Ausência explícita lançada'
                               }
                             >
                               {item.type === 'implicit' ? 'Sem presença' : 'Ausente'}
@@ -338,12 +349,14 @@ export default function DashboardMetricsCards({
             <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
               <p className="text-xl lg:text-2xl font-bold text-foreground">{metrics.ausente}</p>
               {activeTab === 'colaboradores' && metrics.todayAusente !== undefined && (
-                <span
-                  className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 border border-red-500/20 whitespace-nowrap"
-                  title="Ausentes hoje (sem presença marcada no dia corrente)"
+                <button
+                  type="button"
+                  onClick={() => setAbsentAuditView('today')}
+                  className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 border border-red-500/20 whitespace-nowrap hover:bg-red-500/20 transition-colors cursor-pointer"
+                  title="Clique para abrir detalhes de ausentes hoje (sem presença marcada no dia corrente)"
                 >
                   Hoje: {metrics.todayAusente}
-                </span>
+                </button>
               )}
             </div>
             {renderAuditButton('ausentes')}

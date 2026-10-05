@@ -52,8 +52,7 @@ export async function updateTicket(
   id: string,
   ticket: Partial<MaintenanceTicket>,
 ): Promise<MaintenanceTicket> {
-  const { data, error } = await (supabase
-    .from('maintenance_tickets') as any)
+  const { data, error } = await (supabase.from('maintenance_tickets') as any)
     .update(ticket)
     .eq('id', id)
     .select()

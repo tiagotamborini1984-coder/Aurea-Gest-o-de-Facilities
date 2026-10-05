@@ -879,7 +879,11 @@ export const satisfactionSurveyService = {
               : null
 
           // Apenas subperguntas de insatisfação/regular
-          if (isNegativeOrNeutralTrigger(Array.isArray(q.trigger_values) ? (q.trigger_values as any[]) : [])) {
+          if (
+            isNegativeOrNeutralTrigger(
+              Array.isArray(q.trigger_values) ? (q.trigger_values as any[]) : [],
+            )
+          ) {
             if (q.question_type === 'multiple_choice' && ans.text_value && ans.text_value.trim()) {
               const opt = ans.text_value.trim()
               const key = `mc_${q.id}_${opt.toLowerCase()}`
@@ -951,7 +955,8 @@ export const satisfactionSurveyService = {
 
     for (const resp of filteredResponses) {
       const pId = resp.plant_id || resp.survey?.plant_id || 'unassigned'
-      const pName = (resp.plant as any)?.name || (resp.survey?.plants as any)?.name || 'Não Identificada'
+      const pName =
+        (resp.plant as any)?.name || (resp.survey?.plants as any)?.name || 'Não Identificada'
       const pCode = (resp.plant as any)?.code || (resp.survey?.plants as any)?.code || null
 
       if (!plantMap[pId]) {

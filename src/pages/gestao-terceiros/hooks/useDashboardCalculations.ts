@@ -235,38 +235,27 @@ export function useDashboardCalculations(
     const absenteismoDenominator = contratado > 0 ? contratado : totalFallbackCount
 
     // Novo cálculo de ausentes:
-    // Para colaboradores: para cada data válida de cada planta, ausentes = base ativa/esperada - presentes.
-    // Base diária de cada planta: dCont > 0 ? dCont : fallbackCountByPlant.get(pid)
-    // Se houver ausentes explícitos além dessa diferença, garante pelo menos o número de ausentes explícitos.
+    // Para colaboradores: para cada data válida, somamos o total de pessoas ausentes reais
+    // (explícitas com log status=false + ativas da planta sem presença lançada naquele dia).
+    // Isso garante correspondência idêntica com o detalhamento de ausentes por data.
     let totalAbsentDailySum = 0
     Array.from(allValidDatesSet).forEach((date) => {
-      validPlants.forEach((pid) => {
-        if (!plantValidDatesMap[pid]?.has(date)) return
-        const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
-        const dPres = dayLogs.filter((l) => l.status).length
-        const dExplicitAbs = dayLogs.filter((l) => !l.status).length
-
-        if (activeTab === 'colaboradores' || activeTab === 'metas') {
-          const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
-            if (selectedCompanies.length > 0 && c.type === 'colaborador') {
-              const validCompanyIds = new Set(
-                employees
-                  .filter((e) => companiesSet.has(e.company_name) && e.company_id)
-                  .map((e) => e.company_id),
-              )
-              if (c.company_id && !validCompanyIds.has(c.company_id)) return false
-            }
-            return true
-          }).reduce((sum, c) => sum + c.quantity, 0)
-
-          const plantBase = pCont > 0 ? pCont : fallbackCountByPlant.get(pid) || 0
-          const implicitAbs = Math.max(0, plantBase - dPres)
-          totalAbsentDailySum += Math.max(implicitAbs, dExplicitAbs)
-        } else {
-          // Para equipamentos, indisponíveis calculados a partir dos logs ou do contratado
+      if (activeTab === 'colaboradores' || activeTab === 'metas') {
+        const absentsForDay = getStaffAbsentListForDate(date)
+        // Considera apenas as plantas com logs/válidas nesta data
+        const absentsInValidPlants = absentsForDay.filter((item) =>
+          plantValidDatesMap[item.plantId]?.has(date),
+        )
+        totalAbsentDailySum += absentsInValidPlants.length
+      } else {
+        // Para equipamentos, indisponíveis calculados a partir dos logs de indisponibilidade
+        validPlants.forEach((pid) => {
+          if (!plantValidDatesMap[pid]?.has(date)) return
+          const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
+          const dExplicitAbs = dayLogs.filter((l) => !l.status).length
           totalAbsentDailySum += dExplicitAbs
-        }
-      })
+        })
+      }
     })
 
     const avgAusente = globalDays > 0 ? totalAbsentDailySum / globalDays : 0
@@ -304,6 +293,83 @@ export function useDashboardCalculations(
 
     const todayDateStr = getTodayLocalDateStr()
 
+    // Base ativa de colaboradores deduped por matrícula/nome para auditoria consistente
+    const validActiveEmployeesForAudit =
+      typeCont === 'colaborador'
+        ? (() => {
+            const seen = new Set<string>()
+            const list: any[] = []
+            employees.forEach((e) => {
+              if (e.status !== 'Ativo') return
+              if (selectedPlants.length > 0 && !validPlants.includes(e.plant_id)) return
+              if (selectedCompanies.length > 0 && !companiesSet.has(e.company_name)) return
+              const regNum = e.registration_number?.trim()
+              const name = e.name?.toLowerCase().trim()
+              const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
+              if (seen.has(dedupKey)) return
+              seen.add(dedupKey)
+              list.push(e)
+            })
+            return list
+          })()
+        : []
+
+    // Helper para extrair a lista exata de ausentes (explícitos + sem presença) em uma data
+    const getStaffAbsentListForDate = (date: string) => {
+      const dayLogs = activeLogs.filter((l) => l.date === date)
+      const presentRefIds = new Set(
+        dayLogs.filter((l) => l.status === true).map((l) => l.reference_id),
+      )
+      const explicitAbsentRefIds = new Set(
+        dayLogs.filter((l) => l.status === false).map((l) => l.reference_id),
+      )
+
+      const result: Array<{
+        id: string
+        date: string
+        refName: string
+        plantId: string
+        plantName: string
+        companyName?: string
+        type: 'explicit' | 'implicit'
+      }> = []
+
+      // 1. Ausentes explícitos com log
+      dayLogs
+        .filter((l) => l.status === false)
+        .forEach((l) => {
+          const emp = employees.find((e) => e.id === l.reference_id)
+          const plant = plants.find((p) => p.id === l.plant_id)
+          result.push({
+            id: `exp-${l.id || l.reference_id}-${date}`,
+            date,
+            refName: emp?.name || 'Desconhecido',
+            plantId: l.plant_id,
+            plantName: plant?.name || 'N/A',
+            companyName: emp?.company_name,
+            type: 'explicit',
+          })
+        })
+
+      // 2. Colaboradores ativos sem presença e sem log explícito no dia
+      validActiveEmployeesForAudit.forEach((emp) => {
+        if (isPlantDateNonWorking(emp.plant_id, date)) return
+        if (presentRefIds.has(emp.id) || explicitAbsentRefIds.has(emp.id)) return
+        const plant = plants.find((p) => p.id === emp.plant_id)
+        result.push({
+          id: `imp-${emp.id}-${date}`,
+          date,
+          refName: emp.name,
+          plantId: emp.plant_id,
+          plantName: plant?.name || 'N/A',
+          companyName: emp.company_name,
+          type: 'implicit',
+        })
+      })
+
+      return result
+    }
+
     // Cálculo dos números específicos de "Hoje" para o card
     let todayPresentCount = 0
     let todayExplicitAbsentCount = 0
@@ -335,9 +401,13 @@ export function useDashboardCalculations(
     })
 
     const todayBase = todayContractedSum > 0 ? todayContractedSum : todayFallbackSum
+    const todayAbsentsList =
+      activeTab === 'colaboradores' || activeTab === 'metas'
+        ? getStaffAbsentListForDate(todayDateStr)
+        : []
     const todayAusente =
       activeTab === 'colaboradores' || activeTab === 'metas'
-        ? Math.max(Math.max(0, todayBase - todayPresentCount), todayExplicitAbsentCount)
+        ? todayAbsentsList.length
         : todayExplicitAbsentCount
 
     const plantStats = plants
@@ -412,7 +482,7 @@ export function useDashboardCalculations(
 
             const dPlantAbs =
               activeTab === 'colaboradores' || activeTab === 'metas'
-                ? Math.max(Math.max(0, dDenom - dPres), dExplicitAbs)
+                ? getStaffAbsentListForDate(date).filter((item) => item.plantId === plant.id).length
                 : dExplicitAbs
 
             pTotalAbsSum += dPlantAbs
@@ -520,10 +590,14 @@ export function useDashboardCalculations(
             const dExplicitAbs = dDayLogs.filter((l) => !l.status).length
             const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
 
-            const locBase = dCont > 0 ? dCont : refIds.length
+            const locEmpSet = new Set(refIds)
             const dLocAbs =
               activeTab === 'colaboradores' || activeTab === 'metas'
-                ? Math.max(Math.max(0, locBase - dPres), dExplicitAbs)
+                ? getStaffAbsentListForDate(date).filter(
+                    (item) =>
+                      item.plantId === plantId &&
+                      locEmpSet.has(item.id.replace(/^(exp|imp)-/, '').split('-')[0]),
+                  ).length
                 : dExplicitAbs
 
             lTotalAbsSum += dLocAbs
@@ -709,7 +783,9 @@ export function useDashboardCalculations(
 
         const dAbsentees =
           activeTab === 'colaboradores' || activeTab === 'metas'
-            ? Math.max(Math.max(0, dDenominator - dPresentes), dAusentes)
+            ? getStaffAbsentListForDate(date).filter((item) =>
+                plantValidDatesMap[item.plantId]?.has(date),
+              ).length
             : dAusentes
 
         return {
@@ -806,6 +882,18 @@ export function useDashboardCalculations(
         return { ...g, avg }
       })
 
+    // Monta a lista consolidada de ausentes em todas as datas válidas com logs para auditoria
+    const periodAbsentsList =
+      activeTab === 'colaboradores' || activeTab === 'metas'
+        ? Array.from(allValidDatesSet)
+            .sort((a, b) => b.localeCompare(a))
+            .flatMap((d) =>
+              getStaffAbsentListForDate(d).filter((item) =>
+                plantValidDatesMap[item.plantId]?.has(d),
+              ),
+            )
+        : []
+
     return {
       metrics: {
         lancado: formatStr(avgLancado),
@@ -815,12 +903,15 @@ export function useDashboardCalculations(
         todayAusente: formatStr(todayAusente),
         todayPresente: formatStr(todayPresentCount),
         todayContratado: formatStr(todayBase),
+        todayAbsentsList,
+        periodAbsentsList,
         contratado:
           activeTab === 'equipamentos'
             ? formatContratadoPrecision(contratado)
             : formatStr(contratado),
         absenteismo,
         excludedDaysCount,
+        validDatesCount: globalDays,
         locationStats,
         collaboratorStats,
       },

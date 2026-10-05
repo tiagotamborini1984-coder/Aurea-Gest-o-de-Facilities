@@ -29,9 +29,29 @@ export default function DashboardGestor() {
     [activeClient?.primaryColor, activeClient?.secondaryColor],
   )
 
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [referenceMonth, setReferenceMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const getCuiabaDateStr = (date: Date = new Date()) => {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Cuiaba',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date)
+      const y = parts.find((p) => p.type === 'year')?.value
+      const m = parts.find((p) => p.type === 'month')?.value
+      const d = parts.find((p) => p.type === 'day')?.value
+      if (y && m && d) return `${y}-${m}-${d}`
+    } catch {
+      // fallback
+    }
+    return format(date, 'yyyy-MM-dd')
+  }
+
+  const [dateFrom, setDateFrom] = useState(() => format(subDays(new Date(), 7), 'yyyy-MM-dd'))
+  const [dateTo, setDateTo] = useState(() => getCuiabaDateStr(new Date()))
+  const [referenceMonth, setReferenceMonth] = useState(() =>
+    getCuiabaDateStr(new Date()).substring(0, 7),
+  )
   const [selectedPlants, setSelectedPlants] = useState<string[]>([])
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'colaboradores' | 'equipamentos'>('colaboradores')
