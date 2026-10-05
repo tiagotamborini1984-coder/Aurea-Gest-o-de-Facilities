@@ -205,7 +205,9 @@ export default function AuditoriaConfig() {
             <Input
               type="number"
               value={advanceNotice}
-              onChange={(e) => setAdvanceNotice(e.target.value)}
+              onChange={(e) =>
+                setAdvanceNotice(e.target.value === '' ? '' : Number(e.target.value))
+              }
             />
           </div>
         </CardContent>

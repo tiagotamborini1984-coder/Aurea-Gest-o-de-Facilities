@@ -29,7 +29,13 @@ export function ChecklistSettings() {
           variant="outline"
           size="sm"
           onClick={() =>
-            append({ title: '', weight: 1, evidence_required: false, comments_required: false })
+            append({
+              title: '',
+              weight: 1,
+              evidence_required: false,
+              comments_required: false,
+              order_index: fields.length,
+            })
           }
         >
           <Plus className="w-4 h-4 mr-2" />

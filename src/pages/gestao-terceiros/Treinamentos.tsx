@@ -103,7 +103,7 @@ export default function Treinamentos() {
 
     if (emps) {
       setEmployees(emps)
-      const statuses = await getTrainingStatuses(emps)
+      const statuses = (await getTrainingStatuses(emps)) as Record<string, string>
       setTrainingStatuses(statuses)
     }
     setIsLoading(false)

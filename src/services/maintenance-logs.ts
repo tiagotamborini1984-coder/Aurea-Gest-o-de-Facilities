@@ -19,5 +19,5 @@ export async function fetchTicketLogs(ticketId: string): Promise<MaintenanceTick
     .order('created_at', { ascending: true })
 
   if (error) throw error
-  return (data || []) as MaintenanceTicketLog[]
+  return (data || []) as unknown as MaintenanceTicketLog[]
 }

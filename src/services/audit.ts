@@ -48,7 +48,7 @@ export const submitAuditExecution = async (
 }
 
 export const reopenAuditExecution = async (executionId: string) => {
-  const { data, error } = await supabase.rpc('reopen_audit_execution', {
+  const { data, error } = await (supabase.rpc as any)('reopen_audit_execution', {
     p_execution_id: executionId,
   })
 

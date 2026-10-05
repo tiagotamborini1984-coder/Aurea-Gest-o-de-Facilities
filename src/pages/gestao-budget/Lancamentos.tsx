@@ -198,13 +198,10 @@ export default function Lancamentos() {
           filter: `client_id=eq.${activeClientId}`,
         },
         async () => {
-          const { data } = await supabase
-            .from('budget_entries')
-            // @ts-expect-error
+          const { data } = await (supabase.from('budget_entries') as any)
             .select('updated_at')
             .eq('client_id', activeClientId)
             .in('cost_center_id', selectedCCs)
-            // @ts-expect-error
             .order('updated_at', { ascending: false })
             .limit(1)
 
@@ -255,13 +252,10 @@ export default function Lancamentos() {
       }
     }
 
-    const { data: lastUpdatedData } = await supabase
-      .from('budget_entries')
-      // @ts-expect-error
+    const { data: lastUpdatedData } = await (supabase.from('budget_entries') as any)
       .select('updated_at')
       .eq('client_id', activeClientId)
       .in('cost_center_id', selectedCCs)
-      // @ts-expect-error
       .order('updated_at', { ascending: false })
       .limit(1)
 

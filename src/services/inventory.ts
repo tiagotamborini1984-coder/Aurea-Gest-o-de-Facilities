@@ -323,8 +323,12 @@ async function undoImport(logId: string): Promise<{ deletedCount: number; restor
     .eq('id', logId)
     .single()
   if (error) throw error
-  const insertedIds: string[] = log.inserted_products || []
-  const updatedEntries = log.updated_products || []
+  const insertedIds: string[] = Array.isArray(log.inserted_products)
+    ? (log.inserted_products as string[])
+    : []
+  const updatedEntries: any[] = Array.isArray(log.updated_products)
+    ? (log.updated_products as any[])
+    : []
   let deletedCount = 0
   let restoredCount = 0
   if (insertedIds.length > 0) {
@@ -332,6 +336,7 @@ async function undoImport(logId: string): Promise<{ deletedCount: number; restor
       .from('inventory_products')
       .delete()
       .in('id', insertedIds)
+      .select()
     deletedCount = deleted?.length || 0
   }
   for (const entry of updatedEntries) {

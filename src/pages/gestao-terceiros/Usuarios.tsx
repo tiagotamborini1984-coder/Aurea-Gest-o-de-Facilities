@@ -71,7 +71,7 @@ export default function Usuarios() {
           .eq('id', clientId)
           .single()
         if (cData && cData.modules) {
-          setClientModules(Array.isArray(cData.modules) ? cData.modules : [])
+          setClientModules(Array.isArray(cData.modules) ? (cData.modules as string[]) : [])
         }
       } else if (profile.role === 'Master') {
         const { data: cData } = await supabase.from('clients').select('id, name, modules')

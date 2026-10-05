@@ -39,6 +39,7 @@ interface AppContextType {
   isLoadingClients: boolean
   profile: Profile | null
   activeClient: Client | null
+  activePlant?: string
   selectedMasterClient: string | 'all'
   setSelectedMasterClient: (id: string | 'all') => void
   selectedPlant: string | 'all'
@@ -209,6 +210,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       isLoadingClients,
       profile,
       activeClient,
+      activePlant: selectedPlant !== 'all' ? selectedPlant : undefined,
       selectedMasterClient,
       setSelectedMasterClient,
       selectedPlant,

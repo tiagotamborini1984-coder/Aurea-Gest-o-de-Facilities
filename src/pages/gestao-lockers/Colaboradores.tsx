@@ -78,7 +78,9 @@ export default function ColaboradoresLockers() {
       if (profile.role === 'Master' || profile.role === 'Administrador') {
         setPlants(allPlants)
       } else {
-        const authPlants = profile.authorized_plants || []
+        const authPlants = Array.isArray(profile.authorized_plants)
+          ? (profile.authorized_plants as string[])
+          : []
         setPlants(allPlants.filter((p: any) => authPlants.includes(p.id)))
       }
     } catch (error) {

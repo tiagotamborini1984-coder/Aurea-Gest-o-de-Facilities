@@ -322,7 +322,7 @@ export function AuditAiAgentDialog({
       generateAuditAiReportPdf({
         report,
         clientName: activeClient?.name || 'Sistema Aurea',
-        logoUrl: activeClient?.logo_url,
+        logoUrl: activeClient?.logo,
         plantName: report.plantName || targetPlantName || 'Todas as Plantas',
       })
     } catch (err: any) {

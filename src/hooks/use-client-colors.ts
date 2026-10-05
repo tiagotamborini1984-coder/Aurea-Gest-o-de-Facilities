@@ -11,6 +11,7 @@ const DEFAULT_COLORS: AccessibleColors = {
 
 export function useClientColors(slug: string | undefined) {
   const [colors, setColors] = useState<AccessibleColors>(DEFAULT_COLORS)
+  const [client, setClient] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function useClientColors(slug: string | undefined) {
         if (!mounted) return
         const clientData = (data as any)?.client
         if (clientData) {
+          setClient(clientData)
           setColors(getAccessibleColors(clientData.primary_color, clientData.secondary_color))
         }
         setLoading(false)
@@ -38,5 +40,5 @@ export function useClientColors(slug: string | undefined) {
     }
   }, [slug])
 
-  return { colors, loading }
+  return { colors, client, loading }
 }

@@ -182,8 +182,7 @@ export const auditAiService = {
       : report.auditType
     const title = `Laudo IA - ${titlePrefix}${plantSuffix} (${report.periodLabel})`
 
-    const { data, error } = await supabase
-      .from('audit_ai_reports')
+    const { data, error } = await (supabase.from('audit_ai_reports') as any)
       .insert({
         client_id: report.clientId,
         plant_id: report.plantId && report.plantId !== 'all' ? report.plantId : null,
@@ -202,7 +201,7 @@ export const auditAiService = {
         },
         ranking: report.ranking,
         insights: report.insights,
-        actionPlan: report.actionPlan,
+        action_plan: report.actionPlan,
         period_label: report.periodLabel,
         total_executions: report.totalExecutions,
         conformity_score: report.overallConformityScore,
@@ -301,7 +300,7 @@ export const auditAiService = {
       scoreDelta: summary.scoreDelta,
       ranking: data.ranking || [],
       insights: data.insights || [],
-      actionPlan: data.actionPlan || [],
+      actionPlan: (data as any).action_plan || (data as any).actionPlan || [],
       plantBreakdown: summary.plantBreakdown || [],
     } as any
   },

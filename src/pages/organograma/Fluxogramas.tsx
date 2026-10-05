@@ -372,7 +372,9 @@ export default function OrgFluxogramas() {
                     return (
                       <div
                         key={node.id}
-                        ref={(el) => (nodeRefs.current[node.id] = el)}
+                        ref={(el) => {
+                          nodeRefs.current[node.id] = el
+                        }}
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedNodeId(node.id)

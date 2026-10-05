@@ -736,7 +736,7 @@ export default function ChamadosManutencao() {
         .eq('ticket_id', selectedTicket.id)
         .order('created_at', { ascending: true })
 
-      await generateTicketPdf(selectedTicket, logs || [])
+      await generateTicketPdf(selectedTicket, (logs || []) as any)
     } catch (err: any) {
       toast.error(err.message || 'Erro ao gerar PDF')
     } finally {

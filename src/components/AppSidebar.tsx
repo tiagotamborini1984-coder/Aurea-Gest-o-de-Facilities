@@ -44,11 +44,7 @@ import { useAppStore } from '@/store/AppContext'
 export function AppSidebar() {
   const location = useLocation()
   const { profile, activeClient, selectedMasterClient } = useAppStore()
-  const role = (profile?.role || 'Operacional') as
-    | 'Master'
-    | 'Administrador'
-    | 'Gestor'
-    | 'Operacional'
+  const role: string = profile?.role || 'Operacional'
   const accessibleMenus = useMemo(
     () => profile?.accessible_menus || [],
     [profile?.accessible_menus],

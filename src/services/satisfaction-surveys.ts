@@ -169,10 +169,10 @@ export const satisfactionSurveyService = {
 
     return {
       ...data,
-      questions: (data.questions || []).sort(
-        (a: SurveyQuestion, b: SurveyQuestion) => a.order_index - b.order_index,
+      questions: ((data.questions as any[]) || []).sort(
+        (a: any, b: any) => a.order_index - b.order_index,
       ),
-    }
+    } as any
   },
 
   // 2.1 Resolver planta por ID ou Slug/Código/Nome
@@ -262,10 +262,10 @@ export const satisfactionSurveyService = {
 
     const survey: SatisfactionSurvey = {
       ...data,
-      questions: (data.questions || []).sort(
-        (a: SurveyQuestion, b: SurveyQuestion) => a.order_index - b.order_index,
+      questions: ((data.questions as any[]) || []).sort(
+        (a: any, b: any) => a.order_index - b.order_index,
       ),
-    }
+    } as any
 
     // Verificar se está ativa
     if (!survey.is_active) {
@@ -553,8 +553,9 @@ export const satisfactionSurveyService = {
       return { success: false, error: error.message || 'Erro ao registrar resposta.' }
     }
 
-    if (data && !data.success) {
-      return { success: false, error: data.error }
+    const resData = data as any
+    if (resData && !resData.success) {
+      return { success: false, error: resData.error }
     }
 
     return { success: true }
@@ -706,7 +707,7 @@ export const satisfactionSurveyService = {
             isConditional: q.is_conditional ?? false,
             parentQuestionId: q.parent_question_id || null,
             parentQuestionTitle: null,
-            triggerValues: q.trigger_values || [],
+            triggerValues: Array.isArray(q.trigger_values) ? (q.trigger_values as any[]) : [],
             totalAnswers: 0,
             sumScores: 0,
             countScores: 0,
@@ -878,7 +879,7 @@ export const satisfactionSurveyService = {
               : null
 
           // Apenas subperguntas de insatisfação/regular
-          if (isNegativeOrNeutralTrigger(q.trigger_values)) {
+          if (isNegativeOrNeutralTrigger(Array.isArray(q.trigger_values) ? (q.trigger_values as any[]) : [])) {
             if (q.question_type === 'multiple_choice' && ans.text_value && ans.text_value.trim()) {
               const opt = ans.text_value.trim()
               const key = `mc_${q.id}_${opt.toLowerCase()}`
@@ -950,8 +951,8 @@ export const satisfactionSurveyService = {
 
     for (const resp of filteredResponses) {
       const pId = resp.plant_id || resp.survey?.plant_id || 'unassigned'
-      const pName = resp.plant?.name || resp.survey?.plants?.name || 'Não Identificada'
-      const pCode = resp.plant?.code || resp.survey?.plants?.code || null
+      const pName = (resp.plant as any)?.name || (resp.survey?.plants as any)?.name || 'Não Identificada'
+      const pCode = (resp.plant as any)?.code || (resp.survey?.plants as any)?.code || null
 
       if (!plantMap[pId]) {
         plantMap[pId] = {

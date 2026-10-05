@@ -78,7 +78,7 @@ function createZip(files: { name: string; data: Uint8Array }[]): Blob {
   ev.setUint32(12, cdSize, true)
   ev.setUint32(16, offset, true)
 
-  return new Blob([...parts, ...cdParts, eocd], {
+  return new Blob([...parts, ...cdParts, eocd] as BlobPart[], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 }

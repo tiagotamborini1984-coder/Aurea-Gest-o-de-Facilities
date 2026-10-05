@@ -283,7 +283,7 @@ export function useDashboardCalculations(
       return val.replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')
     }
 
-    // Identificação de "Hoje" no fuso horário local seguro (America/Cuiaba para MT / local do navegador)
+    // Identificação de "Hoje" no fuso horário seguro America/Cuiaba (para MT e operações da plataforma)
     const getTodayLocalDateStr = () => {
       try {
         const parts = new Intl.DateTimeFormat('en-CA', {
@@ -297,7 +297,7 @@ export function useDashboardCalculations(
         const d = parts.find((p) => p.type === 'day')?.value
         if (y && m && d) return `${y}-${m}-${d}`
       } catch {
-        // Fallback para fuso local padrão do navegador
+        // Fallback para fuso local do navegador se Intl timeZone falhar
       }
       return format(new Date(), 'yyyy-MM-dd')
     }

@@ -3,16 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/store/AppContext'
 import { useState } from 'react'
-import { AddClientDialog } from '@/components/AddClientDialog'
+import { CreateClientDialog } from '@/pages/admin/components/CreateClientDialog'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Index() {
-  const { clients, thirdParties } = useAppStore()
+  const { clients } = useAppStore()
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const { toast } = useToast()
 
   const activeClients = clients.filter((c) => c.status === 'Ativo').length
-  const totalThirdParties = thirdParties.length
+  const totalThirdParties = 0
   const activeModules = clients.reduce((acc, curr) => acc + curr.modules.length, 0)
 
   const handleGenerateReport = () => {
@@ -152,7 +152,11 @@ export default function Index() {
         </Card>
       </div>
 
-      <AddClientDialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen} />
+      <CreateClientDialog
+        open={isClientModalOpen}
+        onOpenChange={setIsClientModalOpen}
+        onSuccess={() => {}}
+      />
     </div>
   )
 }

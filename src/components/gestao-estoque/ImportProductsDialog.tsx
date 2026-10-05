@@ -17,7 +17,7 @@ import {
   Download,
   X,
 } from 'lucide-react'
-import { inventoryService } from '@/services/inventory'
+import { inventoryService, type InventoryProduct } from '@/services/inventory'
 import { useAppStore } from '@/store/AppContext'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'

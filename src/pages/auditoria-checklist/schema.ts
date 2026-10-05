@@ -27,3 +27,4 @@ export const auditSchema = z.object({
 })
 
 export type AuditFormValues = z.infer<typeof auditSchema>
+export type AuditConfigForm = AuditFormValues

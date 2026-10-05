@@ -40,8 +40,7 @@ export async function getTickets(clientId: string, plantId?: string): Promise<Ma
 }
 
 export async function createTicket(ticket: MaintenanceTicket): Promise<MaintenanceTicket> {
-  const { data, error } = await supabase
-    .from('maintenance_tickets')
+  const { data, error } = await (supabase.from('maintenance_tickets') as any)
     .insert(ticket)
     .select()
     .single()
@@ -53,8 +52,8 @@ export async function updateTicket(
   id: string,
   ticket: Partial<MaintenanceTicket>,
 ): Promise<MaintenanceTicket> {
-  const { data, error } = await supabase
-    .from('maintenance_tickets')
+  const { data, error } = await (supabase
+    .from('maintenance_tickets') as any)
     .update(ticket)
     .eq('id', id)
     .select()

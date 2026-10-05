@@ -239,7 +239,7 @@ export default function NovaSolicitacaoPublica() {
 
       if (error) throw error
 
-      setSuccess(data?.ticket_number || 'Chamado registrado')
+      setSuccess((data as any)?.ticket_number || 'Chamado registrado')
       setForm(EMPTY_FORM)
       setFiles([])
       setErrors({})

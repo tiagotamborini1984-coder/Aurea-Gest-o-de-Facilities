@@ -457,10 +457,11 @@ export default function PainelChamados() {
       if (existingTasks && existingTasks.length > 0) {
         const existingTask = existingTasks[0]
 
+        const prevUrls = Array.isArray(existingTask.attachment_urls)
+          ? (existingTask.attachment_urls as string[])
+          : []
         const updatedUrls =
-          attachment_urls.length > 0
-            ? [...new Set([...(existingTask.attachment_urls || []), ...attachment_urls])]
-            : existingTask.attachment_urls
+          attachment_urls.length > 0 ? [...new Set([...prevUrls, ...attachment_urls])] : prevUrls
 
         const { error } = await supabase
           .from('tasks')

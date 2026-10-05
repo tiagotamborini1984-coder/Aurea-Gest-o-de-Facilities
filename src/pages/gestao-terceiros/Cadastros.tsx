@@ -87,10 +87,7 @@ export default function Cadastros() {
   if (profile.role !== 'Master' && !profile.client_id) return null
 
   // Para componentes customizados, delegamos a renderização passando as permissões e dados necessários
-  if (type === 'quadro-contratado')
-    return (
-      <QuadroContratado canAdd={true} hasAccess={hasAccess} plants={plants} locations={locations} />
-    )
+  if (type === 'quadro-contratado') return <QuadroContratado />
 
   // Para o CRUD genérico, validamos o acesso na rota
   if (!config) return <Navigate to="/gestao-terceiros" replace />
@@ -262,8 +259,7 @@ export default function Cadastros() {
             payload.is_active = false
           }
 
-          const { data, error } = await supabase
-            .from(config.tableName)
+          const { data, error } = await (supabase.from(config.tableName) as any)
             .insert(payload)
             .select()
             .single()

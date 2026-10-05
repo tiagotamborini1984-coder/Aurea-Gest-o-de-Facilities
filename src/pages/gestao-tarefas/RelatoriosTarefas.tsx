@@ -340,6 +340,7 @@ export default function RelatoriosTarefas() {
         sumToRC: 0,
         sumGrossRC: 0,
         sumFrozenRC: 0,
+        sumToPO: 0,
         sumCadastro: 0,
         countToRC: 0,
         countToPO: 0,
@@ -357,6 +358,7 @@ export default function RelatoriosTarefas() {
           sumToRC: 0,
           sumGrossRC: 0,
           sumFrozenRC: 0,
+          sumToPO: 0,
           sumCadastro: 0,
           countToRC: 0,
           countToPO: 0,
@@ -544,7 +546,7 @@ export default function RelatoriosTarefas() {
         {(['Administrador', 'Master'].includes(profile?.role || '') ||
           (Array.isArray(profile?.accessible_menus) &&
             profile.accessible_menus.includes('Gestão de Tarefas:Filtro Responsável')) ||
-          profile?.feature_permissions?.can_view_purchasing_responsible_filter) && (
+          (profile as any)?.feature_permissions?.can_view_purchasing_responsible_filter) && (
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-foreground">Responsável</Label>
             <Select value={filterAssignee} onValueChange={(v) => updateSearchParam('assignee', v)}>
