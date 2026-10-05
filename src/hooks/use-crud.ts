@@ -23,7 +23,7 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     if (profile.role !== 'Master' && !profile.client_id) return
 
     setLoading(true)
-    let q = supabase.from(tableName).select(getQuerySelect())
+    let q = (supabase.from(tableName as any) as any).select(getQuerySelect())
 
     if (tableName === 'profiles') {
       q = q
@@ -92,8 +92,7 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
     const { functions, org_functions, ...cleanRecord } = record as any
     const payload = { ...cleanRecord, client_id: (record as any).client_id || targetClientId }
 
-    const { data: result, error } = await supabase
-      .from(tableName)
+    const { data: result, error } = await (supabase.from(tableName as any) as any)
       .insert(payload)
       .select(getQuerySelect())
       .single()
@@ -107,8 +106,7 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
 
   const update = async (id: string, record: Partial<T>) => {
     const { functions, org_functions, ...cleanRecord } = record as any
-    const { data: result, error } = await supabase
-      .from(tableName)
+    const { data: result, error } = await (supabase.from(tableName as any) as any)
       .update(cleanRecord)
       .eq('id', id)
       .select(getQuerySelect())
@@ -122,15 +120,14 @@ export function useCrud<T>(tableName: string, defaultSelect = '*') {
   }
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from(tableName).delete().eq('id', id)
+    const { error } = await (supabase.from(tableName as any) as any).delete().eq('id', id)
 
     if (
       error &&
       (error.message?.includes('lançamentos') || error.code === 'P0001' || error.code === '23503')
     ) {
       if (tableName === 'employees' || tableName === 'equipment') {
-        const { error: updateError } = await supabase
-          .from(tableName)
+        const { error: updateError } = await (supabase.from(tableName as any) as any)
           .update({ status: 'Inativo' })
           .eq('id', id)
         if (!updateError) {

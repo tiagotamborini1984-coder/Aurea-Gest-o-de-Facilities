@@ -19,18 +19,20 @@ export function useClientColors(slug: string | undefined) {
       return
     }
     let mounted = true
-    supabase
-      .rpc('get_maintenance_public_options', { p_slug: slug })
-      .then(({ data }) => {
+    const fetchColors = async () => {
+      try {
+        const { data } = await supabase.rpc('get_maintenance_public_options', { p_slug: slug })
         if (!mounted) return
-        if (data?.client) {
-          setColors(getAccessibleColors(data.client.primary_color, data.client.secondary_color))
+        const clientData = (data as any)?.client
+        if (clientData) {
+          setColors(getAccessibleColors(clientData.primary_color, clientData.secondary_color))
         }
         setLoading(false)
-      })
-      .catch(() => {
+      } catch {
         if (mounted) setLoading(false)
-      })
+      }
+    }
+    fetchColors()
     return () => {
       mounted = false
     }

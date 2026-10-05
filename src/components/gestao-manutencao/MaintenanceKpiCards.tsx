@@ -54,7 +54,7 @@ export function MaintenanceKpiCards({
         setError(true)
         setKpi(null)
       } else {
-        setKpi(data as KpiData)
+        setKpi(data as unknown as KpiData)
       }
       setLoading(false)
     }

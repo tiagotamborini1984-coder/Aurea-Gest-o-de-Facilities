@@ -6,7 +6,7 @@ const TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
 export function AutoLogout() {
   const lastActivity = useRef(Date.now())
-  const intervalRef = useRef<NodeJS.Timeout>()
+  const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const { signOut, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()

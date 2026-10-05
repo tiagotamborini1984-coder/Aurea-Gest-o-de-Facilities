@@ -256,19 +256,33 @@ export function ImportProductsDialog({
         throw new Error('Nenhum produto válido encontrado no arquivo CSV.')
       }
 
-      const res = await inventoryService.importProducts(clientId, parsedProducts)
+      const res = await inventoryService.importProducts(
+        clientId,
+        parsedProducts as InventoryProduct[],
+      )
       setProgress(100)
-      setResult(res)
-      if (res.success && (res.inserted > 0 || res.updated > 0)) {
+      setResult({
+        success: res.success,
+        inserted: res.inserted || 0,
+        updated: res.updated || 0,
+        skipped: res.skipped || 0,
+        total: res.total || 0,
+        errors:
+          res.errors?.map((e: any) => (typeof e === 'string' ? e : `${e.item}: ${e.error}`)) || [],
+        warnings: res.warnings || [],
+        error: res.error,
+      })
+      if (res.success && (res.inserted > 0 || (res.updated || 0) > 0)) {
         const parts: string[] = []
         if (res.inserted > 0) parts.push(`${res.inserted} importado(s)`)
-        if (res.updated > 0) parts.push(`${res.updated} atualizado(s)`)
-        if (res.skipped > 0) parts.push(`${res.skipped} ignorado(s)`)
+        if ((res.updated || 0) > 0) parts.push(`${res.updated} atualizado(s)`)
+        if ((res.skipped || 0) > 0) parts.push(`${res.skipped} ignorado(s)`)
         toast.success(
-          parts.join(', ') + (res.errors.length > 0 ? ` (${res.errors.length} erro(s))` : ''),
+          parts.join(', ') +
+            ((res.errors?.length || 0) > 0 ? ` (${res.errors.length} erro(s))` : ''),
         )
         onImportComplete()
-      } else if (res.success && res.inserted === 0 && res.updated === 0) {
+      } else if (res.success && res.inserted === 0 && (res.updated || 0) === 0) {
         toast.info('Nenhum produto novo para importar. Todos já existem no catálogo.')
       } else {
         toast.error(res.error || 'Erro ao importar produtos')

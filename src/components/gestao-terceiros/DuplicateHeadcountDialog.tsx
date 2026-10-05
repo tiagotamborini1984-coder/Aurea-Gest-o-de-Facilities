@@ -65,11 +65,11 @@ export function DuplicateHeadcountDialog({
         }
       }
 
-      const { data: sourceData } = await supabase
-        .from(tableName)
+      const { data: sourceData } = await (supabase
+        .from(tableName as any)
         .select('*')
         .eq('client_id', clientId)
-        .eq('reference_month', `${dupSource}-01`)
+        .eq('reference_month', `${dupSource}-01`) as any)
 
       if (!sourceData || sourceData.length === 0) {
         toast({ title: 'Nenhum dado na origem', variant: 'destructive' })
@@ -82,15 +82,15 @@ export function DuplicateHeadcountDialog({
 
       let oldData: any[] = []
       if (dupConflict) {
-        const { data } = await supabase
-          .from(tableName)
+        const { data } = await (supabase
+          .from(tableName as any)
           .select('*')
           .eq('client_id', clientId)
-          .eq('reference_month', `${dupTarget}-01`)
+          .eq('reference_month', `${dupTarget}-01`) as any)
         oldData = data || []
       }
 
-      const newEntries = sourceData.map((item) => {
+      const newEntries = (sourceData as any[]).map((item) => {
         const { id, created_at, ...rest } = item
         const newId =
           typeof crypto !== 'undefined' && crypto.randomUUID
@@ -132,14 +132,14 @@ export function DuplicateHeadcountDialog({
           }
         }
 
-        await supabase
-          .from(tableName)
+        await (supabase
+          .from(tableName as any)
           .delete()
           .eq('client_id', clientId)
-          .eq('reference_month', `${dupTarget}-01`)
+          .eq('reference_month', `${dupTarget}-01`) as any)
       }
 
-      const { error } = await supabase.from(tableName).insert(newEntries)
+      const { error } = await (supabase.from(tableName as any).insert(newEntries) as any)
       if (error) throw error
 
       if (tableName === 'employees') {

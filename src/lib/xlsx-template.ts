@@ -141,3 +141,44 @@ export function downloadTicketsTemplate(): void {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+export function downloadBudgetTemplate(): void {
+  const headers = ['Código da Conta', 'Nome da Conta', 'Valor Realizado']
+  const example = ['1.01.01', 'Conta Exemplo', '1500.00']
+  const all = [...headers, ...example]
+  const enc = new TextEncoder()
+
+  const ssXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${all.length}" uniqueCount="${all.length}">${all.map((s) => `<si><t xml:space="preserve">${escapeXml(s)}</t></si>`).join('')}</sst>`
+
+  const r1 = headers.map((_, i) => `<c r="${colLetter(i)}1" t="s"><v>${i}</v></c>`).join('')
+  const r2 = example.map((_, i) => `<c r="${colLetter(i)}2" t="s"><v>${i + 3}</v></c>`).join('')
+  const wsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">${r1}</row><row r="2">${r2}</row></sheetData></worksheet>`
+
+  const ctXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>'
+
+  const relsXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'
+
+  const wbXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Orcamento" sheetId="1" r:id="rId1"/></sheets></workbook>'
+
+  const wbRelsXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>'
+
+  const blob = createZip([
+    { name: '[Content_Types].xml', data: enc.encode(ctXml) },
+    { name: '_rels/.rels', data: enc.encode(relsXml) },
+    { name: 'xl/workbook.xml', data: enc.encode(wbXml) },
+    { name: 'xl/_rels/workbook.xml.rels', data: enc.encode(wbRelsXml) },
+    { name: 'xl/worksheets/sheet1.xml', data: enc.encode(wsXml) },
+    { name: 'xl/sharedStrings.xml', data: enc.encode(ssXml) },
+  ])
+
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'template_orcamento.xlsx'
+  a.click()
+  URL.revokeObjectURL(url)
+}

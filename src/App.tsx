@@ -127,7 +127,7 @@ const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme" attribute="class">
     <AuthProvider>
       <AppProvider>
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <BrowserRouter>
           <AutoLogout />
           <TooltipProvider>
             <Toaster />

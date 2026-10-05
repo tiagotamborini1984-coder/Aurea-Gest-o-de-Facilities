@@ -20,8 +20,12 @@ export interface InventoryProduct {
 export interface ImportProductsResult {
   success: boolean
   inserted: number
+  updated?: number
+  skipped?: number
   total: number
   errors: Array<{ item: string; error: string }>
+  warnings?: string[]
+  error?: string
 }
 
 export async function getProducts(
@@ -427,10 +431,61 @@ async function deleteArea(areaId: string): Promise<void> {
   if (error) throw error
 }
 
+async function saveCategory(payload: {
+  id?: string
+  client_id: string
+  name: string
+  oldName?: string
+}): Promise<any> {
+  const { id, client_id, name, oldName } = payload
+  if (id) {
+    const { data, error } = await supabase
+      .from('inventory_categories')
+      .update({ name })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    if (oldName && oldName !== name) {
+      await supabase
+        .from('inventory_products')
+        .update({ category: name })
+        .eq('client_id', client_id)
+        .eq('category', oldName)
+    }
+    return data
+  }
+  const { data, error } = await supabase
+    .from('inventory_categories')
+    .insert({ client_id, name })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+async function getCategoryProductCount(clientId: string, categoryName: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('inventory_products')
+    .select('*', { count: 'exact', head: true })
+    .eq('client_id', clientId)
+    .eq('category', categoryName)
+  if (error) return 0
+  return count || 0
+}
+
+async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('inventory_categories').delete().eq('id', id)
+  if (error) throw error
+}
+
 export const inventoryService = {
   getProducts,
   searchProducts,
   getCategories,
+  saveCategory,
+  getCategoryProductCount,
+  deleteCategory,
   getPlants,
   getAreas,
   getAreasByClient,

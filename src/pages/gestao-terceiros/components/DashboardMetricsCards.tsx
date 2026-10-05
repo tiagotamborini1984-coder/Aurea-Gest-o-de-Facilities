@@ -46,6 +46,141 @@ export default function DashboardMetricsCards({
       }
       return true
     })
+    // Se for auditoria de ausentes de colaboradores, incluir tanto ausentes com log explícito (status=false)
+    // quanto colaboradores ativos sem lançamento de presença na data (ausência implícita de Hoje ou dias do filtro)
+    if (metricType === 'ausentes' && activeTab === 'colaboradores') {
+      const datesWithLogs = Array.from(new Set(companyFiltered.map((l: any) => l.date))).sort(
+        (a: any, b: any) => b.localeCompare(a),
+      )
+
+      // Identificar quem está ativo por planta
+      const validEmps = employees.filter((e: any) => {
+        if (e.status !== 'Ativo') return false
+        if (selectedPlants.length > 0 && !selectedPlants.includes(e.plant_id)) return false
+        if (
+          selectedCompanies.length > 0 &&
+          (!e.company_id || !selectedCompanies.includes(e.company_id))
+        ) {
+          return false
+        }
+        return true
+      })
+
+      // Para cada data com logs, verificar ausências
+      const absentRecords: Array<{
+        id: string
+        date: string
+        refName: string
+        type: 'explicit' | 'implicit'
+      }> = []
+
+      datesWithLogs.forEach((dStr: string) => {
+        const dayLogs = companyFiltered.filter((l: any) => l.date === dStr)
+        const presentRefIds = new Set(
+          dayLogs.filter((l: any) => l.status === true).map((l: any) => l.reference_id),
+        )
+        const explicitAbsentRefIds = new Set(
+          dayLogs.filter((l: any) => l.status === false).map((l: any) => l.reference_id),
+        )
+
+        // 1. Ausentes explícitos com log
+        dayLogs
+          .filter((l: any) => l.status === false)
+          .forEach((l: any) => {
+            const emp = employees.find((e: any) => e.id === l.reference_id)
+            absentRecords.push({
+              id: `exp-${l.id || l.reference_id}-${dStr}`,
+              date: dStr,
+              refName: emp?.name || 'Desconhecido',
+              type: 'explicit',
+            })
+          })
+
+        // 2. Colaboradores ativos sem presença marcada naquele dia
+        // Dedup por matrícula/nome para não listar duplicatas cadastrais
+        const seenKeys = new Set<string>()
+        validEmps.forEach((emp: any) => {
+          if (presentRefIds.has(emp.id) || explicitAbsentRefIds.has(emp.id)) return
+          const key = emp.registration_number?.trim() || emp.name?.toLowerCase().trim() || emp.id
+          if (seenKeys.has(key)) return
+          seenKeys.add(key)
+          absentRecords.push({
+            id: `imp-${emp.id}-${dStr}`,
+            date: dStr,
+            refName: emp.name,
+            type: 'implicit',
+          })
+        })
+      })
+
+      return (
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground mt-1 gap-1 -ml-2"
+            >
+              <Eye className="h-3 w-3" /> Ver Detalhes
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-full sm:max-w-md md:max-w-lg flex flex-col p-0">
+            <SheetHeader className="p-6 pb-2 border-b border-border/50">
+              <SheetTitle>Auditoria de Ausências</SheetTitle>
+              <SheetDescription>
+                Colaboradores sem presença marcada ou com ausência registrada (
+                {absentRecords.length})
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="flex-1">
+              <div className="p-6 pt-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Colaborador</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {absentRecords.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                          Nenhum colaborador ausente registrado no período.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      absentRecords.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(new Date(item.date + 'T12:00:00Z'), 'dd/MM/yyyy')}
+                          </TableCell>
+                          <TableCell className="font-medium">{item.refName}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="bg-red-500/10 text-red-600 border-red-500/20"
+                              title={
+                                item.type === 'implicit'
+                                  ? 'Sem presença lançada no dia'
+                                  : 'Ausência lançada'
+                              }
+                            >
+                              {item.type === 'implicit' ? 'Sem presença' : 'Ausente'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      )
+    }
+
     const finalLogs = companyFiltered
       .filter((l: any) => {
         if (metricType === 'presentes') return l.status === true
@@ -72,7 +207,7 @@ export default function DashboardMetricsCards({
               {metricType === 'presentes'
                 ? 'Registros de presenças'
                 : metricType === 'ausentes'
-                  ? 'Registros de ausências'
+                  ? 'Registros de indisponibilidade'
                   : 'Todos os registros'}{' '}
               ({finalLogs.length})
             </SheetDescription>
@@ -196,13 +331,21 @@ export default function DashboardMetricsCards({
           <div className="bg-red-500/10 p-2 lg:p-3 rounded-lg shrink-0 border border-red-500/10">
             <XCircle className="h-4 w-4 lg:h-5 lg:w-5 text-red-500" />
           </div>
-          <div className="flex-1">
-            <p className="text-[10px] lg:text-xs font-medium text-red-500 uppercase tracking-wider">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] lg:text-xs font-medium text-red-500 uppercase tracking-wider truncate">
               {activeTab === 'colaboradores' ? 'Ausentes' : 'Indisponíveis'}
             </p>
-            <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">
-              {metrics.ausente}
-            </p>
+            <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
+              <p className="text-xl lg:text-2xl font-bold text-foreground">{metrics.ausente}</p>
+              {activeTab === 'colaboradores' && metrics.todayAusente !== undefined && (
+                <span
+                  className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 border border-red-500/20 whitespace-nowrap"
+                  title="Ausentes hoje (sem presença marcada no dia corrente)"
+                >
+                  Hoje: {metrics.todayAusente}
+                </span>
+              )}
+            </div>
             {renderAuditButton('ausentes')}
           </div>
         </CardContent>

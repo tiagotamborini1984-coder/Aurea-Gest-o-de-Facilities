@@ -177,7 +177,6 @@ export function useDashboardCalculations(
     // Conta total de logs ativos considerando apenas dias úteis por planta
     const validActiveLogs = activeLogs.filter((l) => !isPlantDateNonWorking(l.plant_id, l.date))
     const totalPresentCount = validActiveLogs.filter((l) => l.status).length
-    const totalAbsentCount = validActiveLogs.filter((l) => !l.status).length
     const totalLancadoCount = validActiveLogs.length
 
     let totalContractedSum = 0
@@ -227,7 +226,6 @@ export function useDashboardCalculations(
     }
 
     const avgPresente = globalDays > 0 ? totalPresentCount / globalDays : 0
-    const avgAusente = globalDays > 0 ? totalAbsentCount / globalDays : 0
     const avgLancado = globalDays > 0 ? totalLancadoCount / globalDays : 0
 
     const totalFallbackCount = validPlants.reduce(
@@ -235,6 +233,43 @@ export function useDashboardCalculations(
       0,
     )
     const absenteismoDenominator = contratado > 0 ? contratado : totalFallbackCount
+
+    // Novo cálculo de ausentes:
+    // Para colaboradores: para cada data válida de cada planta, ausentes = base ativa/esperada - presentes.
+    // Base diária de cada planta: dCont > 0 ? dCont : fallbackCountByPlant.get(pid)
+    // Se houver ausentes explícitos além dessa diferença, garante pelo menos o número de ausentes explícitos.
+    let totalAbsentDailySum = 0
+    Array.from(allValidDatesSet).forEach((date) => {
+      validPlants.forEach((pid) => {
+        if (!plantValidDatesMap[pid]?.has(date)) return
+        const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
+        const dPres = dayLogs.filter((l) => l.status).length
+        const dExplicitAbs = dayLogs.filter((l) => !l.status).length
+
+        if (activeTab === 'colaboradores' || activeTab === 'metas') {
+          const pCont = getApplicableContracted(pid, typeCont, date, (c) => {
+            if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+              const validCompanyIds = new Set(
+                employees
+                  .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+                  .map((e) => e.company_id),
+              )
+              if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+            }
+            return true
+          }).reduce((sum, c) => sum + c.quantity, 0)
+
+          const plantBase = pCont > 0 ? pCont : fallbackCountByPlant.get(pid) || 0
+          const implicitAbs = Math.max(0, plantBase - dPres)
+          totalAbsentDailySum += Math.max(implicitAbs, dExplicitAbs)
+        } else {
+          // Para equipamentos, indisponíveis calculados a partir dos logs ou do contratado
+          totalAbsentDailySum += dExplicitAbs
+        }
+      })
+    })
+
+    const avgAusente = globalDays > 0 ? totalAbsentDailySum / globalDays : 0
     const absenteismo =
       absenteismoDenominator > 0
         ? Math.max(0, ((absenteismoDenominator - avgPresente) / absenteismoDenominator) * 100)
@@ -248,6 +283,63 @@ export function useDashboardCalculations(
       return val.replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')
     }
 
+    // Identificação de "Hoje" no fuso horário local seguro (America/Cuiaba para MT / local do navegador)
+    const getTodayLocalDateStr = () => {
+      try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Cuiaba',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).formatToParts(new Date())
+        const y = parts.find((p) => p.type === 'year')?.value
+        const m = parts.find((p) => p.type === 'month')?.value
+        const d = parts.find((p) => p.type === 'day')?.value
+        if (y && m && d) return `${y}-${m}-${d}`
+      } catch {
+        // Fallback para fuso local padrão do navegador
+      }
+      return format(new Date(), 'yyyy-MM-dd')
+    }
+
+    const todayDateStr = getTodayLocalDateStr()
+
+    // Cálculo dos números específicos de "Hoje" para o card
+    let todayPresentCount = 0
+    let todayExplicitAbsentCount = 0
+    let todayContractedSum = 0
+    let todayFallbackSum = 0
+
+    validPlants.forEach((pid) => {
+      if (isPlantDateNonWorking(pid, todayDateStr)) return
+
+      const pCont = getApplicableContracted(pid, typeCont, todayDateStr, (c) => {
+        if (selectedCompanies.length > 0 && c.type === 'colaborador') {
+          const validCompanyIds = new Set(
+            employees
+              .filter((e) => companiesSet.has(e.company_name) && e.company_id)
+              .map((e) => e.company_id),
+          )
+          if (c.company_id && !validCompanyIds.has(c.company_id)) return false
+        }
+        return true
+      }).reduce((sum, c) => sum + c.quantity, 0)
+
+      todayContractedSum += pCont
+      todayFallbackSum += fallbackCountByPlant.get(pid) || 0
+
+      // Logs de hoje
+      const tLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === todayDateStr)
+      todayPresentCount += tLogs.filter((l) => l.status).length
+      todayExplicitAbsentCount += tLogs.filter((l) => !l.status).length
+    })
+
+    const todayBase = todayContractedSum > 0 ? todayContractedSum : todayFallbackSum
+    const todayAusente =
+      activeTab === 'colaboradores' || activeTab === 'metas'
+        ? Math.max(Math.max(0, todayBase - todayPresentCount), todayExplicitAbsentCount)
+        : todayExplicitAbsentCount
+
     const plantStats = plants
       .filter((p) => validPlants.includes(p.id))
       .map((plant) => {
@@ -257,7 +349,6 @@ export function useDashboardCalculations(
 
         const pDays = pValidDates.size
         const pPres = pDays > 0 ? pValidLogs.filter((l) => l.status).length / pDays : 0
-        const pAbs = pDays > 0 ? pValidLogs.filter((l) => !l.status).length / pDays : 0
 
         let pCont = 0
         let hasContracted = false
@@ -295,6 +386,9 @@ export function useDashboardCalculations(
           pCont = pDays > 0 ? sumContratado / pDays : 0
         }
 
+        const plantDenominator = hasContracted ? pCont : fallbackCountByPlant.get(plant.id) || 0
+
+        let pTotalAbsSum = 0
         const dailyTrend = Array.from(pValidDates)
           .filter((date) => !isPlantDateNonWorking(plant.id, date))
           .sort()
@@ -312,18 +406,27 @@ export function useDashboardCalculations(
             }).reduce((sum, c) => sum + c.quantity, 0)
             const dDayLogs = pLogs.filter((l) => l.date === date)
             const dPres = dDayLogs.filter((l) => l.status).length
-            const dAbs = dDayLogs.filter((l) => !l.status).length
+            const dExplicitAbs = dDayLogs.filter((l) => !l.status).length
             const dDenom = dCont > 0 ? dCont : fallbackCountByPlant.get(plant.id) || 0
             const abs = dDenom > 0 ? Math.max(0, ((dDenom - dPres) / dDenom) * 100) : 0
+
+            const dPlantAbs =
+              activeTab === 'colaboradores' || activeTab === 'metas'
+                ? Math.max(Math.max(0, dDenom - dPres), dExplicitAbs)
+                : dExplicitAbs
+
+            pTotalAbsSum += dPlantAbs
+
             return {
               date,
               absenteismo: Number(abs.toFixed(1)),
               presentes: dPres,
+              ausentes: dPlantAbs,
               contratado: dDenom,
             }
           })
 
-        const plantDenominator = hasContracted ? pCont : fallbackCountByPlant.get(plant.id) || 0
+        const pAbs = pDays > 0 ? pTotalAbsSum / pDays : 0
 
         return {
           id: plant.id,
@@ -365,7 +468,6 @@ export function useDashboardCalculations(
         const lDays = pValidDates.size
 
         const lPres = lDays > 0 ? lLogs.filter((l) => l.status).length / lDays : 0
-        const lAbs = lDays > 0 ? lLogs.filter((l) => !l.status).length / lDays : 0
 
         let lCont = 0
         let hasLocationContracted = false
@@ -402,6 +504,7 @@ export function useDashboardCalculations(
           lCont = lDays > 0 ? sumLocationContratado / lDays : 0
         }
 
+        let lTotalAbsSum = 0
         const dailyTrend = Array.from(pValidDates || [])
           .filter((date) => !isPlantDateNonWorking(plantId, date))
           .sort()
@@ -414,15 +517,27 @@ export function useDashboardCalculations(
             ).reduce((sum, c) => sum + c.quantity, 0)
             const dDayLogs = lLogsRaw.filter((l) => l.date === date)
             const dPres = dDayLogs.filter((l) => l.status).length
-            const dAbs = dDayLogs.filter((l) => !l.status).length
+            const dExplicitAbs = dDayLogs.filter((l) => !l.status).length
             const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
+
+            const locBase = dCont > 0 ? dCont : refIds.length
+            const dLocAbs =
+              activeTab === 'colaboradores' || activeTab === 'metas'
+                ? Math.max(Math.max(0, locBase - dPres), dExplicitAbs)
+                : dExplicitAbs
+
+            lTotalAbsSum += dLocAbs
+
             return {
               date,
               absenteismo: Number(abs.toFixed(1)),
               presentes: dPres,
+              ausentes: dLocAbs,
               contratado: dCont,
             }
           })
+
+        const lAbs = lDays > 0 ? lTotalAbsSum / lDays : 0
 
         return {
           id: loc.id,
@@ -592,10 +707,16 @@ export function useDashboardCalculations(
         const abs =
           dDenominator > 0 ? Math.max(0, ((dDenominator - dPresentes) / dDenominator) * 100) : 0
 
+        const dAbsentees =
+          activeTab === 'colaboradores' || activeTab === 'metas'
+            ? Math.max(Math.max(0, dDenominator - dPresentes), dAusentes)
+            : dAusentes
+
         return {
           date,
           absenteismo: Number(abs.toFixed(1)),
           presentes: dPresentes,
+          ausentes: dAbsentees,
           contratado: dDenominator,
         }
       })
@@ -690,6 +811,10 @@ export function useDashboardCalculations(
         lancado: formatStr(avgLancado),
         presente: formatStr(avgPresente),
         ausente: formatStr(avgAusente),
+        todayDateStr,
+        todayAusente: formatStr(todayAusente),
+        todayPresente: formatStr(todayPresentCount),
+        todayContratado: formatStr(todayBase),
         contratado:
           activeTab === 'equipamentos'
             ? formatContratadoPrecision(contratado)
