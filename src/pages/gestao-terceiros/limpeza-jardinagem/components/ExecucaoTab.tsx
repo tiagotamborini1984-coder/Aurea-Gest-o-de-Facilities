@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { exportToCSV } from '@/lib/export'
 import { isExpiredPendente } from '@/lib/business-days'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 
 interface ExecucaoTabProps {
   plantId: string
@@ -100,7 +101,8 @@ export function ExecucaoTab({
 
     let filtered = rawData
     if (serviceType !== 'all') filtered = filtered.filter((s) => s.areas?.type === serviceType)
-    setSchedules(filtered)
+    // Consolidar duplicidades na listagem de execução
+    setSchedules(deduplicateSchedules(filtered))
     setLoading(false)
   }
 

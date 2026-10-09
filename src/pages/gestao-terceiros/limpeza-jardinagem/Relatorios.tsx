@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { Card, CardContent } from '@/components/ui/card'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 import {
   Dialog,
   DialogContent,
@@ -82,6 +83,8 @@ export default function RelatoriosLJ() {
 
       let filtered = res.data || []
       if (serviceType !== 'all') filtered = filtered.filter((s) => s.areas?.type === serviceType)
+      // Consolidar duplicidades no relatório
+      filtered = deduplicateSchedules(filtered)
 
       setData(filtered)
       setLoading(false)

@@ -31,6 +31,7 @@ import { Navigate } from 'react-router-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 
 export default function MapaLJ() {
   const { plants } = useMasterData()
@@ -93,7 +94,8 @@ export default function MapaLJ() {
       if (schedulesError) console.error('Error fetching schedules:', schedulesError)
 
       setAreas(fetchedAreas)
-      setSchedules(schedulesData || [])
+      // Consolidar duplicidades no mapa operacional
+      setSchedules(deduplicateSchedules(schedulesData || []))
       setSelectedAreaDetails(null)
     }
 

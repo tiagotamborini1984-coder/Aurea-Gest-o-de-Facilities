@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { DateRange } from 'react-day-picker'
 import { format, differenceInDays, addDays } from 'date-fns'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 
 export type StrategicData = {
   plant: { id: string; name: string; city: string }
@@ -139,7 +140,9 @@ export function useDashboardEstrategico(dateRange: DateRange | undefined) {
           fetchAll(
             supabase
               .from('cleaning_gardening_schedules')
-              .select('id, plant_id, status')
+              .select(
+                'id, plant_id, area_id, activity_date, start_time, status, client_id, description',
+              )
               .eq('client_id', activeClient.id)
               .gte('activity_date', startDateStr)
               .lte('activity_date', endDateStr),
@@ -217,7 +220,8 @@ export function useDashboardEstrategico(dateRange: DateRange | undefined) {
           const plantLogs = dailyLogs?.filter((l) => l.plant_id === plant.id) || []
           const plantTasks = tasks?.filter((t) => t.plant_id === plant.id) || []
           const plantAccidents = accidents?.filter((a) => a.plant_id === plant.id) || []
-          const plantSchedules = cleaningSchedules?.filter((s) => s.plant_id === plant.id) || []
+          const rawPlantSchedules = cleaningSchedules?.filter((s) => s.plant_id === plant.id) || []
+          const plantSchedules = deduplicateSchedules(rawPlantSchedules)
 
           let absenteismoRate = 0
           if (plantLogs.length > 0) {

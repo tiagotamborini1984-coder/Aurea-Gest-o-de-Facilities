@@ -52,6 +52,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { cn } from '@/lib/utils'
 import { exportToCSV } from '@/lib/export'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 
 const getStatusColor = (status: string) => {
   if (status === 'Realizado') return 'bg-[#dcfce7] border-[#86efac] text-[#166534]'
@@ -124,7 +125,11 @@ export function PlanejamentoTab({
         .lte('activity_date', format(addDays(weekStart, 6), 'yyyy-MM-dd')),
     ])
     setAreas(areasRes.data || [])
-    setSchedules((schedRes.data || []).filter((s: any) => s.areas?.type === effectiveServiceType))
+    const filtered = (schedRes.data || []).filter(
+      (s: any) => s.areas?.type === effectiveServiceType,
+    )
+    // Consolidar duplicidades na exibição da tabela de planejamento
+    setSchedules(deduplicateSchedules(filtered))
     setLoading(false)
   }
 
@@ -159,6 +164,39 @@ export function PlanejamentoTab({
       return
     setIsSaving(true)
     try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+
+      // Bloqueio de inserção para datas passadas
+      if (!modalData.id && modalData.date < todayStr) {
+        toast({
+          variant: 'destructive',
+          title: 'Data inválida',
+          description: 'Não é permitido criar atividades de planejamento para datas passadas.',
+        })
+        return
+      }
+
+      // Verificação de duplicata para nova atividade
+      if (!modalData.id) {
+        const checkTime = modalData.time.substring(0, 5)
+        const { data: existingList } = await supabase
+          .from('cleaning_gardening_schedules')
+          .select('id, start_time, status, description')
+          .eq('plant_id', plantId)
+          .eq('area_id', modalData.area_id)
+          .eq('activity_date', modalData.date)
+
+        const duplicate = existingList?.find((s) => s.start_time.substring(0, 5) === checkTime)
+        if (duplicate) {
+          toast({
+            variant: 'destructive',
+            title: 'Atividade já existente',
+            description: `Já existe uma atividade para esta data e horário (${checkTime}). Status: ${duplicate.status}.`,
+          })
+          return
+        }
+      }
+
       const payload = {
         client_id: profile!.client_id,
         plant_id: plantId,
@@ -207,6 +245,35 @@ export function PlanejamentoTab({
     if (!duplicateDate || !modalData) return
     setIsSaving(true)
     try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      if (duplicateDate < todayStr) {
+        toast({
+          variant: 'destructive',
+          title: 'Data inválida',
+          description: 'Não é permitido duplicar ou replicar atividades para datas passadas.',
+        })
+        return
+      }
+
+      // Checar se já existe atividade idêntica na data de destino
+      const targetTime = modalData.time.substring(0, 5)
+      const { data: existingList } = await supabase
+        .from('cleaning_gardening_schedules')
+        .select('id, start_time, status')
+        .eq('plant_id', plantId)
+        .eq('area_id', modalData.area_id)
+        .eq('activity_date', duplicateDate)
+
+      const duplicate = existingList?.find((s) => s.start_time.substring(0, 5) === targetTime)
+      if (duplicate) {
+        toast({
+          variant: 'destructive',
+          title: 'Atividade já existente',
+          description: `A data selecionada já possui uma atividade para esta mesma área e horário (${targetTime}). Status atual: ${duplicate.status}.`,
+        })
+        return
+      }
+
       const dupDateObj = new Date(duplicateDate + 'T00:00:00')
       const todayObj = startOfDay(new Date())
       const isDupToday = isSameDay(dupDateObj, todayObj)

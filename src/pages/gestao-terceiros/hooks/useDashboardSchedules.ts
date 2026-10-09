@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 
 export function useDashboardSchedules(dateFrom: string, dateTo: string, plants: any[]) {
   const [schedules, setSchedules] = useState<any[]>([])
@@ -34,7 +35,7 @@ export function useDashboardSchedules(dateFrom: string, dateTo: string, plants: 
         ])
 
         setAreas(areasData || [])
-        setSchedules(schedulesData || [])
+        setSchedules(deduplicateSchedules(schedulesData || []))
       } catch (err) {
         console.error('Error fetching schedules data', err)
       } finally {

@@ -28,6 +28,7 @@ import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { RankingList } from '../components/BIRankings'
 import { cn } from '@/lib/utils'
+import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
 
 export default function DashboardLJ() {
   const { profile } = useAppStore()
@@ -61,17 +62,22 @@ export default function DashboardLJ() {
     }
   }, [profile, plantId, startDate, endDate])
 
+  // Deduplica e consolida os agendamentos antes de calcular KPIs, gráficos e ranking
+  const consolidatedSchedules = useMemo(() => {
+    return deduplicateSchedules(schedules)
+  }, [schedules])
+
   const kpis = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
 
-    const gardening = schedules.filter((s) => s.areas?.type === 'gardening')
+    const gardening = consolidatedSchedules.filter((s) => s.areas?.type === 'gardening')
     const gardeningValid = gardening.filter((s) => s.activity_date <= todayStr)
     const gardeningDone = gardeningValid.filter((s) => s.status === 'Realizado').length
     const gardeningAdherence = gardeningValid.length
       ? ((gardeningDone / gardeningValid.length) * 100).toFixed(1)
       : 0
 
-    const cleaning = schedules.filter((s) => s.areas?.type === 'cleaning')
+    const cleaning = consolidatedSchedules.filter((s) => s.areas?.type === 'cleaning')
     const cleaningValid = cleaning.filter((s) => s.activity_date <= todayStr)
     const cleaningDone = cleaningValid.filter((s) => s.status === 'Realizado').length
     const cleaningAdherence = cleaningValid.length
@@ -84,11 +90,11 @@ export default function DashboardLJ() {
       gTotal: gardeningValid.length,
       cTotal: cleaningValid.length,
     }
-  }, [schedules])
+  }, [consolidatedSchedules])
 
   const chartData = useMemo(() => {
     const grouped: any = {}
-    schedules.forEach((s) => {
+    consolidatedSchedules.forEach((s) => {
       const aName = s.areas?.name || 'Desconhecida'
       if (!grouped[aName])
         grouped[aName] = { area: aName, Realizado: 0, NãoRealizado: 0, Pendente: 0 }
@@ -102,13 +108,13 @@ export default function DashboardLJ() {
           b.Realizado + b.NãoRealizado + b.Pendente - (a.Realizado + a.NãoRealizado + a.Pendente),
       )
       .slice(0, 10)
-  }, [schedules])
+  }, [consolidatedSchedules])
 
   const plantRankingData = useMemo(() => {
     if (plantId !== 'all') return []
 
     const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const validSchedules = schedules.filter((s) => s.activity_date <= todayStr)
+    const validSchedules = consolidatedSchedules.filter((s) => s.activity_date <= todayStr)
 
     const grouped: Record<string, { total: number; done: number }> = {}
 
@@ -133,7 +139,7 @@ export default function DashboardLJ() {
         }
       })
       .sort((a, b) => parseFloat(b.value) - parseFloat(a.value))
-  }, [schedules, plants, plantId])
+  }, [consolidatedSchedules, plants, plantId])
 
   if (!profile) return null
   if (!hasAccess) return <Navigate to="/gestao-terceiros" replace />
