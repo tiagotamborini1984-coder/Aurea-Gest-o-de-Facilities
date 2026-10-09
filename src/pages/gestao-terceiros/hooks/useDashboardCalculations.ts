@@ -232,36 +232,6 @@ export function useDashboardCalculations(
     )
     const absenteismoDenominator = contratado > 0 ? contratado : totalFallbackCount
 
-    // Novo cálculo de ausentes:
-    // Para colaboradores: para cada data válida, somamos o total de pessoas ausentes reais
-    // (explícitas com log status=false + ativas da planta sem presença lançada naquele dia).
-    // Isso garante correspondência idêntica com o detalhamento de ausentes por data.
-    let totalAbsentDailySum = 0
-    Array.from(allValidDatesSet).forEach((date) => {
-      if (activeTab === 'colaboradores' || activeTab === 'metas') {
-        const absentsForDay = getStaffAbsentListForDate(date)
-        // Considera apenas as plantas com logs/válidas nesta data
-        const absentsInValidPlants = absentsForDay.filter((item) =>
-          plantValidDatesMap[item.plantId]?.has(date),
-        )
-        totalAbsentDailySum += absentsInValidPlants.length
-      } else {
-        // Para equipamentos, indisponíveis calculados a partir dos logs de indisponibilidade
-        validPlants.forEach((pid) => {
-          if (!plantValidDatesMap[pid]?.has(date)) return
-          const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
-          const dExplicitAbs = dayLogs.filter((l) => !l.status).length
-          totalAbsentDailySum += dExplicitAbs
-        })
-      }
-    })
-
-    const avgAusente = globalDays > 0 ? totalAbsentDailySum / globalDays : 0
-    const absenteismo =
-      absenteismoDenominator > 0
-        ? Math.max(0, ((absenteismoDenominator - avgPresente) / absenteismoDenominator) * 100)
-        : 0
-
     const formatStr = (num: number) => (Number.isInteger(num) ? num.toString() : num.toFixed(1))
 
     const formatContratadoPrecision = (num: number) => {
@@ -383,6 +353,36 @@ export function useDashboardCalculations(
 
       return result
     }
+
+    // Novo cálculo de ausentes:
+    // Para colaboradores: para cada data válida, somamos o total de pessoas ausentes reais
+    // (explícitas com log status=false + ativas da planta sem presença lançada naquele dia).
+    // Isso garante correspondência idêntica com o detalhamento de ausentes por data.
+    let totalAbsentDailySum = 0
+    Array.from(allValidDatesSet).forEach((date) => {
+      if (activeTab === 'colaboradores' || activeTab === 'metas') {
+        const absentsForDay = getStaffAbsentListForDate(date)
+        // Considera apenas as plantas com logs/válidas nesta data
+        const absentsInValidPlants = absentsForDay.filter((item) =>
+          plantValidDatesMap[item.plantId]?.has(date),
+        )
+        totalAbsentDailySum += absentsInValidPlants.length
+      } else {
+        // Para equipamentos, indisponíveis calculados a partir dos logs de indisponibilidade
+        validPlants.forEach((pid) => {
+          if (!plantValidDatesMap[pid]?.has(date)) return
+          const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
+          const dExplicitAbs = dayLogs.filter((l) => !l.status).length
+          totalAbsentDailySum += dExplicitAbs
+        })
+      }
+    })
+
+    const avgAusente = globalDays > 0 ? totalAbsentDailySum / globalDays : 0
+    const absenteismo =
+      absenteismoDenominator > 0
+        ? Math.max(0, ((absenteismoDenominator - avgPresente) / absenteismoDenominator) * 100)
+        : 0
 
     // Cálculo dos números específicos de "Hoje" para o card
     let todayPresentCount = 0
