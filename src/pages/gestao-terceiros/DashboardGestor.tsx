@@ -126,7 +126,6 @@ export default function DashboardGestor() {
     const logReferenceIds = new Set((logs || []).map((l: any) => l.reference_id))
 
     employees.forEach((e: any) => {
-      if (e.status === 'Inativo' && !logReferenceIds.has(e.id)) return
       const regNum = e.registration_number?.trim()
       const name = e.name?.toLowerCase().trim()
       const groupKey = regNum ? `${regNum}-${e.plant_id}` : `${name}-${e.plant_id}`
@@ -136,14 +135,29 @@ export default function DashboardGestor() {
 
     const finalFilteredEmployees: any[] = []
     uniqueEmpGroups.forEach((group) => {
-      const activeMembers = group.filter((e) => e.status === 'Ativo')
-      if (activeMembers.length > 0) {
-        const primaryActive =
-          activeMembers.find((am) => logReferenceIds.has(am.id)) || activeMembers[0]
-        finalFilteredEmployees.push(primaryActive)
+      // Sort: most recent version by reference_month DESC, then created_at DESC
+      group.sort((a, b) => {
+        const timeDiff =
+          new Date(b.reference_month || 0).getTime() - new Date(a.reference_month || 0).getTime()
+        if (timeDiff !== 0) return timeDiff
+        const createdDiff =
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        if (createdDiff !== 0) return createdDiff
+        const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+        const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+        return aActive - bActive
+      })
+
+      const best = group[0]
+      const bestIsActive = best.status?.trim().toUpperCase() === 'ATIVO'
+      if (bestIsActive) {
+        finalFilteredEmployees.push(best)
       } else {
-        const memberWithLog = group.find((im) => logReferenceIds.has(im.id)) || group[0]
-        finalFilteredEmployees.push(memberWithLog)
+        // If inactive, only keep if there's historical log in this period for filtering
+        const memberWithLog = group.find((m) => logReferenceIds.has(m.id))
+        if (memberWithLog) {
+          finalFilteredEmployees.push(memberWithLog)
+        }
       }
     })
     return { filteredEmployees: finalFilteredEmployees }

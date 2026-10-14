@@ -150,13 +150,10 @@ export default function Cadastros() {
             .order('created_at', { ascending: false })
 
           if (config.hasMonthFilter) {
-            if (type === 'colaboradores') {
-              q = q.lte('reference_month', `${selectedMonth}-01`)
-            } else {
+            if (type !== 'colaboradores') {
               q = q.eq('reference_month', `${selectedMonth}-01`)
             }
           }
-
           if (type === 'equipamentos') {
             q = q.eq('status', 'Ativo')
           }
@@ -192,24 +189,30 @@ export default function Cadastros() {
                 const bRefMatch = b.reference_month === refMonth ? 0 : 1
                 if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
 
-                const aActive = a.status === 'Ativo' ? 0 : 1
-                const bActive = b.status === 'Ativo' ? 0 : 1
-                if (aActive !== bActive) return aActive - bActive
+                const aRefLte = (a.reference_month || '') <= refMonth ? 0 : 1
+                const bRefLte = (b.reference_month || '') <= refMonth ? 0 : 1
+                if (aRefLte !== bRefLte) return aRefLte - bRefLte
 
-                return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                const timeDiff =
+                  new Date(b.reference_month || 0).getTime() -
+                  new Date(a.reference_month || 0).getTime()
+                if (timeDiff !== 0) return timeDiff
+
+                const createdDiff =
+                  new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                if (createdDiff !== 0) return createdDiff
+
+                const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+                const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+                return aActive - bActive
               })
 
               const best = group[0]
-              if (
-                best.status === 'Ativo' ||
-                (best.status === 'Inativo' &&
-                  best.reference_month &&
-                  best.reference_month > refMonth)
-              ) {
+              // Only show if the winning version is Ativo
+              if (best.status?.trim().toUpperCase() === 'ATIVO') {
                 uniqueEmpsMap.set(best.id, best)
               }
             })
-
             return Array.from(uniqueEmpsMap.values()).sort((a: any, b: any) =>
               (a.name || '').localeCompare(b.name || ''),
             )

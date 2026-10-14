@@ -78,16 +78,33 @@ export function useDashboardCalculations(
 
     const fallbackCountByPlant = new Map<string, number>()
     if (typeCont === 'colaborador') {
-      const seenEmpKeys = new Set<string>()
+      // Group all employee records by person+plant to determine the most recent version
+      const empGroups = new Map<string, any[]>()
       employees.forEach((e) => {
-        if (e.status?.trim().toLowerCase() !== 'ativo') return
-        if (selectedCompanies.length > 0 && !companiesSet.has(e.company_name)) return
+        if (!e) return
         const regNum = e.registration_number?.trim()
         const name = e.name?.toLowerCase().trim()
         const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
-        if (seenEmpKeys.has(dedupKey)) return
-        seenEmpKeys.add(dedupKey)
-        fallbackCountByPlant.set(e.plant_id, (fallbackCountByPlant.get(e.plant_id) || 0) + 1)
+        if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
+        empGroups.get(dedupKey)!.push(e)
+      })
+
+      empGroups.forEach((group) => {
+        group.sort((a, b) => {
+          const timeDiff =
+            new Date(b.reference_month || 0).getTime() - new Date(a.reference_month || 0).getTime()
+          if (timeDiff !== 0) return timeDiff
+          const createdDiff =
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          if (createdDiff !== 0) return createdDiff
+          const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+          const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+          return aActive - bActive
+        })
+        const best = group[0]
+        if (best.status?.trim().toUpperCase() !== 'ATIVO') return
+        if (selectedCompanies.length > 0 && !companiesSet.has(best.company_name)) return
+        fallbackCountByPlant.set(best.plant_id, (fallbackCountByPlant.get(best.plant_id) || 0) + 1)
       })
     } else {
       equipment.forEach((e) => {
@@ -261,22 +278,41 @@ export function useDashboardCalculations(
 
     const todayDateStr = getTodayLocalDateStr()
 
-    // Base ativa de colaboradores deduped por matrícula/nome para auditoria consistente
+    // Base ativa de colaboradores deduped por matrícula/nome para auditoria consistente:
+    // A versão mais recente (reference_month DESC, created_at DESC) é a única considerada.
+    // Se essa versão for Inativo, o colaborador NÃO é ativo e não é incluído.
     const validActiveEmployeesForAudit =
       typeCont === 'colaborador'
         ? (() => {
-            const seen = new Set<string>()
-            const list: any[] = []
+            const empGroups = new Map<string, any[]>()
             employees.forEach((e) => {
-              if (e.status?.trim().toLowerCase() !== 'ativo') return
-              if (selectedPlants.length > 0 && !validPlants.includes(e.plant_id)) return
-              if (selectedCompanies.length > 0 && !companiesSet.has(e.company_name)) return
+              if (!e) return
               const regNum = e.registration_number?.trim()
               const name = e.name?.toLowerCase().trim()
               const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
-              if (seen.has(dedupKey)) return
-              seen.add(dedupKey)
-              list.push(e)
+              if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
+              empGroups.get(dedupKey)!.push(e)
+            })
+
+            const list: any[] = []
+            empGroups.forEach((group) => {
+              group.sort((a, b) => {
+                const timeDiff =
+                  new Date(b.reference_month || 0).getTime() -
+                  new Date(a.reference_month || 0).getTime()
+                if (timeDiff !== 0) return timeDiff
+                const createdDiff =
+                  new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                if (createdDiff !== 0) return createdDiff
+                const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+                const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+                return aActive - bActive
+              })
+              const best = group[0]
+              if (best.status?.trim().toUpperCase() !== 'ATIVO') return
+              if (selectedPlants.length > 0 && !validPlants.includes(best.plant_id)) return
+              if (selectedCompanies.length > 0 && !companiesSet.has(best.company_name)) return
+              list.push(best)
             })
             return list
           })()
