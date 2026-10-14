@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
 import { TrainingStatusCell } from '@/components/gestao-terceiros/TrainingStatusCell'
 import { useTrainingStatus } from '@/hooks/use-training-status'
+import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/AppContext'
 
@@ -214,9 +215,8 @@ export default function Lancamentos() {
       if (!isActive) return
 
       if (!rpcError && rpcEmps) {
-        // RPC already filters by TRIM(UPPER(status)) = 'ATIVO' and derives
-        // client_id from the plant — no need to re-filter in the frontend.
-        fetchedEmps = rpcEmps as any[]
+        // Aplica a mesma regra de vigência aos resultados da RPC (garantindo também descarte se inativo)
+        fetchedEmps = resolveActiveEmployees(rpcEmps as any[])
       } else {
         // Fallback to standard query if RPC fails or doesn't exist yet
         console.warn(
@@ -231,7 +231,7 @@ export default function Lancamentos() {
         let empsQuery = supabase
           .from('employees')
           .select(
-            'id, name, company_name, company_id, function_id, status, registration_number, reference_month, location_id, created_at',
+            'id, name, company_name, company_id, function_id, status, registration_number, reference_month, location_id, created_at, plant_id, client_id',
           )
           .eq('plant_id', selectedPlant)
 
@@ -244,46 +244,9 @@ export default function Lancamentos() {
         if (empsError && empsError.code !== 'PGRST116') throw empsError
 
         if (emps && emps.length > 0) {
-          const grouped = new Map<string, any[]>()
-          emps.forEach((e) => {
-            if (!e || !e.id) return
-            const key = e.registration_number?.trim() || e.name?.toLowerCase().trim() || e.id
-            if (!grouped.has(key)) grouped.set(key, [])
-            grouped.get(key)!.push(e)
-          })
-
-          const uniqueEmpsMap = new Map()
-          Array.from(grouped.values()).forEach((group) => {
-            group.sort((a, b) => {
-              const aRefMatch = a.reference_month === refMonth ? 0 : 1
-              const bRefMatch = b.reference_month === refMonth ? 0 : 1
-              if (aRefMatch !== bRefMatch) return aRefMatch - bRefMatch
-
-              const aRefLte = (a.reference_month || '') <= refMonth ? 0 : 1
-              const bRefLte = (b.reference_month || '') <= refMonth ? 0 : 1
-              if (aRefLte !== bRefLte) return aRefLte - bRefLte
-
-              const timeDiff =
-                new Date(b.reference_month || 0).getTime() -
-                new Date(a.reference_month || 0).getTime()
-              if (timeDiff !== 0) return timeDiff
-
-              const createdDiff =
-                new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-              if (createdDiff !== 0) return createdDiff
-
-              const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
-              const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
-              return aActive - bActive
-            })
-
-            const best = group[0]
-            const bestStatus = best.status?.trim().toUpperCase()
-            if (bestStatus === 'ATIVO') {
-              uniqueEmpsMap.set(best.id, best)
-            }
-          })
-          fetchedEmps = Array.from(uniqueEmpsMap.values())
+          // Regra unificada de vigência: versão mais recente vence (reference_month DESC, created_at DESC).
+          // Se a versão mais recente estiver 'Inativo', a pessoa não aparece na lista de presença.
+          fetchedEmps = resolveActiveEmployees(emps)
         }
       }
 
