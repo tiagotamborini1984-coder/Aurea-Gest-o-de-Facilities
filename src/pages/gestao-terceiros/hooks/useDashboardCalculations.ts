@@ -76,15 +76,36 @@ export function useDashboardCalculations(
     const typeCont =
       activeTab === 'colaboradores' || activeTab === 'metas' ? 'colaborador' : 'equipamento'
 
+    // Normalização robusta de texto (trim + lower + remoção de acentos e múltiplos espaços)
+    const normalizePersonKey = (str: string | null | undefined): string => {
+      if (!str) return ''
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
+
+    const getPersonDedupeKey = (emp: {
+      registration_number?: string | null
+      name?: string | null
+      id?: string
+      plant_id?: string
+    }) => {
+      const reg = emp.registration_number?.trim().toUpperCase()
+      const normName = normalizePersonKey(emp.name)
+      const identifier = reg || normName || emp.id || ''
+      return `${identifier}-${emp.plant_id || ''}`
+    }
+
     // Agrupamento centralizado de colaboradores por pessoa+planta para determinar versão vigente.
-    // Regra v0.0.1716: versão mais recente vence (reference_month DESC, desempate por created_at DESC).
+    // Regra v0.0.1717 / v0.0.1718: versão mais recente vence (reference_month DESC, desempate por created_at DESC).
     // Se a versão mais recente tiver status 'Inativo' (ou não for 'ATIVO'), o colaborador é considerado inativo.
     const empGroups = new Map<string, any[]>()
     employees.forEach((e) => {
       if (!e) return
-      const regNum = e.registration_number?.trim()
-      const name = e.name?.toLowerCase().trim()
-      const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
+      const dedupKey = getPersonDedupeKey(e)
       if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
       empGroups.get(dedupKey)!.push(e)
     })
@@ -92,6 +113,7 @@ export function useDashboardCalculations(
     // Mapeia se o colaborador na planta está com versão vigente Ativo
     // e também mapeia pelo ID de cada versão histórica para resolução direta no log
     const personActiveInPlantMap = new Map<string, boolean>()
+    const personBestInPlantMap = new Map<string, any>()
     const empIdIsCurrentActiveMap = new Map<string, boolean>()
     const empIdCurrentBestMap = new Map<string, any>()
 
@@ -111,6 +133,7 @@ export function useDashboardCalculations(
       const best = group[0]
       const isActive = best.status?.trim().toUpperCase() === 'ATIVO'
       personActiveInPlantMap.set(groupKey, isActive)
+      personBestInPlantMap.set(groupKey, best)
 
       // Associar cada versão do colaborador ao status vigente da pessoa
       group.forEach((member) => {
@@ -318,21 +341,30 @@ export function useDashboardCalculations(
         : []
 
     // Helper para verificar se um colaborador é considerado ativo vigente na planta.
-    // Regra v0.0.1716: Colaborador excluído/inativado na versão mais recente
-    // NÃO aparece em ausentes, gráficos nem contagens de faltas do Dashboard.
+    // Regra v0.0.1717 / v0.0.1718: Colaborador excluído/inativado na versão mais recente
+    // da pessoa na planta NÃO aparece em ausentes, gráficos nem contagens de faltas do Dashboard.
     const isEmployeeCurrentActive = (empId: string, plantId?: string) => {
       // 1. Checagem direta pelo mapa de IDs conhecidos
       if (empIdIsCurrentActiveMap.has(empId)) {
         return empIdIsCurrentActiveMap.get(empId) === true
       }
-      // 2. Fallback buscando nos employees por id e depois pela chave do grupo
+      // 2. Fallback buscando nos employees por id e depois pela chave normalizada da pessoa na planta
       const emp = employees.find((e) => e.id === empId)
       if (!emp) return false
       const pid = plantId || emp.plant_id
-      const regNum = emp.registration_number?.trim()
-      const name = emp.name?.toLowerCase().trim()
-      const dedupKey = `${regNum || name || emp.id}-${pid}`
+      const dedupKey = getPersonDedupeKey({ ...emp, plant_id: pid })
       return personActiveInPlantMap.get(dedupKey) === true
+    }
+
+    const getEmployeeCurrentBest = (empId: string, plantId?: string) => {
+      if (empIdCurrentBestMap.has(empId)) {
+        return empIdCurrentBestMap.get(empId)
+      }
+      const emp = employees.find((e) => e.id === empId)
+      if (!emp) return undefined
+      const pid = plantId || emp.plant_id
+      const dedupKey = getPersonDedupeKey({ ...emp, plant_id: pid })
+      return personBestInPlantMap.get(dedupKey) || emp
     }
 
     // Helper para extrair a lista exata de ausentes (explícitos + sem presença) em uma data
@@ -345,14 +377,12 @@ export function useDashboardCalculations(
         dayLogs.filter((l) => l.status === false).map((l) => l.reference_id),
       )
 
-      // Também indexamos os IDs de referência presentes/explícitos resolvendo agrupamento por matrícula/nome
+      // Também indexamos as chaves normalizadas de pessoas presentes/explícitas
       const registeredRefKeys = new Set<string>()
       dayLogs.forEach((l) => {
         const emp = employees.find((e) => e.id === l.reference_id)
         if (emp) {
-          const regNum = emp.registration_number?.trim()
-          const name = emp.name?.toLowerCase().trim()
-          registeredRefKeys.add(`${regNum || name || emp.id}-${l.plant_id}`)
+          registeredRefKeys.add(getPersonDedupeKey({ ...emp, plant_id: l.plant_id }))
         }
       })
 
@@ -375,9 +405,7 @@ export function useDashboardCalculations(
           if (!isEmployeeCurrentActive(l.reference_id, l.plant_id)) {
             return
           }
-          const emp =
-            empIdCurrentBestMap.get(l.reference_id) ||
-            employees.find((e) => e.id === l.reference_id)
+          const emp = getEmployeeCurrentBest(l.reference_id, l.plant_id)
           const plant = plants.find((p) => p.id === l.plant_id)
           result.push({
             id: `exp-${l.id || l.reference_id}-${date}`,
@@ -394,9 +422,7 @@ export function useDashboardCalculations(
       validActiveEmployeesForAudit.forEach((emp) => {
         if (isPlantDateNonWorking(emp.plant_id, date)) return
         if (presentRefIds.has(emp.id) || explicitAbsentRefIds.has(emp.id)) return
-        const regNum = emp.registration_number?.trim()
-        const name = emp.name?.toLowerCase().trim()
-        const empKey = `${regNum || name || emp.id}-${emp.plant_id}`
+        const empKey = getPersonDedupeKey(emp)
         if (registeredRefKeys.has(empKey)) return
 
         const plant = plants.find((p) => p.id === emp.plant_id)
@@ -789,16 +815,17 @@ export function useDashboardCalculations(
                   .sort((a, b) => a.date.localeCompare(b.date))
                 if (empLogs.length === 0) return
 
-                const regNum = emp.registration_number?.trim()
-                const name = emp.name?.toLowerCase().trim()
-                const gKey = `${regNum || name || emp.id}-${emp.plant_id}`
+                const gKey = getPersonDedupeKey(emp)
+                const currentBest = getEmployeeCurrentBest(emp.id, emp.plant_id) || emp
 
                 if (!empMap.has(gKey)) {
                   empMap.set(gKey, {
-                    id: emp.id,
-                    name: emp.name,
-                    function_id: emp.function_id,
-                    location: locations.find((l) => l.id === emp.location_id)?.name || 'N/A',
+                    id: currentBest.id || emp.id,
+                    name: currentBest.name || emp.name,
+                    function_id: currentBest.function_id || emp.function_id,
+                    location:
+                      locations.find((l) => l.id === (currentBest.location_id || emp.location_id))
+                        ?.name || 'N/A',
                     presencas: empLogs.filter((l) => l.status).length,
                     faltas: empLogs.filter((l) => !l.status).length,
                     history: empLogs.map((log) => ({ date: log.date, status: log.status })),
