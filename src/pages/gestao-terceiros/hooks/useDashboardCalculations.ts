@@ -76,31 +76,52 @@ export function useDashboardCalculations(
     const typeCont =
       activeTab === 'colaboradores' || activeTab === 'metas' ? 'colaborador' : 'equipamento'
 
+    // Agrupamento centralizado de colaboradores por pessoa+planta para determinar versão vigente.
+    // Regra v0.0.1716: versão mais recente vence (reference_month DESC, desempate por created_at DESC).
+    // Se a versão mais recente tiver status 'Inativo' (ou não for 'ATIVO'), o colaborador é considerado inativo.
+    const empGroups = new Map<string, any[]>()
+    employees.forEach((e) => {
+      if (!e) return
+      const regNum = e.registration_number?.trim()
+      const name = e.name?.toLowerCase().trim()
+      const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
+      if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
+      empGroups.get(dedupKey)!.push(e)
+    })
+
+    // Mapeia se o colaborador na planta está com versão vigente Ativo
+    // e também mapeia pelo ID de cada versão histórica para resolução direta no log
+    const personActiveInPlantMap = new Map<string, boolean>()
+    const empIdIsCurrentActiveMap = new Map<string, boolean>()
+    const empIdCurrentBestMap = new Map<string, any>()
+
+    empGroups.forEach((group, groupKey) => {
+      group.sort((a, b) => {
+        const timeDiff =
+          new Date(b.reference_month || 0).getTime() - new Date(a.reference_month || 0).getTime()
+        if (timeDiff !== 0) return timeDiff
+        const createdDiff =
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        if (createdDiff !== 0) return createdDiff
+        // Em caso de mesmo mês e mesmo timestamp, Ativo desempata
+        const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+        const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
+        return aActive - bActive
+      })
+      const best = group[0]
+      const isActive = best.status?.trim().toUpperCase() === 'ATIVO'
+      personActiveInPlantMap.set(groupKey, isActive)
+
+      // Associar cada versão do colaborador ao status vigente da pessoa
+      group.forEach((member) => {
+        empIdIsCurrentActiveMap.set(member.id, isActive)
+        empIdCurrentBestMap.set(member.id, best)
+      })
+    })
+
     const fallbackCountByPlant = new Map<string, number>()
     if (typeCont === 'colaborador') {
-      // Group all employee records by person+plant to determine the most recent version
-      const empGroups = new Map<string, any[]>()
-      employees.forEach((e) => {
-        if (!e) return
-        const regNum = e.registration_number?.trim()
-        const name = e.name?.toLowerCase().trim()
-        const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
-        if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
-        empGroups.get(dedupKey)!.push(e)
-      })
-
       empGroups.forEach((group) => {
-        group.sort((a, b) => {
-          const timeDiff =
-            new Date(b.reference_month || 0).getTime() - new Date(a.reference_month || 0).getTime()
-          if (timeDiff !== 0) return timeDiff
-          const createdDiff =
-            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-          if (createdDiff !== 0) return createdDiff
-          const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
-          const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
-          return aActive - bActive
-        })
         const best = group[0]
         if (best.status?.trim().toUpperCase() !== 'ATIVO') return
         if (selectedCompanies.length > 0 && !companiesSet.has(best.company_name)) return
@@ -284,30 +305,8 @@ export function useDashboardCalculations(
     const validActiveEmployeesForAudit =
       typeCont === 'colaborador'
         ? (() => {
-            const empGroups = new Map<string, any[]>()
-            employees.forEach((e) => {
-              if (!e) return
-              const regNum = e.registration_number?.trim()
-              const name = e.name?.toLowerCase().trim()
-              const dedupKey = `${regNum || name || e.id}-${e.plant_id}`
-              if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
-              empGroups.get(dedupKey)!.push(e)
-            })
-
             const list: any[] = []
             empGroups.forEach((group) => {
-              group.sort((a, b) => {
-                const timeDiff =
-                  new Date(b.reference_month || 0).getTime() -
-                  new Date(a.reference_month || 0).getTime()
-                if (timeDiff !== 0) return timeDiff
-                const createdDiff =
-                  new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-                if (createdDiff !== 0) return createdDiff
-                const aActive = a.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
-                const bActive = b.status?.trim().toUpperCase() === 'ATIVO' ? 0 : 1
-                return aActive - bActive
-              })
               const best = group[0]
               if (best.status?.trim().toUpperCase() !== 'ATIVO') return
               if (selectedPlants.length > 0 && !validPlants.includes(best.plant_id)) return
@@ -317,6 +316,24 @@ export function useDashboardCalculations(
             return list
           })()
         : []
+
+    // Helper para verificar se um colaborador é considerado ativo vigente na planta.
+    // Regra v0.0.1716: Colaborador excluído/inativado na versão mais recente
+    // NÃO aparece em ausentes, gráficos nem contagens de faltas do Dashboard.
+    const isEmployeeCurrentActive = (empId: string, plantId?: string) => {
+      // 1. Checagem direta pelo mapa de IDs conhecidos
+      if (empIdIsCurrentActiveMap.has(empId)) {
+        return empIdIsCurrentActiveMap.get(empId) === true
+      }
+      // 2. Fallback buscando nos employees por id e depois pela chave do grupo
+      const emp = employees.find((e) => e.id === empId)
+      if (!emp) return false
+      const pid = plantId || emp.plant_id
+      const regNum = emp.registration_number?.trim()
+      const name = emp.name?.toLowerCase().trim()
+      const dedupKey = `${regNum || name || emp.id}-${pid}`
+      return personActiveInPlantMap.get(dedupKey) === true
+    }
 
     // Helper para extrair a lista exata de ausentes (explícitos + sem presença) em uma data
     const getStaffAbsentListForDate = (date: string) => {
@@ -349,11 +366,18 @@ export function useDashboardCalculations(
         type: 'explicit' | 'implicit'
       }> = []
 
-      // 1. Ausentes explícitos com log
+      // 1. Ausentes explícitos com log:
+      // Filtra qualquer colaborador cuja versão vigente mais recente na planta tenha status "Inativo"
       dayLogs
         .filter((l) => l.status === false)
         .forEach((l) => {
-          const emp = employees.find((e) => e.id === l.reference_id)
+          // Se o colaborador está inativo na versão vigente, NÃO entra nos ausentes
+          if (!isEmployeeCurrentActive(l.reference_id, l.plant_id)) {
+            return
+          }
+          const emp =
+            empIdCurrentBestMap.get(l.reference_id) ||
+            employees.find((e) => e.id === l.reference_id)
           const plant = plants.find((p) => p.id === l.plant_id)
           result.push({
             id: `exp-${l.id || l.reference_id}-${date}`,
@@ -755,6 +779,9 @@ export function useDashboardCalculations(
             employees
               .filter((e) => selectedCompanies.length === 0 || companiesSet.has(e.company_name))
               .forEach((emp) => {
+                // Se a versão vigente do colaborador na planta for Inativo, ele não aparece na tabela
+                if (!isEmployeeCurrentActive(emp.id, emp.plant_id)) return
+
                 const empLogs = activeLogs
                   .filter(
                     (l) => l.reference_id === emp.id && plantValidDatesMap[l.plant_id]?.has(l.date),

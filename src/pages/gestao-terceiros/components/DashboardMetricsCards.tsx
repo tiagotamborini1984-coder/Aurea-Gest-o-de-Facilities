@@ -349,14 +349,98 @@ export default function DashboardMetricsCards({
             <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
               <p className="text-xl lg:text-2xl font-bold text-foreground">{metrics.ausente}</p>
               {activeTab === 'colaboradores' && metrics.todayAusente !== undefined && (
-                <button
-                  type="button"
-                  onClick={() => setAbsentAuditView('today')}
-                  className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 border border-red-500/20 whitespace-nowrap hover:bg-red-500/20 transition-colors cursor-pointer"
-                  title="Clique para abrir detalhes de ausentes hoje (sem presença marcada no dia corrente)"
-                >
-                  Hoje: {metrics.todayAusente}
-                </button>
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setAbsentAuditView('today')}
+                      className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 border border-red-500/20 whitespace-nowrap hover:bg-red-500/20 transition-colors cursor-pointer"
+                      title="Clique para abrir detalhes de ausentes hoje (sem presença marcada no dia corrente)"
+                    >
+                      Hoje: {metrics.todayAusente}
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent
+                    side="right"
+                    className="w-full sm:max-w-md md:max-w-lg flex flex-col p-0"
+                  >
+                    <SheetHeader className="p-6 pb-3 border-b border-border/50 space-y-3">
+                      <div>
+                        <SheetTitle className="text-lg">Auditoria de Ausências</SheetTitle>
+                        <SheetDescription className="text-xs mt-1">
+                          Mostrando colaboradores ausentes em{' '}
+                          <strong>
+                            Hoje (
+                            {metrics.todayDateStr
+                              ? format(new Date(metrics.todayDateStr + 'T12:00:00Z'), 'dd/MM/yyyy')
+                              : 'data atual'}
+                            )
+                          </strong>
+                          : <strong>{(metrics.todayAbsentsList || []).length} pessoas</strong> (bate
+                          exatamente com o badge <em>Hoje: {metrics.todayAusente}</em>).
+                        </SheetDescription>
+                      </div>
+                    </SheetHeader>
+                    <ScrollArea className="flex-1">
+                      <div className="p-6 pt-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Data</TableHead>
+                              <TableHead>Colaborador</TableHead>
+                              <TableHead>Planta / Empresa</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(metrics.todayAbsentsList || []).length === 0 ? (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={4}
+                                  className="text-center text-muted-foreground py-8"
+                                >
+                                  Nenhum colaborador ausente registrado hoje.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              (metrics.todayAbsentsList || []).map((item: any) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="whitespace-nowrap text-xs">
+                                    {format(new Date(item.date + 'T12:00:00Z'), 'dd/MM/yyyy')}
+                                  </TableCell>
+                                  <TableCell className="font-medium text-xs">
+                                    {item.refName}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">
+                                    <div>{item.plantName || '-'}</div>
+                                    {item.companyName && (
+                                      <div className="text-[10px] text-muted-foreground/80">
+                                        {item.companyName}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-red-500/10 text-red-600 border-red-500/20 text-[10px] whitespace-nowrap"
+                                      title={
+                                        item.type === 'implicit'
+                                          ? 'Sem presença lançada no dia'
+                                          : 'Ausência explícita lançada'
+                                      }
+                                    >
+                                      {item.type === 'implicit' ? 'Sem presença' : 'Ausente'}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </ScrollArea>
+                  </SheetContent>
+                </Sheet>
               )}
             </div>
             {renderAuditButton('ausentes')}
