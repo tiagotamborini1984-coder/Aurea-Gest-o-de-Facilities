@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { getPersonKey } from '@/lib/employee-vigencia'
 
 export function useTrainingStatus() {
   const getTrainingStatuses = useCallback(
@@ -8,7 +9,57 @@ export function useTrainingStatus() {
         return includeDetails ? { statusMap: {}, detailsMap: {} } : {}
       }
 
-      const employeeIds = Array.from(new Set(employees.map((e) => e?.id).filter(Boolean)))
+      // Agrupar IDs dos colaboradores fornecidos por chave de vigência de pessoa
+      const personKeyToCurrentEmpIds = new Map<string, string[]>()
+      employees.forEach((emp) => {
+        if (!emp?.id) return
+        const key = getPersonKey(emp)
+        const current = personKeyToCurrentEmpIds.get(key) || []
+        current.push(emp.id)
+        personKeyToCurrentEmpIds.set(key, current)
+      })
+
+      // Buscar todos os IDs históricos correspondentes a esses colaboradores
+      // para carregar o histórico completo de registros de treinamento de cada um
+      const clientIds = Array.from(new Set(employees.map((e) => e?.client_id).filter(Boolean)))
+      let allRelatedEmpIds = new Set<string>()
+
+      if (clientIds.length > 0) {
+        // Buscar colaboradores do mesmo cliente
+        let histEmps: any[] = []
+        for (const cId of clientIds) {
+          let from = 0
+          const limit = 1000
+          let hasMore = true
+          while (hasMore) {
+            const { data, error } = await supabase
+              .from('employees')
+              .select('id, name, registration_number, plant_id, client_id')
+              .eq('client_id', cId)
+              .range(from, from + limit - 1)
+
+            if (error || !data || data.length === 0) break
+            histEmps = histEmps.concat(data)
+            from += limit
+            if (data.length < limit) hasMore = false
+          }
+        }
+
+        // Mapear cada registro histórico para a pessoa correspondente
+        histEmps.forEach((hEmp) => {
+          const key = getPersonKey(hEmp)
+          if (personKeyToCurrentEmpIds.has(key)) {
+            allRelatedEmpIds.add(hEmp.id)
+          }
+        })
+      }
+
+      // Garantir que todos os IDs dos colaboradores atuais estão incluídos
+      employees.forEach((e) => {
+        if (e?.id) allRelatedEmpIds.add(e.id)
+      })
+
+      const employeeIds = Array.from(allRelatedEmpIds)
 
       // Fetch required trainings with pagination to avoid 1000 row limits
       let reqTrainings: any[] = []
@@ -74,11 +125,30 @@ export function useTrainingStatus() {
         }
       }
 
-      const recordsById: Record<string, any[]> = {}
+      // Mapear registros de treinamento para o ID do colaborador E também associar por pessoa
+      const recordsByPersonKey: Record<string, any[]> = {}
+      // Mapear id do colaborador -> personKey
+      const empIdToPersonKey = new Map<string, string>()
+      employees.forEach((emp) => {
+        if (emp?.id) empIdToPersonKey.set(emp.id, getPersonKey(emp))
+      })
       allRecords.forEach((r) => {
         if (!r || !r.employee_id) return
-        if (!recordsById[r.employee_id]) recordsById[r.employee_id] = []
-        recordsById[r.employee_id].push(r)
+        // Tentar obter personKey do colaborador histórico
+        let pKey = empIdToPersonKey.get(r.employee_id)
+        if (!pKey) {
+          // Se não encontrou diretamente, procurar no map personKeyToCurrentEmpIds
+          for (const [key, ids] of personKeyToCurrentEmpIds.entries()) {
+            if (ids.includes(r.employee_id)) {
+              pKey = key
+              break
+            }
+          }
+        }
+        if (pKey) {
+          if (!recordsByPersonKey[pKey]) recordsByPersonKey[pKey] = []
+          recordsByPersonKey[pKey].push(r)
+        }
       })
 
       const statusMap: Record<string, 'Apto' | 'Inapto' | 'Isento' | 'Função não definida'> = {}
@@ -101,7 +171,8 @@ export function useTrainingStatus() {
           return
         }
 
-        const myRecords = recordsById[emp.id] || []
+        const pKey = getPersonKey(emp)
+        const myRecords = recordsByPersonKey[pKey] || []
         let employeeStatus: 'Apto' | 'Inapto' = 'Apto'
         const details: any[] = []
 

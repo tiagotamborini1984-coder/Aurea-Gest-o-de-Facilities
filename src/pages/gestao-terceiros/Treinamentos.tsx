@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { useTrainingStatus } from '@/hooks/use-training-status'
+import { resolveActiveEmployees } from '@/lib/employee-vigencia'
+import { normalizeString } from '@/lib/string-utils'
 import { format } from 'date-fns'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -44,7 +46,6 @@ export default function Treinamentos() {
   const { getTrainingStatuses } = useTrainingStatus()
   const { toast } = useToast()
 
-  const [month, setMonth] = useState<string>(format(new Date(), 'yyyy-MM'))
   const [plants, setPlants] = useState<any[]>([])
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -69,10 +70,10 @@ export default function Treinamentos() {
   }, [activeClient])
 
   useEffect(() => {
-    if (activeClient && month) {
+    if (activeClient) {
       fetchData()
     }
-  }, [activeClient, selectedPlant, month])
+  }, [activeClient, selectedPlant])
 
   const fetchPlants = async () => {
     const { data } = await supabase
@@ -86,33 +87,99 @@ export default function Treinamentos() {
   const fetchData = async () => {
     if (!activeClient?.id) return
     setIsLoading(true)
-    const referenceMonth = month + '-01'
 
-    let q = supabase
-      .from('employees')
-      .select('*, functions(name)')
-      .eq('client_id', activeClient.id)
-      .eq('reference_month', referenceMonth)
-      .eq('status', 'Ativo')
+    try {
+      // Busca todos os colaboradores por planta (ou todas as plantas do cliente) sem filtrar pelo mês
+      // A lista de colaboradores é paginada caso haja mais de 1000 registros
+      let allEmps: any[] = []
+      let from = 0
+      const limit = 1000
+      let hasMore = true
 
-    if (selectedPlant !== 'all') {
-      q = q.eq('plant_id', selectedPlant)
-    }
+      while (hasMore) {
+        let q = supabase
+          .from('employees')
+          .select('*, functions(name)')
+          .eq('client_id', activeClient.id)
+          .range(from, from + limit - 1)
 
-    const { data: emps } = await q
+        if (selectedPlant !== 'all') {
+          q = q.eq('plant_id', selectedPlant)
+        }
 
-    if (emps) {
-      setEmployees(emps)
-      const statuses = (await getTrainingStatuses(emps)) as Record<string, string>
+        const { data: pageData, error } = await q
+        if (error) {
+          console.error('Erro ao buscar colaboradores:', error)
+          break
+        }
+
+        if (pageData && pageData.length > 0) {
+          allEmps = allEmps.concat(pageData)
+          from += limit
+          if (pageData.length < limit) hasMore = false
+        } else {
+          hasMore = false
+        }
+      }
+
+      // Aplica regra de vigência oficial (v0.0.1716+):
+      // Agrupa por pessoa (matrícula sanitizada ou nome normalizado + plant_id)
+      // Versão mais recente vence (reference_month DESC, created_at DESC)
+      // Se a versão vigente for "Inativo", o colaborador é descartado
+      // Retorna ordenado alfabeticamente por nome em pt-BR
+      const activeEmps = resolveActiveEmployees(allEmps)
+
+      setEmployees(activeEmps)
+      const statuses = (await getTrainingStatuses(activeEmps)) as Record<string, string>
       setTrainingStatuses(statuses)
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   const openViewer = async (rawUrl: string | undefined) => {
     if (rawUrl) {
       viewerRef.current?.open(rawUrl)
     }
+  }
+
+  // Helper para buscar todos os IDs históricos associados à mesma pessoa
+  const getHistoricalEmployeeIds = async (emp: any): Promise<string[]> => {
+    if (!activeClient?.id || !emp) return emp?.id ? [emp.id] : []
+
+    if (emp.registration_number?.trim()) {
+      let query = supabase
+        .from('employees')
+        .select('id')
+        .eq('client_id', activeClient.id)
+        .eq('registration_number', emp.registration_number.trim())
+
+      if (emp.plant_id) {
+        query = query.eq('plant_id', emp.plant_id)
+      }
+
+      const { data: relatedEmps } = await query
+      if (relatedEmps && relatedEmps.length > 0) {
+        return Array.from(new Set(relatedEmps.map((e) => e.id)))
+      }
+    } else if (emp.name) {
+      let nameQuery = supabase.from('employees').select('id, name').eq('client_id', activeClient.id)
+
+      if (emp.plant_id) {
+        nameQuery = nameQuery.eq('plant_id', emp.plant_id)
+      }
+
+      const { data: relatedByName } = await nameQuery
+      if (relatedByName && relatedByName.length > 0) {
+        const empNormName = normalizeString(emp.name)
+        const matched = relatedByName.filter((e) => normalizeString(e.name) === empNormName)
+        if (matched.length > 0) {
+          return Array.from(new Set(matched.map((e) => e.id)))
+        }
+      }
+    }
+
+    return [emp.id]
   }
 
   const openDetails = async (emp: any) => {
@@ -131,33 +198,15 @@ export default function Treinamentos() {
 
     setReqTrainings(reqsData)
 
-    // Find all emp ids that share this registration number to get unified history
-    if (emp.registration_number && activeClient?.id) {
-      const { data: relatedEmps } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('client_id', activeClient.id)
-        .eq('registration_number', emp.registration_number)
+    const ids = await getHistoricalEmployeeIds(emp)
 
-      const ids = relatedEmps?.length ? relatedEmps.map((e) => e.id) : [emp.id]
+    const { data: records } = await supabase
+      .from('employee_training_records')
+      .select('*, trainings(*)')
+      .in('employee_id', ids)
+      .order('completion_date', { ascending: false })
 
-      const { data: records } = await supabase
-        .from('employee_training_records')
-        .select('*, trainings(*)')
-        .in('employee_id', ids)
-        .order('completion_date', { ascending: false })
-
-      setEmpRecords(records || [])
-    } else {
-      const { data: records } = await supabase
-        .from('employee_training_records')
-        .select('*, trainings(*)')
-        .eq('employee_id', emp.id)
-        .order('completion_date', { ascending: false })
-
-      setEmpRecords(records || [])
-    }
-
+    setEmpRecords(records || [])
     setIsRecordsLoading(false)
   }
 
@@ -233,12 +282,14 @@ export default function Treinamentos() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Concluído':
+      case 'Apto':
         return (
           <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
             <CheckCircle2 className="w-3 h-3 mr-1" /> Regular
           </Badge>
         )
       case 'Pendente':
+      case 'Inapto':
         return (
           <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">
             <AlertTriangle className="w-3 h-3 mr-1" /> Pendente
@@ -250,10 +301,16 @@ export default function Treinamentos() {
             <AlertCircle className="w-3 h-3 mr-1" /> Vencido
           </Badge>
         )
+      case 'Isento':
+        return (
+          <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+            <Info className="w-3 h-3 mr-1" /> Isento
+          </Badge>
+        )
       default:
         return (
           <Badge variant="outline" className="text-gray-500">
-            <Info className="w-3 h-3 mr-1" /> N/A
+            <Info className="w-3 h-3 mr-1" /> {status || 'N/A'}
           </Badge>
         )
     }
@@ -282,15 +339,9 @@ export default function Treinamentos() {
       <Card>
         <CardHeader className="pb-4 border-b">
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <Input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="w-full sm:w-auto bg-white"
-              />
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-center">
               <Select value={selectedPlant} onValueChange={setSelectedPlant}>
-                <SelectTrigger className="w-full sm:w-[220px] bg-white">
+                <SelectTrigger className="w-full sm:w-[260px] bg-white">
                   <SelectValue placeholder="Todas as Plantas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -337,7 +388,7 @@ export default function Treinamentos() {
                 ) : filteredEmployees.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                      Nenhum colaborador encontrado para este mês.
+                      Nenhum colaborador ativo encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
