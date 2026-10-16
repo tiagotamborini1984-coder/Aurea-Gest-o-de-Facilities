@@ -113,6 +113,7 @@ Deno.serve(async (req: Request) => {
       evaluatedCount++
       const startDateStr = (plan.start_date || todayStr).split('T')[0]
       const planStart = new Date(startDateStr + 'T00:00:00Z')
+      const advanceDays = Math.max(0, Number(plan.advance_days) || 0)
 
       let nextDue: Date
       if (plan.last_generated_date) {
@@ -125,9 +126,10 @@ Deno.serve(async (req: Request) => {
 
       // Se a data calculada ainda estiver no passado distante em relação a hoje e já teve geração,
       // avança respeitando a periodicidade até alcançar ou ultrapassar hoje
+      // considerando também os advanceDays
       if (plan.last_generated_date && nextDue < today) {
         let guard = 0
-        while (nextDue < today && guard < 1000) {
+        while (addDaysUTC(nextDue, -advanceDays) < today && nextDue < today && guard < 1000) {
           const adv = addFrequency(nextDue, plan.frequency)
           if (adv.getTime() <= nextDue.getTime()) break
           nextDue = adv
@@ -135,8 +137,9 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Se a data de vencimento for hoje ou anterior (ou se nunca gerou e a start_date já chegou)
-      const isDue = today >= nextDue || (!plan.last_generated_date && today >= planStart)
+      // A OS deve ser gerada quando (data planejada - dias de antecedência) <= hoje
+      const triggerDate = addDaysUTC(nextDue, -advanceDays)
+      const isDue = today >= triggerDate
 
       if (!isDue) {
         details.push({
@@ -144,11 +147,14 @@ Deno.serve(async (req: Request) => {
           title: plan.title,
           status: 'skipped_not_due',
           next_due: fmtDate(nextDue),
+          trigger_date: fmtDate(triggerDate),
+          advance_days: advanceDays,
         })
         continue
       }
 
-      const scheduledDateStr = fmtDate(nextDue > today ? today : nextDue)
+      // A data planejada de execução da OS é nextDue (não a data de hoje nem triggerDate)
+      const scheduledDateStr = fmtDate(nextDue)
 
       // Verificar idempotência: já existe OS gerada para este plano nesta data planejada?
       const plannedDayStart = `${scheduledDateStr}T00:00:00.000Z`

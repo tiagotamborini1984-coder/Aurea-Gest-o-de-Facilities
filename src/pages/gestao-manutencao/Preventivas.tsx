@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Play,
   ClipboardList,
+  Clock,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -50,6 +51,7 @@ export default function PreventivasManutencao() {
   const initialForm = {
     title: '',
     frequency: 'Mensal',
+    advance_days: 0,
     start_date: '',
     description: '',
     plant_id: '',
@@ -254,6 +256,7 @@ export default function PreventivasManutencao() {
           asset_id: suggestion.scope === 'asset' ? suggestion.asset_id : null,
           title: suggestion.title,
           frequency: suggestion.frequency,
+          advance_days: 0,
           start_date: new Date().toISOString().split('T')[0],
           description: suggestion.description,
           is_active: true,
@@ -289,6 +292,7 @@ export default function PreventivasManutencao() {
     setForm({
       title: plan.title,
       frequency: plan.frequency,
+      advance_days: Number(plan.advance_days) || 0,
       start_date: plan.start_date,
       description: plan.description || '',
       plant_id: plan.plant_id,
@@ -341,6 +345,7 @@ export default function PreventivasManutencao() {
 
     try {
       const validChecklist = checklist.filter((c) => c.description.trim())
+      const advanceDaysNum = Math.min(90, Math.max(0, Number(form.advance_days) || 0))
 
       const payload = {
         plant_id: form.plant_id,
@@ -351,6 +356,7 @@ export default function PreventivasManutencao() {
         assignee_id: form.assignee_id !== 'none' ? form.assignee_id : null,
         title: form.title,
         frequency: form.frequency,
+        advance_days: advanceDaysNum,
         start_date: form.start_date || new Date().toISOString().split('T')[0],
         description: form.description,
       }
@@ -723,7 +729,7 @@ export default function PreventivasManutencao() {
                     placeholder="Ex: Revisão Mensal HVAC"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Periodicidade</Label>
                     <Select
@@ -736,7 +742,10 @@ export default function PreventivasManutencao() {
                       <SelectContent>
                         <SelectItem value="Diária">Diária</SelectItem>
                         <SelectItem value="Semanal">Semanal</SelectItem>
+                        <SelectItem value="Quinzenal">Quinzenal</SelectItem>
                         <SelectItem value="Mensal">Mensal</SelectItem>
+                        <SelectItem value="Bimestral">Bimestral</SelectItem>
+                        <SelectItem value="Trimestral">Trimestral</SelectItem>
                         <SelectItem value="Semestral">Semestral</SelectItem>
                         <SelectItem value="Anual">Anual</SelectItem>
                       </SelectContent>
@@ -750,6 +759,30 @@ export default function PreventivasManutencao() {
                       value={form.start_date}
                       onChange={(e) => setForm({ ...form, start_date: e.target.value })}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="advance_days">Antecedência (dias)</Label>
+                    </div>
+                    <Input
+                      id="advance_days"
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={form.advance_days}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          advance_days: Math.max(0, parseInt(e.target.value, 10) || 0),
+                        })
+                      }
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-muted-foreground leading-tight">
+                      {form.advance_days > 0
+                        ? `Gera a OS ${form.advance_days} dia(s) antes da data planejada`
+                        : '0 = gera no dia da execução'}
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -848,6 +881,15 @@ export default function PreventivasManutencao() {
                   <span className="text-gray-500">Periodicidade:</span>
                   <span className="font-medium">{plan.frequency}</span>
                 </div>
+                {Number(plan.advance_days) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Antecedência:</span>
+                    <span className="font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Gera OS {plan.advance_days} dia{plan.advance_days > 1 ? 's' : ''} antes
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Alvo:</span>
                   <span className="font-medium truncate max-w-[150px]">
