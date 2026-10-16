@@ -38,7 +38,6 @@ import {
   FileText,
   Mail,
   User,
-  Layers,
 } from 'lucide-react'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -51,7 +50,6 @@ interface FormState {
   description: string
   plant_id: string
   area_id: string
-  subarea_id: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -60,7 +58,6 @@ const EMPTY_FORM: FormState = {
   description: '',
   plant_id: '',
   area_id: '',
-  subarea_id: '',
 }
 
 const BackgroundElements = () => (
@@ -96,15 +93,11 @@ export default function NovaSolicitacaoPublica() {
   const [files, setFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const { plants, getAreasForPlant, getSubareasForArea } = useMaintenanceFormData(clientId)
+  const { plants, getAreasForPlant } = useMaintenanceFormData(clientId)
 
   const areas = useMemo(
     () => (form.plant_id ? getAreasForPlant(form.plant_id) : []),
     [form.plant_id, getAreasForPlant],
-  )
-  const subareas = useMemo(
-    () => (form.area_id ? getSubareasForArea(form.area_id) : []),
-    [form.area_id, getSubareasForArea],
   )
 
   useEffect(() => {
@@ -220,7 +213,7 @@ export default function NovaSolicitacaoPublica() {
         p_client_id: clientId,
         p_plant_id: form.plant_id,
         p_area_id: form.area_id,
-        p_sublocation_id: form.subarea_id || null,
+        p_sublocation_id: null,
         p_asset_id: null,
         p_requester_name: form.name.trim(),
         p_requester_email: form.email.trim(),
@@ -429,7 +422,6 @@ export default function NovaSolicitacaoPublica() {
                         ...form,
                         plant_id: v,
                         area_id: '',
-                        subarea_id: '',
                       })
                       if (errors.plant_id) setErrors({ ...errors, plant_id: '' })
                     }}
@@ -464,7 +456,7 @@ export default function NovaSolicitacaoPublica() {
                   <Select
                     value={form.area_id}
                     onValueChange={(v) => {
-                      setForm({ ...form, area_id: v, subarea_id: '' })
+                      setForm({ ...form, area_id: v })
                       if (errors.area_id) setErrors({ ...errors, area_id: '' })
                     }}
                     disabled={!form.plant_id}
@@ -487,44 +479,6 @@ export default function NovaSolicitacaoPublica() {
                     </p>
                   )}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-900">
-                  <Layers className="inline-block h-3.5 w-3.5 mr-1" />
-                  Subárea (opcional)
-                </Label>
-                <Select
-                  value={form.subarea_id}
-                  onValueChange={(v) => {
-                    setForm({ ...form, subarea_id: v })
-                  }}
-                  disabled={!form.area_id || subareas.length === 0}
-                >
-                  <SelectTrigger className="bg-white text-slate-900 border-slate-300 h-11">
-                    <SelectValue
-                      placeholder={
-                        !form.area_id
-                          ? 'Selecione uma área primeiro...'
-                          : subareas.length === 0
-                            ? 'Nenhuma subárea disponível'
-                            : 'Selecione a subárea...'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    {subareas.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.area_id && subareas.length === 0 && (
-                  <p className="text-xs text-slate-400 mt-1">
-                    Nenhuma subárea cadastrada para esta área.
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
