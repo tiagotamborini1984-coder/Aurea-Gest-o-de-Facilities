@@ -145,6 +145,7 @@ export default function ChamadosManutencao() {
   const [statuses, setStatuses] = useState<any[]>([])
   const [types, setTypes] = useState<any[]>([])
   const [assignees, setAssignees] = useState<any[]>([])
+  const [workers, setWorkers] = useState<any[]>([])
 
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [closureModalOpen, setClosureModalOpen] = useState(false)
@@ -392,6 +393,10 @@ export default function ChamadosManutencao() {
     let statQ = supabase.from('maintenance_statuses').select('*').order('order_index')
     let tQ = supabase.from('maintenance_types').select('*').order('name')
     let assignQ = supabase.from('profiles').select('id, name, role').order('name')
+    let workersQ = supabase
+      .from('maintenance_workers')
+      .select('id, name, company, discipline, plant_id')
+      .order('name')
 
     if (clientId) {
       pQ = pQ.eq('client_id', clientId)
@@ -402,18 +407,11 @@ export default function ChamadosManutencao() {
       statQ = statQ.eq('client_id', clientId)
       tQ = tQ.eq('client_id', clientId)
       assignQ = assignQ.eq('client_id', clientId)
+      workersQ = workersQ.eq('client_id', clientId)
     }
 
-    const [pRes, aRes, subRes, asRes, prioRes, statRes, tRes, assignRes] = await Promise.all([
-      pQ,
-      aQ,
-      subQ,
-      asQ,
-      prioQ,
-      statQ,
-      tQ,
-      assignQ,
-    ])
+    const [pRes, aRes, subRes, asRes, prioRes, statRes, tRes, assignRes, workersRes] =
+      await Promise.all([pQ, aQ, subQ, asQ, prioQ, statQ, tQ, assignQ, workersQ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
     if (subRes.data) setSublocations(subRes.data)
@@ -422,6 +420,7 @@ export default function ChamadosManutencao() {
     if (statRes.data) setStatuses(statRes.data)
     if (tRes.data) setTypes(tRes.data)
     if (assignRes.data) setAssignees(assignRes.data)
+    if (workersRes.data) setWorkers(workersRes.data)
   }
 
   const loadTickets = async () => {
@@ -440,8 +439,20 @@ export default function ChamadosManutencao() {
     if (selectedPlant !== 'all') q = q.eq('plant_id', selectedPlant)
 
     const { data } = await q
+    // Mapear tickets para garantir que assignee mostre o manutentor se assignee_id for de um maintenance_worker
     setTickets(data || [])
     setLoading(false)
+  }
+
+  // Resolve nome do responsável (seja de profiles ou maintenance_workers)
+  const resolveTicketAssigneeName = (ticket: any) => {
+    if (ticket.assignee?.name) return ticket.assignee.name
+    if (!ticket.assignee_id) return null
+    const worker = workers.find((w) => w.id === ticket.assignee_id)
+    if (worker) return worker.name
+    const prof = assignees.find((a) => a.id === ticket.assignee_id)
+    if (prof) return prof.name
+    return null
   }
   loadTicketsRef.current = loadTickets
 
@@ -566,6 +577,8 @@ export default function ChamadosManutencao() {
           .eq('id', selectedTicket.id)
         if (updateError) throw updateError
 
+        const matchedWorker = workers.find((w) => w.id === updatePayload.assignee_id)
+        const matchedAssignee = assignees.find((a) => a.id === updatePayload.assignee_id)
         const updatedTicket = {
           ...selectedTicket,
           ...updatePayload,
@@ -574,7 +587,7 @@ export default function ChamadosManutencao() {
           sublocation: sublocations.find((s) => s.id === updatePayload.sublocation_id),
           asset: assets.find((a) => a.id === updatePayload.asset_id),
           priority: priorities.find((p) => p.id === updatePayload.priority_id),
-          assignee: assignees.find((a) => a.id === updatePayload.assignee_id),
+          assignee: matchedAssignee || (matchedWorker ? { name: matchedWorker.name } : null),
           status: statuses.find((s) => s.id === updatePayload.status_id),
           type: types.find((t) => t.id === updatePayload.type_id),
         }
@@ -606,6 +619,8 @@ export default function ChamadosManutencao() {
       if (error) throw error
       toast.success('O.S. atualizada com sucesso!')
       loadTickets()
+      const matchedWorker = workers.find((w) => w.id === payload.assignee_id)
+      const matchedAssignee = assignees.find((a) => a.id === payload.assignee_id)
       setSelectedTicket({
         ...selectedTicket,
         ...payload,
@@ -614,7 +629,7 @@ export default function ChamadosManutencao() {
         sublocation: sublocations.find((s) => s.id === payload.sublocation_id),
         asset: assets.find((a) => a.id === payload.asset_id),
         priority: priorities.find((p) => p.id === payload.priority_id),
-        assignee: assignees.find((a) => a.id === payload.assignee_id),
+        assignee: matchedAssignee || (matchedWorker ? { name: matchedWorker.name } : null),
         status: statuses.find((s) => s.id === payload.status_id),
         type: types.find((t) => t.id === payload.type_id),
       })
@@ -1171,15 +1186,18 @@ export default function ChamadosManutencao() {
 
                         <div className="flex items-center justify-between mt-1 border-t border-border pt-2">
                           <div className="flex items-center gap-1.5 font-medium text-foreground">
-                            {ticket.assignee ? (
+                            {resolveTicketAssigneeName(ticket) ? (
                               <>
                                 <Avatar className="h-4 w-4">
                                   <AvatarFallback className="text-[8px] bg-brand-vividBlue text-white">
-                                    {ticket.assignee.name?.[0]}
+                                    {resolveTicketAssigneeName(ticket)?.[0]}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="truncate max-w-[100px]">
-                                  {ticket.assignee.name}
+                                <span
+                                  className="truncate max-w-[100px]"
+                                  title={resolveTicketAssigneeName(ticket)}
+                                >
+                                  {resolveTicketAssigneeName(ticket)}
                                 </span>
                               </>
                             ) : (
@@ -1632,11 +1650,25 @@ export default function ChamadosManutencao() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Não atribuído</SelectItem>
+                      {workers.length > 0 && (
+                        <>
+                          {workers.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name} {w.discipline ? `(${w.discipline})` : ''}{' '}
+                              {w.company ? `- ${w.company}` : ''}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                       {assignees
-                        .filter((a) => a.role === 'Manutentor' || a.id === editForm.assignee_id)
+                        .filter(
+                          (a) =>
+                            (a.role === 'Manutentor' || a.id === editForm.assignee_id) &&
+                            !workers.some((w) => w.id === a.id),
+                        )
                         .map((a) => (
                           <SelectItem key={a.id} value={a.id}>
-                            {a.name}
+                            {a.name} (Usuário do sistema)
                           </SelectItem>
                         ))}
                     </SelectContent>

@@ -46,7 +46,8 @@ export default function PreventivasManutencao() {
   const [assets, setAssets] = useState<any[]>([])
   const [types, setTypes] = useState<any[]>([])
   const [priorities, setPriorities] = useState<any[]>([])
-  const [assignees, setAssignees] = useState<any[]>([])
+  const [workers, setWorkers] = useState<any[]>([])
+  const [legacyProfiles, setLegacyProfiles] = useState<any[]>([])
 
   const initialForm = {
     title: '',
@@ -101,7 +102,11 @@ export default function PreventivasManutencao() {
         .order('name')
       let typesQ = supabase.from('maintenance_types').select('id, name').order('name')
       let prioQ = supabase.from('maintenance_priorities').select('id, name').order('name')
-      let assigneesQ = supabase.from('profiles').select('id, name, role').order('name')
+      let workersQ = supabase
+        .from('maintenance_workers')
+        .select('id, name, company, discipline, plant_id')
+        .order('name')
+      let profilesQ = supabase.from('profiles').select('id, name, role').order('name')
 
       if (clientId) {
         pQ = pQ.eq('client_id', clientId)
@@ -109,16 +114,18 @@ export default function PreventivasManutencao() {
         asQ = asQ.eq('client_id', clientId)
         typesQ = typesQ.eq('client_id', clientId)
         prioQ = prioQ.eq('client_id', clientId)
-        assigneesQ = assigneesQ.eq('client_id', clientId)
+        workersQ = workersQ.eq('client_id', clientId)
+        profilesQ = profilesQ.eq('client_id', clientId)
       }
 
-      const [pRes, aRes, asRes, typesRes, prioRes, assigneesRes] = await Promise.all([
+      const [pRes, aRes, asRes, typesRes, prioRes, workersRes, profilesRes] = await Promise.all([
         pQ,
         aQ,
         asQ,
         typesQ,
         prioQ,
-        assigneesQ,
+        workersQ,
+        profilesQ,
       ])
 
       if (pRes.data) setPlants(pRes.data)
@@ -126,7 +133,8 @@ export default function PreventivasManutencao() {
       if (asRes.data) setAssets(asRes.data)
       if (typesRes.data) setTypes(typesRes.data)
       if (prioRes.data) setPriorities(prioRes.data)
-      if (assigneesRes.data) setAssignees(assigneesRes.data)
+      if (workersRes.data) setWorkers(workersRes.data)
+      if (profilesRes.data) setLegacyProfiles(profilesRes.data)
     }
   }
 
@@ -155,6 +163,26 @@ export default function PreventivasManutencao() {
   const formAssets = useMemo(
     () => assets.filter((a) => a.plant_id === form.plant_id),
     [assets, form.plant_id],
+  )
+
+  // Manutentores cadastrados (filtrados pela planta selecionada no formulário, se houver)
+  const availableWorkers = useMemo(() => {
+    if (!form.plant_id) return workers
+    const filtered = workers.filter((w) => !w.plant_id || w.plant_id === form.plant_id)
+    return filtered.length > 0 ? filtered : workers
+  }, [workers, form.plant_id])
+
+  // Helper para resolver o nome do responsável em planos existentes
+  const getAssigneeLabel = useMemo(
+    () => (assigneeId?: string | null) => {
+      if (!assigneeId || assigneeId === 'none') return null
+      const worker = workers.find((w) => w.id === assigneeId)
+      if (worker) return worker.name
+      const legacyProfile = legacyProfiles.find((p) => p.id === assigneeId)
+      if (legacyProfile) return legacyProfile.name
+      return 'Responsável anterior'
+    },
+    [workers, legacyProfiles],
   )
 
   const handleAddChecklistItem = () => {
@@ -700,19 +728,32 @@ export default function PreventivasManutencao() {
                     </Select>
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <Label>Responsável</Label>
+                    <Label>Responsável (Manutentor)</Label>
                     <Select
                       value={form.assignee_id}
                       onValueChange={(v) => setForm({ ...form, assignee_id: v })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
+                        <SelectValue placeholder="Selecione um manutentor..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Selecione um responsável</SelectItem>
-                        {assignees.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
+                        <SelectItem value="none">Nenhum responsável</SelectItem>
+
+                        {/* Se o plano em edição foi criado com um responsável antigo (usuário/perfil legado) que não está em workers */}
+                        {form.assignee_id &&
+                          form.assignee_id !== 'none' &&
+                          !availableWorkers.some((w) => w.id === form.assignee_id) && (
+                            <SelectItem value={form.assignee_id}>
+                              {legacyProfiles.find((p) => p.id === form.assignee_id)?.name
+                                ? `${legacyProfiles.find((p) => p.id === form.assignee_id)?.name} (Usuário anterior)`
+                                : 'Responsável anterior'}
+                            </SelectItem>
+                          )}
+
+                        {availableWorkers.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name} {w.discipline ? `(${w.discipline})` : ''}{' '}
+                            {w.company ? `- ${w.company}` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -894,6 +935,15 @@ export default function PreventivasManutencao() {
                   <span className="text-gray-500">Alvo:</span>
                   <span className="font-medium truncate max-w-[150px]">
                     {plan.maintenance_assets?.name || plan.maintenance_areas?.name || 'Geral'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Responsável:</span>
+                  <span
+                    className="font-medium truncate max-w-[170px]"
+                    title={getAssigneeLabel(plan.assignee_id) || 'Não atribuído'}
+                  >
+                    {getAssigneeLabel(plan.assignee_id) || 'Não atribuído'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

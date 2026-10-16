@@ -42,6 +42,7 @@ export default function PlanejamentoManutencao() {
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
   const [assignees, setAssignees] = useState<any[]>([])
+  const [workers, setWorkers] = useState<any[]>([])
 
   const [selectedPlant, setSelectedPlant] = useState<string>('all')
   const [selectedArea, setSelectedArea] = useState<string>('all')
@@ -91,15 +92,22 @@ export default function PlanejamentoManutencao() {
     let pQ = supabase.from('plants').select('id, name').order('name')
     let aQ = supabase.from('maintenance_areas').select('id, name, plant_id').order('name')
     let assignQ = supabase.from('profiles').select('id, name, role').order('name')
+    let workersQ = supabase
+      .from('maintenance_workers')
+      .select('id, name, company, discipline, plant_id')
+      .order('name')
+
     if (clientId) {
       pQ = pQ.eq('client_id', clientId)
       aQ = aQ.eq('client_id', clientId)
       assignQ = assignQ.eq('client_id', clientId)
+      workersQ = workersQ.eq('client_id', clientId)
     }
-    const [pRes, aRes, assignRes] = await Promise.all([pQ, aQ, assignQ])
+    const [pRes, aRes, assignRes, workersRes] = await Promise.all([pQ, aQ, assignQ, workersQ])
     if (pRes.data) setPlants(pRes.data)
     if (aRes.data) setAreas(aRes.data)
     if (assignRes.data) setAssignees(assignRes.data)
+    if (workersRes.data) setWorkers(workersRes.data)
   }
 
   const loadTickets = async () => {
@@ -125,6 +133,17 @@ export default function PlanejamentoManutencao() {
     const { data } = await query
     setTickets(data || [])
     setLoading(false)
+  }
+
+  // Resolve nome do responsável (seja de profiles ou maintenance_workers)
+  const resolveTicketAssigneeName = (ticket: any) => {
+    if (ticket.assignee?.name) return ticket.assignee.name
+    if (!ticket.assignee_id) return null
+    const worker = workers.find((w) => w.id === ticket.assignee_id)
+    if (worker) return worker.name
+    const prof = assignees.find((a) => a.id === ticket.assignee_id)
+    if (prof) return prof.name
+    return null
   }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -263,8 +282,17 @@ export default function PlanejamentoManutencao() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos Manutentores</SelectItem>
+                {workers.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
                 {assignees
-                  .filter((a) => a.role === 'Manutentor' || selectedAssignee === a.id)
+                  .filter(
+                    (a) =>
+                      (a.role === 'Manutentor' || selectedAssignee === a.id) &&
+                      !workers.some((w) => w.id === a.id),
+                  )
                   .map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}
@@ -334,10 +362,10 @@ export default function PlanejamentoManutencao() {
                     <p className="text-sm line-clamp-2" title={t.description}>
                       {t.description}
                     </p>
-                    {t.assignee && (
+                    {resolveTicketAssigneeName(t) && (
                       <div className="text-[10px] text-gray-500 mt-1 truncate flex items-center gap-1">
                         <User className="w-3 h-3" />
-                        {t.assignee.name}
+                        {resolveTicketAssigneeName(t)}
                       </div>
                     )}
                   </CardContent>
@@ -409,10 +437,10 @@ export default function PlanejamentoManutencao() {
                         <p className="text-xs font-medium line-clamp-2 my-1" title={t.description}>
                           {t.description}
                         </p>
-                        {t.assignee && (
+                        {resolveTicketAssigneeName(t) && (
                           <div className="text-[10px] text-gray-500 mt-1 truncate flex items-center gap-1">
                             <User className="w-3 h-3" />
-                            {t.assignee.name}
+                            {resolveTicketAssigneeName(t)}
                           </div>
                         )}
                       </CardContent>
@@ -495,11 +523,21 @@ export default function PlanejamentoManutencao() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Sem Atribuição</SelectItem>
+                    {workers.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name} {w.discipline ? `(${w.discipline})` : ''}{' '}
+                        {w.company ? `- ${w.company}` : ''}
+                      </SelectItem>
+                    ))}
                     {assignees
-                      .filter((a) => a.role === 'Manutentor' || editForm.assignee_id === a.id)
+                      .filter(
+                        (a) =>
+                          (a.role === 'Manutentor' || editForm.assignee_id === a.id) &&
+                          !workers.some((w) => w.id === a.id),
+                      )
                       .map((a) => (
                         <SelectItem key={a.id} value={a.id}>
-                          {a.name}
+                          {a.name} (Usuário anterior)
                         </SelectItem>
                       ))}
                   </SelectContent>
