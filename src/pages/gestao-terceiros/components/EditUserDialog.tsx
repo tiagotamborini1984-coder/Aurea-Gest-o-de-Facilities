@@ -34,11 +34,24 @@ const MAIN_MENUS = [
   'Gestão de Budget',
   'Gestão de Acidentes',
   'Gestão da Manutenção',
+  'Gestão de Manutenção',
+  'Gestão de Chamados',
   'Gestão de Estoque',
   'Gestão de EPIs',
   'Gestão de Férias',
   'Pesquisa de Satisfação',
 ]
+
+const MAINTENANCE_MODULE_VARIATIONS = [
+  'Gestão da Manutenção',
+  'Gestão de Manutenção',
+  'Gestão de Chamados',
+]
+
+const isMaintenanceModule = (mod?: string | null): boolean => {
+  if (!mod) return false
+  return MAINTENANCE_MODULE_VARIATIONS.includes(mod)
+}
 
 const GESTAO_TERCEIROS_SUBMENUS = [
   'Dashboard do Gestor',
@@ -254,11 +267,39 @@ export function EditUserDialog({
         return { ...p, accessible_menus: next }
       }
 
-      if (menu.startsWith('Gestão da Manutenção:') && next.includes('Gestão da Manutenção')) {
-        next = next.filter((m) => m !== 'Gestão da Manutenção')
+      if (
+        (menu.startsWith('Gestão da Manutenção:') ||
+          menu.startsWith('Gestão de Manutenção:') ||
+          menu.startsWith('Gestão de Chamados:')) &&
+        next.some((m) => isMaintenanceModule(m))
+      ) {
+        next = next.filter((m) => !isMaintenanceModule(m))
         MANUTENCAO_SUBMENUS.forEach((sub) => {
           if (`Gestão da Manutenção:${sub}` !== menu) next.push(`Gestão da Manutenção:${sub}`)
         })
+        return { ...p, accessible_menus: next }
+      }
+
+      if (isMaintenanceModule(menu)) {
+        const currentlyHas = next.some((m) => isMaintenanceModule(m))
+        if (currentlyHas) {
+          next = next.filter(
+            (m) =>
+              !isMaintenanceModule(m) &&
+              !m.startsWith('Gestão da Manutenção:') &&
+              !m.startsWith('Gestão de Manutenção:') &&
+              !m.startsWith('Gestão de Chamados:'),
+          )
+        } else {
+          // Remove submenus redundantes e inclui a variação
+          next = next.filter(
+            (m) =>
+              !m.startsWith('Gestão da Manutenção:') &&
+              !m.startsWith('Gestão de Manutenção:') &&
+              !m.startsWith('Gestão de Chamados:'),
+          )
+          next.push(menu)
+        }
         return { ...p, accessible_menus: next }
       }
 
@@ -376,16 +417,21 @@ export function EditUserDialog({
               <div>
                 <Label className="mb-2 block">Menus Principais Acessíveis</Label>
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
-                  {MAIN_MENUS.map((menu) => (
-                    <Badge
-                      key={menu}
-                      variant={form.accessible_menus.includes(menu) ? 'default' : 'outline'}
-                      className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(menu) ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
-                      onClick={() => toggleMenu(menu)}
-                    >
-                      {menu}
-                    </Badge>
-                  ))}
+                  {MAIN_MENUS.map((menu) => {
+                    const isSelected = isMaintenanceModule(menu)
+                      ? form.accessible_menus.some((m) => isMaintenanceModule(m))
+                      : form.accessible_menus.includes(menu)
+                    return (
+                      <Badge
+                        key={menu}
+                        variant={isSelected ? 'default' : 'outline'}
+                        className={`cursor-pointer hover:bg-slate-200 ${isSelected ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        onClick={() => toggleMenu(menu)}
+                      >
+                        {menu}
+                      </Badge>
+                    )
+                  })}
                 </div>
               </div>
               <div>
@@ -557,16 +603,16 @@ export function EditUserDialog({
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-md border border-slate-100">
                   {MANUTENCAO_SUBMENUS.map((menu) => {
                     const key = `Gestão da Manutenção:${menu}`
+                    const isChecked =
+                      form.accessible_menus.includes(key) ||
+                      form.accessible_menus.includes(`Gestão de Manutenção:${menu}`) ||
+                      form.accessible_menus.includes(`Gestão de Chamados:${menu}`) ||
+                      form.accessible_menus.some((m) => isMaintenanceModule(m))
                     return (
                       <Badge
                         key={key}
-                        variant={
-                          form.accessible_menus.includes(key) ||
-                          form.accessible_menus.includes('Gestão da Manutenção')
-                            ? 'default'
-                            : 'outline'
-                        }
-                        className={`cursor-pointer hover:bg-slate-200 ${form.accessible_menus.includes(key) || form.accessible_menus.includes('Gestão da Manutenção') ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
+                        variant={isChecked ? 'default' : 'outline'}
+                        className={`cursor-pointer hover:bg-slate-200 ${isChecked ? 'bg-brand-vividBlue text-white hover:bg-brand-vividBlue/90' : ''}`}
                         onClick={() => toggleMenu(key)}
                       >
                         {menu}

@@ -46,6 +46,58 @@ export function useHasAccess(menuName: string) {
     return true
   }
 
+  // Equivalência para variações de Gestão da Manutenção / Gestão de Manutenção / Gestão de Chamados
+  const MAINTENANCE_MODULE_VARIATIONS = [
+    'Gestão da Manutenção',
+    'Gestão de Manutenção',
+    'Gestão de Chamados',
+  ]
+  const userHasMaintenanceModule = userMenus.some(
+    (m) =>
+      MAINTENANCE_MODULE_VARIATIONS.includes(m) ||
+      m.startsWith('Gestão da Manutenção:') ||
+      m.startsWith('Gestão de Manutenção:') ||
+      m.startsWith('Gestão de Chamados:'),
+  )
+
+  if (MAINTENANCE_MODULE_VARIATIONS.includes(menuName)) {
+    if (userHasMaintenanceModule) {
+      return true
+    }
+  }
+
+  if (
+    menuName.startsWith('Gestão da Manutenção:') ||
+    menuName.startsWith('Gestão de Manutenção:') ||
+    menuName.startsWith('Gestão de Chamados:')
+  ) {
+    if (userMenus.some((m) => MAINTENANCE_MODULE_VARIATIONS.includes(m))) {
+      return true
+    }
+    const sub = menuName.split(':')[1]
+    if (
+      userMenus.includes(`Gestão da Manutenção:${sub}`) ||
+      userMenus.includes(`Gestão de Manutenção:${sub}`) ||
+      userMenus.includes(`Gestão de Chamados:${sub}`) ||
+      userMenus.includes(sub)
+    ) {
+      return true
+    }
+  }
+
+  // Submenu 'Painel de Chamados' chamado isoladamente
+  if (menuName === 'Painel de Chamados') {
+    if (
+      userHasMaintenanceModule ||
+      userMenus.includes('Painel de Chamados') ||
+      userMenus.includes('Gestão da Manutenção:Painel de Chamados') ||
+      userMenus.includes('Gestão de Manutenção:Painel de Chamados') ||
+      userMenus.includes('Gestão de Chamados:Painel de Chamados')
+    ) {
+      return true
+    }
+  }
+
   // legacy mapping for Gestão de Terceiros submenus
   if (menuName.startsWith('Gestão de Terceiros:')) {
     const subName = menuName.split(':')[1]

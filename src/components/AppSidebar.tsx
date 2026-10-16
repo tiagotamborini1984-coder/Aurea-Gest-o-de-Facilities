@@ -291,7 +291,19 @@ export function AppSidebar() {
             item.title !== 'Gestão de Imóveis' &&
             item.title !== 'Gestão de Férias'
           ) {
-            const hasModule = activeClient?.modules?.includes(item.title)
+            const MAINTENANCE_VARIATIONS = [
+              'Gestão da Manutenção',
+              'Gestão de Manutenção',
+              'Gestão de Chamados',
+            ]
+            let hasModule = false
+            if (MAINTENANCE_VARIATIONS.includes(item.title)) {
+              hasModule =
+                activeClient?.modules?.some((m: string) => MAINTENANCE_VARIATIONS.includes(m)) ||
+                false
+            } else {
+              hasModule = activeClient?.modules?.includes(item.title) || false
+            }
             if (!hasModule) return null
           }
 
@@ -403,10 +415,20 @@ export function AppSidebar() {
             } else if (item.title === 'Gestão de Férias') {
               filteredSubItems = userMenus.includes('Gestão de Férias') ? item.subItems : []
             } else if (item.title === 'Gestão da Manutenção') {
+              const MAINTENANCE_VARIATIONS = [
+                'Gestão da Manutenção',
+                'Gestão de Manutenção',
+                'Gestão de Chamados',
+              ]
+              const hasMainMod = userMenus.some((m: string) => MAINTENANCE_VARIATIONS.includes(m))
               filteredSubItems = item.subItems.filter(
                 (sub) =>
+                  hasMainMod ||
                   userMenus.includes('Gestão da Manutenção') ||
-                  userMenus.includes(`Gestão da Manutenção:${sub.title}`),
+                  userMenus.includes(`Gestão da Manutenção:${sub.title}`) ||
+                  userMenus.includes(`Gestão de Manutenção:${sub.title}`) ||
+                  userMenus.includes(`Gestão de Chamados:${sub.title}`) ||
+                  (sub.title === 'Painel de Chamados' && userMenus.includes('Painel de Chamados')),
               )
             } else if (item.title === 'Gestão de Acidentes') {
               filteredSubItems = item.subItems.filter(

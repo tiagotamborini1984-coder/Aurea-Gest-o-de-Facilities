@@ -29,7 +29,9 @@ const ALL_MODULES = [
   'Organograma e Fluxos',
   'Gestão de Acidentes',
   'Gestão de Budget',
+  'Gestão da Manutenção',
   'Gestão de Manutenção',
+  'Gestão de Chamados',
   'Gestão de Documentos',
   'Gestão de Lockers',
   'Gestão de Imóveis',
@@ -41,6 +43,17 @@ const ALL_MODULES = [
   'Pesquisa de Satisfação',
   'BI',
 ]
+
+export const MAINTENANCE_MODULE_VARIATIONS = [
+  'Gestão da Manutenção',
+  'Gestão de Manutenção',
+  'Gestão de Chamados',
+]
+
+export const isMaintenanceModule = (mod?: string | null): boolean => {
+  if (!mod) return false
+  return MAINTENANCE_MODULE_VARIATIONS.includes(mod)
+}
 
 export default function Usuarios() {
   const { profile, selectedMasterClient } = useAppStore()
@@ -261,7 +274,9 @@ export default function Usuarios() {
       accModules = form.accessible_menus.filter((m: string) => ALL_MODULES.includes(m))
       accMenus = form.accessible_menus.filter((m: string) => ALL_MENUS.includes(m))
     } else if (form.accessible_menus && typeof form.accessible_menus === 'object') {
-      accModules = form.accessible_menus.modules || []
+      accModules = (form.accessible_menus.modules || []).filter((m: string) =>
+        ALL_MODULES.includes(m),
+      )
       accMenus = form.accessible_menus.menus || []
     }
 
@@ -285,12 +300,32 @@ export default function Usuarios() {
       }
     }
 
+    const isModuleSelected = (mod: string) => {
+      if (isMaintenanceModule(mod)) {
+        return accModules.some((m) => isMaintenanceModule(m))
+      }
+      return accModules.includes(mod)
+    }
+
     const toggleModule = (mod: string) => {
       let newModules = [...accModules]
-      if (newModules.includes(mod)) {
-        newModules = newModules.filter((m) => m !== mod)
+      if (isMaintenanceModule(mod)) {
+        const currentlyHas = newModules.some((m) => isMaintenanceModule(m))
+        if (currentlyHas) {
+          newModules = newModules.filter((m) => !isMaintenanceModule(m))
+        } else {
+          // Usar o nome exato cadastrado no cliente se existir entre as variações,
+          // senão o próprio mod selecionado
+          const clientMaintenanceMod = availableModules.find((m) => isMaintenanceModule(m))
+          const modToSave = clientMaintenanceMod || mod
+          newModules.push(modToSave)
+        }
       } else {
-        newModules.push(mod)
+        if (newModules.includes(mod)) {
+          newModules = newModules.filter((m) => m !== mod)
+        } else {
+          newModules.push(mod)
+        }
       }
       setForm({ ...form, accessible_menus: [...newModules, ...accMenus] })
     }
@@ -361,14 +396,14 @@ export default function Usuarios() {
               <div key={m} className="flex items-center space-x-2">
                 <Checkbox
                   id={`mod-${m}`}
-                  checked={accModules.includes(m)}
+                  checked={isModuleSelected(m)}
                   onCheckedChange={() => toggleModule(m)}
                 />
                 <Label
                   htmlFor={`mod-${m}`}
                   className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  {m}
+                  {isMaintenanceModule(m) ? `${m} (Gestão de Chamados)` : m}
                 </Label>
               </div>
             ))}

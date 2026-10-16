@@ -47,6 +47,12 @@ const routeMenuMap: Record<string, string> = {
   '/organograma/fluxogramas': 'Organograma e Fluxos:Fluxogramas',
   '/pesquisa-satisfacao': 'Pesquisa de Satisfação',
   '/pesquisa-satisfacao/dashboard': 'Pesquisa de Satisfação',
+  '/gestao-manutencao/chamados': 'Gestão da Manutenção:Painel de Chamados',
+  '/gestao-manutencao/dashboard': 'Gestão da Manutenção:Dashboard',
+  '/gestao-manutencao/planejamento': 'Gestão da Manutenção:Planejamento (Agenda)',
+  '/gestao-manutencao/preventivas': 'Gestão da Manutenção:Manutenção Preventiva',
+  '/gestao-manutencao/cadastros': 'Gestão da Manutenção:Cadastros',
+  '/gestao-manutencao': 'Gestão da Manutenção',
 }
 
 const moduleRouteMap: Record<string, string> = {
@@ -54,7 +60,14 @@ const moduleRouteMap: Record<string, string> = {
   '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-epis': 'Gestão de EPIs',
   '/pesquisa-satisfacao': 'Pesquisa de Satisfação',
+  '/gestao-manutencao': 'Gestão da Manutenção',
 }
+
+const MAINTENANCE_VARIATIONS = [
+  'Gestão da Manutenção',
+  'Gestão de Manutenção',
+  'Gestão de Chamados',
+]
 
 export function AccessGuard() {
   const location = useLocation()
@@ -63,22 +76,29 @@ export function AccessGuard() {
   const getBasePath = (path: string) => {
     if (path.startsWith('/gestao-terceiros/cadastros')) return 'Cadastros'
 
-    const exactMatch = Object.keys(routeMenuMap).find((r) => path === r || path.startsWith(r + '/'))
+    // Priorizar matches mais longos e exatos primeiro
+    const sortedKeys = Object.keys(routeMenuMap).sort((a, b) => b.length - a.length)
+    const exactMatch = sortedKeys.find((r) => path === r || path.startsWith(r + '/'))
     return exactMatch ? routeMenuMap[exactMatch] : null
   }
 
   const menuName = getBasePath(location.pathname)
   const hasAccess = useHasAccess(menuName || '')
 
-  const requiredModule = Object.keys(moduleRouteMap).find(
+  const sortedModuleKeys = Object.keys(moduleRouteMap).sort((a, b) => b.length - a.length)
+  const requiredModule = sortedModuleKeys.find(
     (r) => location.pathname === r || location.pathname.startsWith(r + '/'),
   )
 
-  if (
-    requiredModule &&
-    activeClient &&
-    !activeClient.modules?.includes(moduleRouteMap[requiredModule])
-  ) {
+  const hasClientModule = (targetModule: string) => {
+    if (!activeClient?.modules) return true
+    if (MAINTENANCE_VARIATIONS.includes(targetModule)) {
+      return activeClient.modules.some((m) => MAINTENANCE_VARIATIONS.includes(m))
+    }
+    return activeClient.modules.includes(targetModule)
+  }
+
+  if (requiredModule && activeClient && !hasClientModule(moduleRouteMap[requiredModule])) {
     return <ModuleAccessDenied />
   }
 
