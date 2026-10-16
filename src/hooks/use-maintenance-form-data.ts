@@ -18,7 +18,7 @@ export function useMaintenanceFormData(clientId: string | null) {
     }
     let mounted = true
     setLoading(true)
-    Promise.all([
+    Promise.allSettled([
       supabase
         .from('plants')
         .select('id, name, code, city')
@@ -42,10 +42,10 @@ export function useMaintenanceFormData(clientId: string | null) {
     ])
       .then(([p, a, l, s]) => {
         if (!mounted) return
-        setPlants(p.data || [])
-        setAllAreas(a.data || [])
-        setAllLocations(l.data || [])
-        setAllSublocations(s.data || [])
+        if (p.status === 'fulfilled') setPlants(p.value.data || [])
+        if (a.status === 'fulfilled') setAllAreas(a.value.data || [])
+        if (l.status === 'fulfilled') setAllLocations(l.value.data || [])
+        if (s.status === 'fulfilled') setAllSublocations(s.value.data || [])
       })
       .catch(() => {
         if (!mounted) return
@@ -80,6 +80,8 @@ export function useMaintenanceFormData(clientId: string | null) {
 
   return {
     plants,
+    allAreas,
+    allSublocations,
     getAreasForPlant,
     getLocationsForPlant,
     getSublocationsForLocation,

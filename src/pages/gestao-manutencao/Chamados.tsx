@@ -1163,7 +1163,9 @@ export default function ChamadosManutencao() {
                         <div className="flex items-center gap-1.5">
                           <MapPin className="h-3 w-3" />
                           <span className="truncate">
-                            {ticket.area?.name || ticket.plant?.name || 'Sem local'}
+                            {ticket.area?.name
+                              ? `${ticket.area.name}${ticket.sublocation?.name ? ` > ${ticket.sublocation.name}` : ''}`
+                              : ticket.plant?.name || 'Sem local'}
                           </span>
                         </div>
 
@@ -1334,6 +1336,26 @@ export default function ChamadosManutencao() {
                     {new Date(
                       selectedTicket.reported_at || selectedTicket.created_at,
                     ).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+              )}
+
+              {(selectedTicket.area?.name || selectedTicket.sublocation?.name) && (
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <Label className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-1 block">
+                    Localização
+                  </Label>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-brand-vividBlue flex-shrink-0" />
+                    <span>
+                      {selectedTicket.area?.name || 'Sem área'}
+                      {selectedTicket.sublocation?.name && (
+                        <span className="text-muted-foreground">
+                          {' '}
+                          &gt; {selectedTicket.sublocation.name}
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </div>
               )}

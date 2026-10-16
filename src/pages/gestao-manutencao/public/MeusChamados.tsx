@@ -77,6 +77,7 @@ export default function MeusChamadosPublico() {
         `id, ticket_number, description, created_at, photos, planned_start,
         status:maintenance_statuses(id, name, color, step),
         area:maintenance_areas(name),
+        subarea:maintenance_sublocations(name),
         plant:plants(name),
         assignee:profiles!maintenance_tickets_assignee_id_fkey(name)`,
       )
@@ -223,6 +224,7 @@ export default function MeusChamadosPublico() {
                       {t.area && (
                         <span className="text-xs text-slate-500 flex items-center gap-1">
                           <MapPin className="h-3.5 w-3.5" /> {t.area.name}
+                          {t.subarea?.name && ` > ${t.subarea.name}`}
                         </span>
                       )}
                       <span className="text-xs text-slate-500 flex items-center gap-1">

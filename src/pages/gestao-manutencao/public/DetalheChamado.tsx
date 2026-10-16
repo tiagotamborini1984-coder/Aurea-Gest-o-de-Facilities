@@ -54,6 +54,7 @@ export default function DetalheChamadoPublico() {
         `*,
         status:maintenance_statuses(id, name, color, step),
         area:maintenance_areas(name),
+        subarea:maintenance_sublocations(name),
         plant:plants(name),
         priority:maintenance_priorities(name, color),
         type:maintenance_types(name, color),
@@ -164,6 +165,13 @@ export default function DetalheChamadoPublico() {
                   icon={<Wrench className="h-4 w-4" />}
                   label="Área"
                   value={ticket.area.name}
+                />
+              )}
+              {ticket.subarea?.name && (
+                <InfoItem
+                  icon={<Wrench className="h-4 w-4" />}
+                  label="Subárea"
+                  value={ticket.subarea.name}
                 />
               )}
               <InfoItem

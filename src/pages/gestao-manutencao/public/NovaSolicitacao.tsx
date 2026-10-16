@@ -96,8 +96,7 @@ export default function NovaSolicitacaoPublica() {
   const [files, setFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const { plants, getAreasForPlant, getSubareasForArea } =
-    useMaintenanceFormData(clientId)
+  const { plants, getAreasForPlant, getSubareasForArea } = useMaintenanceFormData(clientId)
 
   const areas = useMemo(
     () => (form.plant_id ? getAreasForPlant(form.plant_id) : []),

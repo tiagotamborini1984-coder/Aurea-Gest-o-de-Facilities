@@ -28,6 +28,7 @@ const esc = (s: string | null | undefined): string =>
 export async function generateTicketPdf(ticket: any, logs: LogEntry[]): Promise<void> {
   const plantName = ticket.plant?.name || '—'
   const areaName = ticket.area?.name || '—'
+  const subareaName = ticket.sublocation?.name || ticket.subarea?.name || '—'
   const assetName = ticket.asset?.name || '—'
   const priorityName = ticket.priority?.name || '—'
   const typeName = ticket.type?.name || '—'
@@ -85,6 +86,7 @@ tr:nth-child(even){background:#f8fafc}
 <h2>Dados de Abertura</h2>
 <div class="info-grid">
 <div class="info-item"><span class="info-label">Area:</span><span class="info-value">${esc(areaName)}</span></div>
+<div class="info-item"><span class="info-label">Subarea:</span><span class="info-value">${esc(subareaName)}</span></div>
 <div class="info-item"><span class="info-label">Ativo/Equipamento:</span><span class="info-value">${esc(assetName)}</span></div>
 <div class="info-item"><span class="info-label">Prioridade:</span><span class="info-value">${esc(priorityName)}</span></div>
 <div class="info-item"><span class="info-label">Tipo:</span><span class="info-value">${esc(typeName)}</span></div>
