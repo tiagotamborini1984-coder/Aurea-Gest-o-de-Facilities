@@ -70,6 +70,20 @@ export function useMaintenanceFormData(clientId: string | null) {
     () => (locationId: string) => allSublocations.filter((s) => s.location_id === locationId),
     [allSublocations],
   )
+  const getSubareasForArea = useMemo(
+    () => (areaId: string) =>
+      allSublocations
+        .filter((s) => s.area_id === areaId)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [allSublocations],
+  )
 
-  return { plants, getAreasForPlant, getLocationsForPlant, getSublocationsForLocation, loading }
+  return {
+    plants,
+    getAreasForPlant,
+    getLocationsForPlant,
+    getSublocationsForLocation,
+    getSubareasForArea,
+    loading,
+  }
 }

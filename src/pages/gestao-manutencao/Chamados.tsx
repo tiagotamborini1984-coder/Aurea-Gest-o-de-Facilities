@@ -887,14 +887,22 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Sublocal</Label>
+                  <Label>Subárea</Label>
                   <Select
                     disabled={!form.area_id}
                     value={form.sublocation_id}
                     onValueChange={(v) => setForm({ ...form, sublocation_id: v, asset_id: '' })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
+                      <SelectValue
+                        placeholder={
+                          !form.area_id
+                            ? 'Selecione uma área primeiro...'
+                            : formSublocations.length === 0
+                              ? 'Nenhuma subárea disponível'
+                              : 'Selecione...'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {formSublocations.map((s) => (
@@ -1479,7 +1487,7 @@ export default function ChamadosManutencao() {
                   </Select>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <Label className="text-muted-foreground">Sublocal</Label>
+                  <Label className="text-muted-foreground">Subárea</Label>
                   <Select
                     value={editForm.sublocation_id}
                     onValueChange={(v) =>
@@ -1488,10 +1496,10 @@ export default function ChamadosManutencao() {
                     disabled={editForm.area_id === 'none'}
                   >
                     <SelectTrigger className="mt-1 h-8 text-xs">
-                      <SelectValue placeholder="Selecione o Sublocal" />
+                      <SelectValue placeholder="Selecione a Subárea" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="none">Nenhuma</SelectItem>
                       {editFormSublocations.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
                           {s.name}
