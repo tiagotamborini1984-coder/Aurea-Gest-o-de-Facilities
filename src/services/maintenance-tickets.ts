@@ -61,9 +61,60 @@ export async function updateTicket(
   return data
 }
 
+function extractStoragePath(url: string, bucket: string): string | null {
+  if (!url || typeof url !== 'string') return null
+  const marker = `/${bucket}/`
+  const idx = url.indexOf(marker)
+  if (idx === -1) return null
+  const pathWithParams = url.substring(idx + marker.length)
+  return pathWithParams.split('?')[0] || null
+}
+
 export async function deleteTicket(id: string): Promise<void> {
+  // 1. Fetch ticket to find photos/closure_photos to clean up storage
+  const { data: ticket } = await supabase
+    .from('maintenance_tickets')
+    .select('id, photos, closure_photos')
+    .eq('id', id)
+    .maybeSingle()
+
+  // 2. Unlink any corrective tickets spawned from this ticket as parent_ticket_id
+  await supabase
+    .from('maintenance_tickets')
+    .update({ parent_ticket_id: null })
+    .eq('parent_ticket_id', id)
+
+  // 3. Delete ticket logs explicitly (even if CASCADE is configured, ensures no FK constraint block)
+  await supabase.from('maintenance_ticket_logs').delete().eq('ticket_id', id)
+
+  // 4. Delete the ticket itself
   const { error } = await supabase.from('maintenance_tickets').delete().eq('id', id)
+
   if (error) throw error
+
+  // 5. Clean up attached storage files best-effort if available
+  try {
+    const filePaths: string[] = []
+    const collectPaths = (raw: unknown) => {
+      if (Array.isArray(raw)) {
+        for (const item of raw) {
+          if (typeof item === 'string') {
+            const p = extractStoragePath(item, 'maintenance_attachments')
+            if (p) filePaths.push(p)
+          }
+        }
+      }
+    }
+    if (ticket) {
+      collectPaths(ticket.photos)
+      collectPaths(ticket.closure_photos)
+    }
+    if (filePaths.length > 0) {
+      await supabase.storage.from('maintenance_attachments').remove(filePaths)
+    }
+  } catch (storageErr) {
+    console.warn('Não foi possível remover anexos de armazenamento da OS:', storageErr)
+  }
 }
 
 export async function importTickets(

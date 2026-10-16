@@ -17,6 +17,7 @@ import {
   UploadCloud,
   FileText,
   History,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -27,6 +28,17 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
@@ -44,6 +56,7 @@ import { useAppStore } from '@/store/AppContext'
 import { ImportTicketsDialog } from '@/components/gestao-manutencao/ImportTicketsDialog'
 import { TicketLogModal } from '@/components/gestao-manutencao/TicketLogModal'
 import { generateTicketPdf } from '@/components/gestao-manutencao/generate-ticket-pdf'
+import { deleteTicket } from '@/services/maintenance-tickets'
 import { getReadableTextColor } from '@/lib/contrast-utils'
 
 const toLocalDatetime = (utcStr: string | null) => {
@@ -121,7 +134,7 @@ export default function ChamadosManutencao() {
   const [open, setOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const { user } = useAuth()
-  const { activeClient } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const [submitting, setSubmitting] = useState(false)
 
   const [plants, setPlants] = useState<any[]>([])
@@ -181,12 +194,18 @@ export default function ChamadosManutencao() {
   const [userRole, setUserRole] = useState<string>('')
   const [logModalOpen, setLogModalOpen] = useState(false)
 
-  const isAdmin = ['Master', 'Admin', 'Administrador'].includes(userRole)
+  // Somente perfil ADM Master pode excluir OS definitivamente
+  const effectiveRole = profile?.role || userRole
+  const isMaster = effectiveRole === 'Master'
+  const isAdmin = ['Master', 'Admin', 'Administrador'].includes(effectiveRole)
   const isTicketFinalized =
     selectedTicket?.status?.is_terminal || selectedTicket?.status?.step === 'Concluído'
   const canEditTicket = !isTicketFinalized || isAdmin
   const [logTicketId, setLogTicketId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+
+  const [ticketToDelete, setTicketToDelete] = useState<any>(null)
+  const [deletingTicket, setDeletingTicket] = useState(false)
 
   const closureErrors = closureTicket
     ? validateTicketForClosure({
@@ -744,6 +763,34 @@ export default function ChamadosManutencao() {
     }
   }
 
+  const handleDeleteTicket = async () => {
+    if (!ticketToDelete) return
+    if (!isMaster) {
+      toast.error('Apenas o ADM master possui permissão para excluir ordens de serviço.')
+      return
+    }
+
+    const ticketId = ticketToDelete.id
+    const ticketNumber = ticketToDelete.ticket_number || 'OS'
+
+    setDeletingTicket(true)
+    try {
+      await deleteTicket(ticketId)
+      // Atualiza listagem imediatamente sem recarregar a página
+      setTickets((prev) => prev.filter((t) => t.id !== ticketId))
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket(null)
+      }
+      setTicketToDelete(null)
+      toast.success(`Ordem de serviço ${ticketNumber} excluída definitivamente com sucesso!`)
+    } catch (err: any) {
+      console.error('Erro ao excluir OS:', err)
+      toast.error(err.message || 'Erro ao excluir ordem de serviço.')
+    } finally {
+      setDeletingTicket(false)
+    }
+  }
+
   const columns = ['Aberto', 'Planejado', 'Em Execução', 'Concluído']
 
   return (
@@ -1186,6 +1233,30 @@ export default function ChamadosManutencao() {
                           {ticket.closure_notes}
                         </div>
                       )}
+
+                      {isMaster && (
+                        <div className="pt-2 border-t border-border flex justify-end">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setTicketToDelete(ticket)
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                Excluir OS
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Excluir OS definitivamente (Apenas ADM Master)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -1588,22 +1659,43 @@ export default function ChamadosManutencao() {
                 )}
 
                 {canEditTicket && (
-                  <div className="col-span-2 mt-4 flex gap-2">
-                    <Button
-                      onClick={handleUpdateTicket}
-                      disabled={updating}
-                      className="flex-1 bg-brand-vividBlue text-sm h-10"
-                    >
-                      {updating ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                    {!isTicketFinalized && (
+                  <div className="col-span-2 mt-4 flex flex-col gap-2">
+                    <div className="flex gap-2">
                       <Button
-                        onClick={() => handleOpenClosure(selectedTicket)}
-                        variant="outline"
-                        className="text-sm h-10 border-green-600 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-950/40"
+                        onClick={handleUpdateTicket}
+                        disabled={updating}
+                        className="flex-1 bg-brand-vividBlue text-sm h-10"
                       >
-                        Finalizar OS
+                        {updating ? 'Salvando...' : 'Salvar Alterações'}
                       </Button>
+                      {!isTicketFinalized && (
+                        <Button
+                          onClick={() => handleOpenClosure(selectedTicket)}
+                          variant="outline"
+                          className="text-sm h-10 border-green-600 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-950/40"
+                        >
+                          Finalizar OS
+                        </Button>
+                      )}
+                    </div>
+
+                    {isMaster && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="w-full text-sm h-10 bg-red-600 hover:bg-red-700"
+                            onClick={() => setTicketToDelete(selectedTicket)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir OS Definitivamente
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Exclusão definitiva disponível apenas para ADM Master</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 )}
@@ -1808,6 +1900,45 @@ export default function ChamadosManutencao() {
       </Dialog>
 
       <TicketLogModal open={logModalOpen} onOpenChange={setLogModalOpen} ticketId={logTicketId} />
+
+      <AlertDialog
+        open={!!ticketToDelete}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !deletingTicket) {
+            setTicketToDelete(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Excluir Ordem de Serviço Definitivamente?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-sm">
+              <span>
+                Você está prestes a excluir a OS{' '}
+                <strong className="text-foreground">{ticketToDelete?.ticket_number}</strong> de
+                forma definitiva do sistema.
+              </span>
+              <span className="block text-destructive font-medium">
+                Esta ação é irreversível e não pode ser desfeita. Todos os históricos, logs e fotos
+                vinculados a esta OS serão apagados permanentemente.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingTicket}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTicket}
+              disabled={deletingTicket}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deletingTicket ? 'Excluindo...' : 'Sim, Excluir OS'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
