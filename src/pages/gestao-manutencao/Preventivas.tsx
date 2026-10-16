@@ -11,6 +11,8 @@ import {
   Sparkles,
   Bot,
   CheckCircle2,
+  Play,
+  ClipboardList,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -61,6 +63,7 @@ export default function PreventivasManutencao() {
   const [form, setForm] = useState(initialForm)
 
   const [checklist, setChecklist] = useState<{ id: string; description: string }[]>([])
+  const [generatingTickets, setGeneratingTickets] = useState(false)
 
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPlantId, setAiPlantId] = useState('')
@@ -162,6 +165,55 @@ export default function PreventivasManutencao() {
 
   const handleChecklistChange = (id: string, value: string) => {
     setChecklist(checklist.map((item) => (item.id === id ? { ...item, description: value } : item)))
+  }
+
+  const handleGenerateTicketsNow = async () => {
+    setGeneratingTickets(true)
+    try {
+      const clientId = activeClient?.id || profile?.client_id || null
+
+      // Invoca a RPC do banco ou a Edge Function
+      const { data, error } = await (supabase.rpc as any)(
+        'generate_preventive_maintenance_tickets',
+        {
+          p_client_id: clientId,
+          p_plan_id: null,
+        },
+      )
+
+      if (error) {
+        // Fallback para Edge Function se RPC falhar
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke(
+          'process-preventive-maintenance',
+          { body: { client_id: clientId } },
+        )
+        if (edgeError) throw edgeError
+        const count = (edgeData as any)?.generatedCount ?? 0
+        if (count > 0) {
+          toast.success(`${count} Ordem(ns) de Serviço preventiva(s) gerada(s) com sucesso!`)
+        } else {
+          toast.info(
+            'Todos os planos preventivos já estão em dia. Nenhuma OS pendente para gerar hoje.',
+          )
+        }
+      } else {
+        const res = data as any
+        const count = res?.generated_count ?? 0
+        if (count > 0) {
+          toast.success(`${count} Ordem(ns) de Serviço preventiva(s) gerada(s) com sucesso!`)
+        } else {
+          toast.info(
+            'Todos os planos preventivos já estão em dia. Nenhuma OS pendente para gerar hoje.',
+          )
+        }
+      }
+
+      await loadPlans()
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao processar preventivas')
+    } finally {
+      setGeneratingTickets(false)
+    }
   }
 
   const handleAnalyzeAI = async () => {
@@ -375,11 +427,26 @@ export default function PreventivasManutencao() {
             Planos de Preventiva
           </h1>
           <p className="text-gray-500 mt-1">
-            Configure preventivas e associe checklists de execução.
+            Configure preventivas e acompanhe a geração automática de Ordens de Serviço.
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleGenerateTicketsNow}
+            disabled={generatingTickets || loading}
+            className="border-blue-200 text-brand-vividBlue hover:bg-blue-50 bg-white"
+            title="Verifica todos os planos preventivos ativos e gera OS imediatas para os planos no período de vencimento"
+          >
+            {generatingTickets ? (
+              <RefreshCcw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            {generatingTickets ? 'Gerando OS...' : 'Gerar OS Agora'}
+          </Button>
+
           <Sheet open={aiOpen} onOpenChange={setAiOpen}>
             <SheetTrigger asChild>
               <Button
@@ -790,8 +857,19 @@ export default function PreventivasManutencao() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Início:</span>
                   <span className="font-medium flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
+                    <Calendar className="h-3 w-3 text-gray-400" />
                     {new Date(plan.start_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Última OS Gerada:</span>
+                  <span className="font-medium flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3 text-gray-400" />
+                    {plan.last_generated_date
+                      ? new Date(plan.last_generated_date).toLocaleDateString('pt-BR', {
+                          timeZone: 'UTC',
+                        })
+                      : 'Nenhuma ainda'}
                   </span>
                 </div>
               </CardContent>
