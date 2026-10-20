@@ -69,7 +69,9 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
             .eq('client_id', activeClient.id),
           supabase
             .from('employee_training_records')
-            .select('id, employee_id, training_id, completion_date, document_url')
+            .select(
+              'id, employee_id, training_id, completion_date, document_url, verification_status',
+            )
             .eq('client_id', activeClient.id),
         ])
 
