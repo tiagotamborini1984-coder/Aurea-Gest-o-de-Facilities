@@ -86,6 +86,7 @@ export const cloneAudit = async (auditId: string, userId: string) => {
       order_index: a.order_index,
       evidence_required: a.evidence_required,
       comments_required: a.comments_required,
+      category_id: a.category_id || null,
     }))
     const { error: actionsError } = await supabase.from('audit_actions').insert(clonedActions)
     if (actionsError) throw actionsError
@@ -190,6 +191,7 @@ export const saveAuditConfig = async ({
         comments_required: a.comments_required || false,
         weight: a.weight ?? 1,
         order_index: a.order_index ?? 0,
+        category_id: a.category_id || null,
       }
     })
 

@@ -15,8 +15,13 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { ArrowLeft, Plus, Trash2, Save, Send } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Send, Tag } from 'lucide-react'
 import { AuditDiagnostic } from '@/pages/auditoria-checklist/components/AuditDiagnostic'
+import {
+  AuditQuestionCategory,
+  auditCategoryService,
+} from '@/services/audit-categories'
+import { AuditCategoryManagerDialog } from './components/AuditCategoryManagerDialog'
 
 export default function AuditoriaConfig() {
   const { id } = useParams()
@@ -25,6 +30,8 @@ export default function AuditoriaConfig() {
   const [clientId, setClientId] = useState('')
   const [plants, setPlants] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [categories, setCategories] = useState<AuditQuestionCategory[]>([])
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
 
   const [title, setTitle] = useState('')
   const [type, setType] = useState('Geral')
@@ -60,12 +67,14 @@ export default function AuditoriaConfig() {
       if (!profile?.client_id) return
 
       setClientId(profile.client_id)
-      const [resP, resU] = await Promise.all([
+      const [resP, resU, catData] = await Promise.all([
         supabase.from('plants').select('id, name').eq('client_id', profile.client_id),
         supabase.from('profiles').select('id, name').eq('client_id', profile.client_id),
+        auditCategoryService.listCategories(profile.client_id, true).catch(() => []),
       ])
       if (resP.data) setPlants(resP.data)
       if (resU.data) setUsers(resU.data)
+      if (catData) setCategories(catData)
 
       if (id) {
         try {
@@ -116,7 +125,11 @@ export default function AuditoriaConfig() {
           status: isDraft ? 'Rascunho' : 'Ativo',
           scoring_settings: scoring,
         },
-        actions: actions.map((a, i) => ({ ...a, order_index: i })),
+        actions: actions.map((a, i) => ({
+          ...a,
+          order_index: i,
+          category_id: a.category_id || null,
+        })),
         assignments,
       })
       toast.success(isDraft ? 'Auditoria salva como rascunho!' : 'Auditoria publicada com sucesso!')
@@ -289,20 +302,35 @@ export default function AuditoriaConfig() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Checklist e Ações</CardTitle>
-            <CardDescription>Itens que serão avaliados na auditoria</CardDescription>
+            <CardDescription>Itens que serão avaliados na auditoria e suas categorias</CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setActions([
-                ...actions,
-                { title: '', weight: 1, evidence_required: false, comments_required: false },
-              ])
-            }
-          >
-            <Plus className="w-4 h-4 mr-2" /> Adicionar Ação
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCategoryModalOpen(true)}
+            >
+              <Tag className="w-4 h-4 mr-2" /> Categorias
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setActions([
+                  ...actions,
+                  {
+                    title: '',
+                    weight: 1,
+                    evidence_required: false,
+                    comments_required: false,
+                    category_id: null,
+                  },
+                ])
+              }
+            >
+              <Plus className="w-4 h-4 mr-2" /> Adicionar Ação
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {actions.map((a, idx) => (
@@ -311,6 +339,7 @@ export default function AuditoriaConfig() {
                 <Label>Título da Ação</Label>
                 <Input
                   value={a.title}
+                  placeholder="Ex: DO - Documentação de colaboradores em dia"
                   onChange={(e) => {
                     const na = [...actions]
                     na[idx].title = e.target.value
@@ -318,7 +347,59 @@ export default function AuditoriaConfig() {
                   }}
                 />
               </div>
-              <div className="w-24">
+              <div className="w-56">
+                <Label className="flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-primary" /> Categoria
+                </Label>
+                <Select
+                  value={a.category_id || 'none'}
+                  onValueChange={(val) => {
+                    const na = [...actions]
+                    na[idx].category_id = val === 'none' ? null : val
+                    setActions(na)
+                  }}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Sem categoria">
+                      {(() => {
+                        const sel = categories.find((c) => c.id === a.category_id)
+                        if (!sel) return <span className="text-muted-foreground">Sem categoria</span>
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: sel.color || '#3b82f6' }}
+                            />
+                            <span className="truncate">{sel.name}</span>
+                          </div>
+                        )
+                      })()}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Sem categoria</span>
+                    </SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: cat.color || '#3b82f6' }}
+                          />
+                          <span>{cat.name}</span>
+                          {!cat.is_active && (
+                            <span className="text-[10px] text-muted-foreground ml-1">
+                              (inativa)
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-20">
                 <Label>Peso</Label>
                 <Input
                   type="number"
@@ -375,6 +456,18 @@ export default function AuditoriaConfig() {
           )}
         </CardContent>
       </Card>
+
+      <AuditCategoryManagerDialog
+        open={categoryModalOpen}
+        onOpenChange={setCategoryModalOpen}
+        clientId={clientId}
+        onCategoriesChanged={async () => {
+          if (clientId) {
+            const data = await auditCategoryService.listCategories(clientId, true).catch(() => [])
+            setCategories(data)
+          }
+        }}
+      />
 
       <Card>
         <CardHeader>

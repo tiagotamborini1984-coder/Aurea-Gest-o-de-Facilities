@@ -85,6 +85,7 @@ export type Database = {
       audit_actions: {
         Row: {
           audit_id: string
+          category_id: string | null
           comments_required: boolean
           created_at: string
           evidence_required: boolean
@@ -95,6 +96,7 @@ export type Database = {
         }
         Insert: {
           audit_id: string
+          category_id?: string | null
           comments_required?: boolean
           created_at?: string
           evidence_required?: boolean
@@ -105,6 +107,7 @@ export type Database = {
         }
         Update: {
           audit_id?: string
+          category_id?: string | null
           comments_required?: boolean
           created_at?: string
           evidence_required?: boolean
@@ -119,6 +122,13 @@ export type Database = {
             columns: ["audit_id"]
             isOneToOne: false
             referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_actions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "audit_question_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -418,6 +428,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "audit_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_question_categories: {
+        Row: {
+          client_id: string
+          color: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_question_categories_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"

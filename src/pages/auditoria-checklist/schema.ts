@@ -16,6 +16,7 @@ export const auditSchema = z.object({
       comments_required: z.boolean().default(false),
       weight: z.coerce.number().min(1).default(1),
       order_index: z.coerce.number().default(0),
+      category_id: z.string().nullable().optional(),
     }),
   ),
   assignments: z.array(

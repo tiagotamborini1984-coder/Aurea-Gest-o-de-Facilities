@@ -105,6 +105,7 @@ export function AppSidebar() {
         subItems: [
           { title: 'Nova Auditoria', path: '/auditoria-checklist/configuracao' },
           { title: 'Auditorias Criadas', path: '/auditoria-checklist/criadas' },
+          { title: 'Categorias', path: '/auditoria-checklist/categorias' },
           { title: 'Auditorias Realizadas', path: '/auditoria-checklist/realizadas' },
           { title: 'Dashboard', path: '/auditoria-checklist/dashboard' },
         ],

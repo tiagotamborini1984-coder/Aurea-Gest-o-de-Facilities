@@ -63,6 +63,7 @@ import RelatoriosTarefas from './pages/gestao-tarefas/RelatoriosTarefas'
 // Auditoria e Checklist Pages
 import AuditoriaConfig from './pages/auditoria-checklist/Configuracao'
 import AuditoriasCriadas from './pages/auditoria-checklist/AuditoriasCriadas'
+import AuditoriaCategorias from './pages/auditoria-checklist/Categorias'
 import AuditoriaRealizadas from './pages/auditoria-checklist/Realizadas'
 import AuditoriaDetalhes from './pages/auditoria-checklist/AuditoriaDetalhes'
 import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
@@ -186,6 +187,10 @@ const App = () => (
                         element={<AuditoriaConfig />}
                       />
                       <Route path="/auditoria-checklist/criadas" element={<AuditoriasCriadas />} />
+                      <Route
+                        path="/auditoria-checklist/categorias"
+                        element={<AuditoriaCategorias />}
+                      />
                       <Route
                         path="/auditoria-checklist/realizadas"
                         element={<AuditoriaRealizadas />}
