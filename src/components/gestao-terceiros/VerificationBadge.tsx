@@ -21,6 +21,11 @@ const CFG: Record<string, { label: string; icon: any; className: string }> = {
     icon: ShieldQuestion,
     className: 'bg-amber-50 text-amber-700 border-amber-200',
   },
+  analyzing: {
+    label: 'IA: analisando…',
+    icon: ShieldQuestion,
+    className: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
   pending: {
     label: 'IA: aguardando',
     icon: ShieldQuestion,
