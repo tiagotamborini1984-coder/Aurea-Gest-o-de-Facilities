@@ -10,7 +10,106 @@ export interface AuditQuestionCategory {
   updated_at: string
 }
 
+export interface CategoryMetricSummary {
+  total_executions: number
+  overall_compliance_pct: number
+  total_evaluated_questions: number
+  total_points_lost: number
+  best_category: {
+    id: string
+    name: string
+    color: string
+    compliance_percentage: number
+  } | null
+  worst_category: {
+    id: string
+    name: string
+    color: string
+    compliance_percentage: number
+  } | null
+}
+
+export interface CategoryMetricItem {
+  id: string
+  name: string
+  color: string
+  evaluated_questions: number
+  obtained_score: number
+  max_possible_score: number
+  points_lost: number
+  compliance_percentage: number
+}
+
+export interface CategoryTrendMonthItem {
+  category_id: string
+  category_name: string
+  category_color: string
+  compliance_percentage: number
+  evaluated_questions: number
+  obtained_score: number
+  max_possible_score: number
+}
+
+export interface CategoryTrendMonth {
+  month: string
+  categories: CategoryTrendMonthItem[]
+}
+
+export interface AuditCategoryMetricsResult {
+  summary: CategoryMetricSummary
+  categories: CategoryMetricItem[]
+  trend: CategoryTrendMonth[]
+}
+
+export interface GetAuditCategoryMetricsParams {
+  clientId?: string | null
+  auditType?: string | null
+  plantIds?: string[] | null
+  startDate?: string | null // 'YYYY-MM-DD'
+  endDate?: string | null // 'YYYY-MM-DD'
+}
+
 export const auditCategoryService = {
+  async getCategoryMetrics(
+    params: GetAuditCategoryMetricsParams,
+  ): Promise<AuditCategoryMetricsResult> {
+    const { data, error } = await (supabase.rpc as any)('get_audit_category_metrics', {
+      p_client_id: params.clientId || null,
+      p_audit_type: params.auditType && params.auditType !== 'all' ? params.auditType : null,
+      p_plant_ids: params.plantIds && params.plantIds.length > 0 ? params.plantIds : null,
+      p_start_date: params.startDate || null,
+      p_end_date: params.endDate || null,
+    })
+
+    if (error) throw error
+    return (data || {
+      summary: {
+        total_executions: 0,
+        overall_compliance_pct: 0,
+        total_evaluated_questions: 0,
+        total_points_lost: 0,
+        best_category: null,
+        worst_category: null,
+      },
+      categories: [],
+      trend: [],
+    }) as AuditCategoryMetricsResult
+  },
+
+  async getAuditTypes(clientId: string): Promise<string[]> {
+    const { data, error } = await supabase.from('audits').select('type').eq('client_id', clientId)
+
+    if (error) throw error
+    const types = Array.from(
+      new Set(
+        (data || [])
+          .map((row: any) => row.type)
+          .filter((t: any): t is string => Boolean(t && typeof t === 'string' && t.trim() !== '')),
+      ),
+    )
+    types.sort((a, b) => a.localeCompare(b))
+    return types
+  },
   async listCategories(clientId: string, includeInactive = true): Promise<AuditQuestionCategory[]> {
     let query = supabase
       .from('audit_question_categories')

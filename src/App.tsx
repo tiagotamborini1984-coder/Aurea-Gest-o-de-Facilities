@@ -64,6 +64,7 @@ import RelatoriosTarefas from './pages/gestao-tarefas/RelatoriosTarefas'
 import AuditoriaConfig from './pages/auditoria-checklist/Configuracao'
 import AuditoriasCriadas from './pages/auditoria-checklist/AuditoriasCriadas'
 import AuditoriaCategorias from './pages/auditoria-checklist/Categorias'
+import IndicadoresCategorias from './pages/auditoria-checklist/IndicadoresCategorias'
 import AuditoriaRealizadas from './pages/auditoria-checklist/Realizadas'
 import AuditoriaDetalhes from './pages/auditoria-checklist/AuditoriaDetalhes'
 import AuditoriaDashboard from './pages/auditoria-checklist/Dashboard'
@@ -190,6 +191,10 @@ const App = () => (
                       <Route
                         path="/auditoria-checklist/categorias"
                         element={<AuditoriaCategorias />}
+                      />
+                      <Route
+                        path="/auditoria-checklist/indicadores-categorias"
+                        element={<IndicadoresCategorias />}
                       />
                       <Route
                         path="/auditoria-checklist/realizadas"

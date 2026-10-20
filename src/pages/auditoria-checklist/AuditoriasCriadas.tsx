@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Edit, Play, FileText, Copy, Tag } from 'lucide-react'
+import { Plus, Edit, Play, FileText, Copy, Tag, BarChart3 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { cloneAudit } from '@/services/audit'
 
@@ -148,7 +148,14 @@ export default function AuditoriasCriadas() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Modelos de Auditoria</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/auditoria-checklist/indicadores-categorias')}
+            className="flex items-center gap-1.5"
+          >
+            <BarChart3 className="w-4 h-4 text-primary" /> Indicadores por Categoria
+          </Button>
           <Button variant="outline" onClick={() => navigate('/auditoria-checklist/categorias')}>
             <Tag className="w-4 h-4 mr-2" /> Categorias
           </Button>
