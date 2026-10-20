@@ -5,6 +5,8 @@ import { corsHeaders } from '../_shared/cors.ts'
 // Conferência de lista de presença via MAESTRO (Chico) — sem chave de IA externa.
 // Fluxo: POST {record_id} → marca 'analyzing' → aciona webhook do Maestro →
 // Maestro lê o documento com visão → POST callback {action:'callback', ...} → grava resultado.
+// Integração fixa Maestro<->Aurea (repo privado). Env vars custom não chegam ao
+// runtime das Edge Functions neste ambiente; os valores ficam aqui como fallback.
 
 function jsonRes(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -38,8 +40,7 @@ Deno.serve(async (req: Request) => {
 
   // ===== CALLBACK do Maestro com o resultado da conferência =====
   if (body?.action === 'callback') {
-    const cbSecret = Deno.env.get('CHICO_CALLBACK_SECRET') ?? ''
-    if (!cbSecret || body.callback_secret !== cbSecret) {
+    if (!CHICO_CALLBACK_SECRET || body.callback_secret !== CHICO_CALLBACK_SECRET) {
       return jsonRes({ error: 'Não autorizado' }, 401)
     }
     const recordId = body.record_id
@@ -80,9 +81,9 @@ Deno.serve(async (req: Request) => {
       return jsonRes({ error: 'Registro sem documento anexado' }, 400)
     }
 
-    const webhookUrl = Deno.env.get('CHICO_WEBHOOK_URL') ?? ''
-    const webhookSecret = Deno.env.get('CHICO_WEBHOOK_SECRET') ?? ''
-    const cbSecret = Deno.env.get('CHICO_CALLBACK_SECRET') ?? ''
+    const webhookUrl = CHICO_WEBHOOK_URL
+    const webhookSecret = CHICO_WEBHOOK_SECRET
+    const cbSecret = CHICO_CALLBACK_SECRET
     if (!webhookUrl || !webhookSecret || !cbSecret) {
       await admin
         .from('employee_training_records')
