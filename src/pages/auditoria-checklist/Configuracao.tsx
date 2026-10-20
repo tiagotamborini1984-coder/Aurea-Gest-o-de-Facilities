@@ -17,10 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from 'sonner'
 import { ArrowLeft, Plus, Trash2, Save, Send, Tag } from 'lucide-react'
 import { AuditDiagnostic } from '@/pages/auditoria-checklist/components/AuditDiagnostic'
-import {
-  AuditQuestionCategory,
-  auditCategoryService,
-} from '@/services/audit-categories'
+import { AuditQuestionCategory, auditCategoryService } from '@/services/audit-categories'
 import { AuditCategoryManagerDialog } from './components/AuditCategoryManagerDialog'
 
 export default function AuditoriaConfig() {
@@ -302,14 +299,12 @@ export default function AuditoriaConfig() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Checklist e Ações</CardTitle>
-            <CardDescription>Itens que serão avaliados na auditoria e suas categorias</CardDescription>
+            <CardDescription>
+              Itens que serão avaliados na auditoria e suas categorias
+            </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCategoryModalOpen(true)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setCategoryModalOpen(true)}>
               <Tag className="w-4 h-4 mr-2" /> Categorias
             </Button>
             <Button
@@ -363,7 +358,8 @@ export default function AuditoriaConfig() {
                     <SelectValue placeholder="Sem categoria">
                       {(() => {
                         const sel = categories.find((c) => c.id === a.category_id)
-                        if (!sel) return <span className="text-muted-foreground">Sem categoria</span>
+                        if (!sel)
+                          return <span className="text-muted-foreground">Sem categoria</span>
                         return (
                           <div className="flex items-center gap-2">
                             <span

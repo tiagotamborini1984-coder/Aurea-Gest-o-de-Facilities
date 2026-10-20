@@ -149,10 +149,7 @@ export default function AuditoriasCriadas() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Modelos de Auditoria</h1>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/auditoria-checklist/categorias')}
-          >
+          <Button variant="outline" onClick={() => navigate('/auditoria-checklist/categorias')}>
             <Tag className="w-4 h-4 mr-2" /> Categorias
           </Button>
           <Button onClick={() => navigate('/auditoria-checklist/configuracao')}>

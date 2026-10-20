@@ -93,10 +93,7 @@ export const auditCategoryService = {
       )
     }
 
-    const { error } = await supabase
-      .from('audit_question_categories')
-      .delete()
-      .eq('id', categoryId)
+    const { error } = await supabase.from('audit_question_categories').delete().eq('id', categoryId)
 
     if (error) throw error
   },

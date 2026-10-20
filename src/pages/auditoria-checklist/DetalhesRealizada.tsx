@@ -15,6 +15,8 @@ import {
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { AuditCategoryComplianceChart } from './components/AuditCategoryComplianceChart'
 
 export default function DetalhesRealizada() {
   const { id } = useParams()
@@ -74,7 +76,16 @@ export default function DetalhesRealizada() {
     const { data: ansData } = await supabase
       .from('audit_execution_answers')
       .select(`
-      *, audit_actions ( title, weight, order_index ), profiles ( name )
+      *, 
+      audit_actions ( 
+        id, 
+        title, 
+        weight, 
+        order_index, 
+        category_id,
+        audit_question_categories ( id, name, color )
+      ), 
+      profiles ( name )
     `)
       .eq('execution_id', id)
       .order('audit_actions(order_index)', { ascending: true })
@@ -222,6 +233,25 @@ export default function DetalhesRealizada() {
         </div>
       </div>
 
+      {/* Gráfico de Desempenho por Categoria */}
+      <AuditCategoryComplianceChart
+        items={answers.map((ans) => ({
+          action: {
+            id: ans.audit_actions?.id || ans.action_id,
+            title: ans.audit_actions?.title || '',
+            weight: ans.audit_actions?.weight,
+            category_id: ans.audit_actions?.category_id,
+            category: ans.audit_actions?.audit_question_categories,
+          },
+          score: ans.score,
+        }))}
+        maxScorePerQuestion={
+          scoringSettings.length > 0
+            ? Math.max(...scoringSettings.map((s: any) => s.score || 0))
+            : 5
+        }
+      />
+
       <div className="space-y-6">
         <h2
           className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2 print:text-black"
@@ -239,9 +269,30 @@ export default function DetalhesRealizada() {
               >
                 <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                   <div className="flex-1 w-full">
-                    <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-base print:text-black">
-                      {idx + 1}. {ans.audit_actions?.title}
-                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 text-base print:text-black">
+                        {idx + 1}. {ans.audit_actions?.title}
+                      </span>
+                      {ans.audit_actions?.audit_question_categories?.name ? (
+                        <Badge variant="outline" className="text-xs font-normal gap-1.5 py-0 px-2">
+                          <span
+                            className="w-2 h-2 rounded-full inline-block"
+                            style={{
+                              backgroundColor:
+                                ans.audit_actions.audit_question_categories.color || '#3b82f6',
+                            }}
+                          />
+                          {ans.audit_actions.audit_question_categories.name}
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="text-[11px] text-muted-foreground font-normal"
+                        >
+                          Sem categoria
+                        </Badge>
+                      )}
+                    </div>
                     {ans.observations && (
                       <div className="mt-3 bg-slate-50 dark:bg-slate-800 print:bg-transparent print:border print:border-dashed print:border-slate-300 p-3 rounded text-sm text-slate-700 dark:text-slate-300 print:text-black">
                         <span className="font-semibold block mb-1">Observações:</span>

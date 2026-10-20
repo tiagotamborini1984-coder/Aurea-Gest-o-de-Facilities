@@ -44,6 +44,7 @@ import { format, parseISO, addDays, addWeeks, addMonths, addYears } from 'date-f
 
 import { PrintLayout } from './components/PrintLayout'
 import { PaginationControls } from './components/PaginationControls'
+import { AuditCategoryComplianceChart } from './components/AuditCategoryComplianceChart'
 
 const ITEMS_PER_PAGE = 3
 
@@ -219,7 +220,10 @@ function AuditoriaDetalhesInner() {
 
         const { data: actionsData, error: actionsError } = await supabase
           .from('audit_actions')
-          .select('*')
+          .select(`
+            *,
+            audit_question_categories ( id, name, color )
+          `)
           .eq('audit_id', execData.audit_id)
           .order('order_index')
 
@@ -610,16 +614,61 @@ function AuditoriaDetalhesInner() {
               </CardContent>
             </Card>
 
+            {/* Gráfico de Conformidade por Categoria se finalizado ou com respostas */}
+            {actions.length > 0 && Object.keys(answers).length > 0 && (
+              <AuditCategoryComplianceChart
+                items={actions.map((act) => ({
+                  action: {
+                    id: act.id,
+                    title: act.title,
+                    weight: act.weight,
+                    category_id: act.category_id,
+                    category: act.audit_question_categories,
+                  },
+                  score: answers[act.id]?.score,
+                }))}
+                maxScorePerQuestion={
+                  scoringSettings.length > 0
+                    ? Math.max(...scoringSettings.map((s: any) => s.score || 0))
+                    : 5
+                }
+              />
+            )}
+
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Critérios de Avaliação</h2>
               {paginatedActions.map((action, index) => (
                 <Card key={action.id}>
                   <CardHeader>
-                    <CardTitle className="text-base flex items-center justify-between">
-                      <span>
-                        {startIndex + index + 1}. {action.title}
-                      </span>
-                      <span className="text-sm font-normal text-muted-foreground">
+                    <CardTitle className="text-base flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>
+                          {startIndex + index + 1}. {action.title}
+                        </span>
+                        {action.audit_question_categories?.name ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-normal gap-1.5 py-0 px-2"
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full inline-block"
+                              style={{
+                                backgroundColor:
+                                  action.audit_question_categories.color || '#3b82f6',
+                              }}
+                            />
+                            {action.audit_question_categories.name}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="text-[11px] text-muted-foreground font-normal"
+                          >
+                            Sem categoria
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-sm font-normal text-muted-foreground shrink-0">
                         Peso: {action.weight}
                       </span>
                     </CardTitle>

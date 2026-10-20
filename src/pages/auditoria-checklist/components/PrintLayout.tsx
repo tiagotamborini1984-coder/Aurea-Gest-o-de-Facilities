@@ -108,9 +108,28 @@ export function PrintLayout({ execution, actions, answersMap, clientBrand }: any
               >
                 <div className="flex flex-row items-start justify-between gap-4">
                   <div className="flex-1 w-full">
-                    <h4 className="font-semibold text-black text-base mb-2">
-                      {idx + 1}. {action.title}
-                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <h4 className="font-semibold text-black text-base">
+                        {idx + 1}. {action.title}
+                      </h4>
+                      {action.audit_question_categories?.name && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded border inline-flex items-center gap-1 font-medium"
+                          style={{
+                            borderColor: action.audit_question_categories.color || '#3b82f6',
+                            color: action.audit_question_categories.color || '#3b82f6',
+                          }}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{
+                              backgroundColor: action.audit_question_categories.color || '#3b82f6',
+                            }}
+                          />
+                          {action.audit_question_categories.name}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm font-medium text-slate-800">
                       Resposta: <span className="font-bold">{label}</span>
                     </div>

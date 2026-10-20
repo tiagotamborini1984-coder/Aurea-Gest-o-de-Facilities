@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback, useId } from 'react'
-import {
-  AuditQuestionCategory,
-  auditCategoryService,
-} from '@/services/audit-categories'
+import { AuditQuestionCategory, auditCategoryService } from '@/services/audit-categories'
 import {
   Dialog,
   DialogContent,
@@ -23,17 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Check,
-  X,
-  Palette,
-  Tag,
-  Loader2,
-  AlertCircle,
-} from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, Palette, Tag, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { normalizeMatch } from '@/lib/string-utils'
 
@@ -159,9 +146,7 @@ export function AuditCategoryManagerDialog({
       return
     }
 
-    const exists = categories.some(
-      (c) => c.id !== cat.id && normalizeMatch(c.name, trimmed),
-    )
+    const exists = categories.some((c) => c.id !== cat.id && normalizeMatch(c.name, trimmed))
     if (exists) {
       toast.error('Já existe outra categoria com este nome')
       return
@@ -193,9 +178,7 @@ export function AuditCategoryManagerDialog({
       setCategories((prev) =>
         prev.map((c) => (c.id === cat.id ? { ...c, is_active: !c.is_active } : c)),
       )
-      toast.success(
-        !cat.is_active ? 'Categoria ativada' : 'Categoria inativada',
-      )
+      toast.success(!cat.is_active ? 'Categoria ativada' : 'Categoria inativada')
       onCategoriesChanged?.()
     } catch (err: any) {
       console.error(err)
@@ -241,8 +224,8 @@ export function AuditCategoryManagerDialog({
             Categorias de Perguntas de Auditoria
           </DialogTitle>
           <DialogDescription>
-            Cadastre nomes livres para categorizar os itens avaliados nas auditorias.
-            As cores definidas serão usadas nos gráficos dos relatórios.
+            Cadastre nomes livres para categorizar os itens avaliados nas auditorias. As cores
+            definidas serão usadas nos gráficos dos relatórios.
           </DialogDescription>
         </DialogHeader>
 
@@ -274,10 +257,7 @@ export function AuditCategoryManagerDialog({
                     className="w-10 h-9 rounded-md border cursor-pointer flex items-center justify-center p-1 bg-background"
                     title="Selecionar cor"
                   >
-                    <span
-                      className="w-full h-full rounded"
-                      style={{ backgroundColor: newColor }}
-                    />
+                    <span className="w-full h-full rounded" style={{ backgroundColor: newColor }} />
                   </label>
                   <input
                     id={newColorPickerId}
@@ -305,7 +285,11 @@ export function AuditCategoryManagerDialog({
                 </div>
               </div>
 
-              <Button type="submit" disabled={saving || !newName.trim()} className="w-full sm:w-auto">
+              <Button
+                type="submit"
+                disabled={saving || !newName.trim()}
+                className="w-full sm:w-auto"
+              >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
@@ -335,8 +319,8 @@ export function AuditCategoryManagerDialog({
                   Nenhuma categoria cadastrada ainda.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                  Crie categorias como preferir (ex: Higiene, Salão, Estrutura, EPIs) para
-                  agrupar as perguntas das suas auditorias.
+                  Crie categorias como preferir (ex: Higiene, Salão, Estrutura, EPIs) para agrupar
+                  as perguntas das suas auditorias.
                 </p>
               </div>
             ) : (
@@ -402,7 +386,10 @@ export function AuditCategoryManagerDialog({
                                   {cat.name}
                                 </span>
                                 {!cat.is_active && (
-                                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs text-muted-foreground"
+                                  >
                                     Inativa
                                   </Badge>
                                 )}

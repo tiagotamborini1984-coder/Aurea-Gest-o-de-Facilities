@@ -24,7 +24,8 @@ export default function AuditoriaCategorias() {
               <CardTitle>Acesso Restrito</CardTitle>
             </div>
             <CardDescription>
-              O cadastro e manutenção de categorias de auditoria é restrito aos perfis Administrador e Master.
+              O cadastro e manutenção de categorias de auditoria é restrito aos perfis Administrador
+              e Master.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -41,7 +42,11 @@ export default function AuditoriaCategorias() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/auditoria-checklist/criadas')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/auditoria-checklist/criadas')}
+          >
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
@@ -49,7 +54,8 @@ export default function AuditoriaCategorias() {
               <Tag className="w-6 h-6 text-primary" /> Categorias de Auditoria
             </h1>
             <p className="text-muted-foreground text-sm">
-              Gerencie as categorias personalizadas para agrupar as perguntas e enriquecer os relatórios.
+              Gerencie as categorias personalizadas para agrupar as perguntas e enriquecer os
+              relatórios.
             </p>
           </div>
         </div>
@@ -63,13 +69,15 @@ export default function AuditoriaCategorias() {
         <CardHeader>
           <CardTitle>Categorização Livre das Perguntas</CardTitle>
           <CardDescription>
-            Aqui você define livremente as categorias da sua operação (ex.: "DO - Documental", "LOJA - Salão", "Higiene e Limpeza", "Estrutura Predial").
+            Aqui você define livremente as categorias da sua operação (ex.: "DO - Documental", "LOJA
+            - Salão", "Higiene e Limpeza", "Estrutura Predial").
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Cada pergunta cadastrada em um modelo de auditoria pode ser associada a uma categoria criada por você.
-            Nos relatórios de auditoria, você terá um gráfico visual com o percentual de conformidade e o total de pontos perdidos por categoria.
+            Cada pergunta cadastrada em um modelo de auditoria pode ser associada a uma categoria
+            criada por você. Nos relatórios de auditoria, você terá um gráfico visual com o
+            percentual de conformidade e o total de pontos perdidos por categoria.
           </p>
 
           <div className="pt-2">

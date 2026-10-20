@@ -110,11 +110,13 @@ export default function RelatorioImprimir() {
 
       const { data: actionsData } = await supabase
         .from('audit_actions')
-        .select('*')
+        .select(`
+          *,
+          audit_question_categories ( id, name, color )
+        `)
         .eq('audit_id', execData.audit_id)
         .order('order_index')
       setActions(actionsData || [])
-
       const { data: answersData } = await supabase
         .from('audit_execution_answers')
         .select('*')
@@ -276,9 +278,33 @@ export default function RelatorioImprimir() {
                   >
                     <div className="bg-slate-50 p-4 border-b flex justify-between items-start gap-4">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-slate-800 text-lg">
-                          {index + 1}. {action.title}
-                        </h4>
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-slate-800 text-lg">
+                            {index + 1}. {action.title}
+                          </h4>
+                          {action.audit_question_categories?.name ? (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full border inline-flex items-center gap-1.5 font-medium"
+                              style={{
+                                borderColor: action.audit_question_categories.color || '#3b82f6',
+                                color: action.audit_question_categories.color || '#3b82f6',
+                              }}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    action.audit_question_categories.color || '#3b82f6',
+                                }}
+                              />
+                              {action.audit_question_categories.name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                              Sem categoria
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex-shrink-0 flex items-center gap-2 bg-white px-3 py-1 rounded-md shadow-sm border border-slate-200">
                         <span className="text-sm text-slate-500 font-medium">Pontos:</span>

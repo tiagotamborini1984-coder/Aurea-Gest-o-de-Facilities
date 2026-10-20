@@ -14,10 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAppStore } from '@/store/AppContext'
-import {
-  AuditQuestionCategory,
-  auditCategoryService,
-} from '@/services/audit-categories'
+import { AuditQuestionCategory, auditCategoryService } from '@/services/audit-categories'
 import { AuditCategoryManagerDialog } from './AuditCategoryManagerDialog'
 import type { AuditFormValues } from '../schema'
 
@@ -160,7 +157,9 @@ export function AuditFormActions() {
                                   <span>{selected.name}</span>
                                 </div>
                               ) : (
-                                <span className="text-muted-foreground">Sem categoria vinculada</span>
+                                <span className="text-muted-foreground">
+                                  Sem categoria vinculada
+                                </span>
                               )}
                             </SelectValue>
                           </SelectTrigger>
