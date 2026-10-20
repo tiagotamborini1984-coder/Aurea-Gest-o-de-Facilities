@@ -951,7 +951,22 @@ export default function PainelChamados() {
                     <TableCell className="text-muted-foreground">
                       {requester?.name || '-'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{assignee?.name || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span>{assignee?.name || '-'}</span>
+                        {task.approval_status === 'pending' && task.previous_assignee_id && (
+                          <span
+                            className="text-[10px] text-muted-foreground/80"
+                            title={`Executor original: ${users.find((u) => u.id === task.previous_assignee_id)?.name || 'Anterior'}`}
+                          >
+                            (Executor:{' '}
+                            {users.find((u) => u.id === task.previous_assignee_id)?.name ||
+                              'Anterior'}
+                            )
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge
                         className="font-medium text-white border-0 shadow-sm"

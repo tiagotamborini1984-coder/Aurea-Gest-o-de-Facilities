@@ -229,16 +229,30 @@ export function TaskDetailsSheet({
     }
 
     // NC Approval interception: when closing an NC task, reroute to "Aguardando Aprovação"
+    // Regra: O executor atual é preservado em previous_assignee_id e o responsável passa a ser o solicitante (requester_id)
     if (status?.is_terminal && isNcTask) {
       if (pendingApprovalStatus && pendingApprovalStatus.id !== task.status_id) {
+        const executorId = task.assignee_id
+        const requesterId = task.requester_id
+        const requesterUser = users.find((u: any) => u.id === requesterId)
+
         await processStatusChange(pendingApprovalStatus.id, {
           approval_status: 'pending',
           rejection_reason: null,
+          previous_assignee_id: executorId,
+          assignee_id: requesterId,
         })
+
+        await supabase.from('task_timeline').insert({
+          task_id: task.id,
+          user_id: profile.id,
+          content: `Responsabilidade transferida ao solicitante ${requesterUser?.name || 'Solicitante'} para aprovação.`,
+          action_type: 'delegation',
+        })
+
         toast({
           title: 'Demanda enviada para aprovação do solicitante',
-          description:
-            'Por ser uma Não Conformidade, a conclusão requer validação e aprovação do solicitante.',
+          description: `Responsabilidade transferida para ${requesterUser?.name || 'o solicitante'} aprovar ou reprovar.`,
           className: 'bg-amber-50 text-amber-900 border-amber-200',
         })
         return
@@ -703,6 +717,12 @@ export function TaskDetailsSheet({
         taskStatuses.find((s: any) => s.is_terminal && !s.name.toLowerCase().includes('exclu')) ||
         taskStatuses.find((s: any) => s.is_terminal)
 
+      // Se tiver previous_assignee_id registrado, mantemos guardado para histórico
+      const executorName =
+        getAssigneeName(task?.previous_assignee_id) !== 'Desconhecido'
+          ? getAssigneeName(task?.previous_assignee_id)
+          : null
+
       const payload: any = {
         approval_status: 'approved',
         approved_by: profile.id,
@@ -718,10 +738,11 @@ export function TaskDetailsSheet({
       const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
       if (error) throw error
 
+      const executorText = executorName ? ` Executada por: ${executorName}.` : ''
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
-        content: `Demanda de Não Conformidade APROVADA por ${profile.name || 'Solicitante'}.${
+        content: `Demanda de Não Conformidade APROVADA por ${profile.name || 'Solicitante'}.${executorText}${
           completedStatus ? ` Status alterado para: ${completedStatus.name}.` : ''
         }`,
         action_type: 'status_change',
@@ -774,10 +795,28 @@ export function TaskDetailsSheet({
         ) ||
         taskStatuses[0]
 
+      // Regra 3 & 7: o campo Responsável VOLTA a ser a pessoa anterior (previous_assignee_id — quem realmente realizou a demanda).
+      // Se previous_assignee_id não estiver setado (ex: demandas antigas onde assignee ainda era o executor ou já era outro),
+      // faz fallback para o assignee_id se for diferente do solicitante, senão mantém ou busca no histórico.
+      let returnedAssigneeId = task?.previous_assignee_id
+      if (!returnedAssigneeId && task?.assignee_id && task.assignee_id !== task.requester_id) {
+        returnedAssigneeId = task.assignee_id
+      }
+      // Se ainda for igual ao solicitante ou vazio, verifica se temos profile diferente ou fallback
+      if (!returnedAssigneeId) {
+        returnedAssigneeId = task?.assignee_id
+      }
+
+      const returnedAssigneeUser = users.find((u: any) => u.id === returnedAssigneeId)
+
       const payload: any = {
         approval_status: 'rejected',
         rejection_reason: rejectionReason.trim(),
         closed_at: null,
+      }
+
+      if (returnedAssigneeId) {
+        payload.assignee_id = returnedAssigneeId
       }
 
       if (openStatus) {
@@ -790,7 +829,7 @@ export function TaskDetailsSheet({
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
-        content: `Demanda de Não Conformidade REPROVADA por ${profile.name || 'Solicitante'}. Justificativa: "${rejectionReason.trim()}". Retornada para o responsável refazer.${
+        content: `Demanda de Não Conformidade REPROVADA por ${profile.name || 'Solicitante'}. Justificativa: "${rejectionReason.trim()}". Devolvida ao responsável ${returnedAssigneeUser?.name || 'anterior'}.${
           openStatus ? ` Status alterado para: ${openStatus.name}.` : ''
         }`,
         action_type: 'status_change',
@@ -1061,12 +1100,29 @@ export function TaskDetailsSheet({
                   {getAssigneeName(task?.assignee_id)}
                 </span>
               </span>
+              {isNcTask && task?.previous_assignee_id && (
+                <span className="text-xs text-muted-foreground">
+                  (Executor original:{' '}
+                  <span className="font-medium text-foreground">
+                    {getAssigneeName(task.previous_assignee_id)}
+                  </span>
+                  )
+                </span>
+              )}
               {isNcTask && (
                 <Badge
                   variant="outline"
                   className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium"
                 >
                   Não Conformidade
+                </Badge>
+              )}
+              {isNcTask && isAwaitingApproval && (
+                <Badge
+                  variant="outline"
+                  className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium"
+                >
+                  Aguardando Aprovação
                 </Badge>
               )}
               {isNcTask && task?.approval_status === 'approved' && (
@@ -1302,8 +1358,20 @@ export function TaskDetailsSheet({
                         Aguardando Aprovação do Solicitante
                       </h5>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        O responsável concluiu o atendimento desta Não Conformidade. O solicitante
-                        deve validar se a ação foi realmente realizada.
+                        O executor concluiu o atendimento desta Não Conformidade. A responsabilidade
+                        foi transferida ao solicitante{' '}
+                        <strong className="text-foreground">
+                          ({getAssigneeName(task?.requester_id)})
+                        </strong>{' '}
+                        para validar se a ação foi realmente realizada.
+                        {task?.previous_assignee_id && (
+                          <span className="block mt-1 text-[11px] text-muted-foreground">
+                            Executor da demanda:{' '}
+                            <span className="font-medium text-foreground">
+                              {getAssigneeName(task.previous_assignee_id)}
+                            </span>
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
