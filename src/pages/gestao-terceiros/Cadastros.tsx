@@ -20,6 +20,7 @@ import { DuplicateHeadcountDialog } from '@/components/gestao-terceiros/Duplicat
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
 import { logAudit } from '@/services/audit'
+import { verifyTrainingPresence } from '@/lib/training-verification'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -239,9 +240,10 @@ export default function Cadastros() {
                   completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
                 }))
               if (trPayload.length > 0) {
-                const { error: trError } = await supabase
+                const { error: trError, data: trRows } = await supabase
                   .from('employee_training_records')
                   .insert(trPayload)
+                  .select('id, document_url')
                 if (trError) {
                   return {
                     success: false,
@@ -256,6 +258,12 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador: ${data.name || data.id}`,
                 )
+                // Conferência IA da lista de presença (não bloqueia o cadastro)
+                ;(trRows || [])
+                  .filter((r: any) => r.document_url)
+                  .forEach((r: any) => {
+                    verifyTrainingPresence(r.id)
+                  })
               }
             }
             if (training_records && config.tableName === 'functions') {
@@ -343,9 +351,10 @@ export default function Cadastros() {
                   completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
                 }))
               if (trPayload.length > 0) {
-                const { error: trError } = await supabase
+                const { error: trError, data: trRows } = await supabase
                   .from('employee_training_records')
                   .insert(trPayload)
+                  .select('id, document_url')
                 if (trError) {
                   return {
                     success: false,
@@ -360,6 +369,12 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador ID: ${id}`,
                 )
+                // Conferência IA da lista de presença (não bloqueia o cadastro)
+                ;(trRows || [])
+                  .filter((r: any) => r.document_url)
+                  .forEach((r: any) => {
+                    verifyTrainingPresence(r.id)
+                  })
               }
             }
             if (training_records && config.tableName === 'functions') {

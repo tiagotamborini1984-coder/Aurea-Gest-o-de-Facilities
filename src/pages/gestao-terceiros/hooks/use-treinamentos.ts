@@ -82,7 +82,9 @@ export function useTreinamentos(plantId: string, referenceMonth: string) {
           const funcRequired = required
             .filter((r) => r.function_id === emp.function_id)
             .map((r) => r.training_id)
-          const empRecords = records.filter((r) => r.employee_id === emp.id)
+          const empRecords = records.filter(
+            (r) => r.employee_id === emp.id && r.verification_status !== 'rejected',
+          )
 
           const trainings = allTrainings
             .map((t) => {

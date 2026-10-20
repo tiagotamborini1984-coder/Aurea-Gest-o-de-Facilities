@@ -26,6 +26,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { verifyTrainingPresence } from '@/lib/training-verification'
+import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
 import {
   FileBadge,
   Search,
@@ -256,6 +258,11 @@ export default function Treinamentos() {
           return [newRecord, ...filtered]
         })
         toast({ title: 'Treinamento anexado com sucesso!' })
+        // Conferência IA da lista de presença; ao terminar, atualiza modal e listagem
+        verifyTrainingPresence(newRecord.id).then(() => {
+          openDetails(selectedEmp)
+          fetchData()
+        })
         // Refresh master list status in background
         fetchData()
       }
@@ -520,6 +527,11 @@ export default function Treinamentos() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
+                              <VerificationBadge
+                                status={latest?.verification_status}
+                                notes={latest?.verification_notes}
+                                signedName={latest?.verification_signed_name}
+                              />
                               {getStatusBadge(trStatus)}
                               <div className="relative">
                                 <Button
@@ -566,6 +578,7 @@ export default function Treinamentos() {
                           <TableRow>
                             <TableHead>Treinamento</TableHead>
                             <TableHead>Data Realização</TableHead>
+                            <TableHead>Conferência IA</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -586,6 +599,13 @@ export default function Treinamentos() {
                                       'dd/MM/yyyy',
                                     )
                                   : '-'}
+                              </TableCell>
+                              <TableCell>
+                                <VerificationBadge
+                                  status={record.verification_status}
+                                  notes={record.verification_notes}
+                                  signedName={record.verification_signed_name}
+                                />
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">

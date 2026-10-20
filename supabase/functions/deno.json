@@ -14,6 +14,7 @@
     "import-budget-entries": 151,
     "diagnose-catalog": 133,
     "process-vacation-completion": 1,
-    "create-demo-user": 84
+    "create-demo-user": 84,
+    "verify-training-presence": 1
   }
 }

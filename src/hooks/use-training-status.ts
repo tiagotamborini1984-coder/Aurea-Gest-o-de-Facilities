@@ -198,7 +198,11 @@ export function useTrainingStatus() {
 
             // Filter out explicitly rejected/inactive
             const validRecords = recordsForReq.filter(
-              (r) => r.status !== 'Rejeitado' && r.status !== 'Reprovado' && r.status !== 'Inativo',
+              (r) =>
+                r.status !== 'Rejeitado' &&
+                r.status !== 'Reprovado' &&
+                r.status !== 'Inativo' &&
+                r.verification_status !== 'rejected',
             )
 
             latest = recordsForReq[0] // default to newest record even if rejected for display fallback

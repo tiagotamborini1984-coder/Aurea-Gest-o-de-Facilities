@@ -1020,6 +1020,11 @@ export type Database = {
           employee_id: string
           id: string
           training_id: string
+          verification_status: string | null
+          verification_notes: string | null
+          verification_signed_name: string | null
+          verification_confidence: number | null
+          verified_at: string | null
         }
         Insert: {
           client_id: string
@@ -1029,6 +1034,11 @@ export type Database = {
           employee_id: string
           id?: string
           training_id: string
+          verification_status?: string | null
+          verification_notes?: string | null
+          verification_signed_name?: string | null
+          verification_confidence?: number | null
+          verified_at?: string | null
         }
         Update: {
           client_id?: string
@@ -1038,6 +1048,11 @@ export type Database = {
           employee_id?: string
           id?: string
           training_id?: string
+          verification_status?: string | null
+          verification_notes?: string | null
+          verification_signed_name?: string | null
+          verification_confidence?: number | null
+          verified_at?: string | null
         }
         Relationships: [
           {
