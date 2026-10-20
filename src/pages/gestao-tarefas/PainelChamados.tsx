@@ -905,10 +905,49 @@ export default function PainelChamados() {
                       {task.task_number}
                     </TableCell>
                     <TableCell className="font-medium text-foreground">
-                      {task.title || '-'}
+                      <div className="flex flex-col gap-1 items-start">
+                        <span>{task.title || '-'}</span>
+                        {task.approval_status === 'pending' && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                          >
+                            Aguardando Validação
+                          </Badge>
+                        )}
+                        {task.approval_status === 'approved' && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30"
+                          >
+                            Aprovado
+                          </Badge>
+                        )}
+                        {task.approval_status === 'rejected' && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30"
+                          >
+                            Reprovado
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{plant?.name || '-'}</TableCell>
-                    <TableCell className="text-muted-foreground">{type?.name || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        {type?.name || '-'}
+                        {type?.name &&
+                          (type.name.toLowerCase().includes('não conformidade') ||
+                            type.name.toLowerCase().includes('nao conformidade') ||
+                            type.name.toLowerCase() === 'nc') && (
+                            <span
+                              className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
+                              title="Não Conformidade"
+                            />
+                          )}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {requester?.name || '-'}
                     </TableCell>

@@ -59,7 +59,8 @@ export function TaskDetailsSheet({
   users,
   onTaskUpdated,
 }: any) {
-  const { profile } = useAppStore()  const { toast } = useToast()
+  const { profile } = useAppStore()
+  const { toast } = useToast()
   const [timeline, setTimeline] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [comment, setComment] = useState('')
@@ -668,20 +669,18 @@ export function TaskDetailsSheet({
   // Verification whether the task is of type "Não Conformidade"
   const currentTaskType = taskTypes.find((t: any) => t.id === task?.type_id)
   const isNcTask =
-    (currentTaskType?.name && (
-      currentTaskType.name.toLowerCase().includes('não conformidade') ||
-      currentTaskType.name.toLowerCase().includes('nao conformidade') ||
-      currentTaskType.name.toLowerCase() === 'nc'
-    )) ||
-    (task?.title && (
-      task.title.toLowerCase().startsWith('não conformidade') ||
-      task.title.toLowerCase().startsWith('nao conformidade') ||
-      task.title.toLowerCase().startsWith('nc:')
-    ))
+    (currentTaskType?.name &&
+      (currentTaskType.name.toLowerCase().includes('não conformidade') ||
+        currentTaskType.name.toLowerCase().includes('nao conformidade') ||
+        currentTaskType.name.toLowerCase() === 'nc')) ||
+    (task?.title &&
+      (task.title.toLowerCase().startsWith('não conformidade') ||
+        task.title.toLowerCase().startsWith('nao conformidade') ||
+        task.title.toLowerCase().startsWith('nc:')))
 
   // Find status "Aguardando Aprovação"
   const pendingApprovalStatus = taskStatuses.find((s: any) =>
-    s.name.toLowerCase().includes('aguardando aprova')
+    s.name.toLowerCase().includes('aguardando aprova'),
   )
 
   const currentStatus = taskStatuses.find((s: any) => s.id === task?.status_id)
@@ -768,9 +767,11 @@ export function TaskDetailsSheet({
             (s.name.toLowerCase().includes('andamento') ||
               s.name.toLowerCase().includes('aberto') ||
               s.name.toLowerCase().includes('pendente')) &&
-            !s.name.toLowerCase().includes('aguardando aprova')
+            !s.name.toLowerCase().includes('aguardando aprova'),
         ) ||
-        taskStatuses.find((s: any) => !s.is_terminal && !s.name.toLowerCase().includes('aguardando')) ||
+        taskStatuses.find(
+          (s: any) => !s.is_terminal && !s.name.toLowerCase().includes('aguardando'),
+        ) ||
         taskStatuses[0]
 
       const payload: any = {
@@ -1061,7 +1062,10 @@ export function TaskDetailsSheet({
                 </span>
               </span>
               {isNcTask && (
-                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium">
+                <Badge
+                  variant="outline"
+                  className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium"
+                >
                   Não Conformidade
                 </Badge>
               )}
@@ -1298,7 +1302,8 @@ export function TaskDetailsSheet({
                         Aguardando Aprovação do Solicitante
                       </h5>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        O responsável concluiu o atendimento desta Não Conformidade. O solicitante deve validar se a ação foi realmente realizada.
+                        O responsável concluiu o atendimento desta Não Conformidade. O solicitante
+                        deve validar se a ação foi realmente realizada.
                       </p>
                     </div>
                   </div>
@@ -1312,7 +1317,11 @@ export function TaskDetailsSheet({
                       className="bg-green-600 hover:bg-green-700 text-white font-medium"
                       size="sm"
                     >
-                      {isApproving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                      {isApproving ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                      )}
                       Aprovar e Concluir
                     </Button>
                     <Button
@@ -1328,7 +1337,8 @@ export function TaskDetailsSheet({
                   </div>
                 ) : (
                   <div className="text-xs text-amber-700 dark:text-amber-400 italic pt-1">
-                    Apenas o solicitante ({getAssigneeName(task?.requester_id)}) ou administradores podem aprovar esta demanda.
+                    Apenas o solicitante ({getAssigneeName(task?.requester_id)}) ou administradores
+                    podem aprovar esta demanda.
                   </div>
                 )}
               </div>
@@ -1345,7 +1355,9 @@ export function TaskDetailsSheet({
                       <span className="font-medium text-foreground">
                         {getAssigneeName(task?.approved_by) || 'Solicitante'}
                       </span>{' '}
-                      {task?.approved_at ? `em ${format(new Date(task.approved_at), 'dd/MM/yyyy HH:mm')}` : ''}
+                      {task?.approved_at
+                        ? `em ${format(new Date(task.approved_at), 'dd/MM/yyyy HH:mm')}`
+                        : ''}
                     </p>
                   </div>
                 </div>
@@ -1413,17 +1425,26 @@ export function TaskDetailsSheet({
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {taskStatuses.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-3 h-3 rounded-full shrink-0"
-                              style={{ backgroundColor: s.color }}
-                            ></span>
-                            <span className="truncate">{s.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {taskStatuses
+                        .filter((s: any) => {
+                          // Se for Não Conformidade e o usuário não for solicitante nem admin/master,
+                          // esconde o status terminal para evitar fechamento direto (o fluxo obriga passar por Aguardando Aprovação)
+                          if (isNcTask && s.is_terminal && !isRequesterOrAdmin) {
+                            return false
+                          }
+                          return true
+                        })
+                        .map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="w-3 h-3 rounded-full shrink-0"
+                                style={{ backgroundColor: s.color }}
+                              ></span>
+                              <span className="truncate">{s.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1582,7 +1603,8 @@ export function TaskDetailsSheet({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              A demanda retornará ao status aberto para o responsável refazer ou complementar as ações necessárias.
+              A demanda retornará ao status aberto para o responsável refazer ou complementar as
+              ações necessárias.
             </p>
             <div className="space-y-2">
               <Label>Motivo da Reprovação *</Label>
