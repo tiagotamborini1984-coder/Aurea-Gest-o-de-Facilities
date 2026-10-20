@@ -528,6 +528,7 @@ export default function Treinamentos() {
                             </div>
                             <div className="flex items-center gap-3">
                               <VerificationBadge
+                                recordId={latest?.id}
                                 status={latest?.verification_status}
                                 notes={latest?.verification_notes}
                                 signedName={latest?.verification_signed_name}
@@ -602,6 +603,7 @@ export default function Treinamentos() {
                               </TableCell>
                               <TableCell>
                                 <VerificationBadge
+                                  recordId={record.id}
                                   status={record.verification_status}
                                   notes={record.verification_notes}
                                   signedName={record.verification_signed_name}
