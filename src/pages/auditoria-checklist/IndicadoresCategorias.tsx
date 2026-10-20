@@ -62,6 +62,7 @@ export default function IndicadoresCategorias() {
   const hasAccess = useHasAccess('Auditoria e Checklist')
 
   // Filtros
+  const [filterAuditTitle, setFilterAuditTitle] = useState<string>('all')
   const [filterType, setFilterType] = useState<string>('all')
   const [filterPlant, setFilterPlant] = useState<string>('all')
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('last_6_months')
@@ -69,9 +70,11 @@ export default function IndicadoresCategorias() {
   const [customEndDate, setCustomEndDate] = useState<string>('')
 
   // Dados
+  const [availableTitles, setAvailableTitles] = useState<string[]>([])
   const [availableTypes, setAvailableTypes] = useState<string[]>([])
   const [metrics, setMetrics] = useState<AuditCategoryMetricsResult | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingTitles, setLoadingTitles] = useState(true)
   const [loadingTypes, setLoadingTypes] = useState(true)
 
   const effectiveClientId = activeClient?.id || profile?.client_id
@@ -131,12 +134,25 @@ export default function IndicadoresCategorias() {
     }
   }, [periodPreset, customStartDate, customEndDate])
 
-  // Carregar tipos de auditoria
+  // Carregar títulos e tipos de auditoria
   useEffect(() => {
     if (!effectiveClientId) return
 
     let isMounted = true
+    setLoadingTitles(true)
     setLoadingTypes(true)
+
+    auditCategoryService
+      .getAuditTitles(effectiveClientId)
+      .then((titles) => {
+        if (isMounted) setAvailableTitles(titles)
+      })
+      .catch((err) => {
+        console.error('Erro ao buscar títulos de auditoria:', err)
+      })
+      .finally(() => {
+        if (isMounted) setLoadingTitles(false)
+      })
 
     auditCategoryService
       .getAuditTypes(effectiveClientId)
@@ -173,6 +189,7 @@ export default function IndicadoresCategorias() {
       const result = await auditCategoryService.getCategoryMetrics({
         clientId: effectiveClientId,
         auditType: filterType,
+        auditTitle: filterAuditTitle,
         plantIds: plantIdsParam,
         startDate: dateRange.start,
         endDate: dateRange.end,
@@ -199,6 +216,7 @@ export default function IndicadoresCategorias() {
   }, [
     effectiveClientId,
     filterType,
+    filterAuditTitle,
     filterPlant,
     dateRange.start,
     dateRange.end,
@@ -211,6 +229,7 @@ export default function IndicadoresCategorias() {
   }, [fetchMetrics])
 
   const handleResetFilters = () => {
+    setFilterAuditTitle('all')
     setFilterType('all')
     setFilterPlant('all')
     setPeriodPreset('last_6_months')
@@ -295,11 +314,39 @@ export default function IndicadoresCategorias() {
               Auditoria e Checklist
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <BarChart3 className="w-7 h-7 text-primary" />
-            Indicadores por Categoria
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2 text-foreground">
+              <BarChart3 className="w-7 h-7 text-primary shrink-0" />
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground sm:hidden">
+                Auditoria selecionada
+              </span>
+            </div>
+            <div className="w-full sm:min-w-[320px] md:min-w-[420px] max-w-[620px]">
+              <Select
+                value={filterAuditTitle}
+                onValueChange={setFilterAuditTitle}
+                disabled={loadingTitles}
+              >
+                <SelectTrigger
+                  aria-label="Selecionar auditoria"
+                  className="h-11 sm:h-12 bg-background border-input font-bold text-base sm:text-xl md:text-2xl tracking-tight text-foreground px-3.5 shadow-sm rounded-lg hover:border-primary/50 transition-colors focus:ring-2 focus:ring-primary/20"
+                >
+                  <SelectValue placeholder="Todas as auditorias" />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  <SelectItem value="all" className="font-semibold text-sm">
+                    Todas as auditorias
+                  </SelectItem>
+                  {availableTitles.map((title) => (
+                    <SelectItem key={title} value={title} className="text-sm">
+                      {title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-sm mt-1">
             Acompanhamento agregado e ponderado do nível de conformidade por categoria de pergunta,
             tipo e planta.
           </p>

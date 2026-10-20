@@ -64,6 +64,7 @@ export interface AuditCategoryMetricsResult {
 export interface GetAuditCategoryMetricsParams {
   clientId?: string | null
   auditType?: string | null
+  auditTitle?: string | null
   plantIds?: string[] | null
   startDate?: string | null // 'YYYY-MM-DD'
   endDate?: string | null // 'YYYY-MM-DD'
@@ -79,6 +80,7 @@ export const auditCategoryService = {
       p_plant_ids: params.plantIds && params.plantIds.length > 0 ? params.plantIds : null,
       p_start_date: params.startDate || null,
       p_end_date: params.endDate || null,
+      p_audit_title: params.auditTitle && params.auditTitle !== 'all' ? params.auditTitle : null,
     })
 
     if (error) throw error
@@ -109,6 +111,25 @@ export const auditCategoryService = {
     )
     types.sort((a, b) => a.localeCompare(b))
     return types
+  },
+
+  async getAuditTitles(clientId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('audits')
+      .select('title')
+      .eq('client_id', clientId)
+      .order('title', { ascending: true })
+
+    if (error) throw error
+    const titles = Array.from(
+      new Set(
+        (data || [])
+          .map((row: any) => row.title)
+          .filter((t: any): t is string => Boolean(t && typeof t === 'string' && t.trim() !== '')),
+      ),
+    )
+    titles.sort((a, b) => a.localeCompare(b))
+    return titles
   },
   async listCategories(clientId: string, includeInactive = true): Promise<AuditQuestionCategory[]> {
     let query = supabase
