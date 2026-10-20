@@ -55,11 +55,11 @@ export function TaskDetailsSheet({
   isOpen,
   onClose,
   taskStatuses,
+  taskTypes = [],
   users,
   onTaskUpdated,
 }: any) {
-  const { profile } = useAppStore()
-  const { toast } = useToast()
+  const { profile } = useAppStore()  const { toast } = useToast()
   const [timeline, setTimeline] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [comment, setComment] = useState('')
@@ -86,6 +86,12 @@ export function TaskDetailsSheet({
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null)
   const [poDateDialogOpen, setPoDateDialogOpen] = useState(false)
   const [poGeneratedDate, setPoGeneratedDate] = useState('')
+
+  // NC approval modal & processing state
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [isApproving, setIsApproving] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
 
   useEffect(() => {
     if (isOpen && task) {
@@ -219,6 +225,23 @@ export function TaskDetailsSheet({
       setPoGeneratedDate(format(new Date(), 'yyyy-MM-dd'))
       setPoDateDialogOpen(true)
       return
+    }
+
+    // NC Approval interception: when closing an NC task, reroute to "Aguardando Aprovação"
+    if (status?.is_terminal && isNcTask) {
+      if (pendingApprovalStatus && pendingApprovalStatus.id !== task.status_id) {
+        await processStatusChange(pendingApprovalStatus.id, {
+          approval_status: 'pending',
+          rejection_reason: null,
+        })
+        toast({
+          title: 'Demanda enviada para aprovação do solicitante',
+          description:
+            'Por ser uma Não Conformidade, a conclusão requer validação e aprovação do solicitante.',
+          className: 'bg-amber-50 text-amber-900 border-amber-200',
+        })
+        return
+      }
     }
 
     await processStatusChange(newStatusId)
@@ -642,6 +665,157 @@ export function TaskDetailsSheet({
   const getAssigneeName = (id: string) =>
     users.find((u: any) => u.id === id)?.name || 'Desconhecido'
 
+  // Verification whether the task is of type "Não Conformidade"
+  const currentTaskType = taskTypes.find((t: any) => t.id === task?.type_id)
+  const isNcTask =
+    (currentTaskType?.name && (
+      currentTaskType.name.toLowerCase().includes('não conformidade') ||
+      currentTaskType.name.toLowerCase().includes('nao conformidade') ||
+      currentTaskType.name.toLowerCase() === 'nc'
+    )) ||
+    (task?.title && (
+      task.title.toLowerCase().startsWith('não conformidade') ||
+      task.title.toLowerCase().startsWith('nao conformidade') ||
+      task.title.toLowerCase().startsWith('nc:')
+    ))
+
+  // Find status "Aguardando Aprovação"
+  const pendingApprovalStatus = taskStatuses.find((s: any) =>
+    s.name.toLowerCase().includes('aguardando aprova')
+  )
+
+  const currentStatus = taskStatuses.find((s: any) => s.id === task?.status_id)
+  const isAwaitingApproval =
+    currentStatus?.name?.toLowerCase().includes('aguardando aprova') ||
+    task?.approval_status === 'pending'
+
+  // The requester can approve/reject, or admin/master
+  const isRequesterOrAdmin =
+    profile?.id === task?.requester_id ||
+    profile?.role === 'Master' ||
+    profile?.role === 'Administrador'
+
+  const handleApproveNc = async () => {
+    if (!profile) return
+    setIsApproving(true)
+    try {
+      // Find a terminal/completed status (e.g., Concluído, Finalizado, etc.)
+      const completedStatus =
+        taskStatuses.find((s: any) => s.is_terminal && !s.name.toLowerCase().includes('exclu')) ||
+        taskStatuses.find((s: any) => s.is_terminal)
+
+      const payload: any = {
+        approval_status: 'approved',
+        approved_by: profile.id,
+        approved_at: new Date().toISOString(),
+        rejection_reason: null,
+      }
+
+      if (completedStatus) {
+        payload.status_id = completedStatus.id
+        payload.closed_at = new Date().toISOString()
+      }
+
+      const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
+      if (error) throw error
+
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile.id,
+        content: `Demanda de Não Conformidade APROVADA por ${profile.name || 'Solicitante'}.${
+          completedStatus ? ` Status alterado para: ${completedStatus.name}.` : ''
+        }`,
+        action_type: 'status_change',
+      })
+
+      toast({
+        title: 'Não Conformidade aprovada!',
+        description: 'A demanda foi validada e concluída com sucesso.',
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+
+      onTaskUpdated()
+      loadTimeline()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao aprovar',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handleRejectNc = async () => {
+    if (!rejectionReason.trim()) {
+      toast({
+        title: 'Justificativa obrigatória',
+        description: 'Informe o motivo de reprovar a demanda.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (!profile) return
+
+    setIsRejecting(true)
+    try {
+      // Find open / in progress status (non-terminal, non-pending-approval)
+      const openStatus =
+        taskStatuses.find(
+          (s: any) =>
+            !s.is_terminal &&
+            (s.name.toLowerCase().includes('andamento') ||
+              s.name.toLowerCase().includes('aberto') ||
+              s.name.toLowerCase().includes('pendente')) &&
+            !s.name.toLowerCase().includes('aguardando aprova')
+        ) ||
+        taskStatuses.find((s: any) => !s.is_terminal && !s.name.toLowerCase().includes('aguardando')) ||
+        taskStatuses[0]
+
+      const payload: any = {
+        approval_status: 'rejected',
+        rejection_reason: rejectionReason.trim(),
+        closed_at: null,
+      }
+
+      if (openStatus) {
+        payload.status_id = openStatus.id
+      }
+
+      const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
+      if (error) throw error
+
+      await supabase.from('task_timeline').insert({
+        task_id: task.id,
+        user_id: profile.id,
+        content: `Demanda de Não Conformidade REPROVADA por ${profile.name || 'Solicitante'}. Justificativa: "${rejectionReason.trim()}". Retornada para o responsável refazer.${
+          openStatus ? ` Status alterado para: ${openStatus.name}.` : ''
+        }`,
+        action_type: 'status_change',
+      })
+
+      toast({
+        title: 'Não Conformidade reprovada',
+        description: 'A demanda retornou para o responsável refazer com as observações.',
+        className: 'bg-amber-50 text-amber-900 border-amber-200',
+      })
+
+      setIsRejectDialogOpen(false)
+      setRejectionReason('')
+      onTaskUpdated()
+      loadTimeline()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao reprovar',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsRejecting(false)
+    }
+  }
+
   const canDelegate =
     profile?.role === 'Administrador' ||
     profile?.role === 'Master' ||
@@ -870,18 +1044,37 @@ export function TaskDetailsSheet({
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-[100dvh] p-0 bg-background border-l border-border overflow-hidden">
           <SheetHeader className="p-4 sm:p-6 pb-4 bg-card border-b border-border shrink-0">
-            <SheetTitle className="text-xl text-foreground">
-              {task?.task_number} {task?.title ? `- ${task.title}` : ''}
-            </SheetTitle>
-            <div className="text-sm text-muted-foreground mt-1">
-              Aberto por{' '}
-              <span className="font-medium text-foreground">
-                {getAssigneeName(task?.requester_id)}
-              </span>{' '}
-              para{' '}
-              <span className="font-medium text-foreground">
-                {getAssigneeName(task?.assignee_id)}
+            <div className="flex items-center justify-between gap-2">
+              <SheetTitle className="text-xl text-foreground">
+                {task?.task_number} {task?.title ? `- ${task.title}` : ''}
+              </SheetTitle>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
+              <span>
+                Aberto por{' '}
+                <span className="font-medium text-foreground">
+                  {getAssigneeName(task?.requester_id)}
+                </span>{' '}
+                para{' '}
+                <span className="font-medium text-foreground">
+                  {getAssigneeName(task?.assignee_id)}
+                </span>
               </span>
+              {isNcTask && (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium">
+                  Não Conformidade
+                </Badge>
+              )}
+              {isNcTask && task?.approval_status === 'approved' && (
+                <Badge className="bg-green-600 text-white font-medium border-0">
+                  Aprovada pelo Solicitante
+                </Badge>
+              )}
+              {isNcTask && task?.approval_status === 'rejected' && (
+                <Badge variant="destructive" className="font-medium">
+                  Reprovada - Retornada
+                </Badge>
+              )}
             </div>
           </SheetHeader>
 
@@ -1092,6 +1285,85 @@ export function TaskDetailsSheet({
               </div>
             )}
 
+            {/* Approval banner for Não Conformidade demands */}
+            {isNcTask && isAwaitingApproval && (
+              <div className="p-4 sm:p-5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3 animate-in fade-in">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400">
+                      <CheckCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-foreground text-sm sm:text-base">
+                        Aguardando Aprovação do Solicitante
+                      </h5>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        O responsável concluiu o atendimento desta Não Conformidade. O solicitante deve validar se a ação foi realmente realizada.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {isRequesterOrAdmin ? (
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/20">
+                    <Button
+                      onClick={handleApproveNc}
+                      disabled={isApproving || isRejecting}
+                      className="bg-green-600 hover:bg-green-700 text-white font-medium"
+                      size="sm"
+                    >
+                      {isApproving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                      Aprovar e Concluir
+                    </Button>
+                    <Button
+                      onClick={() => setIsRejectDialogOpen(true)}
+                      disabled={isApproving || isRejecting}
+                      variant="outline"
+                      className="text-red-600 border-red-300 hover:bg-red-500/10 hover:text-red-700 dark:border-red-500/30 font-medium"
+                      size="sm"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Reprovar / Retornar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-amber-700 dark:text-amber-400 italic pt-1">
+                    Apenas o solicitante ({getAssigneeName(task?.requester_id)}) ou administradores podem aprovar esta demanda.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isNcTask && task?.approval_status === 'approved' && (
+              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-between text-green-700 dark:text-green-400">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 shrink-0" />
+                  <div>
+                    <span className="font-semibold text-sm">Não Conformidade Aprovada</span>
+                    <p className="text-xs text-muted-foreground">
+                      Validada por{' '}
+                      <span className="font-medium text-foreground">
+                        {getAssigneeName(task?.approved_by) || 'Solicitante'}
+                      </span>{' '}
+                      {task?.approved_at ? `em ${format(new Date(task.approved_at), 'dd/MM/yyyy HH:mm')}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isNcTask && task?.approval_status === 'rejected' && task?.rejection_reason && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl space-y-1 text-red-700 dark:text-red-400">
+                <div className="flex items-center gap-2">
+                  <X className="w-4 h-4 shrink-0 text-red-600" />
+                  <span className="font-semibold text-sm">Última Reprovação do Solicitante</span>
+                </div>
+                <p className="text-xs text-foreground bg-background/60 p-2.5 rounded-lg border border-red-500/20">
+                  {task.rejection_reason}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-4 pt-4">
               <h4 className="font-semibold text-foreground">Linha do Tempo</h4>
               {loading ? (
@@ -1297,6 +1569,47 @@ export function TaskDetailsSheet({
             <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
               {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Confirmar Exclusão
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for rejecting NC task */}
+      <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reprovar Não Conformidade</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              A demanda retornará ao status aberto para o responsável refazer ou complementar as ações necessárias.
+            </p>
+            <div className="space-y-2">
+              <Label>Motivo da Reprovação *</Label>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Explique o que não foi atendido ou o que ainda precisa ser feito..."
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsRejectDialogOpen(false)}
+              disabled={isRejecting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectNc}
+              disabled={isRejecting || !rejectionReason.trim()}
+            >
+              {isRejecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Confirmar e Retornar
             </Button>
           </div>
         </DialogContent>

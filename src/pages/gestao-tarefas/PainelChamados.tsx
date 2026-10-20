@@ -1361,6 +1361,7 @@ export default function PainelChamados() {
         isOpen={!!selectedTask}
         onClose={() => setSelectedTask(null)}
         taskStatuses={taskStatuses}
+        taskTypes={taskTypes}
         users={users}
         onTaskUpdated={loadData}
       />
