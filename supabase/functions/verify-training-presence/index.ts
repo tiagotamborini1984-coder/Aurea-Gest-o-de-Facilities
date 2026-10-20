@@ -8,6 +8,16 @@ import { corsHeaders } from '../_shared/cors.ts'
 // Integração fixa Maestro<->Aurea (repo privado). Env vars custom não chegam ao
 // runtime das Edge Functions neste ambiente; os valores ficam aqui como fallback.
 
+const CHICO_WEBHOOK_URL =
+  (Deno.env.get('CHICO_WEBHOOK_URL') ?? '') ||
+  'https://maestro.adapta.one/webhooks/generic/f709ed370a39cf342942b0a622d0fffeb0cc9d94d94792b063dbf3de0c3f8343'
+const CHICO_WEBHOOK_SECRET =
+  (Deno.env.get('CHICO_WEBHOOK_SECRET') ?? '') ||
+  '3e8107918d5a42ad04e2f4dd9bcd18b2e5bd26b89f2f61ed6961fefead2ae47e'
+const CHICO_CALLBACK_SECRET =
+  (Deno.env.get('CHICO_CALLBACK_SECRET') ?? '') ||
+  '1bb7858c646aa11edadb7fc2b08d21234c0ec5483a7691e911ad087bb6e83fd7'
+
 function jsonRes(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
