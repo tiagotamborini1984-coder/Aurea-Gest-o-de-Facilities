@@ -1,16 +1,15 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { Loader2, MailWarning } from 'lucide-react'
-import { AutoLogout } from './AutoLogout'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 
 export function ProtectedRoute() {
-  const { user, loading, refreshing } = useAuth()
+  const { user, loading } = useAuth()
   const { toast } = useToast()
 
-  if (loading || refreshing) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-brand-vividBlue" />
@@ -66,10 +65,5 @@ export function ProtectedRoute() {
     )
   }
 
-  return (
-    <>
-      <AutoLogout />
-      <Outlet />
-    </>
-  )
+  return <Outlet />
 }

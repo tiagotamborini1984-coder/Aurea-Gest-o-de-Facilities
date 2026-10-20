@@ -82,32 +82,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return
+      // When the tab becomes visible again, verify if session needs refresh
       supabase.auth.getSession().then(({ data: { session: s } }) => {
-        if (!s) {
-          setRefreshing(true)
-          supabase.auth.refreshSession().finally(() => setRefreshing(false))
+        if (s) {
+          // If token expires in less than 2 minutes, proactively refresh
+          const expiresAt = s.expires_at ? s.expires_at * 1000 : 0
+          if (expiresAt && expiresAt - Date.now() < 2 * 60 * 1000) {
+            supabase.auth.refreshSession().catch((err) => {
+              console.warn('Proactive session refresh on visibility change failed:', err)
+            })
+          }
         }
       })
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
-
-  useEffect(() => {
-    if (!session) return
-    const interval = setInterval(
-      () => {
-        supabase.auth.getSession().then(({ data: { session: s } }) => {
-          if (!s) {
-            setRefreshing(true)
-            supabase.auth.refreshSession().finally(() => setRefreshing(false))
-          }
-        })
-      },
-      5 * 60 * 1000,
-    )
-    return () => clearInterval(interval)
-  }, [session])
 
   const refreshSession = useCallback(async () => {
     setRefreshing(true)
