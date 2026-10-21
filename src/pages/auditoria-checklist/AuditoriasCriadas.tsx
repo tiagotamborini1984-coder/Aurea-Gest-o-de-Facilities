@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Plus, Edit, Play, FileText, Copy, Tag, BarChart3 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { cloneAudit } from '@/services/audit'
 
@@ -193,7 +194,19 @@ export default function AuditoriasCriadas() {
               ) : (
                 audits.map((audit) => (
                   <TableRow key={audit.id}>
-                    <TableCell className="font-medium">{audit.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{audit.title}</span>
+                        {audit.reconstruction_batch && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 border-amber-300 bg-amber-50 text-amber-700"
+                          >
+                            Reconstruída (parcial)
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{audit.type}</TableCell>
                     <TableCell>{audit.frequency}</TableCell>
                     <TableCell>

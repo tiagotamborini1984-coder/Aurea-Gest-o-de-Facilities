@@ -48,17 +48,15 @@ export default function DetalhesRealizada() {
 
   async function fetchExecutionDetails() {
     setLoading(true)
-    const { data: execData } = await supabase
-      .from('audit_executions')
+    const { data: execData } = await (supabase.from('audit_executions') as any)
       .select(`
       *, 
-      audits ( title, scoring_settings, client_id ), 
+      audits ( title, scoring_settings, client_id, reconstruction_batch ), 
       plants ( name ), 
       profiles ( name )
     `)
       .eq('id', id)
       .single()
-
     if (execData) {
       setExecution(execData)
       if (execData.audits?.client_id) {
@@ -168,12 +166,22 @@ export default function DetalhesRealizada() {
 
       <div className="border-b pb-6 print:border-b-2 print:border-black flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
-          <h1
-            className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2 print:text-black"
-            style={brandStyle}
-          >
-            Relatório de Auditoria: {execution.audits?.title}
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap mb-2">
+            <h1
+              className="text-3xl font-bold text-slate-900 dark:text-slate-100 print:text-black"
+              style={brandStyle}
+            >
+              Relatório de Auditoria: {execution.audits?.title}
+            </h1>
+            {(execution.reconstruction_batch || execution.audits?.reconstruction_batch) && (
+              <Badge
+                variant="outline"
+                className="border-amber-300 bg-amber-50 text-amber-700 text-xs"
+              >
+                Reconstruída (parcial)
+              </Badge>
+            )}
+          </div>
           <div className="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-slate-400 mt-4 print:text-black">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
@@ -224,12 +232,25 @@ export default function DetalhesRealizada() {
           </p>
         </div>
         <div className="text-right">
-          <div className="text-4xl font-bold text-primary print:text-black" style={brandStyle}>
-            {percentage}%
-          </div>
-          <div className="text-sm text-slate-500 mt-1 print:text-slate-700">
-            {execution.final_score} de {execution.max_score} pontos
-          </div>
+          {execution.final_score === null && (!execution.max_score || execution.max_score === 0) ? (
+            <div>
+              <div className="text-xl font-semibold text-slate-500 print:text-black">
+                Não calculado
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Auditoria reconstruída de tarefas (apenas NCs recuperadas)
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-4xl font-bold text-primary print:text-black" style={brandStyle}>
+                {percentage}%
+              </div>
+              <div className="text-sm text-slate-500 mt-1 print:text-slate-700">
+                {execution.final_score} de {execution.max_score} pontos
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

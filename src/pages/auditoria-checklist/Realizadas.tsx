@@ -172,13 +172,14 @@ export default function AuditoriaRealizadas() {
   const fetchAudits = async () => {
     try {
       setLoading(true)
-      let query = supabase.from('audit_executions').select(`
+      let query = (supabase.from('audit_executions') as any).select(`
           id,
           status,
           realization_date,
           final_score,
           max_score,
           created_at,
+          reconstruction_batch,
           task_id,
           tasks (
             task_number,
@@ -191,7 +192,8 @@ export default function AuditoriaRealizadas() {
             title,
             type,
             client_id,
-            scoring_settings
+            scoring_settings,
+            reconstruction_batch
           ),
           plants (
             id,
@@ -427,7 +429,19 @@ export default function AuditoriaRealizadas() {
                         <TableCell className="font-medium text-muted-foreground">
                           {audit.tasks?.task_number || '-'}
                         </TableCell>
-                        <TableCell className="font-medium">{audit.audits?.title}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{audit.audits?.title}</span>
+                            {(audit.reconstruction_batch || audit.audits?.reconstruction_batch) && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 border-amber-300 bg-amber-50 text-amber-700"
+                              >
+                                Reconstruída (parcial)
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{audit.plants?.name}</TableCell>
                         <TableCell>{audit.profiles?.name}</TableCell>
                         <TableCell>
@@ -459,18 +473,28 @@ export default function AuditoriaRealizadas() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            className={
-                              scorePercentage >= 80
-                                ? 'bg-green-600 text-white hover:bg-green-700 border-transparent'
-                                : scorePercentage >= 50
-                                  ? 'bg-yellow-500 text-white hover:bg-yellow-600 border-transparent'
-                                  : 'bg-red-600 text-white hover:bg-red-700 border-transparent'
-                            }
-                          >
-                            {audit.final_score || 0} / {audit.max_score || 0} (
-                            {scorePercentage.toFixed(1)}%)
-                          </Badge>
+                          {audit.final_score === null &&
+                          (!audit.max_score || audit.max_score === 0) ? (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs font-normal text-muted-foreground"
+                            >
+                              Sem pontuação geral
+                            </Badge>
+                          ) : (
+                            <Badge
+                              className={
+                                scorePercentage >= 80
+                                  ? 'bg-green-600 text-white hover:bg-green-700 border-transparent'
+                                  : scorePercentage >= 50
+                                    ? 'bg-yellow-500 text-white hover:bg-yellow-600 border-transparent'
+                                    : 'bg-red-600 text-white hover:bg-red-700 border-transparent'
+                              }
+                            >
+                              {audit.final_score || 0} / {audit.max_score || 0} (
+                              {scorePercentage.toFixed(1)}%)
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
