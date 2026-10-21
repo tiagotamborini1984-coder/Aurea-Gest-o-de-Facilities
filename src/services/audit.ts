@@ -32,18 +32,13 @@ export const submitAuditExecution = async (
 
     if (error) {
       console.error('submitAuditExecution RPC Error:', error)
-      throw new Error('Erro ao enviar respostas. Tente novamente.')
+      throw new Error(error.message || 'Erro ao enviar respostas. Tente novamente.')
     }
 
     return data
   } catch (err: any) {
     console.error('submitAuditExecution Exception:', err)
-    if (err.message === 'Erro ao enviar respostas. Tente novamente.') {
-      throw err
-    }
-    throw new Error(
-      'Ocorreu um problema ao comunicar com o servidor. Por favor, tente novamente mais tarde.',
-    )
+    throw new Error(err.message || 'Erro ao enviar respostas. Tente novamente.')
   }
 }
 
