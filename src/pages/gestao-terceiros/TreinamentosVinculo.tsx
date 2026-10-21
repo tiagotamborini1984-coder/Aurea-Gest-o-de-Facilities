@@ -309,6 +309,16 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
                 Comprovante{' '}
                 {record.is_required && <span className="text-red-500 font-bold ml-1">*</span>}
               </Label>
+              {record.document_url && (
+                <div className="mb-1.5">
+                  <VerificationBadge
+                    recordId={null}
+                    status={record.verification_status}
+                    notes={record.verification_notes}
+                    signedName={record.verification_signed_name}
+                  />
+                </div>
+              )}
               {record.document_url ? (
                 <div className="flex items-center gap-2 h-10 px-3 bg-background border rounded-md">
                   <button

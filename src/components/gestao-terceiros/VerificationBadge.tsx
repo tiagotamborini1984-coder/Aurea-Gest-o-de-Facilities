@@ -7,27 +7,27 @@ import { verifyTrainingPresence } from '@/lib/training-verification'
 
 const CFG: Record<string, { label: string; icon: any; className: string }> = {
   verified: {
-    label: 'IA: conferido',
+    label: 'Lista validada ✓',
     icon: ShieldCheck,
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   rejected: {
-    label: 'IA: não conferido',
+    label: 'Lista incorreta ✗',
     icon: ShieldX,
     className: 'bg-rose-50 text-rose-700 border-rose-200',
   },
   failed: {
-    label: 'IA: indisponível',
+    label: 'Falha na conferência',
     icon: ShieldQuestion,
     className: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   analyzing: {
-    label: 'IA: analisando…',
+    label: 'Validando…',
     icon: ShieldQuestion,
     className: 'bg-blue-50 text-blue-700 border-blue-200',
   },
   pending: {
-    label: 'IA: aguardando',
+    label: 'Aguardando conferência',
     icon: ShieldQuestion,
     className: 'bg-slate-50 text-slate-600 border-slate-200',
   },
