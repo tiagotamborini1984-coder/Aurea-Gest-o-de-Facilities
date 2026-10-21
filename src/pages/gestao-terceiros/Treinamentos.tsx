@@ -257,9 +257,35 @@ export default function Treinamentos() {
           )
           return [newRecord, ...filtered]
         })
-        toast({ title: 'Treinamento anexado com sucesso!' })
-        // Conferência IA da lista de presença; ao terminar, atualiza modal e listagem
-        verifyTrainingPresence(newRecord.id).then(() => {
+        toast({ title: 'Documento anexado. Aguardando conferência do agente…' })
+        // Conferência pelo agente; reprovado = registro removido (anexo não vale)
+        verifyTrainingPresence(newRecord.id).then((res: any) => {
+          if (res?.status === 'rejected') {
+            supabase
+              .from('employee_training_records')
+              .delete()
+              .eq('id', newRecord.id)
+              .then(() => {
+                toast({
+                  title: 'Anexo recusado pelo agente',
+                  description: res.notes || 'Documento não validado.',
+                  variant: 'destructive',
+                  duration: 12000,
+                })
+                setEmpRecords((prev) => prev.filter((r) => r.id !== newRecord.id))
+                fetchData()
+              })
+          } else {
+            toast({
+              title:
+                res?.status === 'verified'
+                  ? 'Lista conferida pelo agente ✓'
+                  : 'Verificação indisponível',
+              description: res?.notes || undefined,
+              variant: res?.status === 'verified' ? 'default' : 'destructive',
+              duration: 12000,
+            })
+          }
           openDetails(selectedEmp)
           fetchData()
         })

@@ -50,6 +50,11 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
             completion_date: d.completion_date,
             document_url: d.document_url,
             is_required: false,
+            verification_status: d.verification_status,
+            verification_notes: d.verification_notes,
+            verification_signed_name: d.verification_signed_name,
+            verification_confidence: d.verification_confidence,
+            verified_document_url: d.document_url,
           }))
           setForm((prev: any) => ({ ...prev, training_records: records }))
         }
