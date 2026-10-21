@@ -15,6 +15,8 @@
     "diagnose-catalog": 137,
     "process-vacation-completion": 3,
     "create-demo-user": 88,
-    "verify-training-presence": 7
+    "verify-training-presence": 7,
+    "daily-report": 4,
+    "monthly-report": 1
   }
 }
