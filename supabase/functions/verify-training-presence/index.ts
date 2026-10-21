@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 
 // Conferência de lista de presença via MAESTRO (Chico) — sem chave de IA externa.
-// Fluxo: POST {record_id} → marca 'analyzing' → aciona webhook do Maestro →
+// Fluxo: POST {record_id} OU {job_id} → aciona webhook do Maestro →
 // Maestro lê o documento com visão → POST callback {action:'callback', ...} → grava resultado.
 // Integração fixa Maestro<->Aurea (repo privado). Env vars custom não chegam ao
 // runtime das Edge Functions neste ambiente; os valores ficam aqui como fallback.
@@ -54,19 +54,33 @@ Deno.serve(async (req: Request) => {
       return jsonRes({ error: 'Não autorizado' }, 401)
     }
     const recordId = body.record_id
-    if (!recordId) return jsonRes({ error: 'Missing record_id' }, 400)
+    const jobId = body.job_id
+    if (!recordId && !jobId) return jsonRes({ error: 'Missing record_id/job_id' }, 400)
 
     const status = body.status === 'verified' ? 'verified' : 'rejected'
-    await admin
-      .from('employee_training_records')
-      .update({
-        verification_status: status,
-        verification_notes: String(body.notes || '').slice(0, 500),
-        verification_signed_name: String(body.signed_name || '').slice(0, 200),
-        verification_confidence: typeof body.confidence === 'number' ? body.confidence : 50,
-        verified_at: new Date().toISOString(),
-      })
-      .eq('id', recordId)
+    const payload = {
+      verification_status: status,
+      verification_notes: String(body.notes || '').slice(0, 500),
+      verification_signed_name: String(body.signed_name || '').slice(0, 200),
+      verification_confidence: typeof body.confidence === 'number' ? body.confidence : 50,
+      verified_at: new Date().toISOString(),
+    }
+
+    if (recordId) {
+      await admin.from('employee_training_records').update(payload).eq('id', recordId)
+    }
+    if (jobId) {
+      await admin
+        .from('training_verification_jobs')
+        .update({
+          status: status,
+          notes: payload.verification_notes,
+          signed_name: payload.verification_signed_name,
+          confidence: payload.verification_confidence,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+    }
 
     return jsonRes({ success: true })
   }
@@ -77,22 +91,59 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) return jsonRes({ error: 'Missing Authorization header' }, 401)
 
     const recordId = body?.record_id
-    if (!recordId) return jsonRes({ error: 'Missing record_id' }, 400)
+    const jobId = body?.job_id
+    if (!recordId && !jobId) return jsonRes({ error: 'Missing record_id ou job_id' }, 400)
 
-    const { data: rec, error: recErr } = await admin
-      .from('employee_training_records')
-      .select('id, document_url, employees(name), trainings(name)')
-      .eq('id', recordId)
-      .single()
+    let documentUrl = ''
+    let trainingName = ''
+    let employeeName = ''
 
-    if (recErr || !rec) return jsonRes({ error: 'Registro de treinamento não encontrado' }, 404)
-    const record = rec as any
-    if (!record.document_url) {
-      return jsonRes({ error: 'Registro sem documento anexado' }, 400)
+    if (recordId) {
+      const { data: rec, error: recErr } = await admin
+        .from('employee_training_records')
+        .select('id, document_url, employees(name), trainings(name)')
+        .eq('id', recordId)
+        .single()
+      if (recErr || !rec) return jsonRes({ error: 'Registro de treinamento não encontrado' }, 404)
+      if (!(rec as any).document_url) {
+        return jsonRes({ error: 'Registro sem documento anexado' }, 400)
+      }
+      documentUrl = (rec as any).document_url
+      trainingName = (rec as any).trainings?.name || ''
+      employeeName = (rec as any).employees?.name || ''
+    } else {
+      const { data: job, error: jobErr } = await admin
+        .from('training_verification_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single()
+      if (jobErr || !job) return jsonRes({ error: 'Job de verificação não encontrado' }, 404)
+      documentUrl = (job as any).document_url
+      trainingName = (job as any).training_name || ''
+      employeeName = (job as any).employee_name || ''
+    }
+
+    // Falha que deve ser registrada no registro e/ou no job
+    const markFail = async (notes: string) => {
+      if (recordId) {
+        await admin
+          .from('employee_training_records')
+          .update({
+            verification_status: 'failed',
+            verification_notes: notes,
+            verified_at: new Date().toISOString(),
+          })
+          .eq('id', recordId)
+      }
+      if (jobId) {
+        await admin
+          .from('training_verification_jobs')
+          .update({ status: 'failed', notes, updated_at: new Date().toISOString() })
+          .eq('id', jobId)
+      }
     }
 
     // Resolve caminhos legados (sem URL completa) para a URL pública do bucket
-    let documentUrl = record.document_url
     if (!/^https?:\/\//i.test(documentUrl)) {
       let cleanPath = String(documentUrl)
         .replace(/^documents\//, '')
@@ -108,24 +159,17 @@ Deno.serve(async (req: Request) => {
             `${base}/storage/v1/object/public/training-documents/${cleanPath}`,
             `${base}/storage/v1/object/public/training-documents/trainings/${cleanPath}`,
           ]
-      let resolved: Response | null = null
+      let ok = false
       for (const c of candidates) {
         const r = await fetch(c, { method: 'HEAD' })
         if (r.ok) {
-          resolved = r
+          ok = true
           documentUrl = c
           break
         }
       }
-      if (!resolved) {
-        await admin
-          .from('employee_training_records')
-          .update({
-            verification_status: 'failed',
-            verification_notes: 'Documento não encontrado no repositório (caminho antigo).',
-            verified_at: new Date().toISOString(),
-          })
-          .eq('id', recordId)
+      if (!ok) {
+        await markFail('Documento não encontrado no repositório (caminho antigo).')
         return jsonRes({ error: 'Documento não encontrado no repositório' }, 404)
       }
     }
@@ -134,26 +178,21 @@ Deno.serve(async (req: Request) => {
     const webhookSecret = CHICO_WEBHOOK_SECRET
     const cbSecret = CHICO_CALLBACK_SECRET
     if (!webhookUrl || !webhookSecret || !cbSecret) {
-      await admin
-        .from('employee_training_records')
-        .update({
-          verification_status: 'failed',
-          verification_notes: 'Integração de conferência (Maestro) não configurada.',
-          verified_at: new Date().toISOString(),
-        })
-        .eq('id', recordId)
+      await markFail('Integração de conferência (Maestro) não configurada.')
       return jsonRes({ error: 'Integração de conferência não configurada' }, 500)
     }
 
-    // marca como em análise
-    await admin
-      .from('employee_training_records')
-      .update({
-        verification_status: 'analyzing',
-        verification_notes: 'Conferência em andamento.',
-        verified_at: new Date().toISOString(),
-      })
-      .eq('id', recordId)
+    // marca o registro (se existir) como em análise
+    if (recordId) {
+      await admin
+        .from('employee_training_records')
+        .update({
+          verification_status: 'analyzing',
+          verification_notes: 'Conferência em andamento.',
+          verified_at: new Date().toISOString(),
+        })
+        .eq('id', recordId)
+    }
 
     // aciona o Maestro (Chico)
     const whRes = await fetch(webhookUrl, {
@@ -164,9 +203,10 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         record_id: recordId,
-        document_url: record.document_url,
-        training_name: record.trainings?.name || '',
-        employee_name: record.employees?.name || '',
+        job_id: jobId,
+        document_url: documentUrl,
+        training_name: trainingName,
+        employee_name: employeeName,
         callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/verify-training-presence`,
         callback_secret: cbSecret,
       }),
@@ -174,14 +214,7 @@ Deno.serve(async (req: Request) => {
 
     if (!whRes.ok) {
       const t = (await whRes.text()).slice(0, 300)
-      await admin
-        .from('employee_training_records')
-        .update({
-          verification_status: 'failed',
-          verification_notes: `Falha ao acionar a conferência (${whRes.status}).`,
-          verified_at: new Date().toISOString(),
-        })
-        .eq('id', recordId)
+      await markFail(`Falha ao acionar a conferência (${whRes.status}).`)
       return jsonRes({ error: `Falha ao acionar conferência: ${whRes.status}`, detail: t }, 502)
     }
 

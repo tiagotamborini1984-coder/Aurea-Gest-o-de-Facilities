@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { verifyByJob } from '@/lib/training-verification'
+import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
 import { cn } from '@/lib/utils'
 
 export function EmployeeTrainingsForm({ form, setForm }: any) {
@@ -187,8 +189,34 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     const { data: publicUrlData } = supabase.storage
       .from('training-documents')
       .getPublicUrl(filePath)
-    updateRecord(index, 'document_url', publicUrlData.publicUrl)
-    toast({ title: 'Sucesso', description: 'Documento anexado com sucesso.' })
+    const url = publicUrlData.publicUrl
+    updateRecord(index, 'document_url', url)
+
+    // Conferência IMEDIATA pelo agente (no anexo, antes de salvar)
+    const trainingName =
+      trainings.find((t: any) => t.id === record.training_id)?.name || 'Treinamento'
+    const employeeName = form.name || ''
+    updateRecord(index, 'verification_status', 'analyzing')
+    toast({ title: 'Documento anexado. Agente conferindo a lista…' })
+    const res = await verifyByJob({
+      documentUrl: url,
+      trainingName,
+      employeeName,
+    })
+    updateRecord(index, 'verification_status', res.status || 'failed')
+    updateRecord(index, 'verification_notes', res.notes || null)
+    updateRecord(index, 'verification_signed_name', res.signed_name || null)
+    updateRecord(index, 'verified_document_url', url)
+    if (res.status === 'verified') {
+      toast({ title: 'Lista conferida pelo agente ✓', description: res.notes })
+    } else {
+      toast({
+        title: 'Lista NÃO validada',
+        description: res.notes || 'Documento não confere.',
+        variant: 'destructive',
+        duration: 12000,
+      })
+    }
   }
 
   if (isLoading)

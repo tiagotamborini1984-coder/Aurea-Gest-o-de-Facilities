@@ -20,45 +20,13 @@ import { DuplicateHeadcountDialog } from '@/components/gestao-terceiros/Duplicat
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
 import { logAudit } from '@/services/audit'
-import { verifyTrainingPresence } from '@/lib/training-verification'
 
 // Lista está validada pelo agente (e o documento não mudou desde a validação)?
+// A conferência acontece NO MOMENTO DO ANEXO (TreinamentosVinculo); aqui é só o portão.
 function isListValidated(tr?: any): boolean {
   return (
     !!tr && tr.verification_status === 'verified' && tr.verified_document_url === tr.document_url
   )
-}
-
-// Aguarda a conferência das listas de presença pelo agente (polling no banco).
-async function pollTrainingVerification(
-  ids: string[],
-  timeoutMs = 240000,
-): Promise<{ ok: boolean; notes: string; badIds: string[] }> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 5000))
-    const { data } = await supabase
-      .from('employee_training_records')
-      .select('id, verification_status, verification_notes')
-      .in('id', ids)
-    const rows = data || []
-    if (rows.length === 0) continue
-    const pending = rows.filter(
-      (r: any) =>
-        !r.verification_status ||
-        r.verification_status === 'analyzing' ||
-        r.verification_status === 'pending',
-    )
-    if (pending.length === 0) {
-      const bad = rows.filter((r: any) => r.verification_status !== 'verified')
-      return {
-        ok: bad.length === 0,
-        notes: bad[0]?.verification_notes || 'Lista não validada.',
-        badIds: bad.map((r: any) => r.id),
-      }
-    }
-  }
-  return { ok: false, notes: 'Tempo esgotado aguardando a conferência.', badIds: ids }
 }
 
 export default function Cadastros() {
@@ -302,24 +270,22 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador: ${data.name || data.id}`,
                 )
-                // Portão de validação: listas novas precisam ser conferidas pelo agente
+                // Portão: todas as listas anexadas devem ter sido validadas no anexo
                 const formRecs = training_records.filter((tr: any) => tr.training_id)
-                const toVerify = (trRows || []).filter((r: any, i: number) => {
+                const invalid = (trRows || []).filter((r: any, i: number) => {
                   return r.document_url && !isListValidated(formRecs[i])
                 })
-                for (const r of toVerify) {
-                  await verifyTrainingPresence(r.id)
-                }
-                if (toVerify.length > 0) {
-                  const res = await pollTrainingVerification(toVerify.map((r: any) => r.id))
-                  if (!res.ok) {
-                    await supabase.from('employees').delete().eq('id', data.id)
-                    return {
-                      success: false,
-                      error: {
-                        message: `Cadastro não salvo: lista de presença não validada pelo agente. ${res.notes}`,
-                      },
-                    }
+                if (invalid.length > 0) {
+                  await supabase.from('employees').delete().eq('id', data.id)
+                  return {
+                    success: false,
+                    error: {
+                      message:
+                        `Cadastro não salvo: lista de presença não validada pelo agente. ${invalid[0] ? '' : ''}(anexe uma lista válida e aguarde a conferência)`.replace(
+                          '  ',
+                          ' ',
+                        ),
+                    },
                   }
                 }
               }
@@ -436,28 +402,23 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador ID: ${id}`,
                 )
-                // Portão de validação: listas novas/trocadas precisam ser conferidas pelo agente
+                // Portão: listas novas/trocadas devem ter sido validadas no anexo
                 const formRecs = training_records.filter((tr: any) => tr.training_id)
-                const toVerify = (trRows || []).filter((r: any, i: number) => {
+                const invalid = (trRows || []).filter((r: any, i: number) => {
                   return r.document_url && !isListValidated(formRecs[i])
                 })
-                for (const r of toVerify) {
-                  await verifyTrainingPresence(r.id)
-                }
-                if (toVerify.length > 0) {
-                  const res = await pollTrainingVerification(toVerify.map((r: any) => r.id))
-                  if (!res.ok) {
-                    // desfaz: restaura os registros anteriores
-                    await supabase.from('employee_training_records').delete().eq('employee_id', id)
-                    if (oldRows && oldRows.length > 0) {
-                      await supabase.from('employee_training_records').insert(oldRows)
-                    }
-                    return {
-                      success: false,
-                      error: {
-                        message: `Alteração não salva: lista de presença não validada pelo agente. ${res.notes}`,
-                      },
-                    }
+                if (invalid.length > 0) {
+                  // desfaz: restaura os registros anteriores
+                  await supabase.from('employee_training_records').delete().eq('employee_id', id)
+                  if (oldRows && oldRows.length > 0) {
+                    await supabase.from('employee_training_records').insert(oldRows)
+                  }
+                  return {
+                    success: false,
+                    error: {
+                      message:
+                        'Alteração não salva: há lista de presença não validada pelo agente (anexe uma lista válida e aguarde a conferência no momento do anexo).',
+                    },
                   }
                 }
               }
