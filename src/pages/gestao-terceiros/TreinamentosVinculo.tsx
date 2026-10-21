@@ -135,25 +135,31 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
   const records = form.training_records || []
 
   const addRecord = () => {
-    setForm({
-      ...form,
+    setForm((prev: any) => ({
+      ...prev,
       training_records: [
-        ...records,
+        ...(prev.training_records || []),
         { training_id: '', completion_date: '', document_url: '', is_required: false },
       ],
+    }))
+  }
+
+  // SEMPRE sobre o estado mais recente do form (prev =>): anexos em sequência não
+  // podem sobrescrever resultados de verificação gravados por anexos anteriores.
+  const updateRecord = (index: number, field: string, value: any) => {
+    setForm((prev: any) => {
+      const recs = [...(prev.training_records || [])]
+      if (!recs[index]) return prev
+      recs[index] = { ...recs[index], [field]: value }
+      return { ...prev, training_records: recs }
     })
   }
 
-  const updateRecord = (index: number, field: string, value: any) => {
-    const newRecords = [...records]
-    newRecords[index][field] = value
-    setForm({ ...form, training_records: newRecords })
-  }
-
   const removeRecord = (index: number) => {
-    const newRecords = [...records]
-    newRecords.splice(index, 1)
-    setForm({ ...form, training_records: newRecords })
+    setForm((prev: any) => ({
+      ...prev,
+      training_records: (prev.training_records || []).filter((_: any, i: number) => i !== index),
+    }))
   }
 
   const handleFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {

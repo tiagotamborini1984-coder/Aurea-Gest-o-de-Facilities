@@ -270,10 +270,13 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador: ${data.name || data.id}`,
                 )
-                // Portão: todas as listas anexadas devem ter sido validadas no anexo
+                // Portão: todas as listas anexadas devem ter sido validadas no anexo.
+                // Alinhado por document_url (ordem do retorno do insert não é garantida).
                 const formRecs = training_records.filter((tr: any) => tr.training_id)
-                const invalid = (trRows || []).filter((r: any, i: number) => {
-                  return r.document_url && !isListValidated(formRecs[i])
+                const invalid = (trRows || []).filter((r: any) => {
+                  if (!r.document_url) return false
+                  const tr = formRecs.find((f: any) => f.document_url === r.document_url)
+                  return !tr || !isListValidated(tr)
                 })
                 if (invalid.length > 0) {
                   await supabase.from('employees').delete().eq('id', data.id)
