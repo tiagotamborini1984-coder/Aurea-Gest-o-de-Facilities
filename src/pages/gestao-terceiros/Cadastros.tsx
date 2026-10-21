@@ -369,20 +369,30 @@ export default function Cadastros() {
                   },
                 }
               }
+              const oldByTraining = new Map<string, any>(
+                (oldRows || []).map((o: any) => [o.training_id, o]),
+              )
               const trPayload = training_records
                 .filter((tr: any) => tr.training_id)
-                .map((tr: any) => ({
-                  client_id: updateClientId,
-                  employee_id: id,
-                  training_id: tr.training_id,
-                  document_url: tr.document_url || '',
-                  completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
-                  verification_status: tr.verification_status || 'pending',
-                  verification_notes: tr.verification_notes || null,
-                  verification_signed_name: tr.verification_signed_name || null,
-                  verification_confidence: tr.verification_confidence ?? null,
-                  verified_at: tr.verified_at || null,
-                }))
+                .map((tr: any) => {
+                  // Lista não reanexada = preserva o estado MAIS RECENTE do banco
+                  // (evita que formulário desatualizado sobrescreva verificação nova)
+                  const old = oldByTraining.get(tr.training_id)
+                  const unchanged = !!old && (old.document_url || '') === (tr.document_url || '')
+                  const src = unchanged ? old : tr
+                  return {
+                    client_id: updateClientId,
+                    employee_id: id,
+                    training_id: tr.training_id,
+                    document_url: src.document_url || '',
+                    completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                    verification_status: src.verification_status || 'pending',
+                    verification_notes: src.verification_notes || null,
+                    verification_signed_name: src.verification_signed_name || null,
+                    verification_confidence: src.verification_confidence ?? null,
+                    verified_at: src.verified_at || null,
+                  }
+                })
               if (trPayload.length > 0) {
                 const { error: trError, data: trRows } = await supabase
                   .from('employee_training_records')
@@ -402,10 +412,15 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador ID: ${id}`,
                 )
-                // Portão: listas novas/trocadas devem ter sido validadas no anexo
+                // Portão: SÓ lista NOVA/TROCADA precisa estar validada — listas já
+                // anexadas (iguais às do banco) NÃO são reanalisadas.
                 const formRecs = training_records.filter((tr: any) => tr.training_id)
                 const invalid = (trRows || []).filter((r: any, i: number) => {
-                  return r.document_url && !isListValidated(formRecs[i])
+                  const tr = formRecs[i]
+                  if (!r.document_url) return false
+                  const old = oldByTraining.get(tr.training_id)
+                  const isUnchanged = !!old && (old.document_url || '') === (tr.document_url || '')
+                  return !isUnchanged && !isListValidated(tr)
                 })
                 if (invalid.length > 0) {
                   // desfaz: restaura os registros anteriores

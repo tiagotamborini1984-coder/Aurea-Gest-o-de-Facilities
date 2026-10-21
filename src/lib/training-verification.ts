@@ -68,7 +68,7 @@ export async function verifyByJob(params: {
 
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 4000))
+    await new Promise((r) => setTimeout(r, 2000))
     const { data } = await supabase
       .from('training_verification_jobs')
       .select('status, notes, signed_name, confidence')
@@ -104,9 +104,9 @@ export async function verifyTrainingPresence(
   if (!start?.success) {
     return { ok: false, status: 'failed', notes: start?.error || 'Falha ao acionar conferência.' }
   }
-  const deadline = Date.now() + 240000
+  const deadline = Date.now() + 180000
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 4000))
+    await new Promise((r) => setTimeout(r, 2000))
     const { data } = await supabase
       .from('employee_training_records')
       .select(
