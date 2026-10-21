@@ -191,6 +191,10 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
       .getPublicUrl(filePath)
     const url = publicUrlData.publicUrl
     updateRecord(index, 'document_url', url)
+    // Documento novo anexado: resultado anterior NÃO se aplica — limpar na hora
+    updateRecord(index, 'verification_notes', null)
+    updateRecord(index, 'verification_signed_name', null)
+    updateRecord(index, 'verified_document_url', null)
 
     // Conferência IMEDIATA pelo agente (no anexo, antes de salvar)
     const trainingName =

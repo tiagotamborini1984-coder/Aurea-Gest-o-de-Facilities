@@ -242,6 +242,12 @@ export default function Treinamentos() {
             training_id: trainingId,
             document_url: publicUrlData.publicUrl,
             completion_date: new Date().toISOString().split('T')[0],
+            // Documento (re)anexado: resultado anterior NÃO se aplica — zera para a nova conferência
+            verification_status: 'analyzing',
+            verification_notes: 'Conferência em andamento.',
+            verification_signed_name: null,
+            verification_confidence: null,
+            verified_at: new Date().toISOString(),
           },
           { onConflict: 'employee_id,training_id' },
         )
