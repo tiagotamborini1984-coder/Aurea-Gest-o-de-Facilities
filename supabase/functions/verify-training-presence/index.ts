@@ -65,21 +65,27 @@ Deno.serve(async (req: Request) => {
       verification_confidence: typeof body.confidence === 'number' ? body.confidence : 50,
       verified_at: new Date().toISOString(),
     }
+    // Data de conclusão extraída da lista (se veio no callback)
+    const completionDate = String(body.completion_date || '').match(/^\d{4}-\d{2}-\d{2}$/)
+      ? body.completion_date
+      : null
+    if (completionDate) {
+      ;(payload as any).completion_date = completionDate
+    }
 
     if (recordId) {
       await admin.from('employee_training_records').update(payload).eq('id', recordId)
     }
     if (jobId) {
-      await admin
-        .from('training_verification_jobs')
-        .update({
-          status: status,
-          notes: payload.verification_notes,
-          signed_name: payload.verification_signed_name,
-          confidence: payload.verification_confidence,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', jobId)
+      const jobPayload: any = {
+        status: status,
+        notes: payload.verification_notes,
+        signed_name: payload.verification_signed_name,
+        confidence: payload.verification_confidence,
+        updated_at: new Date().toISOString(),
+      }
+      if (completionDate) jobPayload.completion_date = completionDate
+      await admin.from('training_verification_jobs').update(jobPayload).eq('id', jobId)
     }
 
     return jsonRes({ success: true })

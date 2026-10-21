@@ -227,6 +227,11 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     updateRecord(index, 'verification_notes', res.notes || null)
     updateRecord(index, 'verification_signed_name', res.signed_name || null)
     updateRecord(index, 'verified_document_url', url)
+    // Data de conclusão extraída da lista pelo agente (se veio e o campo está vazio)
+    if (res.completion_date) {
+      const rec = (form.training_records || [])[index]
+      if (!rec?.completion_date) updateRecord(index, 'completion_date', res.completion_date)
+    }
     if (res.status === 'verified') {
       toast({ title: 'Lista conferida pelo agente ✓', description: res.notes })
     } else {

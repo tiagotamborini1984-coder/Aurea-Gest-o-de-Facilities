@@ -6,6 +6,7 @@ export type TrainingVerificationResult = {
   notes?: string
   signed_name?: string
   confidence?: number
+  completion_date?: string
   error?: string
 }
 
@@ -71,7 +72,7 @@ export async function verifyByJob(params: {
     await new Promise((r) => setTimeout(r, 2000))
     const { data } = await supabase
       .from('training_verification_jobs')
-      .select('status, notes, signed_name, confidence')
+      .select('status, notes, signed_name, confidence, completion_date')
       .eq('id', jobId)
       .single()
     const row = data as any
@@ -87,6 +88,7 @@ export async function verifyByJob(params: {
         notes: row.notes || undefined,
         signed_name: row.signed_name || undefined,
         confidence: row.confidence ?? undefined,
+        completion_date: row.completion_date || undefined,
       }
     }
   }
@@ -127,6 +129,7 @@ export async function verifyTrainingPresence(
         notes: row.verification_notes || undefined,
         signed_name: row.verification_signed_name || undefined,
         confidence: row.verification_confidence ?? undefined,
+        completion_date: row.completion_date || undefined,
       }
     }
   }
