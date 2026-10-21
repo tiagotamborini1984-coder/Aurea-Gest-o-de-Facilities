@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { verifyByJob } from '@/lib/training-verification'
+import { mergeFilesToPdf } from '@/lib/merge-files'
 import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
 import { cn } from '@/lib/utils'
 
@@ -156,15 +157,23 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
   }
 
   const handleFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    // Vários arquivos (lista dividida em partes) → mescla num PDF único
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    let file: File
+    try {
+      file = await mergeFilesToPdf(selected)
+    } catch (err: any) {
+      toast({ title: 'Erro ao juntar arquivos', description: err?.message, variant: 'destructive' })
+      return
+    }
 
     if (!activeClient?.id) {
       toast({ title: 'Erro', description: 'Cliente não selecionado.', variant: 'destructive' })
       return
     }
 
-    const fileExt = file.name.split('.').pop()
+    const fileExt = 'pdf'
     const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
     const filePath = `${activeClient.id}/trainings/${fileName}`
 
@@ -387,6 +396,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
               ) : (
                 <Input
                   type="file"
+                  multiple
                   onChange={(e) => handleFileUpload(index, e)}
                   className="bg-background file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-vividBlue/10 file:text-brand-vividBlue hover:file:bg-brand-vividBlue/20 cursor-pointer"
                   accept=".pdf,.jpg,.jpeg,.png"

@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { verifyTrainingPresence } from '@/lib/training-verification'
+import { mergeFilesToPdf } from '@/lib/merge-files'
 import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
 import {
   FileBadge,
@@ -213,12 +214,14 @@ export default function Treinamentos() {
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, trainingId: string) => {
-    const file = e.target.files?.[0]
-    if (!file || !selectedEmp) return
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0 || !selectedEmp) return
 
     try {
       setIsUploading(true)
-      const fileExt = file.name.split('.').pop()
+      // Vários arquivos (lista dividida em partes) → mescla num PDF único
+      const merged = await mergeFilesToPdf(files)
+      const fileExt = 'pdf'
       const fileName = `${selectedEmp.registration_number || selectedEmp.id}_${trainingId}_${Date.now()}.${fileExt}`
 
       const filePath = `${activeClient?.id}/trainings/${fileName}`
