@@ -91,6 +91,45 @@ Deno.serve(async (req: Request) => {
       return jsonRes({ error: 'Registro sem documento anexado' }, 400)
     }
 
+    // Resolve caminhos legados (sem URL completa) para a URL pública do bucket
+    let documentUrl = record.document_url
+    if (!/^https?:\/\//i.test(documentUrl)) {
+      let cleanPath = String(documentUrl)
+        .replace(/^documents\//, '')
+        .replace(/^training-documents\//, '')
+        .replace(/^\//, '')
+      const base = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '')
+      const uuidPrefix = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\//i.test(
+        cleanPath,
+      )
+      const candidates = uuidPrefix
+        ? [`${base}/storage/v1/object/public/training-documents/${cleanPath}`]
+        : [
+            `${base}/storage/v1/object/public/training-documents/${cleanPath}`,
+            `${base}/storage/v1/object/public/training-documents/trainings/${cleanPath}`,
+          ]
+      let resolved: Response | null = null
+      for (const c of candidates) {
+        const r = await fetch(c, { method: 'HEAD' })
+        if (r.ok) {
+          resolved = r
+          documentUrl = c
+          break
+        }
+      }
+      if (!resolved) {
+        await admin
+          .from('employee_training_records')
+          .update({
+            verification_status: 'failed',
+            verification_notes: 'Documento não encontrado no repositório (caminho antigo).',
+            verified_at: new Date().toISOString(),
+          })
+          .eq('id', recordId)
+        return jsonRes({ error: 'Documento não encontrado no repositório' }, 404)
+      }
+    }
+
     const webhookUrl = CHICO_WEBHOOK_URL
     const webhookSecret = CHICO_WEBHOOK_SECRET
     const cbSecret = CHICO_CALLBACK_SECRET

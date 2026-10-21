@@ -277,6 +277,11 @@ export default function Cadastros() {
                   training_id: tr.training_id,
                   document_url: tr.document_url || '',
                   completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                  verification_status: tr.verification_status || 'pending',
+                  verification_notes: tr.verification_notes || null,
+                  verification_signed_name: tr.verification_signed_name || null,
+                  verification_confidence: tr.verification_confidence ?? null,
+                  verified_at: tr.verified_at || null,
                 }))
               if (trPayload.length > 0) {
                 const { error: trError, data: trRows } = await supabase
@@ -406,6 +411,11 @@ export default function Cadastros() {
                   training_id: tr.training_id,
                   document_url: tr.document_url || '',
                   completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                  verification_status: tr.verification_status || 'pending',
+                  verification_notes: tr.verification_notes || null,
+                  verification_signed_name: tr.verification_signed_name || null,
+                  verification_confidence: tr.verification_confidence ?? null,
+                  verified_at: tr.verified_at || null,
                 }))
               if (trPayload.length > 0) {
                 const { error: trError, data: trRows } = await supabase

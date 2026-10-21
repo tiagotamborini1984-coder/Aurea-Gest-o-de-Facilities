@@ -46,6 +46,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
 
         if (data) {
           const records = data.map((d) => ({
+            id: d.id,
             training_id: d.training_id,
             completion_date: d.completion_date,
             document_url: d.document_url,
