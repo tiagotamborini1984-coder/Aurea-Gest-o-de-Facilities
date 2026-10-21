@@ -197,8 +197,9 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     updateRecord(index, 'verified_document_url', null)
 
     // Conferência IMEDIATA pelo agente (no anexo, antes de salvar)
+    const currentRec = records[index]
     const trainingName =
-      trainings.find((t: any) => t.id === record.training_id)?.name || 'Treinamento'
+      trainings.find((t: any) => t.id === currentRec?.training_id)?.name || 'Treinamento'
     const employeeName = form.name || ''
     updateRecord(index, 'verification_status', 'analyzing')
     toast({ title: 'Documento anexado. Agente conferindo a lista…' })
