@@ -228,12 +228,27 @@ export function TaskDetailsSheet({
       return
     }
 
-    // NC Approval interception: when closing an NC task, reroute to "Aguardando Aprovação"
-    // Regra: O executor atual é preservado em previous_assignee_id e o responsável passa a ser o solicitante (requester_id)
-    if (status?.is_terminal && isNcTask) {
-      if (pendingApprovalStatus && pendingApprovalStatus.id !== task.status_id) {
-        const executorId = task.assignee_id
-        const requesterId = task.requester_id
+    // NC Approval interception: when closing or finalizing an NC task
+    // Regra combinada com o usuário:
+    // O responsável pela NC escolhe o status "Finalizado" (ou status terminal similar).
+    // Automaticamente o sistema:
+    // 1. Move o status para "Aguardando Aprovação";
+    // 2. Transfere a responsabilidade para o SOLICITANTE da demanda (requester_id);
+    // 3. Salva o executor atual em previous_assignee_id para permitir devolução se reprovado;
+    // 4. Marca approval_status como 'pending'.
+    if (
+      isNcTask &&
+      (status?.is_terminal || statusName.includes('finaliz') || statusName.includes('conclu'))
+    ) {
+      // Se já estiver aguardando aprovação e for admin/solicitante querendo fechar diretamente
+      if (isAwaitingApproval && isRequesterOrAdmin) {
+        await processStatusChange(newStatusId)
+        return
+      }
+
+      if (pendingApprovalStatus) {
+        const executorId = task.assignee_id || profile.id
+        const requesterId = task.requester_id || executorId
         const requesterUser = users.find((u: any) => u.id === requesterId)
 
         await processStatusChange(pendingApprovalStatus.id, {
@@ -246,13 +261,13 @@ export function TaskDetailsSheet({
         await supabase.from('task_timeline').insert({
           task_id: task.id,
           user_id: profile.id,
-          content: `Responsabilidade transferida ao solicitante ${requesterUser?.name || 'Solicitante'} para aprovação.`,
+          content: `Demanda finalizada pelo responsável. Status movido para Aguardando Aprovação e responsabilidade transferida ao solicitante ${requesterUser?.name || 'Solicitante'}.`,
           action_type: 'delegation',
         })
 
         toast({
-          title: 'Demanda enviada para aprovação do solicitante',
-          description: `Responsabilidade transferida para ${requesterUser?.name || 'o solicitante'} aprovar ou reprovar.`,
+          title: 'Não Conformidade finalizada!',
+          description: `A demanda foi movida para "Aguardando Aprovação" e a responsabilidade transferida para ${requesterUser?.name || 'o solicitante'} aprovar ou reprovar.`,
           className: 'bg-amber-50 text-amber-900 border-amber-200',
         })
         return
@@ -697,6 +712,16 @@ export function TaskDetailsSheet({
     s.name.toLowerCase().includes('aguardando aprova'),
   )
 
+  // Find status "Finalizado" / Concluído
+  const finalizedStatus =
+    taskStatuses.find(
+      (s: any) =>
+        s.name.toLowerCase().includes('finaliz') ||
+        (s.is_terminal &&
+          !s.name.toLowerCase().includes('exclu') &&
+          !s.name.toLowerCase().includes('canc')),
+    ) || taskStatuses.find((s: any) => s.is_terminal)
+
   const currentStatus = taskStatuses.find((s: any) => s.id === task?.status_id)
   const isAwaitingApproval =
     currentStatus?.name?.toLowerCase().includes('aguardando aprova') ||
@@ -707,6 +732,8 @@ export function TaskDetailsSheet({
     profile?.id === task?.requester_id ||
     profile?.role === 'Master' ||
     profile?.role === 'Administrador'
+
+  const isCurrentAssignee = profile?.id === task?.assignee_id
 
   const handleApproveNc = async () => {
     if (!profile) return
@@ -1345,6 +1372,52 @@ export function TaskDetailsSheet({
               </div>
             )}
 
+            {/* Action card for NC assignee when pending completion */}
+            {isNcTask &&
+              !isAwaitingApproval &&
+              task?.approval_status !== 'approved' &&
+              isCurrentAssignee && (
+                <div className="p-4 sm:p-5 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-3 animate-in fade-in">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-500/20 rounded-lg text-blue-600 dark:text-blue-400">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-foreground text-sm sm:text-base">
+                          Conclusão da Não Conformidade
+                        </h5>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Após tomar as ações corretivas e anexar as evidências, marque como{' '}
+                          <strong className="text-foreground">Finalizado</strong>. O sistema moverá
+                          a demanda para aprovação do solicitante{' '}
+                          <strong className="text-foreground">
+                            ({getAssigneeName(task?.requester_id)})
+                          </strong>
+                          .
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-blue-500/20">
+                    <Button
+                      onClick={() => {
+                        if (finalizedStatus) {
+                          handleStatusChange(finalizedStatus.id)
+                        } else if (pendingApprovalStatus) {
+                          handleStatusChange(pendingApprovalStatus.id)
+                        }
+                      }}
+                      className="bg-green-600 hover:bg-green-700 text-white font-medium"
+                      size="sm"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Finalizar Não Conformidade
+                    </Button>
+                  </div>
+                </div>
+              )}
+
             {/* Approval banner for Não Conformidade demands */}
             {isNcTask && isAwaitingApproval && (
               <div className="p-4 sm:p-5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3 animate-in fade-in">
@@ -1485,9 +1558,16 @@ export function TaskDetailsSheet({
                     Alterar Status:
                   </span>
                   <Select
-                    value={task?.status_id}
+                    value={
+                      // Se for NC e o usuário NÃO for solicitante/admin e a tarefa estiver Aguardando Aprovação,
+                      // exibe visualmente para ele como "Aguardando Aprovação" ou o próprio status_id
+                      task?.status_id
+                    }
                     onValueChange={handleStatusChange}
-                    disabled={auditExecution && auditExecution.status !== 'Finalizado'}
+                    disabled={
+                      (auditExecution && auditExecution.status !== 'Finalizado') ||
+                      (isNcTask && isAwaitingApproval && !isRequesterOrAdmin)
+                    }
                   >
                     <SelectTrigger className="bg-background border-input w-full sm:min-w-[140px]">
                       <SelectValue placeholder="Status" />
@@ -1495,10 +1575,13 @@ export function TaskDetailsSheet({
                     <SelectContent>
                       {taskStatuses
                         .filter((s: any) => {
-                          // Se for Não Conformidade e o usuário não for solicitante nem admin/master,
-                          // esconde o status terminal para evitar fechamento direto (o fluxo obriga passar por Aguardando Aprovação)
-                          if (isNcTask && s.is_terminal && !isRequesterOrAdmin) {
-                            return false
+                          // Se for Não Conformidade e o usuário NÃO for o solicitante nem admin/master:
+                          // O responsável deve ver as opções de trabalho e a opção "Finalizado" (ou Concluído),
+                          // que ao ser escolhida dispara a transição automática para "Aguardando Aprovação" com o solicitante.
+                          // Ele só vê "Aguardando Aprovação" se a tarefa já estiver nesse status (para exibição no Select).
+                          if (isNcTask && !isRequesterOrAdmin) {
+                            const isPendingApp = s.name.toLowerCase().includes('aguardando aprova')
+                            if (isPendingApp && s.id !== task?.status_id) return false
                           }
                           return true
                         })
