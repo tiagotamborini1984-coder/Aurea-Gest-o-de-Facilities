@@ -200,28 +200,44 @@ Deno.serve(async (req: Request) => {
         .eq('id', recordId)
     }
 
-    // aciona o Maestro (Chico)
-    const whRes = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Webhook-Secret': webhookSecret,
-      },
-      body: JSON.stringify({
-        record_id: recordId,
-        job_id: jobId,
-        document_url: documentUrl,
-        training_name: trainingName,
-        employee_name: employeeName,
-        callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/verify-training-presence`,
-        callback_secret: cbSecret,
-      }),
+    // aciona o Maestro (Chico) — com RETRY: a entrega do webhook pode falhar
+    // silenciosamente (job fica 'analyzing' para sempre e o usuário não pode salvar).
+    const whBody = JSON.stringify({
+      record_id: recordId,
+      job_id: jobId,
+      document_url: documentUrl,
+      training_name: trainingName,
+      employee_name: employeeName,
+      callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/verify-training-presence`,
+      callback_secret: cbSecret,
     })
+    let whRes: Response | null = null
+    let lastErr = ''
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const r = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Webhook-Secret': webhookSecret,
+          },
+          body: whBody,
+        })
+        if (r.ok) {
+          whRes = r
+          break
+        }
+        lastErr = `HTTP ${r.status}`
+      } catch (e: any) {
+        lastErr = String(e?.message || e)
+      }
+      // espera progressiva antes de tentar de novo (2s, 4s)
+      if (attempt < 3) await new Promise((res) => setTimeout(res, attempt * 2000))
+    }
 
-    if (!whRes.ok) {
-      const t = (await whRes.text()).slice(0, 300)
-      await markFail(`Falha ao acionar a conferência (${whRes.status}).`)
-      return jsonRes({ error: `Falha ao acionar conferência: ${whRes.status}`, detail: t }, 502)
+    if (!whRes) {
+      await markFail(`Falha ao acionar a conferência (${lastErr}). Tente anexar novamente.`)
+      return jsonRes({ error: `Falha ao acionar conferência: ${lastErr}` }, 502)
     }
 
     return jsonRes({ success: true, queued: true })

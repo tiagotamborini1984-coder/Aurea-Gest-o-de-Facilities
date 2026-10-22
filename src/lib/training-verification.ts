@@ -92,6 +92,35 @@ export async function verifyByJob(params: {
       }
     }
   }
+  // Tempo esgotado: NÃO apagar o job — o agente pode ainda responder (entrega atrasada).
+  // Re-aciona a conferência uma vez (retry do webhook) e estende a espera.
+  const retry = await callFn({ job_id: jobId })
+  if (retry?.success) {
+    const deadline2 = Date.now() + 120000
+    while (Date.now() < deadline2) {
+      await new Promise((r) => setTimeout(r, 2000))
+      const { data } = await supabase
+        .from('training_verification_jobs')
+        .select('status, notes, signed_name, confidence, completion_date')
+        .eq('id', jobId)
+        .single()
+      const row = data as any
+      if (
+        row &&
+        (row.status === 'verified' || row.status === 'rejected' || row.status === 'failed')
+      ) {
+        supabase.from('training_verification_jobs').delete().eq('id', jobId)
+        return {
+          ok: row.status === 'verified',
+          status: row.status,
+          notes: row.notes || undefined,
+          signed_name: row.signed_name || undefined,
+          confidence: row.confidence ?? undefined,
+          completion_date: row.completion_date || undefined,
+        }
+      }
+    }
+  }
   supabase.from('training_verification_jobs').delete().eq('id', jobId)
   return { ok: false, status: 'failed', notes: 'Tempo esgotado aguardando a conferência.' }
 }
