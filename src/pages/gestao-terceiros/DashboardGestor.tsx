@@ -14,6 +14,7 @@ import { useDashboardCalculations } from './hooks/useDashboardCalculations'
 import DashboardFilters from './components/DashboardFilters'
 import DashboardMetricsCards from './components/DashboardMetricsCards'
 import DashboardPlantSummary from './components/DashboardPlantSummary'
+import DashboardSnapshotWriter from '@/components/DashboardSnapshotWriter'
 import DashboardDetails from './components/DashboardDetails'
 import DashboardAureaAI from './components/DashboardAureaAI'
 import { useDashboardSchedules } from './hooks/useDashboardSchedules'
@@ -65,6 +66,7 @@ export default function DashboardGestor() {
   }, [absenteeismTarget])
 
   const { plants, contracted, locations, goals, employees, equipment } = useMasterData()
+  const activeClientId = activeClient?.id || (profile as any)?.client_id
 
   const filteredPlants = plants || []
   const filteredContracted = contracted || []
@@ -254,6 +256,14 @@ export default function DashboardGestor() {
             equipment={filteredEquipment}
             selectedPlants={selectedPlants}
             selectedCompanies={selectedCompanies}
+          />
+          <DashboardSnapshotWriter
+            metrics={dashboardData.metrics}
+            plantStats={dashboardData.plantStats}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            activeTab={activeTab}
+            clientId={activeClientId}
           />
 
           <DashboardAureaAI

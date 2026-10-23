@@ -279,142 +279,70 @@ async function localAnswer(admin: any, clientId: string, question: string) {
     return { answer, sources: [{ type: 'aurea', ref: 'Gestão de Tarefas' }] }
   }
 
-  // ===== Absenteísmo (Gestão de Terceiros — Dashboard do Gestor) =====
-  // Mesma fórmula do dashboard: (contratado − presentes) / contratado × 100,
-  // desconsiderando dias não úteis (plant_non_working_days) e dias sem lançamento.
+  // ===== Absenteísmo (Gestão de Terceiros) =====
+  // NÃO recalcula: lê o SNAPSHOT gravado pelo próprio Dashboard do Gestor
+  // (facilita_dashboard_snapshot) — o número respondido é o mesmo que o gestor vê.
   if (matchesAbsenteismo(normalizeForCache(question))) {
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const asked = parseAskedMonth(question)
-    const month = asked && asked <= currentMonth ? asked : currentMonth
-    const monthStart = `${month}-01`
-    const [yy, mm] = month.split('-').map(Number)
-    const lastDay = new Date(yy, mm, 0).getDate()
-    const todayStr = now.toISOString().slice(0, 10)
-    const rangeEnd =
-      month === todayStr.slice(0, 7) ? todayStr : `${month}-${String(lastDay).padStart(2, '0')}`
-
-    const { data: plants } = await admin.from('plants').select('id, name').eq('client_id', clientId)
-    if (!plants || plants.length === 0) {
+    const { data: snaps } = await admin
+      .from('facilita_dashboard_snapshot')
+      .select('metrics, period_start, period_end, computed_at')
+      .eq('client_id', clientId)
+      .eq('source', 'dashboard_gestor')
+      .order('computed_at', { ascending: false })
+      .limit(1)
+    const snap: any = snaps?.[0]
+    if (!snap?.metrics) {
       return {
         answer:
-          '**Absenteísmo**\n\nNão há plantas cadastradas para este cliente no módulo Gestão de Terceiros. 😊',
-        sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — sem plantas' }],
+          '**Absenteísmo (Gestão de Terceiros)**\n\nAinda não há leitura do Dashboard do Gestor para consultar. Abra o **Dashboard do Gestor** — quando ele calcular, eu passo a responder com o número exato dele. 😊',
+        sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — snapshot indisponível' }],
       }
     }
-    const { data: nwd } = await admin
-      .from('plant_non_working_days')
-      .select('plant_id, date')
-      .eq('client_id', clientId)
-      .gte('date', monthStart)
-      .lte('date', rangeEnd)
-      .limit(5000)
-    const { data: logs } = await admin
-      .from('daily_logs')
-      .select('date, plant_id, status')
-      .eq('client_id', clientId)
-      .eq('type', 'staff')
-      .gte('date', monthStart)
-      .lte('date', rangeEnd)
-      .limit(20000)
-    const { data: contracted } = await admin
-      .from('contracted_headcount')
-      .select('plant_id, quantity, reference_month')
-      .eq('client_id', clientId)
-      .eq('type', 'colaborador')
-
-    const nwdSet = new Set((nwd || []).map((n: any) => `${n.plant_id}_${n.date}`))
-    const logsByPlantDate = new Map<string, { present: number; total: number }>()
-    for (const l of logs || []) {
-      const k = `${l.plant_id}_${l.date}`
-      const cur = logsByPlantDate.get(k) || { present: 0, total: 0 }
-      cur.total += 1
-      if (l.status === true) cur.present += 1
-      logsByPlantDate.set(k, cur)
-    }
-
-    // efetivo contratado por planta: reference_month mais recente <= mês perguntado
-    const contractedByPlant = new Map<string, number>()
-    for (const p of plants) {
-      const rows = (contracted || []).filter((c: any) => c.plant_id === p.id)
-      if (!rows.length) continue
-      const months = [...new Set(rows.map((r: any) => r.reference_month || '2000-01-01'))].sort()
-      let applicable = months[0]
-      for (const mm of months) if (mm <= monthStart) applicable = mm
-      const q = rows
-        .filter((r: any) => (r.reference_month || '2000-01-01') === applicable)
-        .reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0)
-      contractedByPlant.set(p.id, q)
-    }
-
-    const dates: string[] = []
-    const startD = new Date(`${monthStart}T00:00:00Z`)
-    const endD = new Date(`${rangeEnd}T00:00:00Z`)
-    for (let d = new Date(startD); d <= endD; d.setUTCDate(d.getUTCDate() + 1)) {
-      dates.push(d.toISOString().slice(0, 10))
-    }
-
-    let totalPresent = 0
-    let totalDenom = 0
-    let days = 0
-    const perPlant: any = {}
-    for (const p of plants) perPlant[p.id] = { name: p.name, present: 0, denom: 0 }
-    for (const date of dates) {
-      for (const p of plants) {
-        if (nwdSet.has(`${p.id}_${date}`)) continue
-        const ld = logsByPlantDate.get(`${p.id}_${date}`)
-        if (!ld || ld.total === 0) continue
-        let denom = contractedByPlant.get(p.id) || 0
-        if (denom === 0) denom = ld.total // fallback do dashboard: efetivo lançado
-        totalPresent += ld.present
-        totalDenom += denom
-        days += 1
-        perPlant[p.id].present += ld.present
-        perPlant[p.id].denom += denom
-      }
-    }
-
-    // "hoje": presentes e ausentes explícitos (status false)
-    let todayPresent = 0
-    let todayAbsent = 0
-    for (const p of plants) {
-      if (nwdSet.has(`${p.id}_${todayStr}`)) continue
-      const ld = logsByPlantDate.get(`${p.id}_${todayStr}`)
-      if (!ld) continue
-      todayPresent += ld.present
-      todayAbsent += ld.total - ld.present
-    }
-
-    const abs =
-      totalDenom > 0 ? Math.max(0, ((totalDenom - totalPresent) / totalDenom) * 100) : null
-    if (abs === null) {
+    const m = snap.metrics
+    const period =
+      snap.period_start && snap.period_end
+        ? `${snap.period_start} a ${snap.period_end}`
+        : 'período do dashboard'
+    const computedAt = String(snap.computed_at || '')
+      .replace('T', ' ')
+      .slice(0, 16)
+    // mês citado fora do período da leitura → honesto sobre a cobertura
+    if (
+      asked &&
+      snap.period_start &&
+      snap.period_end &&
+      !(
+        asked >= String(snap.period_start).slice(0, 7) &&
+        asked <= String(snap.period_end).slice(0, 7)
+      )
+    ) {
       return {
-        answer: `**Absenteísmo — ${month}**\n\nNão há lançamentos de presença no período (Gestão de Terceiros). O número aparece quando o time lançar presenças no Dashboard do Gestor. 😊`,
-        sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — sem lançamentos no período' }],
+        answer: `**Absenteísmo — ${asked}**\n\nA leitura mais recente do Dashboard do Gestor cobre o período ${period}. Para ver ${asked}, ajuste o período no Dashboard do Gestor — ele atualiza o número que eu leio. 😊`,
+        sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — período fora da leitura atual' }],
       }
     }
-    const plantLines = plants
-      .map((p: any) => {
-        const s = perPlant[p.id]
-        const a = s.denom > 0 ? Math.max(0, ((s.denom - s.present) / s.denom) * 100) : null
-        return a === null ? null : `- ${s.name}: ${a.toFixed(1)}%`
-      })
-      .filter(Boolean)
+    const plantStats = Array.isArray(m.plantStats) ? m.plantStats : []
+    const plantLines = plantStats
       .slice(0, 8)
-
+      .map(
+        (p: any) =>
+          `- ${p.name}: ${p.absenteismo != null ? Number(p.absenteismo).toFixed(1) + '%' : '—'}`,
+      )
+      .join('\n')
     const answer =
-      `**Absenteísmo — ${month} (Gestão de Terceiros)**\n\n` +
-      `- Absenteísmo do período: **${abs.toFixed(1)}%**\n` +
-      `- Base: ${days} ${days === 1 ? 'dia' : 'dias'} com lançamento (dias não úteis desconsiderados)\n` +
-      `- Hoje (${todayStr}): ${todayPresent} presentes, ${todayAbsent} ausentes\n` +
-      (plantLines.length ? '\n**Por planta:**\n' + plantLines.join('\n') + '\n' : '') +
-      '\nMesmo cálculo do Dashboard do Gestor. Quer o detalhe de alguma planta? 😊'
+      `**Absenteísmo — Dashboard do Gestor (Gestão de Terceiros)**\n\n` +
+      `- Absenteísmo: **${Number(m.absenteismo ?? 0).toFixed(1)}%**\n` +
+      `- Período analisado: ${period} (${m.validDatesCount ?? '—'} dias válidos)\n` +
+      `- Média: ${m.presente ?? '—'} presentes | ${m.ausente ?? '—'} ausentes | contratado ${m.contratado ?? '—'}\n` +
+      `- Hoje (${m.todayDateStr ?? '—'}): ${m.todayPresente ?? '—'} presentes, ${m.todayAusente ?? '—'} ausentes\n` +
+      (plantLines ? `\n**Por planta:**\n${plantLines}\n` : '') +
+      `\nNúmero lido do Dashboard do Gestor (calculado em ${computedAt}). 😊`
     return {
       answer,
-      sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — Dashboard do Gestor' }],
+      sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — Dashboard do Gestor (snapshot)' }],
     }
   }
-
   return null
 }
 
