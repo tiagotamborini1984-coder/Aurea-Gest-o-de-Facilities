@@ -39,7 +39,7 @@ function adminClient() {
 // Detectores de intenção SÓ para resposta determinística (mais estritos que os
 // detectores de contexto — falso positivo aqui geraria resposta errada).
 const RE_BUDGET =
-  /(orcado|orcamento|realizado|budget|forecast|previsao|opex|capex|gasto|gastos|despesa|despesas|quanto.*gast|quanto.*cust)/
+  /(orcado|orcamento|realizado|budget|forecast|previsao|opex|capex|gasto|gastos|despesa|despesas|quanto.*gast|quanto.*cust|centro de custo|estour.{0,20}(custo|budget|orcado|orcament|gasto|despesa))/
 const RE_IMOVEIS = /(quarto|quartos|ocupad|ocupac|hospede|reserva|imovel|imoveis)/
 const RE_TAREFAS =
   /(chamado|chamados|tarefa|tarefas|ticket|solicitac|ordem de servico|pendenc|demanda)/
@@ -84,6 +84,7 @@ async function localAnswer(admin: any, clientId: string, question: string) {
     if (!entries || entries.length === 0) return null
     const byMonth: any = {}
     const byAccount: any = {}
+    const byCC: any = {}
     for (const e of entries) {
       const m = e.reference_month
       byMonth[m] = byMonth[m] || { b: 0, r: 0 }
@@ -93,17 +94,34 @@ async function localAnswer(admin: any, clientId: string, question: string) {
       byAccount[acc] = byAccount[acc] || { b: 0, r: 0 }
       byAccount[acc].b += Number(e.budgeted_amount) || 0
       byAccount[acc].r += Number(e.realized_amount) || 0
+      const ccName = e.budget_cost_centers?.name || 'Sem centro de custo'
+      byCC[ccName] = byCC[ccName] || { b: 0, r: 0 }
+      byCC[ccName].b += Number(e.budgeted_amount) || 0
+      byCC[ccName].r += Number(e.realized_amount) || 0
     }
     const months = Object.keys(byMonth).sort()
     const top = Object.entries(byAccount)
       .map(([n, v]: any) => ({ n, ...v, pct: v.b > 0 ? (v.r / v.b) * 100 : 0 }))
       .sort((a: any, b: any) => b.pct - a.pct)
       .slice(0, 5)
+    const ccList = Object.entries(byCC)
+      .map(([n, v]: any) => ({ n, ...v, pct: v.b > 0 ? (v.r / v.b) * 100 : 0 }))
+      .sort((a: any, b: any) => b.pct - a.pct)
+    const estourados = ccList.filter((c: any) => c.b > 0 && c.r > c.b)
     const answer =
       '**Budget — orçado vs realizado**\n\n' +
       months
         .map((m) => `- ${m}: orçado ${fmtBRL(byMonth[m].b)} | realizado ${fmtBRL(byMonth[m].r)}`)
         .join('\n') +
+      '\n\n**Centros de custo que estouraram (realizado > orçado):**\n' +
+      (estourados.length
+        ? estourados
+            .map(
+              (c: any) =>
+                `- ${c.n}: ${c.pct.toFixed(1)}% (orçado ${fmtBRL(c.b)}, realizado ${fmtBRL(c.r)}) — excesso de ${fmtBRL(c.r - c.b)}`,
+            )
+            .join('\n')
+        : 'Nenhum centro de custo estourou no período da base.') +
       '\n\n**Top contas por % realizado:**\n' +
       top
         .map(
@@ -111,7 +129,7 @@ async function localAnswer(admin: any, clientId: string, question: string) {
             `- ${a.n}: ${a.pct.toFixed(1)}% (orçado ${fmtBRL(a.b)}, realizado ${fmtBRL(a.r)})`,
         )
         .join('\n') +
-      '\n\nQuer detalhe de algum mês ou conta específica? É só perguntar! 😊'
+      '\n\nQuer detalhe de algum mês, conta ou centro de custo específico? É só perguntar! 😊'
     return {
       answer,
       sources: [{ type: 'budget', ref: `budget do client — até ${months[months.length - 1]}` }],
@@ -720,6 +738,7 @@ Deno.serve(async (req: Request) => {
       if (entries && entries.length > 0) {
         const byMonth: any = {}
         const byAccount: any = {}
+        const byCC: any = {}
         for (const e of entries) {
           const m = e.reference_month
           byMonth[m] = byMonth[m] || { b: 0, r: 0 }
@@ -729,6 +748,10 @@ Deno.serve(async (req: Request) => {
           byAccount[acc] = byAccount[acc] || { b: 0, r: 0 }
           byAccount[acc].b += Number(e.budgeted_amount) || 0
           byAccount[acc].r += Number(e.realized_amount) || 0
+          const ccName = e.budget_cost_centers?.name || 'Sem centro de custo'
+          byCC[ccName] = byCC[ccName] || { b: 0, r: 0 }
+          byCC[ccName].b += Number(e.budgeted_amount) || 0
+          byCC[ccName].r += Number(e.realized_amount) || 0
         }
         const months = Object.keys(byMonth).sort()
         budgetContext =
@@ -747,6 +770,16 @@ Deno.serve(async (req: Request) => {
             .map(
               (a: any) =>
                 `- ${a.n}: ${a.pct.toFixed(1)}% (orçado R$ ${a.b.toFixed(2)}, realizado R$ ${a.r.toFixed(2)})`,
+            )
+            .join('\n') +
+          '\n\nCENTROS DE CUSTO (top por % realizado):\n' +
+          Object.entries(byCC)
+            .map(([n, v]: any) => ({ n, ...v, pct: v.b > 0 ? (v.r / v.b) * 100 : 0 }))
+            .sort((a: any, b: any) => b.pct - a.pct)
+            .slice(0, 8)
+            .map(
+              (c: any) =>
+                `- ${c.n}: ${c.pct.toFixed(1)}% (orçado R$ ${c.b.toFixed(2)}, realizado R$ ${c.r.toFixed(2)})${c.r > c.b ? ' — ESTOUROU' : ''}`,
             )
             .join('\n')
       }
