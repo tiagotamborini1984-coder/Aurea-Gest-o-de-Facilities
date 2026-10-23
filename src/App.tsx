@@ -20,6 +20,9 @@ import Clientes from './pages/admin/Clientes'
 // Gestão de Documentos Pages
 import Documentos from './pages/gestao-documentos/Documentos'
 
+// Facilita — robô tira-dúvidas Facilities
+import FacilitaDocs from './pages/facilita/FacilitaDocs'
+
 // Gestão de Imóveis Pages
 // Gestão de Lockers Pages
 import DashboardLockers from './pages/gestao-lockers/Dashboard'
@@ -255,6 +258,9 @@ const App = () => (
 
                       {/* Gestão de Documentos */}
                       <Route path="/gestao-documentos" element={<Documentos />} />
+
+                      {/* Facilita — robô tira-dúvidas Facilities */}
+                      <Route path="/facilita" element={<FacilitaDocs />} />
 
                       {/* Gestão de Lockers */}
                       <Route path="/gestao-lockers/dashboard" element={<DashboardLockers />} />

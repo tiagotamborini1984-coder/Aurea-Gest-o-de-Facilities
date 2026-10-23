@@ -25,6 +25,7 @@ import {
   HardHat,
   Plane,
   HeartHandshake,
+  Bot,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -195,6 +196,11 @@ export function AppSidebar() {
         path: '/gestao-documentos',
       },
       {
+        title: 'Facilita',
+        icon: Bot,
+        path: '/facilita',
+      },
+      {
         title: 'Gestão de Imóveis',
         icon: Home,
         subItems: [
@@ -336,6 +342,7 @@ export function AppSidebar() {
               'Gestão de Ferramentas',
               'Gestão de Férias',
               'Pesquisa de Satisfação',
+              'Facilita',
             ]
           }
 
@@ -471,7 +478,8 @@ export function AppSidebar() {
 
             return { ...item, subItems: filteredSubItems }
           } else {
-            if (!userMenus.includes(item.title)) return null
+            // Facilita é tira-dúvidas geral: visível para todos os perfis
+            if (!userMenus.includes(item.title) && item.title !== 'Facilita') return null
           }
 
           return item
