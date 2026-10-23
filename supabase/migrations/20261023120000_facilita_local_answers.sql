@@ -38,7 +38,7 @@ AS $$
   FROM public.facilita_answer_cache c
   WHERE c.client_id = p_client
     AND c.created_at > NOW() - INTERVAL '30 days'
-    AND similarity(c.question_norm, p_qnorm) >= 0.85
+    AND similarity(c.question_norm, p_qnorm) >= 0.62
   ORDER BY similarity(c.question_norm, p_qnorm) DESC
   LIMIT 1;
 $$;

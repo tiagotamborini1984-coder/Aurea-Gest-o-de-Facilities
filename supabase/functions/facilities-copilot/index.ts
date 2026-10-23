@@ -124,7 +124,13 @@ async function localAnswer(admin: any, clientId: string, question: string) {
       .select('id, name, city')
       .eq('client_id', clientId)
     const propIds = (props || []).map((p: any) => p.id)
-    if (!propIds.length) return null
+    if (!propIds.length) {
+      return {
+        answer:
+          '**Gestão de Imóveis**\n\nNão há imóveis cadastrados para este cliente no momento. Quando houver cadastro no módulo de Gestão de Imóveis, eu te mostro a ocupação aqui! 😊',
+        sources: [{ type: 'aurea', ref: 'Gestão de Imóveis — sem registros' }],
+      }
+    }
     const { data: rooms } = await admin
       .from('property_rooms')
       .select('id, name, property_id')
@@ -187,7 +193,13 @@ async function localAnswer(admin: any, clientId: string, question: string) {
       .order('created_at', { ascending: false })
       .limit(300)
     const list = tks || []
-    if (!list.length) return null
+    if (!list.length) {
+      return {
+        answer:
+          '**Gestão de Tarefas**\n\nNão há chamados registrados para este cliente no momento. Quando houver, eu te mostro o resumo aqui! 😊',
+        sources: [{ type: 'aurea', ref: 'Gestão de Tarefas — sem registros' }],
+      }
+    }
     const byStatus: any = {}
     for (const t of list) {
       const s = t.task_statuses?.name || 'Sem status'
@@ -383,7 +395,9 @@ Deno.serve(async (req: Request) => {
 
     // FRENTE 2: cacheia resposta de CONHECIMENTO (fontes só pop/know-how/web) para reuso
     try {
+      const answeredByLocal = body.answered_by_local === true
       const knowledgeOnly =
+        !answeredByLocal &&
         sources.length > 0 &&
         sources.every((s: any) => ['pop', 'know-how', 'web'].includes(String(s.type)))
       if (knowledgeOnly) {
@@ -772,6 +786,7 @@ Deno.serve(async (req: Request) => {
 
     // ===== FRENTE 1/2: respostas locais (0 tokens) =====
     let localReply: { answer: string; sources: any[] } | null = null
+    let answeredByLocal = false
     try {
       // FRENTE 2: cache de respostas de conhecimento (pg_trgm >= 0.85, TTL 30 dias)
       const { data: cached } = await admin.rpc('facilita_cache_lookup', {
@@ -781,6 +796,7 @@ Deno.serve(async (req: Request) => {
       const hit = Array.isArray(cached) && cached.length > 0 ? cached[0] : null
       if (hit?.answer) {
         localReply = { answer: String(hit.answer), sources: hit.sources || [] }
+        answeredByLocal = true
       }
       // FRENTE 1: perguntas de dados → resposta determinística (nunca cacheada)
       if (!localReply) {
@@ -806,7 +822,7 @@ Deno.serve(async (req: Request) => {
         sources: localReply.sources,
         status: 'sent',
       })
-      return jsonRes({ success: true, answered_by: 'local' })
+      return jsonRes({ success: true, answered_by: 'local', answered_by_local: true })
     }
 
     await admin.from('facilita_messages').insert({
