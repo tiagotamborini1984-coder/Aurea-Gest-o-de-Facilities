@@ -5,9 +5,10 @@ import { corsHeaders } from '../_shared/cors.ts'
 // Facilita — robô tira-dúvidas Facilities do Aurea, via MAESTRO (Chico), sem chave de IA externa.
 // Fluxo: POST {conversation_id, question} com Authorization do usuário →
 //   1) valida conversa (RLS via token do usuário), cria user message, marca assistant 'processing'
-//   2) aciona webhook do Maestro (Facilita) com pergunta + callback
-//   3) Maestro pesquisa POPs (facilita_chunks), budget e know-how e responde via callback
-//   4) callback grava a resposta do assistente.
+//   2) FRENTE 1: pergunta de DADOS (budget/imóveis/tarefas) → resposta montada aqui (0 tokens, <1s)
+//      FRENTE 2: pergunta de conhecimento já cacheada (pg_trgm ≥ 0.85) → resposta do cache (0 tokens)
+//   3) senão, aciona webhook do Maestro (Facilita) com pergunta + contexto enxuto + callback
+//   4) Maestro responde via callback; respostas de conhecimento são cacheadas p/ reuso.
 // Integração fixa Maestro<->Aurea (mesmo padrão de verify-training-presence).
 
 const FACILITA_WEBHOOK_URL =
@@ -32,6 +33,186 @@ function adminClient() {
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   )
+}
+
+// ===== FRENTE 1/2 — respostas locais (economia de tokens) =====
+// Detectores de intenção SÓ para resposta determinística (mais estritos que os
+// detectores de contexto — falso positivo aqui geraria resposta errada).
+const RE_BUDGET =
+  /(orcado|orcamento|realizado|budget|forecast|previsao|opex|capex|gasto|gastos|despesa|despesas|quanto.*gast|quanto.*cust)/
+const RE_IMOVEIS = /(quarto|quartos|ocupad|ocupac|hospede|reserva|imovel|imoveis)/
+const RE_TAREFAS =
+  /(chamado|chamados|tarefa|tarefas|ticket|solicitac|ordem de servico|pendenc|demanda)/
+
+function matchesBudget(q: string) {
+  return RE_BUDGET.test(q)
+}
+function matchesImoveis(q: string) {
+  return RE_IMOVEIS.test(q)
+}
+function matchesTarefas(q: string) {
+  return RE_TAREFAS.test(q)
+}
+
+function normalizeForCache(s: string) {
+  return String(s)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 400)
+}
+
+const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+
+// Resposta determinística para perguntas de dados (budget, imóveis, tarefas).
+// Retorna null quando não há dados — o fluxo segue para o Maestro com contexto.
+async function localAnswer(admin: any, clientId: string, question: string) {
+  const today = new Date().toISOString().slice(0, 10)
+
+  if (matchesBudget(normalizeForCache(question))) {
+    const { data: entries } = await admin
+      .from('budget_entries')
+      .select(
+        'reference_month, budgeted_amount, realized_amount, budget_accounts(name), budget_cost_centers(name)',
+      )
+      .eq('client_id', clientId)
+      .order('reference_month')
+      .limit(2000)
+    if (!entries || entries.length === 0) return null
+    const byMonth: any = {}
+    const byAccount: any = {}
+    for (const e of entries) {
+      const m = e.reference_month
+      byMonth[m] = byMonth[m] || { b: 0, r: 0 }
+      byMonth[m].b += Number(e.budgeted_amount) || 0
+      byMonth[m].r += Number(e.realized_amount) || 0
+      const acc = e.budget_accounts?.name || 'Desconhecida'
+      byAccount[acc] = byAccount[acc] || { b: 0, r: 0 }
+      byAccount[acc].b += Number(e.budgeted_amount) || 0
+      byAccount[acc].r += Number(e.realized_amount) || 0
+    }
+    const months = Object.keys(byMonth).sort()
+    const top = Object.entries(byAccount)
+      .map(([n, v]: any) => ({ n, ...v, pct: v.b > 0 ? (v.r / v.b) * 100 : 0 }))
+      .sort((a: any, b: any) => b.pct - a.pct)
+      .slice(0, 5)
+    const answer =
+      '**Budget — orçado vs realizado**\n\n' +
+      months
+        .map((m) => `- ${m}: orçado ${fmtBRL(byMonth[m].b)} | realizado ${fmtBRL(byMonth[m].r)}`)
+        .join('\n') +
+      '\n\n**Top contas por % realizado:**\n' +
+      top
+        .map(
+          (a: any) =>
+            `- ${a.n}: ${a.pct.toFixed(1)}% (orçado ${fmtBRL(a.b)}, realizado ${fmtBRL(a.r)})`,
+        )
+        .join('\n') +
+      '\n\nQuer detalhe de algum mês ou conta específica? É só perguntar! 😊'
+    return {
+      answer,
+      sources: [{ type: 'budget', ref: `budget do client — até ${months[months.length - 1]}` }],
+    }
+  }
+
+  if (matchesImoveis(normalizeForCache(question))) {
+    const { data: props } = await admin
+      .from('properties')
+      .select('id, name, city')
+      .eq('client_id', clientId)
+    const propIds = (props || []).map((p: any) => p.id)
+    if (!propIds.length) return null
+    const { data: rooms } = await admin
+      .from('property_rooms')
+      .select('id, name, property_id')
+      .in('property_id', propIds)
+    const roomIds = (rooms || []).map((r: any) => r.id)
+    let reservations: any[] = []
+    if (roomIds.length) {
+      const { data: resv } = await admin
+        .from('property_reservations')
+        .select(
+          'id, room_id, bed_number, check_in_date, check_out_date, status, property_guests(name)',
+        )
+        .in('room_id', roomIds)
+        .neq('status', 'Cancelada')
+      reservations = resv || []
+    }
+    const active = reservations.filter(
+      (r: any) => r.check_in_date <= today && r.check_out_date >= today,
+    )
+    const byCity: any = {}
+    for (const p of props || []) {
+      const city = p.city || 'Sem cidade'
+      byCity[city] = byCity[city] || { properties: 0, rooms: 0, occupied: 0 }
+      byCity[city].properties += 1
+      const pRooms = (rooms || []).filter((r: any) => r.property_id === p.id)
+      byCity[city].rooms += pRooms.length
+      byCity[city].occupied += active.filter((r: any) =>
+        pRooms.some((rm: any) => rm.id === r.room_id),
+      ).length
+    }
+    const answer =
+      `**Gestão de Imóveis — ocupação hoje (${today})**\n\n` +
+      `Total: ${props?.length || 0} imóveis, ${(rooms || []).length} quartos, ${active.length} ocupações ativas.\n\n` +
+      Object.entries(byCity)
+        .map(
+          ([city, v]: any) =>
+            `- ${city}: ${v.properties} imóveis, ${v.rooms} quartos, ${v.occupied} ocupados`,
+        )
+        .join('\n') +
+      '\n\n**Ocupações ativas:**\n' +
+      (active
+        .slice(0, 15)
+        .map((r: any) => {
+          const room = (rooms || []).find((rm: any) => rm.id === r.room_id)
+          const prop = (props || []).find((p: any) => p.id === room?.property_id)
+          return `- ${prop?.city || '?'}/${prop?.name || '?'} — quarto ${room?.name || '?'}: ${r.property_guests?.name || '—'}, ${r.check_in_date} → ${r.check_out_date}`
+        })
+        .join('\n') || '(nenhuma)') +
+      '\n\nDados do módulo de Gestão de Imóveis. 😊'
+    return { answer, sources: [{ type: 'aurea', ref: 'Gestão de Imóveis' }] }
+  }
+
+  if (matchesTarefas(normalizeForCache(question))) {
+    const { data: tks } = await admin
+      .from('tasks')
+      .select(
+        'id, title, due_date, created_at, task_statuses(name, is_terminal), plants(name, city)',
+      )
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(300)
+    const list = tks || []
+    if (!list.length) return null
+    const byStatus: any = {}
+    for (const t of list) {
+      const s = t.task_statuses?.name || 'Sem status'
+      byStatus[s] = (byStatus[s] || 0) + 1
+    }
+    const open = list.filter((t: any) => !t.task_statuses?.is_terminal)
+    const answer =
+      '**Gestão de Tarefas — chamados**\n\n' +
+      `Total recentes: ${list.length} | Em aberto: ${open.length}\n\n` +
+      Object.entries(byStatus)
+        .map(([s, n]) => `- ${s}: ${n}`)
+        .join('\n') +
+      '\n\n**Últimos 10:**\n' +
+      list
+        .slice(0, 10)
+        .map(
+          (t: any) =>
+            `- [${t.task_statuses?.name || '?'}] ${t.title || '(sem título)'} — ${t.plants?.name || '?'}${t.due_date ? ' | prazo ' + t.due_date : ''}`,
+        )
+        .join('\n') +
+      '\n\nDados do módulo de Gestão de Tarefas. 😊'
+    return { answer, sources: [{ type: 'aurea', ref: 'Gestão de Tarefas' }] }
+  }
+
+  return null
 }
 
 Deno.serve(async (req: Request) => {
@@ -102,7 +283,14 @@ Deno.serve(async (req: Request) => {
         .eq('id', documentId)
       return jsonRes({ success: true, chunks: rows.length })
     }
-    return jsonRes({ error: 'op inválida (use queue ou commit)' }, 400)
+    if (op === 'clear-cache') {
+      const cid = body.client_id
+      if (!cid) return jsonRes({ error: 'Missing client_id' }, 400)
+      const { error } = await admin.from('facilita_answer_cache').delete().eq('client_id', cid)
+      if (error) return jsonRes({ error: error.message }, 500)
+      return jsonRes({ success: true, cleared: true })
+    }
+    return jsonRes({ error: 'op inválida (use queue, commit ou clear-cache)' }, 400)
   }
 
   // ===== CALLBACK do Maestro (Facilita): resposta do chat OU dados extraídos do POP =====
@@ -192,6 +380,44 @@ Deno.serve(async (req: Request) => {
       .from('facilita_messages')
       .update({ content: answer, sources, status: 'sent' })
       .eq('id', pend[0].id)
+
+    // FRENTE 2: cacheia resposta de CONHECIMENTO (fontes só pop/know-how/web) para reuso
+    try {
+      const knowledgeOnly =
+        sources.length > 0 &&
+        sources.every((s: any) => ['pop', 'know-how', 'web'].includes(String(s.type)))
+      if (knowledgeOnly) {
+        const { data: lastUser } = await admin
+          .from('facilita_messages')
+          .select('content')
+          .eq('conversation_id', conversationId)
+          .eq('role', 'user')
+          .order('created_at', { ascending: false })
+          .limit(1)
+        const q = lastUser?.[0]?.content
+        if (q) {
+          const { data: convRow } = await admin
+            .from('facilita_conversations')
+            .select('client_id')
+            .eq('id', conversationId)
+            .maybeSingle()
+          if (convRow?.client_id) {
+            await admin.from('facilita_answer_cache').upsert(
+              {
+                client_id: convRow.client_id,
+                question: String(q).slice(0, 4000),
+                question_norm: normalizeForCache(q),
+                answer,
+                sources,
+              },
+              { onConflict: 'client_id,question_norm' },
+            )
+          }
+        }
+      }
+    } catch (_e) {
+      // cache é otimização — falha não afeta a resposta
+    }
 
     return jsonRes({ success: true })
   }
@@ -337,7 +563,7 @@ Deno.serve(async (req: Request) => {
         })
         .filter((s: any) => s.score > 0)
         .sort((a: any, b: any) => b.score - a.score)
-        .slice(0, 8)
+        .slice(0, 5) // DIETA: 5 trechos em vez de 8
       if (scored.length > 0) {
         kbContext = scored
           .map((s: any) => {
@@ -345,7 +571,7 @@ Deno.serve(async (req: Request) => {
             const ref = doc
               ? `${doc.title}${doc.revision ? ' (' + doc.revision + ')' : ''}`
               : 'documento'
-            return `--- ${ref} ---\n${String(s.c.content).slice(0, 1200)}`
+            return `--- ${ref} ---\n${String(s.c.content).slice(0, 800)}`
           })
           .join('\n\n')
       }
@@ -466,6 +692,9 @@ Deno.serve(async (req: Request) => {
     // Budget: resumo real (orçado vs realizado) do client, para perguntas de custos
     let budgetContext = ''
     try {
+      // DIETA: consulta pesada (até 2000 linhas) só quando a pergunta é de custos;
+      // fora disso pula direto para o catch e budgetContext fica vazio.
+      if (!matchesBudget(normalizeForCache(question))) throw new Error('skip-budget-context')
       const { data: entries } = await admin
         .from('budget_entries')
         .select(
@@ -534,12 +763,32 @@ Deno.serve(async (req: Request) => {
       .order('created_at', { ascending: true })
 
     const recentHistory = (history || [])
-      .slice(-10)
+      .slice(-6) // DIETA: 6 mensagens em vez de 10
       .map(
         (m: any) =>
-          `${m.role === 'user' ? 'Usuário' : 'Facilita'}: ${String(m.content).slice(0, 500)}`,
+          `${m.role === 'user' ? 'Usuário' : 'Facilita'}: ${String(m.content).slice(0, 300)}`,
       )
       .join('\n')
+
+    // ===== FRENTE 1/2: respostas locais (0 tokens) =====
+    let localReply: { answer: string; sources: any[] } | null = null
+    try {
+      // FRENTE 2: cache de respostas de conhecimento (pg_trgm >= 0.85, TTL 30 dias)
+      const { data: cached } = await admin.rpc('facilita_cache_lookup', {
+        p_client: conv.client_id,
+        p_qnorm: normalizeForCache(question),
+      })
+      const hit = Array.isArray(cached) && cached.length > 0 ? cached[0] : null
+      if (hit?.answer) {
+        localReply = { answer: String(hit.answer), sources: hit.sources || [] }
+      }
+      // FRENTE 1: perguntas de dados → resposta determinística (nunca cacheada)
+      if (!localReply) {
+        localReply = await localAnswer(admin, conv.client_id, question)
+      }
+    } catch (_e) {
+      // respostas locais indisponíveis não bloqueiam o fluxo do Maestro
+    }
 
     // grava a pergunta do usuário + placeholder do assistente
     await admin.from('facilita_messages').insert({
@@ -548,6 +797,17 @@ Deno.serve(async (req: Request) => {
       content: String(question).slice(0, 4000),
       status: 'sent',
     })
+
+    if (localReply) {
+      await admin.from('facilita_messages').insert({
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: localReply.answer,
+        sources: localReply.sources,
+        status: 'sent',
+      })
+      return jsonRes({ success: true, answered_by: 'local' })
+    }
 
     await admin.from('facilita_messages').insert({
       conversation_id: conversationId,
