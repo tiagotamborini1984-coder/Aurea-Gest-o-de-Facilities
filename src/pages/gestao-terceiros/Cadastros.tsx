@@ -21,13 +21,7 @@ import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
 import { logAudit } from '@/services/audit'
 
-// Lista está validada pelo agente (e o documento não mudou desde a validação)?
-// A conferência acontece NO MOMENTO DO ANEXO (TreinamentosVinculo); aqui é só o portão.
-function isListValidated(tr?: any): boolean {
-  return (
-    !!tr && tr.verification_status === 'verified' && tr.verified_document_url === tr.document_url
-  )
-}
+import { isListValidated } from '@/lib/training-verification'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -270,13 +264,17 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador: ${data.name || data.id}`,
                 )
-                // Portão: todas as listas anexadas devem ter sido validadas no anexo.
-                // Alinhado por document_url (ordem do retorno do insert não é garantida).
+                // Portão: todas as listas anexadas devem estar validadas pelo agente
+                // (critério idêntico ao da UI da VerificationBadge).
+                // Mapeia diretamente por training_id (ou document_url como fallback).
                 const formRecs = training_records.filter((tr: any) => tr.training_id)
-                const invalid = (trRows || []).filter((r: any) => {
-                  if (!r.document_url) return false
-                  const tr = formRecs.find((f: any) => f.document_url === r.document_url)
-                  return !tr || !isListValidated(tr)
+                const formRecsByTraining = new Map<string, any>(
+                  formRecs.map((f: any) => [f.training_id, f]),
+                )
+                const invalid = (trPayload || []).filter((p: any) => {
+                  if (!p.document_url) return false
+                  const tr = formRecsByTraining.get(p.training_id) || p
+                  return !isListValidated(tr)
                 })
                 if (invalid.length > 0) {
                   await supabase.from('employees').delete().eq('id', data.id)
@@ -284,10 +282,7 @@ export default function Cadastros() {
                     success: false,
                     error: {
                       message:
-                        `Cadastro não salvo: lista de presença não validada pelo agente. ${invalid[0] ? '' : ''}(anexe uma lista válida e aguarde a conferência)`.replace(
-                          '  ',
-                          ' ',
-                        ),
+                        'Cadastro não salvo: há lista de presença não validada pelo agente (anexe uma lista válida e aguarde a conferência no momento do anexo).',
                     },
                   }
                 }
@@ -415,15 +410,30 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador ID: ${id}`,
                 )
-                // Portão: SÓ lista NOVA/TROCADA precisa estar validada — listas já
-                // anexadas (iguais às do banco) NÃO são reanalisadas.
+                // Portão: checa se há alguma lista com anexo que NÃO esteja validada.
+                // 1) Listas pré-existentes não modificadas (old.document_url === tr.document_url)
+                //    são preservadas com o status do banco (se já estavam verified ou pending histórico,
+                //    uma edição que não tocou naquele anexo não bloqueia o salvamento).
+                // 2) Listas novas ou trocadas no formulário precisam estar validadas (isListValidated).
+                // 3) Se o formulário já exibe a badge verde (tr.verification_status === 'verified'),
+                //    isListValidated(tr) retorna true e o salvamento é autorizado.
+                // Mapeamento SEMPRE por training_id — NUNCA por índice posicional.
                 const formRecs = training_records.filter((tr: any) => tr.training_id)
-                const invalid = (trRows || []).filter((r: any, i: number) => {
-                  const tr = formRecs[i]
-                  if (!r.document_url) return false
-                  const old = oldByTraining.get(tr.training_id)
-                  const isUnchanged = !!old && (old.document_url || '') === (tr.document_url || '')
-                  return !isUnchanged && !isListValidated(tr)
+                const formRecsByTraining = new Map<string, any>(
+                  formRecs.map((f: any) => [f.training_id, f]),
+                )
+
+                const invalid = (trPayload || []).filter((p: any) => {
+                  if (!p.document_url) return false
+                  const tr = formRecsByTraining.get(p.training_id) || p
+                  const old = oldByTraining.get(p.training_id)
+                  const isUnchanged = !!old && (old.document_url || '') === (p.document_url || '')
+                  // Se o usuário na UI vê a lista validada (tr.verification_status === 'verified')
+                  // OU se a lista pré-existente não foi alterada e o usuário não trocou o documento,
+                  // o salvamento é permitido. Só bloqueia se o anexo foi trocado/adicionado e não validado.
+                  if (isListValidated(tr)) return false
+                  if (isUnchanged) return false
+                  return true
                 })
                 if (invalid.length > 0) {
                   // desfaz: restaura os registros anteriores

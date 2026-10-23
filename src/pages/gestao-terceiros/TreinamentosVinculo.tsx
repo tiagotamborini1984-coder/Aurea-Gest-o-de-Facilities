@@ -42,10 +42,50 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     async function loadSavedRecords() {
       if (form.id && !isInitialized) {
         setIsLoading(true)
-        const { data } = await supabase
+
+        // 1. Tenta carregar registros diretamente ligados ao employee_id atual
+        let { data } = await supabase
           .from('employee_training_records')
           .select('*')
           .eq('employee_id', form.id)
+
+        // 2. Se o colaborador ainda não tem registros neste id específico
+        //    (ex.: vigência criada/duplicada ou novo mês sem cópia), busca
+        //    o histórico unificado da pessoa pelo nome / matrícula no mesmo cliente
+        if ((!data || data.length === 0) && form.client_id) {
+          let empQuery = supabase
+            .from('employees')
+            .select('id, name, registration_number, created_at, reference_month')
+            .eq('client_id', form.client_id)
+
+          if (form.registration_number) {
+            empQuery = empQuery.eq('registration_number', form.registration_number)
+          } else if (form.name) {
+            empQuery = empQuery.eq('name', form.name)
+          }
+
+          const { data: siblingEmps } = await empQuery
+          const siblingIds = (siblingEmps || []).map((e) => e.id).filter(Boolean)
+
+          if (siblingIds.length > 0) {
+            const { data: siblingRecords } = await supabase
+              .from('employee_training_records')
+              .select('*')
+              .in('employee_id', siblingIds)
+              .order('completion_date', { ascending: false, nullsFirst: false })
+
+            if (siblingRecords && siblingRecords.length > 0) {
+              // Deduplica por training_id pegando o mais recente
+              const mapByTraining = new Map<string, any>()
+              for (const sr of siblingRecords) {
+                if (sr.training_id && !mapByTraining.has(sr.training_id)) {
+                  mapByTraining.set(sr.training_id, sr)
+                }
+              }
+              data = Array.from(mapByTraining.values())
+            }
+          }
+        }
 
         if (data) {
           const records = data.map((d) => ({
@@ -54,7 +94,9 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
             completion_date: d.completion_date,
             document_url: d.document_url,
             is_required: false,
-            verification_status: d.verification_status,
+            // Fallback: se o anexo existe e não foi rejeitado, trata como verificado
+            // para compatibilidade com registros importados/legados
+            verification_status: d.verification_status || (d.document_url ? 'verified' : 'pending'),
             verification_notes: d.verification_notes,
             verification_signed_name: d.verification_signed_name,
             verification_confidence: d.verification_confidence,
@@ -69,7 +111,7 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
       }
     }
     loadSavedRecords()
-  }, [form.id, isInitialized, setForm])
+  }, [form.id, form.client_id, form.registration_number, form.name, isInitialized, setForm])
 
   useEffect(() => {
     async function loadRequired() {

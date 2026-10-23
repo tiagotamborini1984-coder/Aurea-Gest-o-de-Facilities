@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase/client'
 
+/**
+ * Critério ÚNICO de "lista de presença validada pelo agente" — usado tanto pela
+ * badge (VerificationBadge via verification_status) quanto pelo portão de
+ * salvamento (Cadastros onAdd/onUpdate). A badge fica verde exatamente quando
+ * verification_status === 'verified'; o save não pode exigir nada além disso.
+ */
+export function isListValidated(tr?: any): boolean {
+  return !!tr && tr.verification_status === 'verified'
+}
+
 export type TrainingVerificationResult = {
   ok: boolean
   status?: 'pending' | 'analyzing' | 'verified' | 'rejected' | 'failed'
