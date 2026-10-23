@@ -50,6 +50,61 @@ Deno.serve(async (req: Request) => {
     return jsonRes({ error: 'JSON inválido' }, 400)
   }
 
+  // ===== OPERAÇÕES DE SERVIÇO do indexador (Maestro) — autentica pelo callback secret =====
+  if (body?.action === 'facilita_index' && body.secret === FACILITA_CALLBACK_SECRET) {
+    const op = body.op
+    if (op === 'queue') {
+      const { data, error } = await admin
+        .from('facilita_documents')
+        .select('id, title, file_urls, client_id, status')
+        .in('status', ['pending', 'analyzing'])
+        .order('created_at', { ascending: true })
+        .limit(10)
+      if (error) return jsonRes({ error: error.message }, 500)
+      return jsonRes({ success: true, documents: data || [] })
+    }
+    if (op === 'commit') {
+      const documentId = body.document_id
+      if (!documentId) return jsonRes({ error: 'Missing document_id' }, 400)
+      const chunks = Array.isArray(body.chunks) ? body.chunks : []
+      if (chunks.length === 0) {
+        await admin
+          .from('facilita_documents')
+          .update({
+            status: 'failed',
+            status_message: String(body.error || 'Nenhum trecho extraído do documento.').slice(
+              0,
+              300,
+            ),
+          })
+          .eq('id', documentId)
+        return jsonRes({ success: true })
+      }
+      await admin.from('facilita_chunks').delete().eq('document_id', documentId)
+      const rows = chunks.map((c: any, i: number) => ({
+        document_id: documentId,
+        client_id: body.client_id,
+        chunk_index: typeof c.chunk_index === 'number' ? c.chunk_index : i,
+        content: String(c.content || '').slice(0, 8000),
+        keywords: Array.isArray(c.keywords) ? c.keywords.slice(0, 20) : [],
+      }))
+      for (let i = 0; i < rows.length; i += 50) {
+        const { error } = await admin.from('facilita_chunks').insert(rows.slice(i, i + 50))
+        if (error) return jsonRes({ error: error.message }, 500)
+      }
+      await admin
+        .from('facilita_documents')
+        .update({
+          status: 'indexed',
+          status_message: `Indexado: ${rows.length} trechos na base do Facilita.`,
+          indexed_at: new Date().toISOString(),
+        })
+        .eq('id', documentId)
+      return jsonRes({ success: true, chunks: rows.length })
+    }
+    return jsonRes({ error: 'op inválida (use queue ou commit)' }, 400)
+  }
+
   // ===== CALLBACK do Maestro (Facilita): resposta do chat OU dados extraídos do POP =====
   if (body?.action === 'callback') {
     if (!FACILITA_CALLBACK_SECRET || body.callback_secret !== FACILITA_CALLBACK_SECRET) {
@@ -249,6 +304,103 @@ Deno.serve(async (req: Request) => {
       return jsonRes({ error: 'Conversa não encontrada ou sem permissão' }, 404)
     }
 
+    // Base de conhecimento: trechos de POPs relevantes à pergunta (service role, todos os clients)
+    let kbContext = ''
+    try {
+      const qWords = String(question)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 3)
+      const { data: chunks } = await admin
+        .from('facilita_chunks')
+        .select('content, keywords, document_id')
+        .eq('client_id', conv.client_id)
+        .limit(400)
+      const { data: docs } = await admin
+        .from('facilita_documents')
+        .select('id, title, revision')
+        .eq('client_id', conv.client_id)
+      const docMap = new Map((docs || []).map((d: any) => [d.id, d]))
+      const scored = (chunks || [])
+        .map((c: any) => {
+          const hay = String(c.content)
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+          let score = 0
+          for (const w of qWords) if (hay.includes(w)) score += 1
+          for (const k of c.keywords || []) if (qWords.includes(String(k))) score += 2
+          return { c, score }
+        })
+        .filter((s: any) => s.score > 0)
+        .sort((a: any, b: any) => b.score - a.score)
+        .slice(0, 8)
+      if (scored.length > 0) {
+        kbContext = scored
+          .map((s: any) => {
+            const doc = docMap.get(s.c.document_id)
+            const ref = doc
+              ? `${doc.title}${doc.revision ? ' (' + doc.revision + ')' : ''}`
+              : 'documento'
+            return `--- ${ref} ---\n${String(s.c.content).slice(0, 1200)}`
+          })
+          .join('\n\n')
+      }
+    } catch (_e) {
+      // KB indisponível não bloqueia a resposta
+    }
+
+    // Budget: resumo real (orçado vs realizado) do client, para perguntas de custos
+    let budgetContext = ''
+    try {
+      const { data: entries } = await admin
+        .from('budget_entries')
+        .select(
+          'reference_month, budgeted_amount, realized_amount, forecast_amount, budget_accounts(name), budget_cost_centers(name)',
+        )
+        .eq('client_id', conv.client_id)
+        .order('reference_month')
+        .limit(2000)
+      if (entries && entries.length > 0) {
+        const byMonth: any = {}
+        const byAccount: any = {}
+        for (const e of entries) {
+          const m = e.reference_month
+          byMonth[m] = byMonth[m] || { b: 0, r: 0 }
+          byMonth[m].b += Number(e.budgeted_amount) || 0
+          byMonth[m].r += Number(e.realized_amount) || 0
+          const acc = e.budget_accounts?.name || 'Desconhecida'
+          byAccount[acc] = byAccount[acc] || { b: 0, r: 0 }
+          byAccount[acc].b += Number(e.budgeted_amount) || 0
+          byAccount[acc].r += Number(e.realized_amount) || 0
+        }
+        const months = Object.keys(byMonth).sort()
+        budgetContext =
+          'RESUMO DO BUDGET (orçado vs realizado):\n' +
+          months
+            .map(
+              (m) =>
+                `- ${m}: orçado R$ ${byMonth[m].b.toFixed(2)} | realizado R$ ${byMonth[m].r.toFixed(2)}`,
+            )
+            .join('\n') +
+          '\n\nTOP CONTAS POR % REALIZADO/ORÇADO:\n' +
+          Object.entries(byAccount)
+            .map(([n, v]: any) => ({ n, ...v, pct: v.b > 0 ? (v.r / v.b) * 100 : 0 }))
+            .sort((a: any, b: any) => b.pct - a.pct)
+            .slice(0, 8)
+            .map(
+              (a: any) =>
+                `- ${a.n}: ${a.pct.toFixed(1)}% (orçado R$ ${a.b.toFixed(2)}, realizado R$ ${a.r.toFixed(2)})`,
+            )
+            .join('\n')
+      }
+    } catch (_e) {
+      // budget indisponível não bloqueia a resposta
+    }
+
     // dados do usuário para o Facilita se contextualizar
     let userName = ''
     let userRole = ''
@@ -303,6 +455,8 @@ Deno.serve(async (req: Request) => {
       user_role: userRole,
       question: String(question).slice(0, 4000),
       recent_history: recentHistory,
+      kb_context: kbContext,
+      budget_context: budgetContext,
       callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/facilities-copilot`,
       callback_secret: FACILITA_CALLBACK_SECRET,
     })
