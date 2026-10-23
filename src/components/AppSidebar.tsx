@@ -300,7 +300,8 @@ export function AppSidebar() {
             item.title !== 'Cadastros' &&
             item.title !== 'Gestão de Clientes' &&
             item.title !== 'Gestão de Imóveis' &&
-            item.title !== 'Gestão de Férias'
+            item.title !== 'Gestão de Férias' &&
+            item.title !== 'Facilita'
           ) {
             const MAINTENANCE_VARIATIONS = [
               'Gestão da Manutenção',
