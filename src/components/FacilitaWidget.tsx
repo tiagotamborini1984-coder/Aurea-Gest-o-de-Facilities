@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/use-toast'
 
 const MASCOTE_URL =
-  'https://wmohkugddlxspjckbgae.supabase.co/storage/v1/object/public/documents/facilita/mascote.jpg'
+  'https://wmohkugddlxspjckbgae.supabase.co/storage/v1/object/public/documents/facilita/mascote.png'
 
 interface Msg {
   role: string
