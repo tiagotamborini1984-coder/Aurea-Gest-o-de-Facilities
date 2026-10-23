@@ -333,8 +333,12 @@ export default function FacilitaDocs() {
         .select('role, content, sources, status, created_at')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
-      if (data) setMessages(data)
-    }, 2500)
+      if (data) {
+        setMessages((prev) =>
+          JSON.stringify(prev) === JSON.stringify(data) ? prev : (data as any),
+        )
+      }
+    }, 2000)
     return () => clearInterval(t)
   }, [chatOpen, conversationId, messages])
 

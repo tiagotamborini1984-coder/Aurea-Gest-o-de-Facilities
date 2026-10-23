@@ -37,10 +37,10 @@ export default function FacilitaWidget() {
     }
   }, [open])
 
-  // autoscroll
+  // autoscroll (sem smooth no polling — evita tremor)
   useEffect(() => {
-    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight })
+  }, [messages.length])
 
   const startConversation = async () => {
     if (conversationId) return conversationId
@@ -123,21 +123,26 @@ export default function FacilitaWidget() {
     }
   }
 
-  // polling das respostas (callback do Maestro grava no banco)
+  // polling das respostas (callback do Maestro grava no banco) — só quando há resposta pendente
+  const hasPending = messages.some((m) => m.role === 'assistant' && m.status === 'processing')
   useEffect(() => {
-    if (!open || !conversationId) return
-    const hasProcessing = messages.some((m) => m.role === 'assistant' && m.status === 'processing')
-    if (!hasProcessing) return
+    if (!open || !conversationId || !hasPending) return
     const t = setInterval(async () => {
       const { data } = await supabase
         .from('facilita_messages')
         .select('role, content, sources, status, created_at')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
-      if (data) setMessages(data)
-    }, 2500)
+      if (data) {
+        setMessages((prev) => {
+          const next = JSON.stringify(data)
+          if (JSON.stringify(prev) === next) return prev // sem mudança = sem re-render (sem tremor)
+          return data as any
+        })
+      }
+    }, 2000)
     return () => clearInterval(t)
-  }, [open, conversationId, messages])
+  }, [open, conversationId, hasPending])
 
   // ===== minimizado: boneco + balão de convite =====
   if (!open) {

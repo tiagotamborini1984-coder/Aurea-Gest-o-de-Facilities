@@ -353,6 +353,116 @@ Deno.serve(async (req: Request) => {
       // KB indisponível não bloqueia a resposta
     }
 
+    // ===== MÓDULOS DO AUREA: contexto real de imóveis, tarefas, manutenção etc. =====
+    let modulesContext = ''
+    try {
+      const q = String(question)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+
+      // --- Gestão de Imóveis: ocupação por cidade/quarto/hóspede ---
+      if (
+        /(imovel|imoveis|quarto|quartos|hosped|hospede|ocupac|reserva|propriedade|pousada|cidade)/.test(
+          q,
+        )
+      ) {
+        const { data: props } = await admin
+          .from('properties')
+          .select('id, name, city, address')
+          .eq('client_id', conv.client_id)
+        const propIds = (props || []).map((p: any) => p.id)
+        if (propIds.length > 0) {
+          const { data: rooms } = await admin
+            .from('property_rooms')
+            .select('id, name, capacity, property_id')
+            .in('property_id', propIds)
+          const roomIds = (rooms || []).map((r: any) => r.id)
+          const today = new Date().toISOString().slice(0, 10)
+          let reservations: any[] = []
+          if (roomIds.length > 0) {
+            const { data: resv } = await admin
+              .from('property_reservations')
+              .select(
+                'id, room_id, bed_number, check_in_date, check_out_date, status, property_guests(name)',
+              )
+              .in('room_id', roomIds)
+              .neq('status', 'Cancelada')
+            reservations = resv || []
+          }
+          const activeRes = reservations.filter(
+            (r: any) => r.check_in_date <= today && r.check_out_date >= today,
+          )
+          const byCity: any = {}
+          for (const p of props || []) {
+            const city = p.city || 'Sem cidade'
+            byCity[city] = byCity[city] || { properties: 0, rooms: 0, occupied: 0 }
+            byCity[city].properties += 1
+            const pRooms = (rooms || []).filter((r: any) => r.property_id === p.id)
+            byCity[city].rooms += pRooms.length
+            byCity[city].occupied += activeRes.filter((r: any) =>
+              pRooms.some((rm: any) => rm.id === r.room_id),
+            ).length
+          }
+          modulesContext +=
+            '\n\n=== GESTÃO DE IMÓVEIS (dados atuais) ===\n' +
+            `Total: ${props?.length || 0} imóveis, ${(rooms || []).length} quartos, ${activeRes.length} ocupações ativas hoje (${today}).\n` +
+            Object.entries(byCity)
+              .map(
+                ([city, v]: any) =>
+                  `- ${city}: ${v.properties} imóveis, ${v.rooms} quartos, ${v.occupied} ocupados hoje`,
+              )
+              .join('\n') +
+            '\nOcupações ativas (quarto — hóspede, check-in → check-out):\n' +
+            (activeRes
+              .slice(0, 15)
+              .map((r: any) => {
+                const room = (rooms || []).find((rm: any) => rm.id === r.room_id)
+                const prop = (props || []).find((p: any) => p.id === room?.property_id)
+                const guest = r.property_guests?.name || '—'
+                return `- ${prop?.city || '?'}/${prop?.name || '?'} — quarto ${room?.name || '?'} (leito ${r.bed_number ?? '-'}): ${guest}, ${r.check_in_date} → ${r.check_out_date}`
+              })
+              .join('\n') || '(nenhuma)')
+        }
+      }
+
+      // --- Gestão de Tarefas: chamados por status ---
+      if (
+        /(tarefa|tarefas|chamado|chamados|solicitac|ticket|ordem|servico|demanda|pendenc)/.test(q)
+      ) {
+        const { data: tks } = await admin
+          .from('tasks')
+          .select(
+            'id, title, description, due_date, created_at, task_statuses(name, is_terminal), task_types(name), plants(name, city)',
+          )
+          .eq('client_id', conv.client_id)
+          .order('created_at', { ascending: false })
+          .limit(300)
+        const list = tks || []
+        const byStatus: any = {}
+        for (const t of list) {
+          const s = t.task_statuses?.name || 'Sem status'
+          byStatus[s] = (byStatus[s] || 0) + 1
+        }
+        const open = list.filter((t: any) => !t.task_statuses?.is_terminal)
+        modulesContext +=
+          `\n\n=== GESTÃO DE TAREFAS (chamados) ===\nTotal recentes: ${list.length} | Em aberto (não terminal): ${open.length}\n` +
+          Object.entries(byStatus)
+            .map(([s, n]) => `- ${s}: ${n}`)
+            .join('\n') +
+          '\nÚltimos 10 chamados:\n' +
+          list
+            .slice(0, 10)
+            .map(
+              (t: any) =>
+                `- [${t.task_statuses?.name || '?'}] ${t.title || t.description?.slice(0, 60) || '(sem título)'} — ${t.plants?.name || '?'}${t.plants?.city ? '/' + t.plants.city : ''}${t.due_date ? ' | prazo ' + t.due_date : ''}`,
+            )
+            .join('\n')
+      }
+    } catch (_e) {
+      // módulos indisponíveis não bloqueiam a resposta
+    }
+
     // Budget: resumo real (orçado vs realizado) do client, para perguntas de custos
     let budgetContext = ''
     try {
@@ -457,6 +567,7 @@ Deno.serve(async (req: Request) => {
       recent_history: recentHistory,
       kb_context: kbContext,
       budget_context: budgetContext,
+      modules_context: modulesContext,
       callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/facilities-copilot`,
       callback_secret: FACILITA_CALLBACK_SECRET,
     })
