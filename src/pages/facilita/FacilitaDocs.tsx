@@ -96,6 +96,16 @@ export default function FacilitaDocs() {
     if (urls.length === 0) return
     if (draftId) return // rascunho já existe (arquivos adicionais)
 
+    // Master com "todos os clients" não tem client para vincular o POP
+    if (profile?.role === 'Master' && selectedMasterClient === 'all') {
+      toast({
+        title: 'Selecione um cliente primeiro',
+        description: 'Escolha no topo qual cliente receberá este documento antes de anexar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsSubmitting(true)
     setDraftExtracting(true)
     setExtractFailed(false)
@@ -121,7 +131,7 @@ export default function FacilitaDocs() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Sessão expirada. Faça login novamente.')
-      const { error: fnErr } = await supabase.functions.invoke('facilita-extract', {
+      const { error: fnErr } = await supabase.functions.invoke('facilities-copilot', {
         body: { document_id: newId },
       })
       if (fnErr) throw fnErr
