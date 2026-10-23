@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/AppContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { ArrowLeft, Tag, Plus, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Tag, Plus } from 'lucide-react'
 import { AuditCategoryManagerDialog } from './components/AuditCategoryManagerDialog'
 
 export default function AuditoriaCategorias() {
@@ -13,30 +13,6 @@ export default function AuditoriaCategorias() {
 
   const effectiveClientId = activeClient?.id || profile?.client_id
   const isAdminOrMaster = profile?.role === 'Master' || profile?.role === 'Administrador'
-
-  if (!isAdminOrMaster) {
-    return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-destructive">
-              <ShieldAlert className="w-5 h-5" />
-              <CardTitle>Acesso Restrito</CardTitle>
-            </div>
-            <CardDescription>
-              O cadastro e manutenção de categorias de auditoria é restrito aos perfis Administrador
-              e Master.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" onClick={() => navigate('/auditoria-checklist/criadas')}>
-              <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

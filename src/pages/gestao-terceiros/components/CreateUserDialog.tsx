@@ -77,6 +77,8 @@ const ORGANOGRAMA_SUBMENUS = ['Organograma', 'Cadastros', 'Fluxogramas']
 const AUDITORIA_SUBMENUS = [
   'Nova Auditoria',
   'Auditorias Criadas',
+  'Categorias',
+  'Indicadores por Categoria',
   'Auditorias Realizadas',
   'Dashboard',
 ]

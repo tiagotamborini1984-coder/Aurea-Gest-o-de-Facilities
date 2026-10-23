@@ -20,6 +20,15 @@ const ALL_MENUS = [
   'Planejamento',
 ]
 
+const AUDITORIA_CHECKLIST_SUBMENUS = [
+  'Nova Auditoria',
+  'Auditorias Criadas',
+  'Categorias',
+  'Indicadores por Categoria',
+  'Auditorias Realizadas',
+  'Dashboard',
+]
+
 const ALL_MODULES = [
   'Gestão de Terceiros',
   'Limpeza e Jardinagem',
@@ -327,7 +336,39 @@ export default function Usuarios() {
           newModules.push(mod)
         }
       }
-      setForm({ ...form, accessible_menus: [...newModules, ...accMenus] })
+      setForm({
+        ...form,
+        accessible_menus: [...newModules, ...accMenus, ...otherItems, ...audSubKeys],
+      })
+    }
+
+    const rawAccessibleMenus: string[] = Array.isArray(form.accessible_menus)
+      ? form.accessible_menus
+      : []
+
+    const otherItems = rawAccessibleMenus.filter(
+      (m: string) =>
+        !ALL_MODULES.includes(m) &&
+        !ALL_MENUS.includes(m) &&
+        !m.startsWith('Auditoria e Checklist:'),
+    )
+
+    const audSubKeys = rawAccessibleMenus.filter((m: string) =>
+      m.startsWith('Auditoria e Checklist:'),
+    )
+
+    const toggleAuditoriaSubmenu = (sub: string) => {
+      const key = `Auditoria e Checklist:${sub}`
+      let newAudSubKeys = [...audSubKeys]
+      if (newAudSubKeys.includes(key)) {
+        newAudSubKeys = newAudSubKeys.filter((k) => k !== key)
+      } else {
+        newAudSubKeys.push(key)
+      }
+      setForm({
+        ...form,
+        accessible_menus: [...accModules, ...accMenus, ...otherItems, ...newAudSubKeys],
+      })
     }
 
     const toggleMenu = (menu: string) => {
@@ -337,7 +378,10 @@ export default function Usuarios() {
       } else {
         newMenus.push(menu)
       }
-      setForm({ ...form, accessible_menus: [...accModules, ...newMenus] })
+      setForm({
+        ...form,
+        accessible_menus: [...accModules, ...newMenus, ...otherItems, ...audSubKeys],
+      })
     }
 
     const featurePerms = form.feature_permissions || {}
@@ -433,6 +477,34 @@ export default function Usuarios() {
                 </Label>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-brand-graphite mb-3">
+            Menus do Módulo: Auditoria e Checklist
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            {AUDITORIA_CHECKLIST_SUBMENUS.map((sub) => {
+              const key = `Auditoria e Checklist:${sub}`
+              const isChecked =
+                audSubKeys.includes(key) || accModules.includes('Auditoria e Checklist')
+              return (
+                <div key={key} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`sub-auditoria-${sub}`}
+                    checked={isChecked}
+                    onCheckedChange={() => toggleAuditoriaSubmenu(sub)}
+                  />
+                  <Label
+                    htmlFor={`sub-auditoria-${sub}`}
+                    className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {sub}
+                  </Label>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

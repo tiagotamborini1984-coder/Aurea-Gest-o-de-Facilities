@@ -40,6 +40,8 @@ const routeMenuMap: Record<string, string> = {
   '/gestao-tarefas/relatorios': 'Gestão de Tarefas',
   '/auditoria-checklist/configuracao': 'Auditoria e Checklist:Nova Auditoria',
   '/auditoria-checklist/criadas': 'Auditoria e Checklist:Auditorias Criadas',
+  '/auditoria-checklist/categorias': 'Auditoria e Checklist:Categorias',
+  '/auditoria-checklist/indicadores-categorias': 'Auditoria e Checklist:Indicadores por Categoria',
   '/auditoria-checklist/realizadas': 'Auditoria e Checklist:Auditorias Realizadas',
   '/auditoria-checklist/dashboard': 'Auditoria e Checklist:Dashboard',
   '/organograma/dashboard': 'Organograma e Fluxos:Organograma',
