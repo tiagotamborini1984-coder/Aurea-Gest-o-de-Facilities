@@ -54,6 +54,43 @@ function matchesTarefas(q: string) {
   return RE_TAREFAS.test(q)
 }
 
+// Absenteísmo/presença (Gestão de Terceiros — Dashboard do Gestor)
+const RE_ABSENTEISMO =
+  /(absente|falta|faltas|ausente|ausenc|presenc|presentes|efetivo|pessoal presente)/
+function matchesAbsenteismo(q: string) {
+  return RE_ABSENTEISMO.test(q)
+}
+
+const MONTHS_PT: any = {
+  janeiro: '01',
+  fevereiro: '02',
+  marco: '03',
+  março: '03',
+  abril: '04',
+  maio: '05',
+  junho: '06',
+  julho: '07',
+  agosto: '08',
+  setembro: '09',
+  outubro: '10',
+  novembro: '11',
+  dezembro: '12',
+}
+
+// Mês citado na pergunta ("setembro", "2026-09") ou null (mês atual)
+function parseAskedMonth(q: string): string | null {
+  const qn = normalizeForCache(q)
+  const iso = qn.match(/\b(20\d{2})-(\d{2})\b/)
+  if (iso) return `${iso[1]}-${iso[2]}`
+  for (const [name, num] of Object.entries(MONTHS_PT)) {
+    if (new RegExp(`\\b${name}\\b`).test(qn)) {
+      const y = qn.match(/\b(20\d{2})\b/)
+      return `${y ? y[1] : String(new Date().getFullYear())}-${num}`
+    }
+  }
+  return null
+}
+
 function normalizeForCache(s: string) {
   return String(s)
     .toLowerCase()
@@ -240,6 +277,142 @@ async function localAnswer(admin: any, clientId: string, question: string) {
         .join('\n') +
       '\n\nDados do módulo de Gestão de Tarefas. 😊'
     return { answer, sources: [{ type: 'aurea', ref: 'Gestão de Tarefas' }] }
+  }
+
+  // ===== Absenteísmo (Gestão de Terceiros — Dashboard do Gestor) =====
+  // Mesma fórmula do dashboard: (contratado − presentes) / contratado × 100,
+  // desconsiderando dias não úteis (plant_non_working_days) e dias sem lançamento.
+  if (matchesAbsenteismo(normalizeForCache(question))) {
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const asked = parseAskedMonth(question)
+    const month = asked && asked <= currentMonth ? asked : currentMonth
+    const monthStart = `${month}-01`
+    const [yy, mm] = month.split('-').map(Number)
+    const lastDay = new Date(yy, mm, 0).getDate()
+    const todayStr = now.toISOString().slice(0, 10)
+    const rangeEnd =
+      month === todayStr.slice(0, 7) ? todayStr : `${month}-${String(lastDay).padStart(2, '0')}`
+
+    const { data: plants } = await admin.from('plants').select('id, name').eq('client_id', clientId)
+    if (!plants || plants.length === 0) {
+      return {
+        answer:
+          '**Absenteísmo**\n\nNão há plantas cadastradas para este cliente no módulo Gestão de Terceiros. 😊',
+        sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — sem plantas' }],
+      }
+    }
+    const { data: nwd } = await admin
+      .from('plant_non_working_days')
+      .select('plant_id, date')
+      .eq('client_id', clientId)
+      .gte('date', monthStart)
+      .lte('date', rangeEnd)
+      .limit(5000)
+    const { data: logs } = await admin
+      .from('daily_logs')
+      .select('date, plant_id, status')
+      .eq('client_id', clientId)
+      .eq('type', 'staff')
+      .gte('date', monthStart)
+      .lte('date', rangeEnd)
+      .limit(20000)
+    const { data: contracted } = await admin
+      .from('contracted_headcount')
+      .select('plant_id, quantity, reference_month')
+      .eq('client_id', clientId)
+      .eq('type', 'colaborador')
+
+    const nwdSet = new Set((nwd || []).map((n: any) => `${n.plant_id}_${n.date}`))
+    const logsByPlantDate = new Map<string, { present: number; total: number }>()
+    for (const l of logs || []) {
+      const k = `${l.plant_id}_${l.date}`
+      const cur = logsByPlantDate.get(k) || { present: 0, total: 0 }
+      cur.total += 1
+      if (l.status === true) cur.present += 1
+      logsByPlantDate.set(k, cur)
+    }
+
+    // efetivo contratado por planta: reference_month mais recente <= mês perguntado
+    const contractedByPlant = new Map<string, number>()
+    for (const p of plants) {
+      const rows = (contracted || []).filter((c: any) => c.plant_id === p.id)
+      if (!rows.length) continue
+      const months = [...new Set(rows.map((r: any) => r.reference_month || '2000-01-01'))].sort()
+      let applicable = months[0]
+      for (const mm of months) if (mm <= monthStart) applicable = mm
+      const q = rows
+        .filter((r: any) => (r.reference_month || '2000-01-01') === applicable)
+        .reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0)
+      contractedByPlant.set(p.id, q)
+    }
+
+    const dates: string[] = []
+    const startD = new Date(`${monthStart}T00:00:00Z`)
+    const endD = new Date(`${rangeEnd}T00:00:00Z`)
+    for (let d = new Date(startD); d <= endD; d.setUTCDate(d.getUTCDate() + 1)) {
+      dates.push(d.toISOString().slice(0, 10))
+    }
+
+    let totalPresent = 0
+    let totalDenom = 0
+    let days = 0
+    const perPlant: any = {}
+    for (const p of plants) perPlant[p.id] = { name: p.name, present: 0, denom: 0 }
+    for (const date of dates) {
+      for (const p of plants) {
+        if (nwdSet.has(`${p.id}_${date}`)) continue
+        const ld = logsByPlantDate.get(`${p.id}_${date}`)
+        if (!ld || ld.total === 0) continue
+        let denom = contractedByPlant.get(p.id) || 0
+        if (denom === 0) denom = ld.total // fallback do dashboard: efetivo lançado
+        totalPresent += ld.present
+        totalDenom += denom
+        days += 1
+        perPlant[p.id].present += ld.present
+        perPlant[p.id].denom += denom
+      }
+    }
+
+    // "hoje": presentes e ausentes explícitos (status false)
+    let todayPresent = 0
+    let todayAbsent = 0
+    for (const p of plants) {
+      if (nwdSet.has(`${p.id}_${todayStr}`)) continue
+      const ld = logsByPlantDate.get(`${p.id}_${todayStr}`)
+      if (!ld) continue
+      todayPresent += ld.present
+      todayAbsent += ld.total - ld.present
+    }
+
+    const abs =
+      totalDenom > 0 ? Math.max(0, ((totalDenom - totalPresent) / totalDenom) * 100) : null
+    if (abs === null) {
+      return {
+        answer: `**Absenteísmo — ${month}**\n\nNão há lançamentos de presença no período (Gestão de Terceiros). O número aparece quando o time lançar presenças no Dashboard do Gestor. 😊`,
+        sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — sem lançamentos no período' }],
+      }
+    }
+    const plantLines = plants
+      .map((p: any) => {
+        const s = perPlant[p.id]
+        const a = s.denom > 0 ? Math.max(0, ((s.denom - s.present) / s.denom) * 100) : null
+        return a === null ? null : `- ${s.name}: ${a.toFixed(1)}%`
+      })
+      .filter(Boolean)
+      .slice(0, 8)
+
+    const answer =
+      `**Absenteísmo — ${month} (Gestão de Terceiros)**\n\n` +
+      `- Absenteísmo do período: **${abs.toFixed(1)}%**\n` +
+      `- Base: ${days} dias com lançamento (dias não úteis desconsiderados)\n` +
+      `- Hoje (${todayStr}): ${todayPresent} presentes, ${todayAbsent} ausentes\n` +
+      (plantLines.length ? '\n**Por planta:**\n' + plantLines.join('\n') + '\n' : '') +
+      '\nMesmo cálculo do Dashboard do Gestor. Quer o detalhe de alguma planta? 😊'
+    return {
+      answer,
+      sources: [{ type: 'aurea', ref: 'Gestão de Terceiros — Dashboard do Gestor' }],
+    }
   }
 
   return null
@@ -716,6 +889,50 @@ Deno.serve(async (req: Request) => {
                 `- [${t.task_statuses?.name || '?'}] ${t.title || t.description?.slice(0, 60) || '(sem título)'} — ${t.plants?.name || '?'}${t.plants?.city ? '/' + t.plants.city : ''}${t.due_date ? ' | prazo ' + t.due_date : ''}`,
             )
             .join('\n')
+      }
+
+      // --- Gestão de Terceiros: presença/faltas (absenteísmo) ---
+      if (/(absente|falta|faltas|ausente|presenc|efetivo|presentes)/.test(q)) {
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const monthStart = todayStr.slice(0, 8) + '01'
+        const { data: emps } = await admin
+          .from('employees')
+          .select('id, name, plants(name)')
+          .eq('client_id', conv.client_id)
+        const empMap = new Map((emps || []).map((e: any) => [e.id, e]))
+        const { data: aLogs } = await admin
+          .from('daily_logs')
+          .select('date, reference_id, status, plants(name)')
+          .eq('client_id', conv.client_id)
+          .eq('type', 'staff')
+          .gte('date', monthStart)
+          .lte('date', todayStr)
+          .limit(20000)
+        const byEmp: any = {}
+        const todayAbsentList: string[] = []
+        for (const l of aLogs || []) {
+          if (l.status === true) continue
+          const e = empMap.get(l.reference_id)
+          const nm = e?.name || 'Colaborador removido'
+          byEmp[nm] = (byEmp[nm] || 0) + 1
+          if (l.date === todayStr) todayAbsentList.push(`${nm} (${l.plants?.name || '?'})`)
+        }
+        const top = Object.entries(byEmp)
+          .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
+          .slice(0, 10)
+        modulesContext +=
+          `\n\n=== GESTÃO DE TERCEIROS — PRESENÇA/FALTAS (mês ${monthStart.slice(0, 7)}, dados atuais) ===\n` +
+          (top.length
+            ? 'Ausências lançadas no mês por colaborador (top):\n' +
+              top.map(([n, c]: any) => `- ${n}: ${c} ausência(s)`).join('\n')
+            : 'Nenhuma ausência lançada no mês.') +
+          (todayAbsentList.length
+            ? '\nAusentes hoje:\n' +
+              todayAbsentList
+                .slice(0, 15)
+                .map((s: string) => `- ${s}`)
+                .join('\n')
+            : '')
       }
     } catch (_e) {
       // módulos indisponíveis não bloqueiam a resposta
