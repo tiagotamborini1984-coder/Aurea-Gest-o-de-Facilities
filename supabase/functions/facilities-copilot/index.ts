@@ -405,7 +405,7 @@ async function localAnswer(admin: any, clientId: string, question: string) {
     const answer =
       `**Absenteísmo — ${month} (Gestão de Terceiros)**\n\n` +
       `- Absenteísmo do período: **${abs.toFixed(1)}%**\n` +
-      `- Base: ${days} dias com lançamento (dias não úteis desconsiderados)\n` +
+      `- Base: ${days} ${days === 1 ? 'dia' : 'dias'} com lançamento (dias não úteis desconsiderados)\n` +
       `- Hoje (${todayStr}): ${todayPresent} presentes, ${todayAbsent} ausentes\n` +
       (plantLines.length ? '\n**Por planta:**\n' + plantLines.join('\n') + '\n' : '') +
       '\nMesmo cálculo do Dashboard do Gestor. Quer o detalhe de alguma planta? 😊'
