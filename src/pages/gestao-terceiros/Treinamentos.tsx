@@ -228,7 +228,7 @@ export default function Treinamentos() {
 
       const { error: uploadError } = await supabase.storage
         .from('training-documents')
-        .upload(filePath, file, { cacheControl: '3600', upsert: true })
+        .upload(filePath, merged, { cacheControl: '3600', upsert: true })
 
       if (uploadError) throw uploadError
 

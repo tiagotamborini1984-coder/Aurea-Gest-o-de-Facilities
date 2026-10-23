@@ -59,9 +59,9 @@ export default function IndicadoresCategorias() {
   const navigate = useNavigate()
   const { profile, activeClient } = useAppStore()
   const { plants } = useMasterData()
-  const hasAccess =
-    useHasAccess('Auditoria e Checklist') ||
-    useHasAccess('Auditoria e Checklist:Indicadores por Categoria')
+  const hasModuleAccess = useHasAccess('Auditoria e Checklist')
+  const hasSubmenuAccess = useHasAccess('Auditoria e Checklist:Indicadores por Categoria')
+  const hasAccess = hasModuleAccess || hasSubmenuAccess
 
   // Filtros
   const [filterAuditTitle, setFilterAuditTitle] = useState<string>('all')

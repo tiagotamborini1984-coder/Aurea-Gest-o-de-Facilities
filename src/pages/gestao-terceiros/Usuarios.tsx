@@ -360,6 +360,21 @@ export default function Usuarios() {
     const toggleAuditoriaSubmenu = (sub: string) => {
       const key = `Auditoria e Checklist:${sub}`
       let newAudSubKeys = [...audSubKeys]
+      let newAccModules = [...accModules]
+
+      // Se o módulo "Auditoria e Checklist" inteiro estava presente, ao desmarcar um submenu
+      // precisamos expandir todos os outros submenus para chaves explícitas e remover o módulo global,
+      // para que a exclusão daquele item específico tenha efeito real.
+      if (newAccModules.includes('Auditoria e Checklist')) {
+        newAccModules = newAccModules.filter((m) => m !== 'Auditoria e Checklist')
+        AUDITORIA_CHECKLIST_SUBMENUS.forEach((s) => {
+          const k = `Auditoria e Checklist:${s}`
+          if (!newAudSubKeys.includes(k)) {
+            newAudSubKeys.push(k)
+          }
+        })
+      }
+
       if (newAudSubKeys.includes(key)) {
         newAudSubKeys = newAudSubKeys.filter((k) => k !== key)
       } else {
@@ -367,7 +382,7 @@ export default function Usuarios() {
       }
       setForm({
         ...form,
-        accessible_menus: [...accModules, ...accMenus, ...otherItems, ...newAudSubKeys],
+        accessible_menus: [...newAccModules, ...accMenus, ...otherItems, ...newAudSubKeys],
       })
     }
 

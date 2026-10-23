@@ -45,8 +45,9 @@ import { cn } from '@/lib/utils'
 export default function AuditoriaDashboard() {
   const { profile, activeClient } = useAppStore()
   const { plants } = useMasterData()
-  const hasAccess =
-    useHasAccess('Auditoria e Checklist') || useHasAccess('Auditoria e Checklist:Dashboard')
+  const hasModuleAccess = useHasAccess('Auditoria e Checklist')
+  const hasSubmenuAccess = useHasAccess('Auditoria e Checklist:Dashboard')
+  const hasAccess = hasModuleAccess || hasSubmenuAccess
 
   const [executions, setExecutions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
