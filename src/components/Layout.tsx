@@ -3,6 +3,7 @@ import { useEffect, useMemo, memo } from 'react'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from './AppSidebar'
 import { AppHeader } from './AppHeader'
+import FacilitaWidget from './FacilitaWidget'
 import { useAppStore } from '@/store/AppContext'
 import { hexToHsl } from '@/lib/color-utils'
 
@@ -81,6 +82,7 @@ export default function Layout() {
           <MainContent />
         </div>
       </div>
+      <FacilitaWidget />
     </SidebarProvider>
   )
 }
