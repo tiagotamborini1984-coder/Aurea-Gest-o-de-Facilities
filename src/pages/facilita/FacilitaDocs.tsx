@@ -30,6 +30,8 @@ import { FileUpload } from '@/components/FileUpload'
 import { supabase } from '@/lib/supabase/client'
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
+  draft: { label: 'Rascunho — revise os dados', color: 'bg-amber-500' },
+  extracting: { label: 'Lendo documento…', color: 'bg-blue-500' },
   pending: { label: 'Na fila', color: 'bg-slate-500' },
   analyzing: { label: 'Lendo documento…', color: 'bg-blue-500' },
   indexed: { label: 'Na base do Facilita', color: 'bg-green-500' },
@@ -38,7 +40,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 
 export default function FacilitaDocs() {
   const { profile, selectedMasterClient } = useAppStore()
-  const { data: docs, loading, add, remove, fetchAll } = useCrud<any>('facilita_documents')
+  const { data: docs, loading, remove, fetchAll } = useCrud<any>('facilita_documents')
   const { toast } = useToast()
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -53,6 +55,10 @@ export default function FacilitaDocs() {
     file_urls: [] as string[],
   }
   const [formData, setFormData] = useState(defaultForm)
+  // rascunho em extração automática (anexou arquivo → Facilita extrai os dados)
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [draftExtracting, setDraftExtracting] = useState(false)
+  const [extractFailed, setExtractFailed] = useState(false)
 
   // ===== Chat =====
   const [chatOpen, setChatOpen] = useState(false)
@@ -84,41 +90,139 @@ export default function FacilitaDocs() {
     })
   }, [docs, searchTerm])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!formData.title || formData.file_urls.length === 0) {
+  // ===== Fluxo de rascunho: anexou arquivo → cria rascunho → Facilita extrai os dados =====
+  const handleFilesAttached = async (urls: string[]) => {
+    setFormData((prev) => ({ ...prev, file_urls: urls }))
+    if (urls.length === 0) return
+    if (draftId) return // rascunho já existe (arquivos adicionais)
+
+    setIsSubmitting(true)
+    setDraftExtracting(true)
+    setExtractFailed(false)
+    try {
+      // cria rascunho com título provisório
+      const { data, error } = await supabase
+        .from('facilita_documents')
+        .insert({
+          title: 'Lendo documento…',
+          file_urls: urls,
+          client_id: clientId,
+          created_by: (profile as any)?.id,
+          status: 'extracting',
+          status_message: 'Facilita está lendo o documento e extraindo os dados.',
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+      const newId = data.id
+      setDraftId(newId)
+
+      // pede extração ao Maestro
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+      const { error: fnErr } = await supabase.functions.invoke('facilita-extract', {
+        body: { document_id: newId },
+      })
+      if (fnErr) throw fnErr
+    } catch (e: any) {
+      setExtractFailed(true)
       toast({
-        title: 'Preencha o título e anexe o arquivo',
+        title: 'Extração automática indisponível',
+        description: 'Preencha os dados manualmente e confirme.',
         variant: 'destructive',
       })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // polling: quando o callback gravar os dados extraídos, preenche o form
+  useEffect(() => {
+    if (!draftId || !draftExtracting) return
+    const t = setInterval(async () => {
+      const { data } = await supabase
+        .from('facilita_documents')
+        .select('title, description, category, revision, status, status_message')
+        .eq('id', draftId)
+        .single()
+      if (data && data.status !== 'extracting') {
+        setDraftExtracting(false)
+        if (data.status === 'draft') {
+          setFormData((prev) => ({
+            ...prev,
+            title: data.title || prev.title,
+            description: data.description || prev.description,
+            category: data.category || prev.category,
+            revision: data.revision || prev.revision,
+          }))
+          toast({ title: 'Dados extraídos — revise e confirme' })
+        } else if (data.status === 'failed') {
+          setExtractFailed(true)
+          toast({
+            title: 'Não consegui extrair os dados',
+            description: 'Preencha manualmente e confirme.',
+            variant: 'destructive',
+          })
+        }
+      }
+    }, 2500)
+    return () => clearInterval(t)
+  }, [draftId, draftExtracting])
+
+  // confirma o rascunho → entra na fila de indexação
+  const confirmDraft = async () => {
+    if (!draftId) return
+    if (!formData.title.trim()) {
+      toast({ title: 'Preencha o título antes de confirmar', variant: 'destructive' })
       return
     }
     setIsSubmitting(true)
     try {
-      const { success, error } = await add({
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        revision: formData.revision,
-        file_urls: formData.file_urls,
-        client_id: clientId,
-        status: 'pending',
-        status_message: 'Na fila para leitura pelo Facilita.',
-      })
-      if (success) {
-        toast({ title: 'Documento na fila — o Facilita vai ler e indexar em instantes' })
-        setIsDialogOpen(false)
-        setFormData(defaultForm)
-      } else throw error
+      const { error } = await supabase
+        .from('facilita_documents')
+        .update({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          revision: formData.revision,
+          file_urls: formData.file_urls,
+          status: 'pending',
+          status_message: 'Na fila para leitura pelo Facilita.',
+        })
+        .eq('id', draftId)
+      if (error) throw error
+      toast({ title: 'Documento na fila — o Facilita vai ler e indexar em instantes' })
+      setIsDialogOpen(false)
+      setFormData(defaultForm)
+      setDraftId(null)
+      setDraftExtracting(false)
+      setExtractFailed(false)
+      fetchAll()
     } catch (error: any) {
       toast({
-        title: 'Erro ao salvar documento',
+        title: 'Erro ao confirmar documento',
         description: error.message || 'Ocorreu um erro inesperado',
         variant: 'destructive',
       })
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // descarta o rascunho (cancelar ou fechar dialog)
+  const discardDraft = async () => {
+    if (!draftId) {
+      setIsDialogOpen(false)
+      return
+    }
+    await supabase.from('facilita_documents').delete().eq('id', draftId)
+    setIsDialogOpen(false)
+    setFormData(defaultForm)
+    setDraftId(null)
+    setDraftExtracting(false)
+    setExtractFailed(false)
+    fetchAll()
   }
 
   const handleDelete = async (id: string) => {
@@ -360,19 +464,43 @@ export default function FacilitaDocs() {
       </div>
 
       {/* dialog novo documento */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) discardDraft()
+          else setIsDialogOpen(true)
+        }}
+      >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Novo documento na base do Facilita</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              confirmDraft()
+            }}
+            className="space-y-4"
+          >
+            {draftExtracting && (
+              <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Facilita está lendo o documento e extraindo título, categoria, revisão e descrição…
+              </div>
+            )}
+            {extractFailed && !draftExtracting && (
+              <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
+                ⚠️ Não consegui extrair os dados automaticamente — preencha manualmente.
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="title">Título *</Label>
               <Input
                 id="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Ex.: POP-042 — Rotina de Ronda Predial"
+                placeholder="Anexe o arquivo — o Facilita extrai os dados"
+                disabled={draftExtracting}
                 required
               />
             </div>
@@ -384,6 +512,7 @@ export default function FacilitaDocs() {
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   placeholder="POP, Instrução de Trabalho, Manual…"
+                  disabled={draftExtracting}
                 />
               </div>
               <div className="space-y-2">
@@ -393,6 +522,7 @@ export default function FacilitaDocs() {
                   value={formData.revision}
                   onChange={(e) => setFormData({ ...formData, revision: e.target.value })}
                   placeholder="Ex.: rev. 3"
+                  disabled={draftExtracting}
                 />
               </div>
             </div>
@@ -403,30 +533,35 @@ export default function FacilitaDocs() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Sobre o que é o documento (opcional)"
+                disabled={draftExtracting}
               />
             </div>
             <div className="space-y-2">
               <Label>Arquivos *</Label>
               <FileUpload
                 existingUrls={formData.file_urls}
-                onUploadComplete={(urls) => setFormData({ ...formData, file_urls: urls })}
+                onUploadComplete={handleFilesAttached}
               />
             </div>
             <div className="flex justify-end gap-2 pt-6 border-t border-border mt-6">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsDialogOpen(false)}
+                onClick={discardDraft}
                 disabled={isSubmitting}
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || draftExtracting || !draftId || !formData.title.trim()}
                 className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
               >
-                {isSubmitting ? 'Salvando...' : 'Adicionar à base'}
+                {draftExtracting
+                  ? 'Extraindo dados…'
+                  : isSubmitting
+                    ? 'Salvando...'
+                    : 'Confirmar e indexar'}
               </Button>
             </div>
           </form>
