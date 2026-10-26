@@ -15,35 +15,41 @@ const MainContent = memo(function MainContent() {
   )
 })
 
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+
 export default function Layout() {
   const { activeClient } = useAppStore()
 
   const applyClientColors = useMemo(
     () => (client: typeof activeClient) => {
-      const isDark = document.documentElement.classList.contains('dark')
+      try {
+        const isDark = document.documentElement.classList.contains('dark')
 
-      if (client?.primaryColor) {
-        const hsl = hexToHsl(client.primaryColor)
-        document.documentElement.style.setProperty('--primary', hsl)
-        if (!isDark) {
-          document.documentElement.style.setProperty('--sidebar-background', hsl)
+        if (client?.primaryColor) {
+          const hsl = hexToHsl(client.primaryColor)
+          document.documentElement.style.setProperty('--primary', hsl)
+          if (!isDark) {
+            document.documentElement.style.setProperty('--sidebar-background', hsl)
+          } else {
+            document.documentElement.style.removeProperty('--sidebar-background')
+          }
         } else {
+          document.documentElement.style.removeProperty('--primary')
           document.documentElement.style.removeProperty('--sidebar-background')
         }
-      } else {
-        document.documentElement.style.removeProperty('--primary')
-        document.documentElement.style.removeProperty('--sidebar-background')
-      }
 
-      if (client?.secondaryColor) {
-        const secondaryHsl = hexToHsl(client.secondaryColor)
-        document.documentElement.style.setProperty('--secondary', secondaryHsl)
-        document.documentElement.style.setProperty('--secondary-foreground', '0 0% 100%')
-        document.documentElement.style.setProperty('--sidebar-primary', secondaryHsl)
-      } else {
-        document.documentElement.style.removeProperty('--secondary')
-        document.documentElement.style.removeProperty('--secondary-foreground')
-        document.documentElement.style.removeProperty('--sidebar-primary')
+        if (client?.secondaryColor) {
+          const secondaryHsl = hexToHsl(client.secondaryColor)
+          document.documentElement.style.setProperty('--secondary', secondaryHsl)
+          document.documentElement.style.setProperty('--secondary-foreground', '0 0% 100%')
+          document.documentElement.style.setProperty('--sidebar-primary', secondaryHsl)
+        } else {
+          document.documentElement.style.removeProperty('--secondary')
+          document.documentElement.style.removeProperty('--secondary-foreground')
+          document.documentElement.style.removeProperty('--sidebar-primary')
+        }
+      } catch (err) {
+        console.warn('Erro ao aplicar cores do cliente:', err)
       }
     },
     [],
@@ -73,13 +79,19 @@ export default function Layout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background overflow-hidden transition-colors duration-500">
         <div className="print:hidden h-full">
-          <AppSidebar />
+          <ErrorBoundary fallbackTitle="Falha na Barra Lateral">
+            <AppSidebar />
+          </ErrorBoundary>
         </div>
         <div className="flex flex-col flex-1 w-full overflow-hidden print:w-full print:block">
           <div className="print:hidden">
-            <AppHeader />
+            <ErrorBoundary fallbackTitle="Falha no Cabeçalho">
+              <AppHeader />
+            </ErrorBoundary>
           </div>
-          <MainContent />
+          <ErrorBoundary fallbackTitle="Erro ao carregar módulo">
+            <MainContent />
+          </ErrorBoundary>
         </div>
       </div>
       <FacilitaWidget />

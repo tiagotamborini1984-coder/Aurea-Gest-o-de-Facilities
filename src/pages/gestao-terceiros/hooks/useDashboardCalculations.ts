@@ -47,6 +47,26 @@ export function useDashboardCalculations(
       return nonWorkingDatesByPlant[plantId]?.has(date) ?? false
     }
 
+    if (!Array.isArray(plants) || !Array.isArray(employees) || !Array.isArray(logs)) {
+      return {
+        metrics: {
+          presente: '0',
+          lancado: '0',
+          contratado: '0',
+          absenteismo: '0.0%',
+          absenteismoPercent: 0,
+          totalFuncionarios: 0,
+          totalEquipamentos: 0,
+        },
+        plantStats: [],
+        locationStats: [],
+        dailyTrend: [],
+        activeLogs: [],
+        equipmentStats: [],
+        collaboratorStats: [],
+      } as any
+    }
+
     const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
     const companiesSet = new Set(selectedCompanies)
 

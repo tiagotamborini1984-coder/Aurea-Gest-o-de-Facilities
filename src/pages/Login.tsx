@@ -24,22 +24,43 @@ export default function Login() {
   const { toast } = useToast()
 
   useEffect(() => {
+    let isMounted = true
     const checkUser = async () => {
       if (user && view !== 'update_password') {
-        const { data } = await supabase
-          .from('profiles')
-          .select('force_password_change')
-          .eq('id', user.id)
-          .single()
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('force_password_change')
+            .eq('id', user.id)
+            .maybeSingle()
 
-        if (data?.force_password_change) {
-          setView('update_password')
-        } else {
-          navigate('/gestao-terceiros', { replace: true })
+          if (!isMounted) return
+
+          if (error) {
+            console.warn('Erro ao verificar perfil no login:', error.message)
+            // Se der erro ao ler profiles, ainda assim redireciona para a rota protegida
+            // que possui seus próprios guards com fallback gracioso
+            navigate('/gestao-terceiros', { replace: true })
+            return
+          }
+
+          if (data?.force_password_change) {
+            setView('update_password')
+          } else {
+            navigate('/gestao-terceiros', { replace: true })
+          }
+        } catch (err) {
+          console.error('Falha ao checar usuário:', err)
+          if (isMounted) {
+            navigate('/gestao-terceiros', { replace: true })
+          }
         }
       }
     }
     checkUser()
+    return () => {
+      isMounted = false
+    }
   }, [user, navigate, view])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -56,23 +77,27 @@ export default function Login() {
       })
       setIsSubmitting(false)
     } else {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('client_id')
-          .eq('id', user.id)
-          .single()
-        if (profile?.client_id) {
-          await supabase.from('audit_logs').insert({
-            client_id: profile.client_id,
-            user_id: user.id,
-            action_type: 'Login',
-            details: 'Usuário entrou no sistema',
-          })
+      try {
+        const {
+          data: { user: currentUser },
+        } = await supabase.auth.getUser()
+        if (currentUser) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('client_id')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+          if (profile?.client_id) {
+            await supabase.from('audit_logs').insert({
+              client_id: profile.client_id,
+              user_id: currentUser.id,
+              action_type: 'Login',
+              details: 'Usuário entrou no sistema',
+            })
+          }
         }
+      } catch (logErr) {
+        console.warn('Falha silenciosa ao registrar log de login:', logErr)
       }
     }
   }

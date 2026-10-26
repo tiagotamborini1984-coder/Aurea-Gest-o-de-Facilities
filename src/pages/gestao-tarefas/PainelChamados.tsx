@@ -440,82 +440,41 @@ export default function PainelChamados() {
 
       if (!initialStatus) throw new Error('Nenhum status configurado para este cliente.')
 
-      // Verificar se já existe uma tarefa aberta com a mesma planta, tipo e título (Upsert Logic)
-      const openStatuses = clientStatuses.filter((s) => !s.is_terminal).map((s) => s.id)
-
-      const { data: existingTasks } = await supabase
+      // Criação de chamado via INSERT direto garantindo novo protocolo
+      const { data: newTask, error } = await supabase
         .from('tasks')
-        .select('*')
-        .eq('client_id', effectiveClientId)
-        .eq('plant_id', form.plant_id)
-        .eq('type_id', form.type_id)
-        .eq('title', form.title)
-        .in('status_id', openStatuses)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .insert({
+          client_id: effectiveClientId as string,
+          plant_id: form.plant_id,
+          type_id: form.type_id,
+          status_id: initialStatus,
+          requester_id: profile.id,
+          assignee_id: form.assignee_id,
+          task_number: 'GERANDO...',
+          title: form.title,
+          description: form.description,
+          attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
+          attachment_urls,
+          status_updated_at: new Date().toISOString(),
+          participants_ids: form.participants_ids,
+          ...(isPersonal && form.custom_due_date
+            ? { due_date: new Date(form.custom_due_date).toISOString() }
+            : {}),
+        } as any)
+        .select()
+        .single()
 
-      if (existingTasks && existingTasks.length > 0) {
-        const existingTask = existingTasks[0]
+      if (error) {
+        console.error('Falha ao inserir chamado:', error)
+        throw new Error(error.message || 'Falha ao salvar chamado no banco de dados.')
+      }
 
-        const prevUrls = Array.isArray(existingTask.attachment_urls)
-          ? (existingTask.attachment_urls as string[])
-          : []
-        const updatedUrls =
-          attachment_urls.length > 0 ? [...new Set([...prevUrls, ...attachment_urls])] : prevUrls
+      if (!newTask) {
+        throw new Error('O chamado não retornou dados após ser salvo.')
+      }
 
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            assignee_id: form.assignee_id,
-            description: form.description,
-            attachment_url:
-              attachment_urls.length > 0 ? attachment_urls[0] : existingTask.attachment_url,
-            attachment_urls: updatedUrls,
-            participants_ids: form.participants_ids,
-            // SLA properties (due_date, created_at, status_updated_at) are intentionally PRESERVED
-          } as any)
-          .eq('id', existingTask.id)
-
-        if (error) throw error
-
-        await supabase.from('task_timeline').insert({
-          task_id: existingTask.id,
-          user_id: profile.id,
-          content: `Chamado atualizado para evitar duplicidade. SLA e prazos originais preservados.`,
-          action_type: 'comment',
-        })
-
-        toast({
-          title: 'Chamado atualizado com sucesso!',
-          description: `Protocolo existente atualizado: ${existingTask.task_number}`,
-          className: 'bg-blue-50 text-blue-900 border-blue-200',
-        })
-      } else {
-        const { data: newTask, error } = await supabase
-          .from('tasks')
-          .insert({
-            client_id: effectiveClientId as string,
-            plant_id: form.plant_id,
-            type_id: form.type_id,
-            status_id: initialStatus,
-            requester_id: profile.id,
-            assignee_id: form.assignee_id,
-            task_number: 'GERANDO...',
-            title: form.title,
-            description: form.description,
-            attachment_url: attachment_urls.length > 0 ? attachment_urls[0] : null,
-            attachment_urls,
-            status_updated_at: new Date().toISOString(),
-            participants_ids: form.participants_ids,
-            ...(isPersonal && form.custom_due_date
-              ? { due_date: new Date(form.custom_due_date).toISOString() }
-              : {}),
-          } as any)
-          .select()
-          .single()
-
-        if (error) throw error
-
+      // Adiciona na timeline do chamado
+      try {
         await supabase.from('task_timeline').insert({
           task_id: newTask.id,
           user_id: profile.id,
@@ -525,17 +484,43 @@ export default function PainelChamados() {
               : `Chamado aberto.`,
           action_type: 'comment',
         })
-
-        toast({
-          title: 'Chamado criado com sucesso!',
-          description: `Protocolo: ${newTask.task_number}`,
-          className: 'bg-green-50 text-green-900 border-green-200',
-        })
+      } catch (tlErr) {
+        console.warn('Falha não-bloqueante ao gravar timeline:', tlErr)
       }
+
+      // Garante que o status do novo chamado está no filtro para que apareça imediatamente
+      if (!selectedStatuses.includes(initialStatus)) {
+        setSelectedStatuses((prev) => [...prev, initialStatus])
+      }
+
+      // Se a aba atual for 'recebidos' e o usuário logado for o solicitante,
+      // muda para 'enviados' ou 'todos' para que o chamado criado apareça na visualização na hora
+      if (
+        activeTab === 'recebidos' &&
+        newTask.requester_id === profile.id &&
+        newTask.assignee_id !== profile.id
+      ) {
+        setActiveTab('enviados')
+      }
+
+      // Feedback visível e claro para a usuária
+      toast({
+        title: 'Chamado criado com sucesso!',
+        description: `Protocolo: ${newTask.task_number}`,
+        className: 'bg-green-50 text-green-900 border-green-200',
+      })
+
+      // Atualiza o estado local imediatamente antes de recarregar do banco
+      setTasks((prev) => [newTask, ...prev.filter((t) => t.id !== newTask.id)])
       setIsModalOpen(false)
-      loadData()
+      await loadData()
     } catch (err: any) {
-      toast({ title: 'Erro ao criar chamado', description: err.message, variant: 'destructive' })
+      console.error('Erro na criação de chamado:', err)
+      toast({
+        title: 'Erro ao criar chamado',
+        description: err.message || 'Ocorreu um erro ao gravar o chamado. Tente novamente.',
+        variant: 'destructive',
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -662,9 +647,9 @@ export default function PainelChamados() {
     const matchStatus = selectedStatuses.includes(t.status_id)
     const matchAssignee = filterAssignee === 'all' || t.assignee_id === filterAssignee
     const matchSearch =
-      t.task_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.task_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (t.title && t.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      t.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (t.description || '').toLowerCase().includes(searchTerm.toLowerCase())
 
     let matchTab = true
     if (activeTab === 'enviados') matchTab = t.requester_id === profile.id
@@ -674,13 +659,8 @@ export default function PainelChamados() {
     return matchPlant && matchStatus && matchAssignee && matchSearch && matchTab
   })
 
-  const _dedupKeys = new Set<string>()
-  const filteredTasks = _filteredTasks.filter((t) => {
-    const key = `${t.title}|${t.plant_id}|${t.description}`
-    if (_dedupKeys.has(key)) return false
-    _dedupKeys.add(key)
-    return true
-  })
+  // Não ocultar tarefas com base em título duplicado — cada tarefa no banco tem seu ID único
+  const filteredTasks = _filteredTasks
 
   const isPersonalTask = form.type_id
     ? taskTypes.find((t) => t.id === form.type_id)?.name.toLowerCase() === 'tarefas pessoais'

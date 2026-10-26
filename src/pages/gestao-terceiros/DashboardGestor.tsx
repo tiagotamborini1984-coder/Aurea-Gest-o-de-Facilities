@@ -119,8 +119,14 @@ export default function DashboardGestor() {
     fetchNWD()
   }, [activeClient?.id, dateFrom, dateTo, selectedMasterClient])
 
-  const { logs, monthlyGoals } = useDashboardLogs(dateFrom, dateTo, referenceMonth, filteredPlants)
-  const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, filteredPlants)
+  const safeFilteredPlants = Array.isArray(filteredPlants) ? filteredPlants : []
+  const { logs, monthlyGoals } = useDashboardLogs(
+    dateFrom,
+    dateTo,
+    referenceMonth,
+    safeFilteredPlants,
+  )
+  const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, safeFilteredPlants)
 
   const { filteredEmployees } = useMemo(() => {
     if (!employees) return { filteredEmployees: [] }

@@ -5,7 +5,18 @@ export function useHasAccess(menuName: string) {
   if (!profile) return false
   if (profile.role === 'Administrador' || profile.role === 'Master') return true
 
-  let userMenus = profile.accessible_menus || []
+  let userMenus: string[] = []
+  if (Array.isArray(profile.accessible_menus)) {
+    userMenus = profile.accessible_menus
+  } else if (typeof profile.accessible_menus === 'string') {
+    try {
+      const parsed = JSON.parse(profile.accessible_menus)
+      if (Array.isArray(parsed)) userMenus = parsed
+    } catch {
+      userMenus = []
+    }
+  }
+
   if (profile.role === 'Operacional' && (!userMenus || userMenus.length === 0)) {
     userMenus = [
       'Lançamentos',

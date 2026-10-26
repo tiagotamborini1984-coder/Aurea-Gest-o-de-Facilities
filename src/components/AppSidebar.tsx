@@ -46,10 +46,19 @@ export function AppSidebar() {
   const location = useLocation()
   const { profile, activeClient, selectedMasterClient } = useAppStore()
   const role: string = profile?.role || 'Operacional'
-  const accessibleMenus = useMemo(
-    () => profile?.accessible_menus || [],
-    [profile?.accessible_menus],
-  )
+  const accessibleMenus = useMemo(() => {
+    const raw = profile?.accessible_menus
+    if (Array.isArray(raw)) return raw
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  }, [profile?.accessible_menus])
 
   const navItems = useMemo(
     () => [

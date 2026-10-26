@@ -61,19 +61,64 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [selectedPlant, setSelectedPlant] = useState<string | 'all'>('all')
 
   useEffect(() => {
+    let mounted = true
     if (user) {
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => {
-          if (data) setProfile(data as Profile)
-        })
+      const loadProfile = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+
+          if (!mounted) return
+          if (error) {
+            console.error('Erro ao buscar profile no AppContext:', error)
+          }
+          if (data) {
+            const rawMenus = Array.isArray(data.accessible_menus)
+              ? (data.accessible_menus as string[])
+              : typeof data.accessible_menus === 'string'
+                ? (() => {
+                    try {
+                      const parsed = JSON.parse(data.accessible_menus)
+                      return Array.isArray(parsed) ? parsed : []
+                    } catch {
+                      return []
+                    }
+                  })()
+                : []
+            const rawPlants = Array.isArray(data.authorized_plants)
+              ? (data.authorized_plants as string[])
+              : typeof data.authorized_plants === 'string'
+                ? (() => {
+                    try {
+                      const parsed = JSON.parse(data.authorized_plants)
+                      return Array.isArray(parsed) ? parsed : []
+                    } catch {
+                      return []
+                    }
+                  })()
+                : []
+
+            setProfile({
+              ...(data as any),
+              accessible_menus: rawMenus,
+              authorized_plants: rawPlants,
+            } as Profile)
+          }
+        } catch (err) {
+          console.error('Exceção ao buscar profile:', err)
+        }
+      }
+      loadProfile()
     } else {
       setProfile(null)
       setActiveClient(null)
       setClients([])
+    }
+    return () => {
+      mounted = false
     }
   }, [user])
 
