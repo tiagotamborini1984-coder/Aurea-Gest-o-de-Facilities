@@ -202,6 +202,18 @@ export default function FacilitaDocs() {
         })
         .eq('id', draftId)
       if (error) throw error
+      // avisa o Maestro (Chico) para indexar AGORA — sem esperar varredura periódica
+      try {
+        await supabase.functions.invoke('facilities-copilot', {
+          body: {
+            action: 'facilita_index_request',
+            secret: 'f6a2c9e4d1b87a5c3e09f8d2b4a6c1e8d7b3f0a9c5e2d8b4f6a1c3e9d7b5f0a2',
+            document_id: draftId,
+          },
+        })
+      } catch (_e) {
+        // sem aviso: o documento fica 'pending' e a rede de segurança diária pega
+      }
       toast({ title: 'Documento na fila — o Facilita vai ler e indexar em instantes' })
       setIsDialogOpen(false)
       setFormData(defaultForm)
@@ -247,7 +259,21 @@ export default function FacilitaDocs() {
       .from('facilita_documents')
       .update({ status: 'pending', status_message: 'Na fila para nova leitura.' })
       .eq('id', doc.id)
-    if (!error) toast({ title: 'Documento na fila para nova leitura' })
+    if (!error) {
+      // avisa o Maestro (Chico) para reindexar AGORA
+      try {
+        await supabase.functions.invoke('facilities-copilot', {
+          body: {
+            action: 'facilita_index_request',
+            secret: 'f6a2c9e4d1b87a5c3e09f8d2b4a6c1e8d7b3f0a9c5e2d8b4f6a1c3e9d7b5f0a2',
+            document_id: doc.id,
+          },
+        })
+      } catch (_e) {
+        // sem aviso: a rede de segurança diária pega
+      }
+      toast({ title: 'Documento na fila para nova leitura' })
+    }
   }
 
   // ===== Chat =====

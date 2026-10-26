@@ -414,6 +414,17 @@ Deno.serve(async (req: Request) => {
         .eq('id', documentId)
       return jsonRes({ success: true, chunks: rows.length })
     }
+    if (op === 'get') {
+      const documentId = body.document_id
+      if (!documentId) return jsonRes({ error: 'Missing document_id' }, 400)
+      const { data, error } = await admin
+        .from('facilita_documents')
+        .select('id, title, file_urls, client_id, status')
+        .eq('id', documentId)
+        .maybeSingle()
+      if (error) return jsonRes({ error: error.message }, 500)
+      return jsonRes({ success: true, documents: data ? [data] : [] })
+    }
     if (op === 'clear-cache') {
       const cid = body.client_id
       if (!cid) return jsonRes({ error: 'Missing client_id' }, 400)
@@ -421,7 +432,37 @@ Deno.serve(async (req: Request) => {
       if (error) return jsonRes({ error: error.message }, 500)
       return jsonRes({ success: true, cleared: true })
     }
-    return jsonRes({ error: 'op inválida (use queue, commit ou clear-cache)' }, 400)
+    return jsonRes({ error: 'op inválida (use queue, commit, get ou clear-cache)' }, 400)
+  }
+
+  // ===== PEDIDO de INDEXAÇÃO por evento (POP confirmado/reindexado no frontend) =====
+  // Repassa o pedido ao Maestro (Chico), que baixa o arquivo, fatia e grava os trechos
+  // via op 'commit' — sem varredura periódica. Falha não bloqueia: o documento fica
+  // 'pending' e a rede de segurança diária pega.
+  if (body?.action === 'facilita_index_request' && body.secret === FACILITA_CALLBACK_SECRET) {
+    const documentId = body.document_id
+    if (!documentId) return jsonRes({ error: 'Missing document_id' }, 400)
+    const whBody = JSON.stringify({
+      action: 'facilita_index',
+      document_id: documentId,
+      callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/facilities-copilot`,
+      callback_secret: FACILITA_CALLBACK_SECRET,
+    })
+    let whOk = false
+    try {
+      const r = await fetch(FACILITA_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Secret': FACILITA_WEBHOOK_SECRET,
+        },
+        body: whBody,
+      })
+      whOk = r.ok
+    } catch (_e) {
+      whOk = false
+    }
+    return jsonRes({ success: true, notified: whOk })
   }
 
   // ===== CALLBACK do Maestro (Facilita): resposta do chat OU dados extraídos do POP =====
