@@ -76,7 +76,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             console.error('Erro ao buscar profile no AppContext:', error)
           }
           if (data) {
-            const rawMenus = Array.isArray(data.accessible_menus)
+            const parsedMenus = Array.isArray(data.accessible_menus)
               ? (data.accessible_menus as string[])
               : typeof data.accessible_menus === 'string'
                 ? (() => {
@@ -88,7 +88,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     }
                   })()
                 : []
-            const rawPlants = Array.isArray(data.authorized_plants)
+            // Deduplica itens de menus para evitar chaves e listas duplicadas no render
+            const rawMenus = Array.from(new Set(parsedMenus.filter(Boolean)))
+
+            const parsedPlants = Array.isArray(data.authorized_plants)
               ? (data.authorized_plants as string[])
               : typeof data.authorized_plants === 'string'
                 ? (() => {
@@ -100,6 +103,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     }
                   })()
                 : []
+            const rawPlants = Array.from(new Set(parsedPlants.filter(Boolean)))
 
             setProfile({
               ...(data as any),

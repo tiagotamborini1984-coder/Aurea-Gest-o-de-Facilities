@@ -48,16 +48,17 @@ export function AppSidebar() {
   const role: string = profile?.role || 'Operacional'
   const accessibleMenus = useMemo(() => {
     const raw = profile?.accessible_menus
-    if (Array.isArray(raw)) return raw
-    if (typeof raw === 'string') {
+    let list: string[] = []
+    if (Array.isArray(raw)) list = raw
+    else if (typeof raw === 'string') {
       try {
         const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed : []
+        if (Array.isArray(parsed)) list = parsed
       } catch {
-        return []
+        list = []
       }
     }
-    return []
+    return Array.from(new Set(list.filter(Boolean)))
   }, [profile?.accessible_menus])
 
   const navItems = useMemo(
@@ -537,7 +538,8 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="px-3 pt-6">
         <SidebarMenu>
-          {visibleItems.map((item: any) => {
+          {visibleItems.map((item: any, idx: number) => {
+            const itemKey = `${item.title}-${item.path || 'group'}-${idx}`
             if (item.subItems) {
               const isSubActive = item.subItems.some((s: any) => {
                 if (s.path === '/gestao-terceiros/dashboard-gestor')
@@ -549,11 +551,7 @@ export function AppSidebar() {
               })
 
               return (
-                <Collapsible
-                  key={item.title}
-                  defaultOpen={isSubActive}
-                  className="group/collapsible"
-                >
+                <Collapsible key={itemKey} defaultOpen={isSubActive} className="group/collapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton className="py-5 mb-1 text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-white transition-all duration-300 relative group overflow-hidden">
@@ -566,11 +564,12 @@ export function AppSidebar() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub className="border-sidebar-border mr-0 pr-0 ml-4 pl-3">
-                        {item.subItems.map((sub: any) => {
+                        {item.subItems.map((sub: any, subIdx: number) => {
                           const isActive = location.pathname === sub.path
+                          const subKey = `${sub.path}-${sub.title}-${subIdx}`
 
                           return (
-                            <SidebarMenuSubItem key={sub.path}>
+                            <SidebarMenuSubItem key={subKey}>
                               <SidebarMenuSubButton
                                 asChild
                                 isActive={isActive}
@@ -597,7 +596,7 @@ export function AppSidebar() {
             const isActive =
               location.pathname === item.path || location.pathname.startsWith(item.path + '/')
             return (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={itemKey}>
                 <SidebarMenuButton
                   asChild
                   isActive={isActive}

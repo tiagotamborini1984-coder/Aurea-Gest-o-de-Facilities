@@ -44,6 +44,12 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.href = '/'
   }
 
+  private handleGoHome = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null })
+    // Preserva a sessão autenticada redirecionando para a rota principal
+    window.location.href = '/gestao-terceiros'
+  }
+
   public render() {
     if (this.state.hasError) {
       const errorMessage =
@@ -61,8 +67,8 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.props.fallbackTitle || 'Ops! Algo deu errado'}
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                Um erro inesperado impediu o carregamento desta tela. Não se preocupe, seus dados
-                estão seguros.
+                Um erro inesperado impediu o carregamento desta tela. Não se preocupe, seus dados e
+                sua sessão estão seguros.
               </p>
             </div>
 
@@ -86,12 +92,9 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button
                 variant="outline"
                 className="w-full h-10 text-xs text-slate-300 border-slate-700 hover:bg-slate-700/50 hover:text-white"
-                onClick={() => {
-                  this.setState({ hasError: false, error: null, errorInfo: null })
-                  window.location.href = '/'
-                }}
+                onClick={this.handleGoHome}
               >
-                <Home className="w-4 h-4 mr-2" /> Ir para Início / Login
+                <Home className="w-4 h-4 mr-2" /> Ir para o Dashboard Principal
               </Button>
 
               <Button
