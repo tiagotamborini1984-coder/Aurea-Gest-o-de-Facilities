@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,6 +15,8 @@ import {
   Play,
   ClipboardList,
   Clock,
+  Building2,
+  Search,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -33,13 +36,18 @@ import { useAuth } from '@/hooks/use-auth'
 import { useAppStore } from '@/store/AppContext'
 
 export default function PreventivasManutencao() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [editPlanId, setEditPlanId] = useState<string | null>(null)
   const { user } = useAuth()
-  const { activeClient } = useAppStore()
-  const [profile, setProfile] = useState<{ role: string; client_id: string } | null>(null)
+  const { activeClient, profile: appProfile } = useAppStore()
+  const [profile, setProfile] = useState<{
+    role: string
+    client_id: string
+    authorized_plants?: any
+  } | null>(null)
 
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
@@ -68,29 +76,126 @@ export default function PreventivasManutencao() {
   const [checklist, setChecklist] = useState<{ id: string; description: string }[]>([])
   const [generatingTickets, setGeneratingTickets] = useState(false)
 
+  // Filtros de planta e busca textual
+  const initialPlantParam = searchParams.get('plant') || searchParams.get('planta') || 'all'
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>(initialPlantParam)
+  const [searchQuery, setSearchQuery] = useState('')
+
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPlantId, setAiPlantId] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<any[]>([])
 
+  const effectiveProfile = profile || appProfile
+  const isAdmin = effectiveProfile?.role === 'Master' || effectiveProfile?.role === 'Administrador'
+
+  // Plantas autorizadas para o usuário logado
+  const authPlantIds = useMemo(() => {
+    if (isAdmin) return null // admin tem acesso a todas as unidades
+    const list = effectiveProfile?.authorized_plants
+    return Array.isArray(list) ? list : []
+  }, [isAdmin, effectiveProfile])
+
+  const authorizedPlants = useMemo(() => {
+    if (isAdmin) return plants
+    if (!authPlantIds) return plants
+    return plants.filter((p) => authPlantIds.includes(p.id))
+  }, [plants, isAdmin, authPlantIds])
+
+  // Helper para verificar se usuário pode acessar determinado plano
+  const canAccessPlan = (targetPlan: any) => {
+    if (!targetPlan) return false
+    if (isAdmin) return true
+    if (!authPlantIds || authPlantIds.length === 0) return false
+    return !!targetPlan.plant_id && authPlantIds.includes(targetPlan.plant_id)
+  }
+
   useEffect(() => {
     if (user) {
-      loadPlans()
       loadAuxData()
     }
   }, [user, activeClient])
+
+  useEffect(() => {
+    if (user && effectiveProfile) {
+      loadPlans(selectedPlantFilter)
+    }
+  }, [
+    user,
+    activeClient,
+    selectedPlantFilter,
+    effectiveProfile?.role,
+    JSON.stringify(authPlantIds),
+  ])
+
+  // Validação de acesso por URL para o filtro de planta
+  useEffect(() => {
+    if (!loading && plants.length > 0 && !isAdmin) {
+      const urlPlant = searchParams.get('plant') || searchParams.get('planta')
+      if (urlPlant && urlPlant !== 'all') {
+        const allowed = authPlantIds?.includes(urlPlant)
+        if (!allowed) {
+          toast.error('Você não tem permissão para visualizar planos desta unidade.')
+          const fallback = authorizedPlants.length === 1 ? authorizedPlants[0].id : 'all'
+          setSelectedPlantFilter(fallback)
+          return
+        }
+      }
+      if (authorizedPlants.length === 1 && selectedPlantFilter === 'all') {
+        setSelectedPlantFilter(authorizedPlants[0].id)
+      }
+    }
+  }, [loading, plants, isAdmin, authPlantIds, authorizedPlants, searchParams])
+
+  // Validação de acesso por URL para abrir detalhes/edição de um plano específico (?id=... ou ?plano=...)
+  const planParamProcessed = useRef(false)
+  useEffect(() => {
+    const urlPlanId =
+      searchParams.get('id') || searchParams.get('plano') || searchParams.get('planId')
+    if (urlPlanId && !loading && !planParamProcessed.current) {
+      planParamProcessed.current = true
+      const existing = plans.find((p) => p.id === urlPlanId)
+      if (existing) {
+        if (canAccessPlan(existing)) {
+          handleEdit(existing)
+        } else {
+          toast.error('Você não tem permissão para acessar o plano desta unidade.')
+        }
+      } else {
+        supabase
+          .from('maintenance_preventive_plans')
+          .select('*, maintenance_assets(name), maintenance_areas(name)')
+          .eq('id', urlPlanId)
+          .single()
+          .then(({ data: fetchedPlan }) => {
+            if (fetchedPlan) {
+              if (canAccessPlan(fetchedPlan)) {
+                handleEdit(fetchedPlan)
+              } else {
+                toast.error('Você não tem permissão para acessar o plano desta unidade.')
+              }
+            }
+          })
+      }
+    }
+  }, [loading, plans, searchParams, isAdmin, authPlantIds])
 
   const loadAuxData = async () => {
     if (!user) return
 
     const { data: userProfile } = await supabase
       .from('profiles')
-      .select('role, client_id')
+      .select('role, client_id, authorized_plants')
       .eq('id', user.id)
       .single()
 
     if (userProfile) {
-      setProfile(userProfile)
+      setProfile({
+        ...userProfile,
+        authorized_plants: Array.isArray(userProfile.authorized_plants)
+          ? userProfile.authorized_plants
+          : [],
+      })
 
       const clientId = activeClient?.id || userProfile.client_id
 
@@ -138,9 +243,7 @@ export default function PreventivasManutencao() {
     }
   }
 
-  const isAdmin = profile?.role === 'Master' || profile?.role === 'Administrador'
-
-  const loadPlans = async () => {
+  const loadPlans = async (targetPlantFilter?: string) => {
     setLoading(true)
     let q = supabase
       .from('maintenance_preventive_plans')
@@ -151,9 +254,40 @@ export default function PreventivasManutencao() {
       q = q.eq('client_id', activeClient.id)
     }
 
+    // Restrição obrigatória por plantas autorizadas se não for admin
+    if (!isAdmin) {
+      if (!authPlantIds || authPlantIds.length === 0) {
+        setPlans([])
+        setLoading(false)
+        return
+      }
+      q = q.in('plant_id', authPlantIds)
+    }
+
+    const currentFilter = targetPlantFilter !== undefined ? targetPlantFilter : selectedPlantFilter
+    if (currentFilter && currentFilter !== 'all') {
+      q = q.eq('plant_id', currentFilter)
+    }
+
     const { data } = await q
     setPlans(data || [])
     setLoading(false)
+  }
+
+  const handlePlantFilterChange = (newPlant: string) => {
+    setSelectedPlantFilter(newPlant)
+    setSearchParams(
+      (prev) => {
+        if (newPlant === 'all') {
+          prev.delete('plant')
+          prev.delete('planta')
+        } else {
+          prev.set('plant', newPlant)
+        }
+        return prev
+      },
+      { replace: true },
+    )
   }
 
   const formAreas = useMemo(
@@ -316,6 +450,10 @@ export default function PreventivasManutencao() {
   }
 
   const handleEdit = async (plan: any) => {
+    if (!canAccessPlan(plan)) {
+      toast.error('Você não tem permissão para acessar o plano desta unidade.')
+      return
+    }
     setEditPlanId(plan.id)
     setForm({
       title: plan.title,
@@ -347,6 +485,12 @@ export default function PreventivasManutencao() {
   }
 
   const handleDelete = async (id: string) => {
+    const plan = plans.find((p) => p.id === id)
+    if (plan && !canAccessPlan(plan)) {
+      toast.error('Você não tem permissão para excluir planos desta unidade.')
+      return
+    }
+
     if (
       window.confirm(
         'Tem certeza que deseja excluir este plano de manutenção? Esta ação não pode ser desfeita.',
@@ -366,6 +510,9 @@ export default function PreventivasManutencao() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.plant_id) return toast.error('Selecione uma planta')
+    if (!isAdmin && authPlantIds && !authPlantIds.includes(form.plant_id)) {
+      return toast.error('Você não tem permissão para configurar planos nesta unidade.')
+    }
     if (form.scope === 'area' && form.area_id === 'none') return toast.error('Selecione uma área')
     if (form.scope === 'asset' && form.asset_id === 'none')
       return toast.error('Selecione um equipamento')
@@ -511,7 +658,7 @@ export default function PreventivasManutencao() {
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {plants.map((p) => (
+                        {authorizedPlants.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name}
                           </SelectItem>
@@ -590,7 +737,14 @@ export default function PreventivasManutencao() {
               className="bg-brand-vividBlue"
               onClick={() => {
                 setEditPlanId(null)
-                setForm(initialForm)
+                const defaultPlant =
+                  selectedPlantFilter !== 'all' &&
+                  authorizedPlants.some((p) => p.id === selectedPlantFilter)
+                    ? selectedPlantFilter
+                    : authorizedPlants.length === 1
+                      ? authorizedPlants[0].id
+                      : ''
+                setForm({ ...initialForm, plant_id: defaultPlant })
                 setChecklist([])
                 setOpen(true)
               }}
@@ -619,7 +773,7 @@ export default function PreventivasManutencao() {
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {plants.map((p) => (
+                        {authorizedPlants.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name}
                           </SelectItem>
@@ -894,99 +1048,168 @@ export default function PreventivasManutencao() {
         </div>
       </div>
 
+      {/* Barra de Filtros e Busca de Planos Preventivos */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar por título, área, equipamento ou periodicidade..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 bg-transparent border-0 shadow-none focus-visible:ring-0 text-sm h-9 placeholder:text-gray-400"
+          />
+        </div>
+        <div className="w-full sm:w-64 border-t sm:border-t-0 sm:border-l border-gray-200 pt-2 sm:pt-0 sm:pl-3">
+          <Select value={selectedPlantFilter} onValueChange={handlePlantFilterChange}>
+            <SelectTrigger className="w-full bg-transparent border-0 shadow-none h-9 text-sm">
+              <div className="flex items-center gap-2 truncate">
+                <Building2 className="h-4 w-4 text-gray-500 shrink-0" />
+                <SelectValue placeholder="Todas as Unidades" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {(isAdmin || authorizedPlants.length > 1) && (
+                <SelectItem value="all">Todas as Unidades</SelectItem>
+              )}
+              {authorizedPlants.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {loading ? (
         <div className="text-center text-gray-500 py-10">Carregando planos...</div>
       ) : plans.length === 0 ? (
-        <div className="text-center text-gray-500 py-10 border-2 border-dashed rounded-lg">
-          Nenhum plano preventivo cadastrado.
+        <div className="text-center text-gray-500 py-12 border-2 border-dashed rounded-xl bg-white/40">
+          <p className="text-base font-medium">Nenhum plano preventivo encontrado.</p>
+          <p className="text-sm text-gray-400 mt-1">
+            {selectedPlantFilter !== 'all'
+              ? 'Não há planos cadastrados para a unidade selecionada.'
+              : 'Nenhum plano preventivo cadastrado para as suas unidades de acesso.'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="shadow-sm hover:shadow-md transition-all">
-              <CardHeader className="pb-3 border-b flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-lg font-bold truncate pr-2" title={plan.title}>
-                  {plan.title}
-                </CardTitle>
-                <Badge
-                  className={
-                    plan.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }
-                  variant="secondary"
-                >
-                  {plan.is_active ? 'Ativo' : 'Inativo'}
-                </Badge>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Periodicidade:</span>
-                  <span className="font-medium">{plan.frequency}</span>
-                </div>
-                {Number(plan.advance_days) > 0 && (
+          {plans
+            .filter((plan) => {
+              // Verificação defensiva de acesso à unidade
+              if (!isAdmin && authPlantIds && !authPlantIds.includes(plan.plant_id)) {
+                return false
+              }
+              // Filtro textual
+              if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase()
+                const titleMatch = plan.title?.toLowerCase().includes(q)
+                const descMatch = plan.description?.toLowerCase().includes(q)
+                const assetMatch = plan.maintenance_assets?.name?.toLowerCase().includes(q)
+                const areaMatch = plan.maintenance_areas?.name?.toLowerCase().includes(q)
+                const freqMatch = plan.frequency?.toLowerCase().includes(q)
+                const plantMatch = plants
+                  .find((p) => p.id === plan.plant_id)
+                  ?.name?.toLowerCase()
+                  .includes(q)
+                return titleMatch || descMatch || assetMatch || areaMatch || freqMatch || plantMatch
+              }
+              return true
+            })
+            .map((plan) => (
+              <Card key={plan.id} className="shadow-sm hover:shadow-md transition-all">
+                <CardHeader className="pb-3 border-b flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-lg font-bold truncate pr-2" title={plan.title}>
+                    {plan.title}
+                  </CardTitle>
+                  <Badge
+                    className={
+                      plan.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }
+                    variant="secondary"
+                  >
+                    {plan.is_active ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Antecedência:</span>
-                    <span className="font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Gera OS {plan.advance_days} dia{plan.advance_days > 1 ? 's' : ''} antes
+                    <span className="text-gray-500">Unidade:</span>
+                    <span
+                      className="font-medium truncate max-w-[170px] text-brand-deepBlue"
+                      title={plants.find((p) => p.id === plan.plant_id)?.name || 'Geral'}
+                    >
+                      {plants.find((p) => p.id === plan.plant_id)?.name || 'Geral'}
                     </span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Periodicidade:</span>
+                    <span className="font-medium">{plan.frequency}</span>
+                  </div>
+                  {Number(plan.advance_days) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Antecedência:</span>
+                      <span className="font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Gera OS {plan.advance_days} dia{plan.advance_days > 1 ? 's' : ''} antes
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Alvo:</span>
+                    <span className="font-medium truncate max-w-[150px]">
+                      {plan.maintenance_assets?.name || plan.maintenance_areas?.name || 'Geral'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Responsável:</span>
+                    <span
+                      className="font-medium truncate max-w-[170px]"
+                      title={getAssigneeLabel(plan.assignee_id) || 'Não atribuído'}
+                    >
+                      {getAssigneeLabel(plan.assignee_id) || 'Não atribuído'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Início:</span>
+                    <span className="font-medium flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-gray-400" />
+                      {new Date(plan.start_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Última OS Gerada:</span>
+                    <span className="font-medium flex items-center gap-1">
+                      <ClipboardList className="h-3 w-3 text-gray-400" />
+                      {plan.last_generated_date
+                        ? new Date(plan.last_generated_date).toLocaleDateString('pt-BR', {
+                            timeZone: 'UTC',
+                          })
+                        : 'Nenhuma ainda'}
+                    </span>
+                  </div>
+                </CardContent>
+                {isAdmin && (
+                  <div className="p-4 border-t bg-gray-50/50 flex gap-2 rounded-b-lg">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleEdit(plan)}
+                    >
+                      <Settings2 className="h-4 w-4 mr-2" /> Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleDelete(plan.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                    </Button>
+                  </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Alvo:</span>
-                  <span className="font-medium truncate max-w-[150px]">
-                    {plan.maintenance_assets?.name || plan.maintenance_areas?.name || 'Geral'}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Responsável:</span>
-                  <span
-                    className="font-medium truncate max-w-[170px]"
-                    title={getAssigneeLabel(plan.assignee_id) || 'Não atribuído'}
-                  >
-                    {getAssigneeLabel(plan.assignee_id) || 'Não atribuído'}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Início:</span>
-                  <span className="font-medium flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-gray-400" />
-                    {new Date(plan.start_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Última OS Gerada:</span>
-                  <span className="font-medium flex items-center gap-1">
-                    <ClipboardList className="h-3 w-3 text-gray-400" />
-                    {plan.last_generated_date
-                      ? new Date(plan.last_generated_date).toLocaleDateString('pt-BR', {
-                          timeZone: 'UTC',
-                        })
-                      : 'Nenhuma ainda'}
-                  </span>
-                </div>
-              </CardContent>
-              {isAdmin && (
-                <div className="p-4 border-t bg-gray-50/50 flex gap-2 rounded-b-lg">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleEdit(plan)}
-                  >
-                    <Settings2 className="h-4 w-4 mr-2" /> Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => handleDelete(plan.id)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                  </Button>
-                </div>
-              )}
-            </Card>
-          ))}
+              </Card>
+            ))}
         </div>
       )}
     </div>
