@@ -4383,6 +4383,51 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_accidents_20261027: {
+        Row: {
+          client_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department: string | null
+          description: string | null
+          event_date: string | null
+          id: string | null
+          location: string | null
+          photos: Json | null
+          plant_id: string | null
+          severity: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          event_date?: string | null
+          id?: string | null
+          location?: string | null
+          photos?: Json | null
+          plant_id?: string | null
+          severity?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          event_date?: string | null
+          id?: string | null
+          location?: string | null
+          photos?: Json | null
+          plant_id?: string | null
+          severity?: string | null
+        }
+        Relationships: []
+      }
       snapshot_audit_actions_20261021: {
         Row: {
           audit_id: string | null
@@ -4564,6 +4609,42 @@ export type Database = {
         Relationships: []
       }
       snapshot_audit_actions_20261026: {
+        Row: {
+          audit_id: string | null
+          category_id: string | null
+          comments_required: boolean | null
+          created_at: string | null
+          evidence_required: boolean | null
+          id: string | null
+          order_index: number | null
+          title: string | null
+          weight: number | null
+        }
+        Insert: {
+          audit_id?: string | null
+          category_id?: string | null
+          comments_required?: boolean | null
+          created_at?: string | null
+          evidence_required?: boolean | null
+          id?: string | null
+          order_index?: number | null
+          title?: string | null
+          weight?: number | null
+        }
+        Update: {
+          audit_id?: string | null
+          category_id?: string | null
+          comments_required?: boolean | null
+          created_at?: string | null
+          evidence_required?: boolean | null
+          id?: string | null
+          order_index?: number | null
+          title?: string | null
+          weight?: number | null
+        }
+        Relationships: []
+      }
+      snapshot_audit_actions_20261027: {
         Row: {
           audit_id: string | null
           category_id: string | null
@@ -4941,6 +5022,63 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_audit_ai_reports_20261027: {
+        Row: {
+          action_plan: Json | null
+          audit_id: string | null
+          audit_type: string | null
+          client_id: string | null
+          conformity_score: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          insights: Json | null
+          period_label: string | null
+          plant_id: string | null
+          ranking: Json | null
+          summary: Json | null
+          title: string | null
+          total_executions: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_plan?: Json | null
+          audit_id?: string | null
+          audit_type?: string | null
+          client_id?: string | null
+          conformity_score?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          insights?: Json | null
+          period_label?: string | null
+          plant_id?: string | null
+          ranking?: Json | null
+          summary?: Json | null
+          title?: string | null
+          total_executions?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_plan?: Json | null
+          audit_id?: string | null
+          audit_type?: string | null
+          client_id?: string | null
+          conformity_score?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          insights?: Json | null
+          period_label?: string | null
+          plant_id?: string | null
+          ranking?: Json | null
+          summary?: Json | null
+          title?: string | null
+          total_executions?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       snapshot_audit_assignments_20261021: {
         Row: {
           assignee_id: string | null
@@ -5062,6 +5200,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_audit_assignments_20261026: {
+        Row: {
+          assignee_id: string | null
+          audit_id: string | null
+          created_at: string | null
+          id: string | null
+          plant_id: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          audit_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          plant_id?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          audit_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          plant_id?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_audit_assignments_20261027: {
         Row: {
           assignee_id: string | null
           audit_id: string | null
@@ -5281,6 +5443,45 @@ export type Database = {
         Relationships: []
       }
       snapshot_audit_execution_answers_20261026: {
+        Row: {
+          action_id: string | null
+          corrective_assignee_id: string | null
+          corrective_due_date: string | null
+          created_at: string | null
+          evidence_url: string | null
+          evidence_urls: Json | null
+          execution_id: string | null
+          id: string | null
+          observations: string | null
+          score: number | null
+        }
+        Insert: {
+          action_id?: string | null
+          corrective_assignee_id?: string | null
+          corrective_due_date?: string | null
+          created_at?: string | null
+          evidence_url?: string | null
+          evidence_urls?: Json | null
+          execution_id?: string | null
+          id?: string | null
+          observations?: string | null
+          score?: number | null
+        }
+        Update: {
+          action_id?: string | null
+          corrective_assignee_id?: string | null
+          corrective_due_date?: string | null
+          created_at?: string | null
+          evidence_url?: string | null
+          evidence_urls?: Json | null
+          execution_id?: string | null
+          id?: string | null
+          observations?: string | null
+          score?: number | null
+        }
+        Relationships: []
+      }
+      snapshot_audit_execution_answers_20261027: {
         Row: {
           action_id: string | null
           corrective_assignee_id: string | null
@@ -5607,6 +5808,54 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_audit_executions_20261027: {
+        Row: {
+          assignee_id: string | null
+          audit_id: string | null
+          created_at: string | null
+          final_score: number | null
+          id: string | null
+          max_score: number | null
+          participants: string | null
+          plant_id: string | null
+          realization_date: string | null
+          reconstruction_batch: string | null
+          signatures: Json | null
+          status: string | null
+          task_id: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          audit_id?: string | null
+          created_at?: string | null
+          final_score?: number | null
+          id?: string | null
+          max_score?: number | null
+          participants?: string | null
+          plant_id?: string | null
+          realization_date?: string | null
+          reconstruction_batch?: string | null
+          signatures?: Json | null
+          status?: string | null
+          task_id?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          audit_id?: string | null
+          created_at?: string | null
+          final_score?: number | null
+          id?: string | null
+          max_score?: number | null
+          participants?: string | null
+          plant_id?: string | null
+          realization_date?: string | null
+          reconstruction_batch?: string | null
+          signatures?: Json | null
+          status?: string | null
+          task_id?: string | null
+        }
+        Relationships: []
+      }
       snapshot_audit_question_categories_20261021: {
         Row: {
           client_id: string | null
@@ -5758,6 +6007,36 @@ export type Database = {
         Relationships: []
       }
       snapshot_audit_question_categories_20261026: {
+        Row: {
+          client_id: string | null
+          color: string | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_audit_question_categories_20261027: {
         Row: {
           client_id: string | null
           color: string | null
@@ -6075,6 +6354,54 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_audits_20261027: {
+        Row: {
+          advance_notice_days: number | null
+          client_id: string | null
+          created_at: string | null
+          frequency: string | null
+          id: string | null
+          parent_audit_id: string | null
+          reconstruction_batch: string | null
+          scoring_settings: Json | null
+          sla_days: number | null
+          start_date: string | null
+          status: string | null
+          title: string | null
+          type: string | null
+        }
+        Insert: {
+          advance_notice_days?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          frequency?: string | null
+          id?: string | null
+          parent_audit_id?: string | null
+          reconstruction_batch?: string | null
+          scoring_settings?: Json | null
+          sla_days?: number | null
+          start_date?: string | null
+          status?: string | null
+          title?: string | null
+          type?: string | null
+        }
+        Update: {
+          advance_notice_days?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          frequency?: string | null
+          id?: string | null
+          parent_audit_id?: string | null
+          reconstruction_batch?: string | null
+          scoring_settings?: Json | null
+          sla_days?: number | null
+          start_date?: string | null
+          status?: string | null
+          title?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
       snapshot_budget_accounts_20261021: {
         Row: {
           client_id: string | null
@@ -6237,6 +6564,33 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_budget_accounts_20261027: {
+        Row: {
+          client_id: string | null
+          code: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          type: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          code?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          type?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          code?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
       snapshot_budget_cost_centers_20261021: {
         Row: {
           client_id: string | null
@@ -6358,6 +6712,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_budget_cost_centers_20261026: {
+        Row: {
+          client_id: string | null
+          code: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          code?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          code?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_budget_cost_centers_20261027: {
         Row: {
           client_id: string | null
           code: string | null
@@ -6615,6 +6993,45 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_budget_entries_20261027: {
+        Row: {
+          account_id: string | null
+          budgeted_amount: number | null
+          client_id: string | null
+          cost_center_id: string | null
+          created_at: string | null
+          forecast_amount: number | null
+          id: string | null
+          realized_amount: number | null
+          reference_month: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          budgeted_amount?: number | null
+          client_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string | null
+          forecast_amount?: number | null
+          id?: string | null
+          realized_amount?: number | null
+          reference_month?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          budgeted_amount?: number | null
+          client_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string | null
+          forecast_amount?: number | null
+          id?: string | null
+          realized_amount?: number | null
+          reference_month?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       snapshot_cleaning_gardening_areas_20261021: {
         Row: {
           client_id: string | null
@@ -6781,6 +7198,39 @@ export type Database = {
         Relationships: []
       }
       snapshot_cleaning_gardening_areas_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          plant_id: string | null
+          polygon_data: Json | null
+          type: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          plant_id?: string | null
+          polygon_data?: Json | null
+          type?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          plant_id?: string | null
+          polygon_data?: Json | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_cleaning_gardening_areas_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -7119,6 +7569,57 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_cleaning_gardening_schedules_20261027: {
+        Row: {
+          activity_date: string | null
+          area_id: string | null
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          end_time: string | null
+          evidence_url: string | null
+          evidence_urls: Json | null
+          id: string | null
+          is_urgent: boolean | null
+          justification: string | null
+          plant_id: string | null
+          start_time: string | null
+          status: string | null
+        }
+        Insert: {
+          activity_date?: string | null
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_time?: string | null
+          evidence_url?: string | null
+          evidence_urls?: Json | null
+          id?: string | null
+          is_urgent?: boolean | null
+          justification?: string | null
+          plant_id?: string | null
+          start_time?: string | null
+          status?: string | null
+        }
+        Update: {
+          activity_date?: string | null
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          end_time?: string | null
+          evidence_url?: string | null
+          evidence_urls?: Json | null
+          id?: string | null
+          is_urgent?: boolean | null
+          justification?: string | null
+          plant_id?: string | null
+          start_time?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       snapshot_companies_20261021: {
         Row: {
           client_id: string | null
@@ -7240,6 +7741,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_companies_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          service_type: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          service_type?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          service_type?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_companies_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -7515,6 +8040,48 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_contracted_headcount_20261027: {
+        Row: {
+          client_id: string | null
+          company_id: string | null
+          created_at: string | null
+          equipment_id: string | null
+          function_id: string | null
+          id: string | null
+          location_id: string | null
+          plant_id: string | null
+          quantity: number | null
+          reference_month: string | null
+          type: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          equipment_id?: string | null
+          function_id?: string | null
+          id?: string | null
+          location_id?: string | null
+          plant_id?: string | null
+          quantity?: number | null
+          reference_month?: string | null
+          type?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          equipment_id?: string | null
+          function_id?: string | null
+          id?: string | null
+          location_id?: string | null
+          plant_id?: string | null
+          quantity?: number | null
+          reference_month?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
       snapshot_daily_logs_20261021: {
         Row: {
           client_id: string | null
@@ -7711,6 +8278,45 @@ export type Database = {
         Relationships: []
       }
       snapshot_daily_logs_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          date: string | null
+          id: string | null
+          is_published: boolean | null
+          location_id: string | null
+          plant_id: string | null
+          reference_id: string | null
+          status: boolean | null
+          type: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          date?: string | null
+          id?: string | null
+          is_published?: boolean | null
+          location_id?: string | null
+          plant_id?: string | null
+          reference_id?: string | null
+          status?: boolean | null
+          type?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          date?: string | null
+          id?: string | null
+          is_published?: boolean | null
+          location_id?: string | null
+          plant_id?: string | null
+          reference_id?: string | null
+          status?: boolean | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_daily_logs_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -7975,6 +8581,51 @@ export type Database = {
         Relationships: []
       }
       snapshot_employee_training_records_20261026: {
+        Row: {
+          client_id: string | null
+          completion_date: string | null
+          created_at: string | null
+          document_url: string | null
+          employee_id: string | null
+          id: string | null
+          training_id: string | null
+          verification_confidence: number | null
+          verification_notes: string | null
+          verification_signed_name: string | null
+          verification_status: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          completion_date?: string | null
+          created_at?: string | null
+          document_url?: string | null
+          employee_id?: string | null
+          id?: string | null
+          training_id?: string | null
+          verification_confidence?: number | null
+          verification_notes?: string | null
+          verification_signed_name?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          completion_date?: string | null
+          created_at?: string | null
+          document_url?: string | null
+          employee_id?: string | null
+          id?: string | null
+          training_id?: string | null
+          verification_confidence?: number | null
+          verification_notes?: string | null
+          verification_signed_name?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_employee_training_records_20261027: {
         Row: {
           client_id: string | null
           completion_date: string | null
@@ -8307,6 +8958,54 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_employees_20261027: {
+        Row: {
+          client_id: string | null
+          company_id: string | null
+          company_name: string | null
+          created_at: string | null
+          function_id: string | null
+          id: string | null
+          location_id: string | null
+          name: string | null
+          plant_id: string | null
+          reference_month: string | null
+          registration_number: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company_id?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          function_id?: string | null
+          id?: string | null
+          location_id?: string | null
+          name?: string | null
+          plant_id?: string | null
+          reference_month?: string | null
+          registration_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          function_id?: string | null
+          id?: string | null
+          location_id?: string | null
+          name?: string | null
+          plant_id?: string | null
+          reference_month?: string | null
+          registration_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       snapshot_function_required_trainings_20261021: {
         Row: {
           client_id: string | null
@@ -8433,6 +9132,27 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_function_required_trainings_20261027: {
+        Row: {
+          client_id: string | null
+          function_id: string | null
+          id: string | null
+          training_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          function_id?: string | null
+          id?: string | null
+          training_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          function_id?: string | null
+          id?: string | null
+          training_id?: string | null
+        }
+        Relationships: []
+      }
       snapshot_inventory_categories_20261021: {
         Row: {
           client_id: string | null
@@ -8539,6 +9259,27 @@ export type Database = {
         Relationships: []
       }
       snapshot_inventory_categories_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_inventory_categories_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -8865,6 +9606,57 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_inventory_products_20261027: {
+        Row: {
+          category: string | null
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          fs_code: string | null
+          id: string | null
+          image_url: string | null
+          is_active: boolean | null
+          item_value: number | null
+          name: string | null
+          sds_url: string | null
+          supply_code: string | null
+          unit_of_measure: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          fs_code?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_active?: boolean | null
+          item_value?: number | null
+          name?: string | null
+          sds_url?: string | null
+          supply_code?: string | null
+          unit_of_measure?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          fs_code?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_active?: boolean | null
+          item_value?: number | null
+          name?: string | null
+          sds_url?: string | null
+          supply_code?: string | null
+          unit_of_measure?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       snapshot_inventory_request_items_20261021: {
         Row: {
           id: string | null
@@ -8986,6 +9778,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_inventory_request_items_20261026: {
+        Row: {
+          id: string | null
+          product_id: string | null
+          quantity: number | null
+          request_id: string | null
+          reserved_quantity: number | null
+        }
+        Insert: {
+          id?: string | null
+          product_id?: string | null
+          quantity?: number | null
+          request_id?: string | null
+          reserved_quantity?: number | null
+        }
+        Update: {
+          id?: string | null
+          product_id?: string | null
+          quantity?: number | null
+          request_id?: string | null
+          reserved_quantity?: number | null
+        }
+        Relationships: []
+      }
+      snapshot_inventory_request_items_20261027: {
         Row: {
           id: string | null
           product_id: string | null
@@ -9297,6 +10113,54 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_inventory_requests_20261027: {
+        Row: {
+          area_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          order_number: string | null
+          plant_id: string | null
+          processed_at: string | null
+          processed_by: string | null
+          requester_id: string | null
+          responsible_name: string | null
+          sap_reservation_number: string | null
+          status: string | null
+          total_items: number | null
+        }
+        Insert: {
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          order_number?: string | null
+          plant_id?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          requester_id?: string | null
+          responsible_name?: string | null
+          sap_reservation_number?: string | null
+          status?: string | null
+          total_items?: number | null
+        }
+        Update: {
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          order_number?: string | null
+          plant_id?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          requester_id?: string | null
+          responsible_name?: string | null
+          sap_reservation_number?: string | null
+          status?: string | null
+          total_items?: number | null
+        }
+        Relationships: []
+      }
       snapshot_maintenance_areas_20261021: {
         Row: {
           client_id: string | null
@@ -9418,6 +10282,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_areas_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          plant_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          plant_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          plant_id?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_areas_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -9675,6 +10563,45 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_maintenance_assets_20261027: {
+        Row: {
+          area_id: string | null
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          location_id: string | null
+          name: string | null
+          plant_id: string | null
+          status: string | null
+          sublocation_id: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          location_id?: string | null
+          name?: string | null
+          plant_id?: string | null
+          status?: string | null
+          sublocation_id?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          location_id?: string | null
+          name?: string | null
+          plant_id?: string | null
+          status?: string | null
+          sublocation_id?: string | null
+        }
+        Relationships: []
+      }
       snapshot_maintenance_plan_checklist_items_20261021: {
         Row: {
           created_at: string | null
@@ -9796,6 +10723,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_plan_checklist_items_20261026: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          order_index: number | null
+          plan_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          order_index?: number | null
+          plan_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          order_index?: number | null
+          plan_id?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_plan_checklist_items_20261027: {
         Row: {
           created_at: string | null
           description: string | null
@@ -10179,6 +11130,66 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_maintenance_preventive_plans_20261027: {
+        Row: {
+          advance_days: number | null
+          area_id: string | null
+          asset_id: string | null
+          assignee_id: string | null
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          frequency: string | null
+          id: string | null
+          is_active: boolean | null
+          last_generated_date: string | null
+          location_id: string | null
+          plant_id: string | null
+          priority_id: string | null
+          start_date: string | null
+          title: string | null
+          type_id: string | null
+        }
+        Insert: {
+          advance_days?: number | null
+          area_id?: string | null
+          asset_id?: string | null
+          assignee_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          frequency?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_generated_date?: string | null
+          location_id?: string | null
+          plant_id?: string | null
+          priority_id?: string | null
+          start_date?: string | null
+          title?: string | null
+          type_id?: string | null
+        }
+        Update: {
+          advance_days?: number | null
+          area_id?: string | null
+          asset_id?: string | null
+          assignee_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          frequency?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_generated_date?: string | null
+          location_id?: string | null
+          plant_id?: string | null
+          priority_id?: string | null
+          start_date?: string | null
+          title?: string | null
+          type_id?: string | null
+        }
+        Relationships: []
+      }
       snapshot_maintenance_priorities_20261021: {
         Row: {
           client_id: string | null
@@ -10315,6 +11326,33 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_priorities_20261026: {
+        Row: {
+          client_id: string | null
+          color: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          sla_hours: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          sla_hours?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          sla_hours?: number | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_priorities_20261027: {
         Row: {
           client_id: string | null
           color: string | null
@@ -10539,6 +11577,39 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_maintenance_statuses_20261027: {
+        Row: {
+          client_id: string | null
+          color: string | null
+          created_at: string | null
+          id: string | null
+          is_terminal: boolean | null
+          name: string | null
+          order_index: number | null
+          step: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_terminal?: boolean | null
+          name?: string | null
+          order_index?: number | null
+          step?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_terminal?: boolean | null
+          name?: string | null
+          order_index?: number | null
+          step?: string | null
+        }
+        Relationships: []
+      }
       snapshot_maintenance_sublocations_20261021: {
         Row: {
           area_id: string | null
@@ -10675,6 +11746,33 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_sublocations_20261026: {
+        Row: {
+          area_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          location_id: string | null
+          name: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          location_id?: string | null
+          name?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          location_id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_sublocations_20261027: {
         Row: {
           area_id: string | null
           client_id: string | null
@@ -10852,6 +11950,36 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_ticket_logs_20261026: {
+        Row: {
+          action_type: string | null
+          created_at: string | null
+          id: string | null
+          new_value: string | null
+          old_value: string | null
+          ticket_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type?: string | null
+          created_at?: string | null
+          id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string | null
+          created_at?: string | null
+          id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_ticket_logs_20261027: {
         Row: {
           action_type: string | null
           created_at: string | null
@@ -11493,6 +12621,108 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_maintenance_tickets_20261027: {
+        Row: {
+          actual_end: string | null
+          actual_start: string | null
+          area_id: string | null
+          asset_id: string | null
+          assignee_id: string | null
+          checklist_responses: Json | null
+          client_id: string | null
+          closed_at: string | null
+          closure_notes: string | null
+          closure_photos: Json | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          location_id: string | null
+          origin: string | null
+          parent_ticket_id: string | null
+          photos: Json | null
+          plan_id: string | null
+          planned_end: string | null
+          planned_start: string | null
+          plant_id: string | null
+          priority_id: string | null
+          reported_at: string | null
+          requester_email: string | null
+          requester_id: string | null
+          requester_name: string | null
+          status_id: string | null
+          sublocation_id: string | null
+          ticket_number: string | null
+          type_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_end?: string | null
+          actual_start?: string | null
+          area_id?: string | null
+          asset_id?: string | null
+          assignee_id?: string | null
+          checklist_responses?: Json | null
+          client_id?: string | null
+          closed_at?: string | null
+          closure_notes?: string | null
+          closure_photos?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          location_id?: string | null
+          origin?: string | null
+          parent_ticket_id?: string | null
+          photos?: Json | null
+          plan_id?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          plant_id?: string | null
+          priority_id?: string | null
+          reported_at?: string | null
+          requester_email?: string | null
+          requester_id?: string | null
+          requester_name?: string | null
+          status_id?: string | null
+          sublocation_id?: string | null
+          ticket_number?: string | null
+          type_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_end?: string | null
+          actual_start?: string | null
+          area_id?: string | null
+          asset_id?: string | null
+          assignee_id?: string | null
+          checklist_responses?: Json | null
+          client_id?: string | null
+          closed_at?: string | null
+          closure_notes?: string | null
+          closure_photos?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          location_id?: string | null
+          origin?: string | null
+          parent_ticket_id?: string | null
+          photos?: Json | null
+          plan_id?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          plant_id?: string | null
+          priority_id?: string | null
+          reported_at?: string | null
+          requester_email?: string | null
+          requester_id?: string | null
+          requester_name?: string | null
+          status_id?: string | null
+          sublocation_id?: string | null
+          ticket_number?: string | null
+          type_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       snapshot_maintenance_types_20261021: {
         Row: {
           client_id: string | null
@@ -11614,6 +12844,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_types_20261026: {
+        Row: {
+          client_id: string | null
+          color: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_types_20261027: {
         Row: {
           client_id: string | null
           color: string | null
@@ -11788,6 +13042,36 @@ export type Database = {
         Relationships: []
       }
       snapshot_maintenance_workers_20261026: {
+        Row: {
+          client_id: string | null
+          company: string | null
+          created_at: string | null
+          discipline: string | null
+          id: string | null
+          name: string | null
+          plant_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company?: string | null
+          created_at?: string | null
+          discipline?: string | null
+          id?: string | null
+          name?: string | null
+          plant_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company?: string | null
+          created_at?: string | null
+          discipline?: string | null
+          id?: string | null
+          name?: string | null
+          plant_id?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_maintenance_workers_20261027: {
         Row: {
           client_id: string | null
           company: string | null
@@ -12033,6 +13317,42 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_properties_20261027: {
+        Row: {
+          address: string | null
+          city: string | null
+          client_id: string | null
+          created_at: string | null
+          daily_rate: number | null
+          description: string | null
+          id: string | null
+          name: string | null
+          photos: Json | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          daily_rate?: number | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          photos?: Json | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          daily_rate?: number | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          photos?: Json | null
+        }
+        Relationships: []
+      }
       snapshot_property_cost_centers_20261021: {
         Row: {
           client_id: string | null
@@ -12139,6 +13459,27 @@ export type Database = {
         Relationships: []
       }
       snapshot_property_cost_centers_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_property_cost_centers_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -12325,6 +13666,39 @@ export type Database = {
         Relationships: []
       }
       snapshot_property_guests_20261026: {
+        Row: {
+          client_id: string | null
+          cost_center_id: string | null
+          created_at: string | null
+          department: string | null
+          email: string | null
+          id: string | null
+          name: string | null
+          phone: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          id?: string | null
+          name?: string | null
+          phone?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          cost_center_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          id?: string | null
+          name?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_property_guests_20261027: {
         Row: {
           client_id: string | null
           cost_center_id: string | null
@@ -12627,6 +14001,51 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_property_reservations_20261027: {
+        Row: {
+          bed_number: number | null
+          check_in_date: string | null
+          check_out_date: string | null
+          client_id: string | null
+          created_at: string | null
+          guest_id: string | null
+          id: string | null
+          property_id: string | null
+          room_id: string | null
+          status: string | null
+          total_amount: number | null
+          voucher: string | null
+        }
+        Insert: {
+          bed_number?: number | null
+          check_in_date?: string | null
+          check_out_date?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          guest_id?: string | null
+          id?: string | null
+          property_id?: string | null
+          room_id?: string | null
+          status?: string | null
+          total_amount?: number | null
+          voucher?: string | null
+        }
+        Update: {
+          bed_number?: number | null
+          check_in_date?: string | null
+          check_out_date?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          guest_id?: string | null
+          id?: string | null
+          property_id?: string | null
+          room_id?: string | null
+          status?: string | null
+          total_amount?: number | null
+          voucher?: string | null
+        }
+        Relationships: []
+      }
       snapshot_property_rooms_20261021: {
         Row: {
           bed_type: string | null
@@ -12808,6 +14227,42 @@ export type Database = {
         Relationships: []
       }
       snapshot_property_rooms_20261026: {
+        Row: {
+          bed_type: string | null
+          beds_quantity: number | null
+          capacity: number | null
+          client_id: string | null
+          created_at: string | null
+          has_bathroom: boolean | null
+          id: string | null
+          name: string | null
+          property_id: string | null
+        }
+        Insert: {
+          bed_type?: string | null
+          beds_quantity?: number | null
+          capacity?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          has_bathroom?: boolean | null
+          id?: string | null
+          name?: string | null
+          property_id?: string | null
+        }
+        Update: {
+          bed_type?: string | null
+          beds_quantity?: number | null
+          capacity?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          has_bathroom?: boolean | null
+          id?: string | null
+          name?: string | null
+          property_id?: string | null
+        }
+        Relationships: []
+      }
+      snapshot_property_rooms_20261027: {
         Row: {
           bed_type: string | null
           beds_quantity: number | null
@@ -13077,6 +14532,45 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_task_statuses_20261027: {
+        Row: {
+          client_id: string | null
+          color: string | null
+          created_at: string | null
+          freeze_sla: boolean | null
+          id: string | null
+          ignore_sla: boolean | null
+          is_terminal: boolean | null
+          name: string | null
+          return_to_requester: boolean | null
+          sla_days: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          freeze_sla?: boolean | null
+          id?: string | null
+          ignore_sla?: boolean | null
+          is_terminal?: boolean | null
+          name?: string | null
+          return_to_requester?: boolean | null
+          sla_days?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          color?: string | null
+          created_at?: string | null
+          freeze_sla?: boolean | null
+          id?: string | null
+          ignore_sla?: boolean | null
+          is_terminal?: boolean | null
+          name?: string | null
+          return_to_requester?: boolean | null
+          sla_days?: number | null
+        }
+        Relationships: []
+      }
       snapshot_task_timeline_20261021: {
         Row: {
           action_type: string | null
@@ -13239,6 +14733,33 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_task_timeline_20261027: {
+        Row: {
+          action_type: string | null
+          content: string | null
+          created_at: string | null
+          id: string | null
+          task_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string | null
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string | null
+          task_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       snapshot_task_types_20261021: {
         Row: {
           client_id: string | null
@@ -13360,6 +14881,30 @@ export type Database = {
         Relationships: []
       }
       snapshot_task_types_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          sla_hours: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          sla_hours?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          sla_hours?: number | null
+        }
+        Relationships: []
+      }
+      snapshot_task_types_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
@@ -13923,6 +15468,96 @@ export type Database = {
         }
         Relationships: []
       }
+      snapshot_tasks_20261027: {
+        Row: {
+          accident_id: string | null
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
+          assignee_id: string | null
+          attachment_url: string | null
+          attachment_urls: Json | null
+          audit_id: string | null
+          client_id: string | null
+          closed_at: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          frozen_time_minutes: number | null
+          id: string | null
+          participants_ids: string[] | null
+          plant_id: string | null
+          po_generated_date: string | null
+          previous_assignee_id: string | null
+          rc_created_date: string | null
+          rejection_reason: string | null
+          requester_id: string | null
+          status_id: string | null
+          status_updated_at: string | null
+          task_number: string | null
+          title: string | null
+          type_id: string | null
+        }
+        Insert: {
+          accident_id?: string | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assignee_id?: string | null
+          attachment_url?: string | null
+          attachment_urls?: Json | null
+          audit_id?: string | null
+          client_id?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          frozen_time_minutes?: number | null
+          id?: string | null
+          participants_ids?: string[] | null
+          plant_id?: string | null
+          po_generated_date?: string | null
+          previous_assignee_id?: string | null
+          rc_created_date?: string | null
+          rejection_reason?: string | null
+          requester_id?: string | null
+          status_id?: string | null
+          status_updated_at?: string | null
+          task_number?: string | null
+          title?: string | null
+          type_id?: string | null
+        }
+        Update: {
+          accident_id?: string | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assignee_id?: string | null
+          attachment_url?: string | null
+          attachment_urls?: Json | null
+          audit_id?: string | null
+          client_id?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          frozen_time_minutes?: number | null
+          id?: string | null
+          participants_ids?: string[] | null
+          plant_id?: string | null
+          po_generated_date?: string | null
+          previous_assignee_id?: string | null
+          rc_created_date?: string | null
+          rejection_reason?: string | null
+          requester_id?: string | null
+          status_id?: string | null
+          status_updated_at?: string | null
+          task_number?: string | null
+          title?: string | null
+          type_id?: string | null
+        }
+        Relationships: []
+      }
       snapshot_trainings_20261021: {
         Row: {
           client_id: string | null
@@ -14059,6 +15694,33 @@ export type Database = {
         Relationships: []
       }
       snapshot_trainings_20261026: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          validity_months: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          validity_months?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          validity_months?: number | null
+        }
+        Relationships: []
+      }
+      snapshot_trainings_20261027: {
         Row: {
           client_id: string | null
           created_at: string | null
