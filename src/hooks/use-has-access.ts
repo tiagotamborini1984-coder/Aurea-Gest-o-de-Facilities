@@ -1,7 +1,9 @@
 import { useAppStore } from '@/store/AppContext'
 
 export function useHasAccess(menuName: string) {
-  const { profile } = useAppStore()
+  const { profile, isLoadingProfile } = useAppStore()
+  // Enquanto o perfil ainda está carregando no login/refresh, não emite falso 'sem acesso'
+  if (isLoadingProfile && !profile) return true
   if (!profile) return false
   if (profile.role === 'Administrador' || profile.role === 'Master') return true
 
@@ -118,7 +120,21 @@ export function useHasAccess(menuName: string) {
     if (
       subName === 'Dashboard do Gestor' &&
       (userMenus.includes('Dashboard Gestor') ||
-        userMenus.includes('Gestão de Terceiros:Dashboard Gestor'))
+        userMenus.includes('Gestão de Terceiros:Dashboard Gestor') ||
+        userMenus.includes('Dashboard') ||
+        userMenus.includes('Gestão de Terceiros'))
+    ) {
+      return true
+    }
+  }
+
+  // Dashboard do Gestor acessado pelo nome direto
+  if (menuName === 'Dashboard do Gestor' || menuName === 'Dashboard Gestor') {
+    if (
+      userMenus.includes('Dashboard Gestor') ||
+      userMenus.includes('Dashboard') ||
+      userMenus.includes('Gestão de Terceiros:Dashboard Gestor') ||
+      userMenus.includes('Gestão de Terceiros')
     ) {
       return true
     }

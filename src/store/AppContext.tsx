@@ -38,6 +38,7 @@ interface AppContextType {
   clients: Client[]
   isLoadingClients: boolean
   profile: Profile | null
+  isLoadingProfile: boolean
   activeClient: Client | null
   activePlant?: string
   selectedMasterClient: string | 'all'
@@ -47,34 +48,57 @@ interface AppContextType {
   addClient: (client: Omit<Client, 'id' | 'url' | 'packageAlertDays'>) => Promise<boolean>
   updateClient: (id: string, data: Partial<Omit<Client, 'id' | 'url'>>) => Promise<boolean>
   deleteClient: (id: string) => Promise<boolean>
+  reloadProfile: () => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
+
+const PROFILE_CACHE_PREFIX = 'aurea_cached_profile_'
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
   const [isLoadingClients, setIsLoadingClients] = useState(true)
-  const [profile, setProfile] = useState<Profile | null>(null)
+
+  // Tenta restaurar do cache local para render imediato sem flash de estado vazio
+  const [profile, setProfile] = useState<Profile | null>(() => {
+    try {
+      if (typeof window !== 'undefined' && user?.id) {
+        const cached = localStorage.getItem(`${PROFILE_CACHE_PREFIX}${user.id}`)
+        if (cached) return JSON.parse(cached)
+      }
+    } catch {
+      // ignore
+    }
+    return null
+  })
+  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true)
   const [activeClient, setActiveClient] = useState<Client | null>(null)
   const [selectedMasterClient, setSelectedMasterClient] = useState<string | 'all'>('all')
   const [selectedPlant, setSelectedPlant] = useState<string | 'all'>('all')
 
-  useEffect(() => {
-    let mounted = true
-    if (user) {
-      const loadProfile = async () => {
+  const fetchProfileWithRetry = useCallback(
+    async (userId: string, retries = 3): Promise<Profile | null> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
         try {
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', user.id)
+            .eq('id', userId)
             .maybeSingle()
 
-          if (!mounted) return
           if (error) {
-            console.error('Erro ao buscar profile no AppContext:', error)
+            console.warn(
+              `[AppContext] Tentativa ${attempt} ao buscar profile falhou:`,
+              error.message,
+            )
+            if (attempt < retries) {
+              await new Promise((res) => setTimeout(res, attempt * 400))
+              continue
+            }
+            return null
           }
+
           if (data) {
             const parsedMenus = Array.isArray(data.accessible_menus)
               ? (data.accessible_menus as string[])
@@ -88,7 +112,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     }
                   })()
                 : []
-            // Deduplica itens de menus para evitar chaves e listas duplicadas no render
             const rawMenus = Array.from(new Set(parsedMenus.filter(Boolean)))
 
             const parsedPlants = Array.isArray(data.authorized_plants)
@@ -105,26 +128,88 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 : []
             const rawPlants = Array.from(new Set(parsedPlants.filter(Boolean)))
 
-            setProfile({
+            const loadedProfile: Profile = {
               ...(data as any),
               accessible_menus: rawMenus,
               authorized_plants: rawPlants,
-            } as Profile)
+            }
+
+            try {
+              localStorage.setItem(
+                `${PROFILE_CACHE_PREFIX}${userId}`,
+                JSON.stringify(loadedProfile),
+              )
+            } catch {
+              // ignore
+            }
+
+            return loadedProfile
           }
+          return null
         } catch (err) {
-          console.error('Exceção ao buscar profile:', err)
+          console.warn(`[AppContext] Exceção tentativa ${attempt} ao buscar profile:`, err)
+          if (attempt < retries) {
+            await new Promise((res) => setTimeout(res, attempt * 400))
+          }
         }
       }
-      loadProfile()
+      return null
+    },
+    [],
+  )
+
+  const reloadProfile = useCallback(async () => {
+    if (!user) return
+    setIsLoadingProfile(true)
+    const loaded = await fetchProfileWithRetry(user.id, 2)
+    if (loaded) {
+      setProfile(loaded)
+    }
+    setIsLoadingProfile(false)
+  }, [user, fetchProfileWithRetry])
+
+  useEffect(() => {
+    let mounted = true
+    if (user) {
+      // Carrega cache imediato se houver
+      try {
+        const cached = localStorage.getItem(`${PROFILE_CACHE_PREFIX}${user.id}`)
+        if (cached && mounted) {
+          setProfile(JSON.parse(cached))
+        }
+      } catch {
+        // ignore
+      }
+
+      setIsLoadingProfile(true)
+      fetchProfileWithRetry(user.id, 3).then((loaded) => {
+        if (!mounted) return
+        if (loaded) {
+          setProfile(loaded)
+        } else {
+          // Se falhou todas as tentativas mas temos cache, mantém o cache
+          setProfile((prev) => {
+            if (prev) return prev
+            try {
+              const cached = localStorage.getItem(`${PROFILE_CACHE_PREFIX}${user.id}`)
+              return cached ? JSON.parse(cached) : null
+            } catch {
+              return null
+            }
+          })
+        }
+        setIsLoadingProfile(false)
+      })
     } else {
       setProfile(null)
+      setIsLoadingProfile(false)
       setActiveClient(null)
       setClients([])
     }
     return () => {
       mounted = false
     }
-  }, [user])
+  }, [user, fetchProfileWithRetry])
 
   useEffect(() => {
     const clientIdToFetch =
@@ -258,6 +343,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       clients,
       isLoadingClients,
       profile,
+      isLoadingProfile,
       activeClient,
       activePlant: selectedPlant !== 'all' ? selectedPlant : undefined,
       selectedMasterClient,
@@ -267,17 +353,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addClient,
       updateClient,
       deleteClient,
+      reloadProfile,
     }),
     [
       clients,
       isLoadingClients,
       profile,
+      isLoadingProfile,
       activeClient,
       selectedMasterClient,
       selectedPlant,
       addClient,
       updateClient,
       deleteClient,
+      reloadProfile,
     ],
   )
 

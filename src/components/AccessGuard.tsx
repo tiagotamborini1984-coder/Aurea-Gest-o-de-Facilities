@@ -73,7 +73,7 @@ const MAINTENANCE_VARIATIONS = [
 
 export function AccessGuard() {
   const location = useLocation()
-  const { profile, activeClient } = useAppStore()
+  const { profile, activeClient, isLoadingProfile, isLoadingClients } = useAppStore()
 
   const getBasePath = (path: string) => {
     if (path.startsWith('/gestao-terceiros/cadastros')) return 'Cadastros'
@@ -100,8 +100,17 @@ export function AccessGuard() {
     return activeClient.modules.includes(targetModule)
   }
 
-  if (requiredModule && activeClient && !hasClientModule(moduleRouteMap[requiredModule])) {
-    return <ModuleAccessDenied />
+  // Se o perfil ou clientes ainda estão carregando, renderiza indicador de carregamento
+  // para evitar falso Acesso Negado por estado vazio transitório
+  if (isLoadingProfile || (isLoadingClients && !activeClient)) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-8">
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center max-w-md space-y-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-sm text-slate-600">Verificando permissões de acesso...</p>
+        </div>
+      </div>
+    )
   }
 
   if (profile?.role === 'Master' || profile?.role === 'Administrador') {
@@ -110,6 +119,10 @@ export function AccessGuard() {
 
   if (location.pathname === '/gestao-terceiros') {
     return <Outlet />
+  }
+
+  if (requiredModule && activeClient && !hasClientModule(moduleRouteMap[requiredModule])) {
+    return <ModuleAccessDenied />
   }
 
   if (menuName && !hasAccess) {

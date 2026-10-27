@@ -18,28 +18,51 @@ export function SubscriptionGuard() {
       }
 
       try {
-        const { data: profile } = await supabase
+        const { data: profile, error: pErr } = await supabase
           .from('profiles')
           .select('role, client_id')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
 
-        if (profile?.role === 'Master') {
+        if (pErr) {
+          console.warn('SubscriptionGuard: Erro transitório ao ler perfil:', pErr)
+          // Em caso de erro de rede transitório, não bloqueia imediatamente
+          setStatus('Ativo')
+          return
+        }
+
+        if (
+          profile?.role === 'Master' ||
+          profile?.role === 'Administrador' ||
+          !profile?.client_id
+        ) {
           setStatus('Ativo')
         } else if (profile?.client_id) {
-          const { data: client } = await supabase
+          const { data: client, error: cErr } = await supabase
             .from('clients')
             .select('status')
             .eq('id', profile.client_id)
-            .single()
+            .maybeSingle()
 
-          setStatus(client?.status || 'Inativo')
+          if (cErr) {
+            console.warn('SubscriptionGuard: Erro transitório ao ler client:', cErr)
+            setStatus('Ativo')
+            return
+          }
+
+          // Se não encontrou o client ou status não é inativo explícito, tolera
+          if (client && client.status === 'Inativo') {
+            setStatus('Inativo')
+          } else {
+            setStatus('Ativo')
+          }
         } else {
-          setStatus('Inativo')
+          setStatus('Ativo')
         }
       } catch (err) {
         console.error('Error verifying subscription:', err)
-        setStatus('Inativo')
+        // Não derruba em 'Inativo' em caso de erro de rede/timeout
+        setStatus('Ativo')
       } finally {
         setLoading(false)
       }
