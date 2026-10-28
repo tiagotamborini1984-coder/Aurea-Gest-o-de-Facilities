@@ -51,6 +51,35 @@ function addFrequency(date: Date, frequency: string): Date {
   }
 }
 
+function calculateDueDaysForAudit(
+  frequency: string | null | undefined,
+  slaDays: number | null | undefined,
+): number {
+  if (slaDays != null && slaDays > 0) {
+    return Math.round(slaDays)
+  }
+  const norm = (frequency || '').trim().toLowerCase()
+  if (norm.includes('diári') || norm.includes('diari')) return 1
+  if (norm.includes('seman')) return 7
+  if (norm.includes('quinzen')) return 15
+  if (norm.includes('mens')) return 30
+  if (norm.includes('bimestr')) return 60
+  if (norm.includes('trimestr')) return 90
+  if (norm.includes('semestr')) return 180
+  if (norm.includes('anual') || norm.includes('ano')) return 365
+  // Default: dia seguinte (nunca mesmo dia)
+  return 1
+}
+
+function computeBRTDueDateISO(baseDate: Date, addDays: number): string {
+  // Format string in America/Sao_Paulo (UTC-3)
+  const target = new Date(baseDate.getTime() + addDays * 86400000)
+  const year = target.getUTCFullYear()
+  const month = String(target.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(target.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}T23:59:59.000-03:00`
+}
+
 function fmtDate(d: Date): string {
   return d.toISOString().split('T')[0]
 }
@@ -103,7 +132,13 @@ async function getTaskConfig(client: any, clientId: string) {
 
 async function ensureTaskForAudit(
   client: any,
-  audit: { id: string; client_id: string; title: string; sla_days: number | null },
+  audit: {
+    id: string
+    client_id: string
+    title: string
+    sla_days: number | null
+    frequency?: string | null
+  },
   assignment: { plant_id: string; assignee_id: string },
   today: Date,
 ): Promise<boolean> {
@@ -126,10 +161,8 @@ async function ensureTaskForAudit(
     .limit(1)
   const reqId = admin?.[0]?.id || assignment.assignee_id
 
-  const due =
-    audit.sla_days != null
-      ? new Date(today.getTime() + audit.sla_days * 86400000).toISOString()
-      : new Date(today.getTime() + 86399999).toISOString()
+  const dueDays = calculateDueDaysForAudit(audit.frequency, audit.sla_days)
+  const due = computeBRTDueDateISO(today, dueDays)
 
   const { data: task, error: te } = await client
     .from('tasks')
@@ -394,6 +427,7 @@ Deno.serve(async (req: Request) => {
               client_id: audit.client_id,
               title: audit.title,
               sla_days: audit.sla_days,
+              frequency: audit.frequency,
             },
             { plant_id: plantId, assignee_id: plantAssigneeId },
             today,
@@ -504,7 +538,7 @@ Deno.serve(async (req: Request) => {
     // BACKFILL: Garantir que auditorias ativas existentes com assignments tenham tasks/executions criadas se estiverem faltando
     const { data: allAudits } = await client
       .from('audits')
-      .select('id, title, client_id, sla_days')
+      .select('id, title, client_id, sla_days, frequency')
       .eq('status', 'Ativo')
     for (const a of allAudits || []) {
       const { data: auditAssignments } = await client

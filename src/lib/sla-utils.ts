@@ -77,7 +77,15 @@ export function calculateSLA(task: any, currentStatus?: any, nonWorkingDays: str
   const end = task.closed_at ? new Date(task.closed_at) : new Date()
 
   if (task.due_date) {
-    const due = new Date(task.due_date)
+    // Se a data vier apenas como "YYYY-MM-DD", o new Date() padrão em JS interpreta em UTC (00:00:00 UTC),
+    // o que no fuso de Brasília (UTC-3) vira às 21:00 do dia ANTERIOR, antecipando o vencimento em 3h.
+    // Garantimos que data sem hora seja tratada até o fim do dia (23:59:59).
+    let due: Date
+    if (typeof task.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(task.due_date.trim())) {
+      due = new Date(`${task.due_date.trim()}T23:59:59`)
+    } else {
+      due = new Date(task.due_date)
+    }
     remainingSecs = getBusinessSeconds(end, due, nonWorkingDays)
     const totalDuration = getBusinessSeconds(new Date(task.created_at), due, nonWorkingDays)
     slaSecs = totalDuration > 0 ? totalDuration : 86400
