@@ -64,17 +64,37 @@ export function BasicSettings() {
         <Input type="date" {...register('start_date')} />
       </div>
 
-      <div className="space-y-2 lg:col-span-2">
+      <div className="space-y-2">
         <Label>Antecedência de Geração (dias)</Label>
+        <Input type="number" min="0" {...register('advance_notice_days')} />
+        <p className="text-xs text-muted-foreground">
+          Quantos dias antes a tarefa de auditoria recorrente será gerada.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>SLA do Checklist (dias)</Label>
         <Input
           type="number"
-          min="0"
-          {...register('advance_notice_days')}
-          className="max-w-[200px]"
+          min="1"
+          placeholder="Opcional (herda frequência)"
+          {...register('sla_days')}
         />
         <p className="text-xs text-muted-foreground">
-          Quantos dias antes a tarefa de auditoria recorrente será gerada e ficará visível no
-          painel.
+          Prazo limite para realização do checklist (vazio = segue frequência).
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="font-semibold text-primary">SLA da Não Conformidade (dias) *</Label>
+        <Input
+          type="number"
+          min="1"
+          {...register('nc_sla_days')}
+          className="border-primary/50 focus-visible:ring-primary"
+        />
+        <p className="text-xs text-muted-foreground">
+          Prazo em dias para resolução das NCs geradas (vencimento às 23:59:59 BRT).
         </p>
       </div>
     </div>

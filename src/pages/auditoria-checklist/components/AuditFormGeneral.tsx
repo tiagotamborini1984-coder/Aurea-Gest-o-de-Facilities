@@ -114,6 +114,48 @@ export function AuditFormGeneral() {
 
         <FormField
           control={control}
+          name="sla_days"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>SLA do Checklist (dias)</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="Opcional (herda frequência)"
+                  {...field}
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="nc_sla_days"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="font-semibold text-primary">
+                SLA da Não Conformidade (dias) *
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min="1"
+                  {...field}
+                  value={field.value ?? 5}
+                  className="border-primary/50 focus-visible:ring-primary"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
           name="status"
           render={({ field }) => (
             <FormItem>

@@ -5,6 +5,8 @@ export const auditSchema = z.object({
   type: z.string().min(1, 'Obrigatório'),
   frequency: z.string().min(1, 'Obrigatório'),
   start_date: z.string().min(1, 'Obrigatório'),
+  sla_days: z.coerce.number().min(0).optional().nullable(),
+  nc_sla_days: z.coerce.number().min(1, 'SLA da NC deve ser de no mínimo 1 dia').default(5),
   advance_notice_days: z.coerce.number().min(0).default(0),
   status: z.string().default('Ativo'),
   scoring_settings: z.any().optional(),

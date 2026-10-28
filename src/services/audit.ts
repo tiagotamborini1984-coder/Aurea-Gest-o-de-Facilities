@@ -66,6 +66,7 @@ export const cloneAudit = async (auditId: string, userId: string) => {
       status: 'Rascunho',
       scoring_settings: audit.scoring_settings,
       sla_days: audit.sla_days,
+      nc_sla_days: audit.nc_sla_days,
       advance_notice_days: audit.advance_notice_days,
     })
     .select()

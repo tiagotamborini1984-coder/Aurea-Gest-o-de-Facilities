@@ -142,7 +142,11 @@ export default function ModeloImprimir() {
                 <strong>Frequência:</strong> {audit.frequency || '-'}
               </p>
               <p>
-                <strong>SLA:</strong> {audit.sla_days ? `${audit.sla_days} dias` : '-'}
+                <strong>SLA do Checklist:</strong> {audit.sla_days ? `${audit.sla_days} dias` : '-'}
+              </p>
+              <p>
+                <strong>SLA Não Conformidade:</strong>{' '}
+                {(audit as any).nc_sla_days ? `${(audit as any).nc_sla_days} dias` : '5 dias'}
               </p>
             </div>
           </div>

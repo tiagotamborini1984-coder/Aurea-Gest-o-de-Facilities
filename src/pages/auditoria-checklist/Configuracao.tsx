@@ -35,6 +35,8 @@ export default function AuditoriaConfig() {
   const [frequency, setFrequency] = useState('Mensal')
   const [startDate, setStartDate] = useState('')
   const [advanceNotice, setAdvanceNotice] = useState<number | ''>(15)
+  const [slaDays, setSlaDays] = useState<number | ''>('')
+  const [ncSlaDays, setNcSlaDays] = useState<number | ''>(5)
 
   const [scoring, setScoring] = useState([
     { score: 1, description: 'Muito Ruim', trigger_task: true },
@@ -85,6 +87,8 @@ export default function AuditoriaConfig() {
           setFrequency(audit.frequency || 'Mensal')
           setStartDate(audit.start_date || '')
           setAdvanceNotice(audit.advance_notice_days ?? 0)
+          setSlaDays(audit.sla_days ?? '')
+          setNcSlaDays(audit.nc_sla_days ?? 5)
           if (audit.scoring_settings && Array.isArray(audit.scoring_settings)) {
             setScoring(audit.scoring_settings as any[])
           }
@@ -118,6 +122,8 @@ export default function AuditoriaConfig() {
           type,
           frequency,
           start_date: startDate,
+          sla_days: slaDays === '' ? null : Number(slaDays),
+          nc_sla_days: ncSlaDays === '' ? 5 : Number(ncSlaDays),
           advance_notice_days: Number(advanceNotice) || 0,
           status: isDraft ? 'Rascunho' : 'Ativo',
           scoring_settings: scoring,
@@ -214,11 +220,42 @@ export default function AuditoriaConfig() {
             <Label>Dias de Antecedência (Aviso)</Label>
             <Input
               type="number"
+              min="0"
               value={advanceNotice}
               onChange={(e) =>
                 setAdvanceNotice(e.target.value === '' ? '' : Number(e.target.value))
               }
             />
+            <p className="text-xs text-muted-foreground">
+              Dias antes para geração da tarefa de auditoria.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>SLA do Checklist (dias)</Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="Opcional (herda da frequência)"
+              value={slaDays}
+              onChange={(e) => setSlaDays(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Prazo limite para realização da auditoria (deixe vazio para usar a frequência).
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label className="font-semibold text-primary">SLA da Não Conformidade (dias) *</Label>
+            <Input
+              type="number"
+              min="1"
+              value={ncSlaDays}
+              onChange={(e) => setNcSlaDays(e.target.value === '' ? '' : Number(e.target.value))}
+              className="border-primary/50 focus-visible:ring-primary"
+            />
+            <p className="text-xs text-muted-foreground">
+              Prazo em dias para resolução de chamados de NC gerados por esta auditoria (vencendo às
+              23:59:59 BRT).
+            </p>
           </div>
         </CardContent>
       </Card>
