@@ -146,7 +146,7 @@ export default function ModeloImprimir() {
               </p>
               <p>
                 <strong>SLA Não Conformidade:</strong>{' '}
-                {(audit as any).nc_sla_days ? `${(audit as any).nc_sla_days} dias` : '5 dias'}
+                {audit.nc_sla_days ? `${audit.nc_sla_days} dias` : '5 dias'}
               </p>
             </div>
           </div>
