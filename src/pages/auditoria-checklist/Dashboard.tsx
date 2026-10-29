@@ -71,21 +71,18 @@ export default function AuditoriaDashboard() {
   const [filterTitle, setFilterTitle] = useState('all')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
 
-  const roleLower = (profile?.role || '').toLowerCase()
+  const isMaster = profile?.role === 'Master'
+  const roleLower = String(profile?.role || '').toLowerCase()
   const isSuperAdmin =
     roleLower === 'administrador' || roleLower === 'master' || roleLower === 'admin'
-  const isMaster = roleLower === 'master'
+
+  // Alinhado exatamente com o Painel de Chamados:
+  // effectiveClientId respeita o cliente selecionado pelo Master no topo, ou o cliente do perfil
+  const effectiveClientId = isMaster ? selectedMasterClient : profile?.client_id || activeClient?.id
 
   useEffect(() => {
     if (!profile) return
-
-    const targetClientId = isMaster
-      ? selectedMasterClient !== 'all'
-        ? selectedMasterClient
-        : activeClient?.id || profile?.client_id
-      : activeClient?.id || profile?.client_id
-
-    if (!targetClientId && !isMaster) return
+    if (!effectiveClientId && !isMaster) return
 
     const authPlants: string[] = Array.isArray(profile.authorized_plants)
       ? profile.authorized_plants
@@ -107,8 +104,8 @@ export default function AuditoriaDashboard() {
 
       let query = supabase.from('audit_executions').select('*, audits!inner(*)')
 
-      if (targetClientId && targetClientId !== 'all') {
-        query = query.eq('audits.client_id', targetClientId)
+      if (effectiveClientId && effectiveClientId !== 'all') {
+        query = query.eq('audits.client_id', effectiveClientId)
       }
 
       if (!isSuperAdmin) {
@@ -126,12 +123,13 @@ export default function AuditoriaDashboard() {
         .from('task_statuses')
         .select('id, name, is_terminal, color, client_id')
 
-      if (targetClientId && targetClientId !== 'all') {
-        typesQuery = typesQuery.eq('client_id', targetClientId)
-        statusesQuery = statusesQuery.eq('client_id', targetClientId)
+      if (effectiveClientId && effectiveClientId !== 'all') {
+        typesQuery = typesQuery.eq('client_id', effectiveClientId)
+        statusesQuery = statusesQuery.eq('client_id', effectiveClientId)
       }
 
       // Consulta de Tarefas (Não Conformidades e demandas de auditoria)
+      // Escopo alinhado ao Painel de Chamados (RLS da tabela tasks já faz o isolamento por tenant/planta)
       let ncQuery = supabase.from('tasks').select(`
           id,
           task_number,
@@ -149,8 +147,8 @@ export default function AuditoriaDashboard() {
           audit_id
         `)
 
-      if (targetClientId && targetClientId !== 'all') {
-        ncQuery = ncQuery.eq('client_id', targetClientId)
+      if (effectiveClientId && effectiveClientId !== 'all') {
+        ncQuery = ncQuery.eq('client_id', effectiveClientId)
       }
 
       if (!isSuperAdmin) {
@@ -188,7 +186,15 @@ export default function AuditoriaDashboard() {
     }
 
     load()
-  }, [profile, activeClient, selectedMasterClient, isSuperAdmin, isMaster, reloadTrigger])
+  }, [
+    profile,
+    activeClient,
+    selectedMasterClient,
+    effectiveClientId,
+    isSuperAdmin,
+    isMaster,
+    reloadTrigger,
+  ])
 
   const filtered = useMemo(() => {
     return executions.filter((e) => {
@@ -250,18 +256,25 @@ export default function AuditoriaDashboard() {
     const isNcType = (task: any) => {
       const typeObj = typesMap.get(task.type_id)
       const typeName = (typeObj?.name || '').toLowerCase()
-      const title = (task.title || '').toLowerCase()
+      const title = (task.title || '').trim().toLowerCase()
+      const desc = (task.description || '').toLowerCase()
 
-      // Identifica se é Não Conformidade pelo tipo, título ou vínculo com auditoria
+      // Identifica se é Não Conformidade pelo tipo, título, vínculo com auditoria ou descrição
       return (
         Boolean(task.audit_id) ||
         typeName.includes('não conformidade') ||
         typeName.includes('nao conformidade') ||
         typeName === 'nc' ||
+        typeName.includes('auditoria') ||
         title.startsWith('não conformidade') ||
         title.startsWith('nao conformidade') ||
         title.startsWith('nc:') ||
-        title.includes('[nc]')
+        title.startsWith('nc ') ||
+        title.includes('[nc]') ||
+        title.includes('não conformidade') ||
+        title.includes('nao conformidade') ||
+        desc.includes('não conformidade gerada') ||
+        desc.includes('gerada automaticamente pelo checklist')
       )
     }
 
@@ -278,11 +291,13 @@ export default function AuditoriaDashboard() {
     const isResolvedOrTerminal = (task: any) => {
       const status = getStatusObj(task)
       const statusName = (status?.name || '').toLowerCase()
-      return (
+      return Boolean(
+        task.closed_at ||
+        task.approval_status === 'approved' ||
         status?.is_terminal === true ||
         statusName.includes('finaliz') ||
         statusName.includes('conclu') ||
-        statusName.includes('cancel')
+        statusName.includes('cancel'),
       )
     }
 
@@ -337,29 +352,44 @@ export default function AuditoriaDashboard() {
       const isTerminal = isResolvedOrTerminal(task)
 
       const isAwaitingApproval =
-        statusName.includes('aguardando aprova') ||
-        statusName.includes('fechamento') ||
-        task.approval_status === 'pending'
+        statusName.includes('aguardando aprova') || task.approval_status === 'pending'
 
-      const isRejected = task.approval_status === 'rejected' || statusName.includes('reprovad')
+      const isPendingClosure =
+        isAwaitingApproval ||
+        statusName.includes('fechamento') ||
+        statusName.includes('pendente') ||
+        statusName.includes('em andamento') ||
+        statusName.includes('aberto')
+
+      const isRejected =
+        task.approval_status === 'rejected' ||
+        statusName.includes('reprovad') ||
+        Boolean(task.rejection_reason)
 
       // 1. NCs Abertas: não resolvidas / não terminais
       if (!isTerminal) {
         abertasCount++
       }
 
-      // 2. Pendentes de Aprovação: marcadas 'Finalizado' pelo responsável, aguardando aprovação do solicitante
+      // 2. Pendentes de Aprovação: marcadas pelo responsável aguardando validação do solicitante
       if (isAwaitingApproval && !isTerminal) {
         pendentesAprovacaoCount++
       }
 
-      // 3. Reprovadas: reprovadas pelo solicitante (com motivo)
+      // 3. Reprovadas: reprovadas pelo solicitante (com motivo ou flag)
       if (isRejected && !isTerminal) {
         reprovadasCount++
       }
 
-      // 4. Pendentes de Fechamento: trabalho feito, falta fechar (aguardando aprovação/encerramento)
+      // 4. Pendentes de Fechamento: demandas em aberto aguardando aprovação/conclusão
       if (isAwaitingApproval && !isTerminal) {
+        pendentesFechamentoCount++
+      } else if (
+        isPendingClosure &&
+        !isTerminal &&
+        task.closed_at === null &&
+        task.approval_status === 'pending'
+      ) {
         pendentesFechamentoCount++
       }
 
