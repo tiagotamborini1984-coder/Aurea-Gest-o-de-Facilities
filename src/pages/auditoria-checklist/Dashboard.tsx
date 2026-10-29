@@ -51,7 +51,7 @@ import { cn } from '@/lib/utils'
 
 export default function AuditoriaDashboard() {
   const navigate = useNavigate()
-  const { profile, activeClient } = useAppStore()
+  const { profile, activeClient, selectedMasterClient } = useAppStore()
   const { plants } = useMasterData()
   const hasModuleAccess = useHasAccess('Auditoria e Checklist')
   const hasSubmenuAccess = useHasAccess('Auditoria e Checklist:Dashboard')
@@ -60,31 +60,58 @@ export default function AuditoriaDashboard() {
   const [executions, setExecutions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [ncTasks, setNcTasks] = useState<any[]>([])
+  const [taskTypes, setTaskTypes] = useState<any[]>([])
+  const [taskStatuses, setTaskStatuses] = useState<any[]>([])
   const [loadingNc, setLoadingNc] = useState(true)
+  const [ncError, setNcError] = useState<string | null>(null)
+  const [reloadTrigger, setReloadTrigger] = useState(0)
 
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [filterTitle, setFilterTitle] = useState('all')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
 
-  const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
+  const roleLower = (profile?.role || '').toLowerCase()
+  const isSuperAdmin =
+    roleLower === 'administrador' || roleLower === 'master' || roleLower === 'admin'
+  const isMaster = roleLower === 'master'
 
   useEffect(() => {
     if (!profile) return
-    const targetClientId = activeClient?.id || profile.client_id
-    if (!targetClientId) return
+
+    const targetClientId = isMaster
+      ? selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : activeClient?.id || profile?.client_id
+      : activeClient?.id || profile?.client_id
+
+    if (!targetClientId && !isMaster) return
+
+    const authPlants: string[] = Array.isArray(profile.authorized_plants)
+      ? profile.authorized_plants
+      : typeof profile.authorized_plants === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(profile.authorized_plants)
+              return Array.isArray(parsed) ? parsed : []
+            } catch {
+              return []
+            }
+          })()
+        : []
 
     const load = async () => {
       setLoading(true)
       setLoadingNc(true)
+      setNcError(null)
 
-      let query = supabase
-        .from('audit_executions')
-        .select('*, audits!inner(*)')
-        .eq('audits.client_id', targetClientId)
+      let query = supabase.from('audit_executions').select('*, audits!inner(*)')
+
+      if (targetClientId && targetClientId !== 'all') {
+        query = query.eq('audits.client_id', targetClientId)
+      }
 
       if (!isSuperAdmin) {
-        const authPlants = profile.authorized_plants || []
         if (authPlants.length > 0) {
           query = query.in('plant_id', authPlants)
         } else {
@@ -92,10 +119,20 @@ export default function AuditoriaDashboard() {
         }
       }
 
-      // Consulta única de Não Conformidades (tarefas originadas por auditorias)
-      let ncQuery = supabase
-        .from('tasks')
-        .select(`
+      // Consulta de Tipos e Status de chamados separadamente para evitar falhas silenciosas de inner joins
+      let typesQuery = supabase.from('task_types').select('id, name, client_id')
+
+      let statusesQuery = supabase
+        .from('task_statuses')
+        .select('id, name, is_terminal, color, client_id')
+
+      if (targetClientId && targetClientId !== 'all') {
+        typesQuery = typesQuery.eq('client_id', targetClientId)
+        statusesQuery = statusesQuery.eq('client_id', targetClientId)
+      }
+
+      // Consulta de Tarefas (Não Conformidades e demandas de auditoria)
+      let ncQuery = supabase.from('tasks').select(`
           id,
           task_number,
           title,
@@ -108,22 +145,15 @@ export default function AuditoriaDashboard() {
           approval_status,
           rejection_reason,
           status_id,
-          audit_id,
-          task_statuses (
-            id,
-            name,
-            is_terminal,
-            color
-          ),
-          task_types!inner (
-            id,
-            name
-          )
+          type_id,
+          audit_id
         `)
-        .eq('client_id', targetClientId)
+
+      if (targetClientId && targetClientId !== 'all') {
+        ncQuery = ncQuery.eq('client_id', targetClientId)
+      }
 
       if (!isSuperAdmin) {
-        const authPlants = profile.authorized_plants || []
         if (authPlants.length > 0) {
           ncQuery = ncQuery.in('plant_id', authPlants)
         } else {
@@ -131,15 +161,34 @@ export default function AuditoriaDashboard() {
         }
       }
 
-      const [execRes, ncRes] = await Promise.all([query, ncQuery])
+      const [execRes, ncRes, typesRes, statusesRes] = await Promise.all([
+        query,
+        ncQuery,
+        typesQuery,
+        statusesQuery,
+      ])
+
+      if (execRes.error) {
+        console.error('Erro ao consultar execuções de auditoria:', execRes.error)
+      }
+
+      if (ncRes.error) {
+        console.error('Erro ao consultar tarefas de Não Conformidade:', ncRes.error)
+        setNcError(ncRes.error.message || 'Falha ao buscar tarefas no banco de dados.')
+      } else {
+        setNcError(null)
+      }
 
       setExecutions(execRes.data || [])
       setNcTasks(ncRes.data || [])
+      setTaskTypes(typesRes.data || [])
+      setTaskStatuses(statusesRes.data || [])
       setLoading(false)
       setLoadingNc(false)
     }
+
     load()
-  }, [profile, activeClient, isSuperAdmin])
+  }, [profile, activeClient, selectedMasterClient, isSuperAdmin, isMaster, reloadTrigger])
 
   const filtered = useMemo(() => {
     return executions.filter((e) => {
@@ -183,29 +232,52 @@ export default function AuditoriaDashboard() {
     return { total, totalFinished, avgScore }
   }, [filtered])
 
+  // Mapa indexado de tipos e status para rápida resolução
+  const typesMap = useMemo(() => {
+    const map = new Map<string, any>()
+    taskTypes.forEach((t) => map.set(t.id, t))
+    return map
+  }, [taskTypes])
+
+  const statusesMap = useMemo(() => {
+    const map = new Map<string, any>()
+    taskStatuses.forEach((s) => map.set(s.id, s))
+    return map
+  }, [taskStatuses])
+
   // Indicadores de Não Conformidades (NCs)
   const ncKpis = useMemo(() => {
     const isNcType = (task: any) => {
-      const typeName = task.task_types?.name?.toLowerCase() || ''
-      const title = task.title?.toLowerCase() || ''
+      const typeObj = typesMap.get(task.type_id)
+      const typeName = (typeObj?.name || '').toLowerCase()
+      const title = (task.title || '').toLowerCase()
+
+      // Identifica se é Não Conformidade pelo tipo, título ou vínculo com auditoria
       return (
+        Boolean(task.audit_id) ||
         typeName.includes('não conformidade') ||
         typeName.includes('nao conformidade') ||
         typeName === 'nc' ||
         title.startsWith('não conformidade') ||
         title.startsWith('nao conformidade') ||
-        title.startsWith('nc:')
+        title.startsWith('nc:') ||
+        title.includes('[nc]')
       )
     }
 
+    const getStatusObj = (task: any) => {
+      return statusesMap.get(task.status_id) || null
+    }
+
     const isExcluded = (task: any) => {
-      const statusName = task.task_statuses?.name?.toLowerCase() || ''
+      const status = getStatusObj(task)
+      const statusName = (status?.name || '').toLowerCase()
       return statusName.includes('exclu')
     }
 
     const isResolvedOrTerminal = (task: any) => {
-      const status = task.task_statuses
-      const statusName = status?.name?.toLowerCase() || ''
+      const status = getStatusObj(task)
+      const statusName = (status?.name || '').toLowerCase()
       return (
         status?.is_terminal === true ||
         statusName.includes('finaliz') ||
@@ -243,10 +315,12 @@ export default function AuditoriaDashboard() {
 
     const parseDueDate = (dueDate: string | null | undefined): Date | null => {
       if (!dueDate) return null
-      if (typeof dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dueDate.trim())) {
-        return new Date(`${dueDate.trim()}T23:59:59`)
+      const trimmed = String(dueDate).trim()
+      // Se vier como YYYY-MM-DD puro, o fim do dia no horário de Brasília (UTC-3) ou local
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        return new Date(`${trimmed}T23:59:59.999-03:00`)
       }
-      return new Date(dueDate)
+      return new Date(trimmed)
     }
 
     const now = new Date()
@@ -258,11 +332,16 @@ export default function AuditoriaDashboard() {
     let emAtrasoCount = 0
 
     filteredNc.forEach((task) => {
+      const status = getStatusObj(task)
+      const statusName = (status?.name || '').toLowerCase()
       const isTerminal = isResolvedOrTerminal(task)
-      const statusName = task.task_statuses?.name?.toLowerCase() || ''
+
       const isAwaitingApproval =
-        statusName.includes('aguardando aprova') || task.approval_status === 'pending'
-      const isRejected = task.approval_status === 'rejected'
+        statusName.includes('aguardando aprova') ||
+        statusName.includes('fechamento') ||
+        task.approval_status === 'pending'
+
+      const isRejected = task.approval_status === 'rejected' || statusName.includes('reprovad')
 
       // 1. NCs Abertas: não resolvidas / não terminais
       if (!isTerminal) {
@@ -285,9 +364,9 @@ export default function AuditoriaDashboard() {
       }
 
       // 5. Em atraso: NCs abertas com due_date vencido (fuso Brasil, não contando concluídas/excluídas)
-      if (!isTerminal) {
+      if (!isTerminal && task.due_date) {
         const due = parseDueDate(task.due_date)
-        if (due && now > due) {
+        if (due && !isNaN(due.getTime()) && now.getTime() > due.getTime()) {
           emAtrasoCount++
         }
       }
@@ -301,7 +380,7 @@ export default function AuditoriaDashboard() {
       reprovadas: reprovadasCount,
       emAtraso: emAtrasoCount,
     }
-  }, [ncTasks, filterPlant, dateRange])
+  }, [ncTasks, filterPlant, dateRange, typesMap, statusesMap])
 
   const plantData = useMemo(() => {
     const groups: any = {}
@@ -438,22 +517,48 @@ export default function AuditoriaDashboard() {
                   Não Conformidades de Auditoria (NCs)
                 </h3>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-brand-deepBlue hover:bg-brand-deepBlue/10 gap-1 h-8"
-                onClick={() =>
-                  navigate(
-                    filterPlant !== 'all'
-                      ? `/gestao-tarefas?plant=${filterPlant}`
-                      : '/gestao-tarefas',
-                  )
-                }
-              >
-                Ver Painel de Chamados
-                <ExternalLink className="w-3.5 h-3.5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                {ncError && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-red-600 border-red-200 hover:bg-red-50 gap-1 h-8"
+                    onClick={() => setReloadTrigger((prev) => prev + 1)}
+                  >
+                    Tentar novamente
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-brand-deepBlue hover:bg-brand-deepBlue/10 gap-1 h-8"
+                  onClick={() =>
+                    navigate(
+                      filterPlant !== 'all'
+                        ? `/gestao-tarefas?plant=${filterPlant}`
+                        : '/gestao-tarefas',
+                    )
+                  }
+                >
+                  Ver Painel de Chamados
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
+
+            {ncError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
+                <span>Erro ao carregar indicadores de NC: {ncError}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-red-800 underline hover:bg-red-100 h-7"
+                  onClick={() => setReloadTrigger((prev) => prev + 1)}
+                >
+                  Recarregar
+                </Button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               {/* 1. NCs Abertas — neutro */}
