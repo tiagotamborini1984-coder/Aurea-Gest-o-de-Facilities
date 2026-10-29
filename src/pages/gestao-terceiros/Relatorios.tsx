@@ -72,9 +72,17 @@ export default function Relatorios() {
     const empsInPlants = employees.filter(
       (e) => selectedPlants.length === 0 || selectedPlants.includes(e.plant_id),
     )
-    const companies = new Set(empsInPlants.map((e) => e.company_name).filter(Boolean))
-    return Array.from(companies).sort()
-  }, [employees, selectedPlants])
+    const compSet = new Set<string>()
+    empsInPlants.forEach((e) => {
+      const name = e.company_name?.trim()
+      if (name) compSet.add(name)
+    })
+    companies.forEach((c) => {
+      const name = c.name?.trim()
+      if (name) compSet.add(name)
+    })
+    return Array.from(compSet).sort((a, b) => a.localeCompare(b))
+  }, [employees, selectedPlants, companies])
 
   const handleCompanyChange = (c: string, checked: boolean) => {
     if (selectedCompanies.length === 0) {
@@ -88,9 +96,42 @@ export default function Relatorios() {
   }
 
   const reportData = useMemo(() => {
-    const validLogs = logs.filter(
-      (l) => selectedPlants.length === 0 || selectedPlants.includes(l.plant_id),
-    )
+    // Normalização dos identificadores e nomes de empresas aceitos
+    const acceptedCompanyIdentifiers = new Set<string>()
+    if (selectedCompanies.length > 0) {
+      selectedCompanies.forEach((val) => {
+        acceptedCompanyIdentifiers.add(val)
+        const matchedComp = companies.find((c) => c.id === val || c.name === val)
+        if (matchedComp) {
+          if (matchedComp.id) acceptedCompanyIdentifiers.add(matchedComp.id)
+          if (matchedComp.name) acceptedCompanyIdentifiers.add(matchedComp.name)
+        }
+      })
+      employees.forEach((e) => {
+        if (
+          (e.company_id && acceptedCompanyIdentifiers.has(e.company_id)) ||
+          (e.company_name && acceptedCompanyIdentifiers.has(e.company_name))
+        ) {
+          if (e.company_id) acceptedCompanyIdentifiers.add(e.company_id)
+          if (e.company_name) acceptedCompanyIdentifiers.add(e.company_name)
+        }
+      })
+    }
+
+    const matchesCompany = (companyId?: string | null, companyName?: string | null): boolean => {
+      if (selectedCompanies.length === 0) return true
+      if (companyId && acceptedCompanyIdentifiers.has(companyId)) return true
+      if (companyName && acceptedCompanyIdentifiers.has(companyName)) return true
+      return false
+    }
+
+    const allowedPlantIds = new Set(plants.map((p) => p.id))
+    const effectiveSelectedPlants =
+      selectedPlants.length > 0
+        ? selectedPlants.filter((id) => allowedPlantIds.has(id))
+        : plants.map((p) => p.id)
+
+    const validLogs = logs.filter((l) => effectiveSelectedPlants.includes(l.plant_id))
     const validDates = new Set(validLogs.map((l) => l.date))
     const validDays = Math.max(1, validDates.size)
 
@@ -99,8 +140,8 @@ export default function Relatorios() {
     if (activeTab === 'colaborador') {
       const targets = employees.filter(
         (e) =>
-          (selectedPlants.length === 0 || selectedPlants.includes(e.plant_id)) &&
-          (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+          effectiveSelectedPlants.includes(e.plant_id) &&
+          matchesCompany(e.company_id, e.company_name),
       )
       result = targets.map((emp) => {
         const eLogs = validLogs.filter((l) => l.type === 'staff' && l.reference_id === emp.id)
@@ -119,16 +160,10 @@ export default function Relatorios() {
         }
       })
     } else if (activeTab === 'local') {
-      const targets = locations.filter(
-        (l) => selectedPlants.length === 0 || selectedPlants.includes(l.plant_id),
-      )
+      const targets = locations.filter((l) => effectiveSelectedPlants.includes(l.plant_id))
       result = targets.map((loc) => {
         const empIds = employees
-          .filter(
-            (e) =>
-              e.location_id === loc.id &&
-              (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
-          )
+          .filter((e) => e.location_id === loc.id && matchesCompany(e.company_id, e.company_name))
           .map((e) => e.id)
         const eLogs = validLogs.filter((l) => l.type === 'staff' && empIds.includes(l.reference_id))
         const pres = eLogs.filter((l) => l.status).length
@@ -136,7 +171,14 @@ export default function Relatorios() {
         const mPres = pres / validDays
         const mFaltas = faltas / validDays
         const cont = contracted
-          .filter((c) => c.location_id === loc.id && c.type === 'colaborador')
+          .filter((c) => {
+            if (c.location_id !== loc.id || c.type !== 'colaborador') return false
+            if (selectedCompanies.length > 0) {
+              if (!c.company_id) return false
+              if (!matchesCompany(c.company_id, null)) return false
+            }
+            return true
+          })
           .reduce((a, b) => a + b.quantity, 0)
         return {
           Entidade: loc.name,
@@ -148,16 +190,10 @@ export default function Relatorios() {
         }
       })
     } else if (activeTab === 'planta') {
-      const targets = plants.filter(
-        (p) => selectedPlants.length === 0 || selectedPlants.includes(p.id),
-      )
+      const targets = plants.filter((p) => effectiveSelectedPlants.includes(p.id))
       result = targets.map((p) => {
         const empIds = employees
-          .filter(
-            (e) =>
-              e.plant_id === p.id &&
-              (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
-          )
+          .filter((e) => e.plant_id === p.id && matchesCompany(e.company_id, e.company_name))
           .map((e) => e.id)
         const eLogs = validLogs.filter((l) => l.type === 'staff' && empIds.includes(l.reference_id))
         const pres = eLogs.filter((l) => l.status).length
@@ -165,7 +201,14 @@ export default function Relatorios() {
         const mPres = pres / validDays
         const mFaltas = faltas / validDays
         const cont = contracted
-          .filter((c) => c.plant_id === p.id && c.type === 'colaborador')
+          .filter((c) => {
+            if (c.plant_id !== p.id || c.type !== 'colaborador') return false
+            if (selectedCompanies.length > 0) {
+              if (!c.company_id) return false
+              if (!matchesCompany(c.company_id, null)) return false
+            }
+            return true
+          })
           .reduce((a, b) => a + b.quantity, 0)
         return {
           Entidade: p.name,
@@ -177,9 +220,7 @@ export default function Relatorios() {
         }
       })
     } else if (activeTab === 'equipamento') {
-      const targets = equipment.filter(
-        (e) => selectedPlants.length === 0 || selectedPlants.includes(e.plant_id),
-      )
+      const targets = equipment.filter((e) => effectiveSelectedPlants.includes(e.plant_id))
       result = targets.map((eq) => {
         const eLogs = validLogs.filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
         const pres = eLogs.filter((l) => l.status).length
@@ -204,8 +245,8 @@ export default function Relatorios() {
 
       const targets = employees.filter(
         (e) =>
-          (selectedPlants.length === 0 || selectedPlants.includes(e.plant_id)) &&
-          (selectedCompanies.length === 0 || selectedCompanies.includes(e.company_name)),
+          effectiveSelectedPlants.includes(e.plant_id) &&
+          matchesCompany(e.company_id, e.company_name),
       )
       const targetIds = targets.map((e) => e.id)
 
@@ -254,6 +295,7 @@ export default function Relatorios() {
     contracted,
     employeeTrainingRecords,
     trainings,
+    companies,
   ])
 
   // Hook auxiliar para exportação CSV dos dados por cargo
@@ -262,8 +304,10 @@ export default function Relatorios() {
     contracted,
     functions,
     plants,
+    companies,
     selectedPlants,
     selectedFunctionId: 'all',
+    selectedCompanies,
     dateFrom: cargoDateFrom,
     dateTo: cargoDateTo,
   })
@@ -342,140 +386,56 @@ export default function Relatorios() {
         </p>
       </div>
 
-      {activeTab !== 'cargo' && (
-        <Card className="shadow-sm border-gray-100 overflow-hidden print:hidden">
-          <CardContent className="p-6 space-y-6 bg-white">
-            {activeTab !== 'treinamentos' && (
-              <div className="flex flex-wrap gap-6">
-                <div className="space-y-1.5">
-                  <Label
-                    className="text-xs text-slate-700 uppercase font-bold tracking-wider"
-                    translate="no"
-                  >
-                    Data Inicial
-                  </Label>
-                  <Input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-[160px] h-10 border-slate-200"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    className="text-xs text-slate-700 uppercase font-bold tracking-wider"
-                    translate="no"
-                  >
-                    Data Final
-                  </Label>
-                  <Input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="w-[160px] h-10 border-slate-200"
-                  />
-                </div>
+      {/* Bloco de Filtros Globais unificado (compartilhado e sincronizado entre todas as abas) */}
+      <Card className="shadow-sm border-gray-100 overflow-hidden print:hidden">
+        <CardContent className="p-6 space-y-6 bg-white">
+          {activeTab !== 'treinamentos' && activeTab !== 'cargo' && (
+            <div className="flex flex-wrap gap-6">
+              <div className="space-y-1.5">
+                <Label
+                  className="text-xs text-slate-700 uppercase font-bold tracking-wider"
+                  translate="no"
+                >
+                  Data Inicial
+                </Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-[160px] h-10 border-slate-200"
+                />
               </div>
-            )}
-
-            <div className="space-y-3">
-              <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
-                Filtrar por Planta (múltipla seleção)
-              </Label>
-              <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
-                {plants.map((p) => (
-                  <div key={p.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`plant-${p.id}`}
-                      checked={selectedPlants.includes(p.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) setSelectedPlants([...selectedPlants, p.id])
-                        else setSelectedPlants(selectedPlants.filter((id) => id !== p.id))
-                      }}
-                      className="w-5 h-5 rounded border-slate-300"
-                    />
-                    <Label
-                      htmlFor={`plant-${p.id}`}
-                      className="font-medium cursor-pointer text-sm text-slate-800"
-                    >
-                      {p.name}
-                    </Label>
-                  </div>
-                ))}
-                {plants.length === 0 && (
-                  <span className="text-sm text-slate-600">Nenhuma planta cadastrada.</span>
-                )}
+              <div className="space-y-1.5">
+                <Label
+                  className="text-xs text-slate-700 uppercase font-bold tracking-wider"
+                  translate="no"
+                >
+                  Data Final
+                </Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-[160px] h-10 border-slate-200"
+                />
               </div>
             </div>
+          )}
 
-            {activeTab !== 'equipamento' && availableCompanies.length > 0 && (
-              <>
-                <div className="h-px bg-slate-100 my-4" />
-                <div className="space-y-3">
-                  <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
-                    Filtrar por Empresa (múltipla seleção)
-                  </Label>
-                  <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="all-companies-report"
-                        checked={
-                          selectedCompanies.length === 0 ||
-                          selectedCompanies.length === availableCompanies.length
-                        }
-                        onCheckedChange={() => setSelectedCompanies([])}
-                        className="w-5 h-5 rounded border-slate-300"
-                      />
-                      <Label
-                        htmlFor="all-companies-report"
-                        className="font-medium cursor-pointer text-sm text-slate-800"
-                      >
-                        Todas as empresas
-                      </Label>
-                    </div>
-                    {availableCompanies.map((c: any) => (
-                      <div key={c} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`company-${c}`}
-                          checked={
-                            selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
-                          }
-                          onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
-                          className="w-5 h-5 rounded border-slate-300"
-                        />
-                        <Label
-                          htmlFor={`company-${c}`}
-                          className="font-medium cursor-pointer text-sm text-slate-700"
-                        >
-                          {c}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Para a aba por cargo, mantemos a seleção de plantas disponível no topo se necessário */}
-      {activeTab === 'cargo' && (
-        <Card className="shadow-sm border-gray-100 overflow-hidden print:hidden">
-          <CardContent className="p-5 space-y-3 bg-white">
+          <div className="space-y-3">
             <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
               Filtrar por Planta (múltipla seleção)
             </Label>
             <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id="all-plants-cargo"
+                  id="all-plants-report"
                   checked={selectedPlants.length === 0}
                   onCheckedChange={() => setSelectedPlants([])}
                   className="w-5 h-5 rounded border-slate-300"
                 />
                 <Label
-                  htmlFor="all-plants-cargo"
+                  htmlFor="all-plants-report"
                   className="font-medium cursor-pointer text-sm text-slate-800"
                 >
                   Todas as Plantas
@@ -484,7 +444,7 @@ export default function Relatorios() {
               {plants.map((p) => (
                 <div key={p.id} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`cargo-plant-${p.id}`}
+                    id={`plant-${p.id}`}
                     checked={selectedPlants.includes(p.id)}
                     onCheckedChange={(checked) => {
                       if (checked) setSelectedPlants([...selectedPlants, p.id])
@@ -493,17 +453,68 @@ export default function Relatorios() {
                     className="w-5 h-5 rounded border-slate-300"
                   />
                   <Label
-                    htmlFor={`cargo-plant-${p.id}`}
+                    htmlFor={`plant-${p.id}`}
                     className="font-medium cursor-pointer text-sm text-slate-800"
                   >
                     {p.name}
                   </Label>
                 </div>
               ))}
+              {plants.length === 0 && (
+                <span className="text-sm text-slate-600">Nenhuma planta cadastrada.</span>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          {activeTab !== 'equipamento' && availableCompanies.length > 0 && (
+            <>
+              <div className="h-px bg-slate-100 my-4" />
+              <div className="space-y-3">
+                <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
+                  Filtrar por Empresa (múltipla seleção)
+                </Label>
+                <div className="flex flex-wrap gap-5 p-4 bg-slate-50 rounded-xl border border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="all-companies-report"
+                      checked={
+                        selectedCompanies.length === 0 ||
+                        selectedCompanies.length === availableCompanies.length
+                      }
+                      onCheckedChange={() => setSelectedCompanies([])}
+                      className="w-5 h-5 rounded border-slate-300"
+                    />
+                    <Label
+                      htmlFor="all-companies-report"
+                      className="font-medium cursor-pointer text-sm text-slate-800"
+                    >
+                      Todas as empresas
+                    </Label>
+                  </div>
+                  {availableCompanies.map((c: any) => (
+                    <div key={c} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`company-${c}`}
+                        checked={
+                          selectedCompanies.length === 0 ? true : selectedCompanies.includes(c)
+                        }
+                        onCheckedChange={(checked) => handleCompanyChange(c, checked as boolean)}
+                        className="w-5 h-5 rounded border-slate-300"
+                      />
+                      <Label
+                        htmlFor={`company-${c}`}
+                        className="font-medium cursor-pointer text-sm text-slate-700"
+                      >
+                        {c}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
@@ -579,6 +590,9 @@ export default function Relatorios() {
           plants={plants}
           companies={companies}
           selectedPlants={selectedPlants}
+          selectedCompanies={selectedCompanies}
+          onCompanyChange={handleCompanyChange}
+          onClearCompanies={() => setSelectedCompanies([])}
           dateFrom={cargoDateFrom}
           dateTo={cargoDateTo}
           onDateFromChange={setCargoDateFrom}

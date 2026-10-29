@@ -62,9 +62,11 @@ interface ComputeParams {
   contracted: any[]
   functions: any[]
   plants: any[]
+  companies?: any[]
   selectedPlants: string[]
   selectedFunctionId: string // 'all' ou ID específico
-  selectedCompanyId?: string // 'all' ou ID/nome
+  selectedCompanyId?: string // 'all' ou ID/nome ou array/set
+  selectedCompanies?: string[] // suporte explícito a múltiplos nomes/IDs de empresas
   dateFrom: string // 'YYYY-MM-DD'
   dateTo: string // 'YYYY-MM-DD'
   groupByPlant?: boolean // se verdadeiro, calcula métricas por cargo + planta individualmente
@@ -90,9 +92,11 @@ export function useCargoCalculations({
   contracted,
   functions,
   plants,
+  companies = [],
   selectedPlants,
   selectedFunctionId,
   selectedCompanyId,
+  selectedCompanies,
   dateFrom,
   dateTo,
   groupByPlant = false,
@@ -124,19 +128,71 @@ export function useCargoCalculations({
     const monthLabels = validMonths.map((d) => format(d, 'MMM/yyyy', { locale: ptBR }))
 
     // Plantas válidas
-    const validPlantIds = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
+    // Assegura que validPlantIds contenha apenas plantas autorizadas (interseção com plants disponíveis)
+    const allowedPlantIds = new Set(plants.map((p) => p.id))
+    const validPlantIds =
+      selectedPlants.length > 0
+        ? selectedPlants.filter((id) => allowedPlantIds.has(id))
+        : plants.map((p) => p.id)
     const plantMap = new Map<string, string>(plants.map((p) => [p.id, p.name]))
     const functionMap = new Map<string, any>(functions.map((f) => [f.id, f]))
+
+    // Normalização e consolidação das empresas selecionadas (suporta selectedCompanyId singular e/ou selectedCompanies lista)
+    const activeSelectedCompanies: string[] = []
+    if (selectedCompanies && selectedCompanies.length > 0) {
+      activeSelectedCompanies.push(...selectedCompanies)
+    } else if (selectedCompanyId && selectedCompanyId !== 'all') {
+      activeSelectedCompanies.push(selectedCompanyId)
+    }
+
+    // Conjunto de identificadores de empresas aceitas: aceita tanto company_id (UUID) quanto company_name
+    const acceptedCompanyIdentifiers = new Set<string>()
+    const acceptedCompanyIds = new Set<string>()
+
+    if (activeSelectedCompanies.length > 0) {
+      activeSelectedCompanies.forEach((val) => {
+        acceptedCompanyIdentifiers.add(val)
+        // Se for id de company, adiciona seu nome e seu id
+        const matchedComp = companies.find((c) => c.id === val || c.name === val)
+        if (matchedComp) {
+          if (matchedComp.id) {
+            acceptedCompanyIdentifiers.add(matchedComp.id)
+            acceptedCompanyIds.add(matchedComp.id)
+          }
+          if (matchedComp.name) {
+            acceptedCompanyIdentifiers.add(matchedComp.name)
+          }
+        }
+      })
+
+      // Mapeia também pelos employees conhecidos
+      employees.forEach((e) => {
+        if (
+          (e.company_id && acceptedCompanyIdentifiers.has(e.company_id)) ||
+          (e.company_name && acceptedCompanyIdentifiers.has(e.company_name))
+        ) {
+          if (e.company_id) {
+            acceptedCompanyIdentifiers.add(e.company_id)
+            acceptedCompanyIds.add(e.company_id)
+          }
+          if (e.company_name) {
+            acceptedCompanyIdentifiers.add(e.company_name)
+          }
+        }
+      })
+    }
+
+    const matchesCompany = (companyId?: string | null, companyName?: string | null): boolean => {
+      if (activeSelectedCompanies.length === 0) return true
+      if (companyId && acceptedCompanyIdentifiers.has(companyId)) return true
+      if (companyName && acceptedCompanyIdentifiers.has(companyName)) return true
+      return false
+    }
 
     // Filtra colaboradores de acordo com as plantas e empresa
     const scopedEmployees = employees.filter((emp) => {
       if (!emp.plant_id || !validPlantIds.includes(emp.plant_id)) return false
-      if (
-        selectedCompanyId &&
-        selectedCompanyId !== 'all' &&
-        emp.company_id !== selectedCompanyId &&
-        emp.company_name !== selectedCompanyId
-      ) {
+      if (!matchesCompany(emp.company_id, emp.company_name)) {
         return false
       }
       return true
@@ -218,11 +274,23 @@ export function useCargoCalculations({
       if (cDate > group.lastCreated) group.lastCreated = cDate
     })
 
-    // Indexa contracted_headcount para consulta rápida:
+    // Filtra contracted_headcount respeitando empresa (quando selecionada)
+    // Se empresa estiver filtrada: se c.company_id existir, checa matchesCompany(c.company_id, ...).
+    // Se o registro contracted_headcount não tiver company_id, só incluímos se nenhuma empresa estiver filtrada.
+    const scopedContracted = contracted.filter((c) => {
+      if (c.type !== 'colaborador' || !c.function_id) return false
+      if (c.plant_id && !validPlantIds.includes(c.plant_id)) return false
+      if (activeSelectedCompanies.length > 0) {
+        if (!c.company_id) return false
+        if (!matchesCompany(c.company_id, null)) return false
+      }
+      return true
+    })
+
+    // Indexa contracted_headcount filtrado para consulta rápida:
     // Chave: `${functionId}_${plantId}_${monthKey}` ou cascata para mês anterior
     const contractedByCargoPlantMonth = new Map<string, number>()
-    contracted.forEach((c) => {
-      if (c.type !== 'colaborador' || !c.function_id) return
+    scopedContracted.forEach((c) => {
       const mKey = (c.reference_month || '').substring(0, 7)
       const key = `${c.function_id}_${c.plant_id}_${mKey}`
       contractedByCargoPlantMonth.set(
@@ -239,11 +307,10 @@ export function useCargoCalculations({
         if (contractedByCargoPlantMonth.has(key)) {
           return contractedByCargoPlantMonth.get(key) || 0
         }
-        // Fallback: busca mês mais próximo anterior para essa planta/cargo
-        const matches = contracted
+        // Fallback: busca mês mais próximo anterior para essa planta/cargo dentro de scopedContracted
+        const matches = scopedContracted
           .filter(
             (c) =>
-              c.type === 'colaborador' &&
               c.function_id === fId &&
               c.plant_id === pId &&
               (c.reference_month || '').substring(0, 7) <= (mKey || ''),
@@ -251,10 +318,9 @@ export function useCargoCalculations({
           .sort((a, b) => (b.reference_month || '').localeCompare(a.reference_month || ''))
         if (matches.length > 0) {
           const bestMonth = (matches[0].reference_month || '').substring(0, 7)
-          return contracted
+          return scopedContracted
             .filter(
               (c) =>
-                c.type === 'colaborador' &&
                 c.function_id === fId &&
                 c.plant_id === pId &&
                 (c.reference_month || '').substring(0, 7) === bestMonth,
@@ -551,9 +617,11 @@ export function useCargoCalculations({
     contracted,
     functions,
     plants,
+    companies,
     selectedPlants,
     selectedFunctionId,
     selectedCompanyId,
+    selectedCompanies,
     dateFrom,
     dateTo,
     groupByPlant,

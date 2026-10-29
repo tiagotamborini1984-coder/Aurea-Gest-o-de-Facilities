@@ -54,6 +54,9 @@ interface RelatorioCargosProps {
   plants: any[]
   companies: any[]
   selectedPlants: string[]
+  selectedCompanies?: string[]
+  onCompanyChange?: (c: string, checked: boolean) => void
+  onClearCompanies?: () => void
   dateFrom: string
   dateTo: string
   onDateFromChange: (val: string) => void
@@ -67,13 +70,15 @@ export default function RelatorioCargos({
   plants,
   companies,
   selectedPlants,
+  selectedCompanies = [],
+  onCompanyChange,
+  onClearCompanies,
   dateFrom,
   dateTo,
   onDateFromChange,
   onDateToChange,
 }: RelatorioCargosProps) {
   const [selectedFunctionId, setSelectedFunctionId] = useState<string>('all')
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all')
   const [expandedCargoId, setExpandedCargoId] = useState<string | null>(null)
   const [showCharts, setShowCharts] = useState<boolean>(true)
   const [filterOnlyBelow, setFilterOnlyBelow] = useState<boolean>(false)
@@ -84,9 +89,10 @@ export default function RelatorioCargos({
     contracted,
     functions,
     plants,
+    companies,
     selectedPlants,
     selectedFunctionId,
-    selectedCompanyId,
+    selectedCompanies,
     dateFrom,
     dateTo,
   })
@@ -299,14 +305,42 @@ export default function RelatorioCargos({
               <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
                 Empresa Parceira
               </Label>
-              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+              <Select
+                value={
+                  selectedCompanies.length === 1
+                    ? selectedCompanies[0]
+                    : selectedCompanies.length === 0
+                      ? 'all'
+                      : 'multiple'
+                }
+                onValueChange={(val) => {
+                  if (val === 'all') {
+                    if (onClearCompanies) onClearCompanies()
+                  } else if (onCompanyChange) {
+                    // Seleciona exclusivamente essa empresa
+                    if (onClearCompanies) onClearCompanies()
+                    onCompanyChange(val, true)
+                  }
+                }}
+              >
                 <SelectTrigger className="h-10 border-slate-200">
-                  <SelectValue placeholder="Todas as Empresas" />
+                  <SelectValue placeholder="Todas as Empresas">
+                    {selectedCompanies.length === 0
+                      ? 'Todas as Empresas'
+                      : selectedCompanies.length === 1
+                        ? selectedCompanies[0]
+                        : `${selectedCompanies.length} empresas selecionadas`}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as Empresas</SelectItem>
+                  {selectedCompanies.length > 1 && (
+                    <SelectItem value="multiple" disabled>
+                      {selectedCompanies.length} selecionadas no painel
+                    </SelectItem>
+                  )}
                   {companies.map((c) => (
-                    <SelectItem key={c.id || c.name} value={c.id || c.name}>
+                    <SelectItem key={c.id || c.name} value={c.name || c.id}>
                       {c.name}
                     </SelectItem>
                   ))}
