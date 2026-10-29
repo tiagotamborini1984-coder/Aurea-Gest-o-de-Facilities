@@ -64,21 +64,66 @@ export default function Relatorios() {
   } = useMasterData()
 
   useEffect(() => {
+    let isCancelled = false
+
     const fetchLogs = async () => {
       setLoading(true)
-      let query = supabase.from('daily_logs').select('*').gte('date', dateFrom).lte('date', dateTo)
 
-      if (profile?.role === 'Master' && selectedMasterClient !== 'all') {
-        query = query.eq('client_id', selectedMasterClient)
-      } else if (profile?.role !== 'Master' && profile?.client_id) {
-        query = query.eq('client_id', profile.client_id)
+      const allRows: any[] = []
+      const pageSize = 1000
+      let page = 0
+      let hasMore = true
+
+      while (hasMore && !isCancelled) {
+        const start = page * pageSize
+        const end = start + pageSize - 1
+
+        let query = supabase
+          .from('daily_logs')
+          .select('*')
+          .gte('date', dateFrom)
+          .lte('date', dateTo)
+          .order('date', { ascending: true })
+          .order('created_at', { ascending: false })
+          .range(start, end)
+
+        if (profile?.role === 'Master' && selectedMasterClient !== 'all') {
+          query = query.eq('client_id', selectedMasterClient)
+        } else if (profile?.role !== 'Master' && profile?.client_id) {
+          query = query.eq('client_id', profile.client_id)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          console.error('Erro ao buscar daily_logs em Relatórios:', error.message)
+          hasMore = false
+          break
+        }
+
+        if (data && data.length > 0) {
+          allRows.push(...data)
+          page++
+        }
+
+        if (!data || data.length < pageSize) {
+          hasMore = false
+        }
       }
 
-      const { data } = await query
-      setLogs(data || [])
-      setLoading(false)
+      if (!isCancelled) {
+        setLogs(allRows)
+        setLoading(false)
+      }
     }
-    if (plants.length > 0 && activeTab !== 'treinamentos' && activeTab !== 'cargo') fetchLogs()
+
+    if (plants.length > 0 && activeTab !== 'treinamentos' && activeTab !== 'cargo') {
+      fetchLogs()
+    }
+
+    return () => {
+      isCancelled = true
+    }
   }, [dateFrom, dateTo, plants, activeTab, profile, selectedMasterClient])
 
   const availableCompanies = useMemo(() => {

@@ -545,4 +545,166 @@ describe('colaborador-calculations for Relatórios', () => {
     expect(row['Média Presenças']).toBeCloseTo(3 / 5, 4)
     expect(row['Média Faltas']).toBeCloseTo(2 / 5, 4)
   })
+
+  it('cenário Sorriso Abraham: consolida todas as 19 presenças e 2 faltas de Abraham em 21 dias lançados no período 01/10 a 29/10/2026', () => {
+    // 4 versões históricas de Abraham Jose Marino
+    const employees = [
+      {
+        id: 'emp-abr-1',
+        name: 'Abraham Jose Marino',
+        registration_number: 'REG-00001',
+        plant_id: 'plant-sorriso',
+        company_id: 'comp-azul',
+        company_name: 'Azul Serviços',
+        status: 'Ativo',
+        reference_month: '2026-04-01',
+        created_at: '2026-05-05T19:35:37.293Z',
+      },
+      {
+        id: 'emp-abr-2',
+        name: 'Abraham Jose Marino',
+        registration_number: 'REG-00001',
+        plant_id: 'plant-sorriso',
+        company_id: 'comp-azul',
+        company_name: 'Azul Serviços',
+        status: 'Ativo',
+        reference_month: '2026-05-01',
+        created_at: '2026-03-16T18:03:39.898Z',
+      },
+      {
+        id: 'emp-abr-3',
+        name: 'Abraham Jose Marino',
+        registration_number: 'REG-00001',
+        plant_id: 'plant-sorriso',
+        company_id: 'comp-azul',
+        company_name: 'Azul Serviços',
+        status: 'Ativo',
+        reference_month: '2026-06-01',
+        created_at: '2026-06-01T13:01:05.603Z',
+      },
+      {
+        id: 'emp-abr-4',
+        name: 'Abraham Jose Marino',
+        registration_number: 'REG-00001',
+        plant_id: 'plant-sorriso',
+        company_id: 'comp-azul',
+        company_name: 'Azul Serviços',
+        status: 'Ativo',
+        reference_month: '2026-07-01',
+        created_at: '2026-07-01T12:53:55.027Z',
+      },
+    ]
+
+    // 21 dias de lançamentos em outubro de 2026 (19 presenças e 2 faltas nos dias 01 e 29)
+    const dates = [
+      { date: '2026-10-01', status: false },
+      { date: '2026-10-03', status: true },
+      { date: '2026-10-05', status: true },
+      { date: '2026-10-06', status: true },
+      { date: '2026-10-09', status: true },
+      { date: '2026-10-10', status: true },
+      { date: '2026-10-13', status: true },
+      { date: '2026-10-14', status: true },
+      { date: '2026-10-15', status: true },
+      { date: '2026-10-16', status: true },
+      { date: '2026-10-17', status: true },
+      { date: '2026-10-19', status: true },
+      { date: '2026-10-20', status: true },
+      { date: '2026-10-21', status: true },
+      { date: '2026-10-22', status: true },
+      { date: '2026-10-23', status: true },
+      { date: '2026-10-24', status: true },
+      { date: '2026-10-26', status: true },
+      { date: '2026-10-27', status: true },
+      { date: '2026-10-28', status: true },
+      { date: '2026-10-29', status: false },
+    ]
+
+    const logs = dates.map((d, index) => ({
+      id: `log-abr-${index}`,
+      reference_id: 'emp-abr-4',
+      plant_id: 'plant-sorriso',
+      type: 'staff',
+      date: d.date,
+      status: d.status,
+      created_at: `${d.date}T14:00:00Z`,
+    }))
+
+    const result = calculateColaboradorReport({
+      employees,
+      logs,
+      plants: [{ id: 'plant-sorriso', name: 'SMT - SORRISO' }],
+      effectiveSelectedPlants: ['plant-sorriso'],
+      matchesCompany: () => true,
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-29',
+    })
+
+    expect(result).toHaveLength(1)
+    const abraham = result[0]
+    expect(abraham.Entidade).toBe('Abraham Jose Marino')
+    expect(abraham.plantId).toBe('plant-sorriso')
+    expect(abraham.plantName).toBe('SMT - SORRISO')
+    // Dias Lançados deve ser exatamente 19 (presenças) e NÃO 2
+    expect(abraham.loggedDays).toBe(19)
+    expect(abraham.presencasCount).toBe(19)
+    expect(abraham['Total Faltas']).toBe(2)
+    // Presenças + Faltas = 19 + 2 = 21 dias registrados
+    expect(abraham.loggedDays + abraham['Total Faltas']).toBe(21)
+    expect(abraham['Média Presenças']).toBeCloseTo(19 / 21, 4)
+    expect(abraham['Média Faltas']).toBeCloseTo(2 / 21, 4)
+    expect(abraham['Taxa Presença']).toBeCloseTo((19 / 21) * 100, 2)
+    expect(abraham.Absenteísmo).toBeCloseTo((2 / 21) * 100, 2)
+    expect(abraham.absenceDates).toEqual(['2026-10-01', '2026-10-29'])
+  })
+
+  it('desempate no mesmo dia: retificação de falta para presença no mesmo dia prevalece pelo timestamp mais recente', () => {
+    const employees = [
+      {
+        id: 'emp-retif',
+        name: 'Carlos Retificado',
+        registration_number: 'REG-9900',
+        plant_id: 'plant-sorriso',
+        status: 'Ativo',
+      },
+    ]
+
+    const logs = [
+      {
+        id: 'log-old-falta',
+        reference_id: 'emp-retif',
+        plant_id: 'plant-sorriso',
+        type: 'staff',
+        date: '2026-10-15',
+        status: false,
+        created_at: '2026-10-15T08:00:00.000Z',
+      },
+      {
+        id: 'log-new-presenca',
+        reference_id: 'emp-retif',
+        plant_id: 'plant-sorriso',
+        type: 'staff',
+        date: '2026-10-15',
+        status: true,
+        created_at: '2026-10-15T16:30:00.000Z',
+      },
+    ]
+
+    const result = calculateColaboradorReport({
+      employees,
+      logs,
+      plants: [{ id: 'plant-sorriso', name: 'SMT - SORRISO' }],
+      effectiveSelectedPlants: ['plant-sorriso'],
+      matchesCompany: () => true,
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-29',
+    })
+
+    expect(result).toHaveLength(1)
+    expect(result[0].loggedDays).toBe(1)
+    expect(result[0].presencasCount).toBe(1)
+    expect(result[0]['Total Faltas']).toBe(0)
+    expect(result[0]['Média Presenças']).toBe(1)
+    expect(result[0].absenceDates).toEqual([])
+  })
 })

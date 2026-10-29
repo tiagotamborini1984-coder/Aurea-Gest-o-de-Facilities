@@ -181,9 +181,17 @@ export function calculateColaboradorReport({
     // Deduplicação de registros no mesmo dia: ordenação por created_at DESC (timestamp real)
     // para que o lançamento mais recente prevaleça em caso de retificação
     const sortedLogs = [...plantLogs].sort((a, b) => {
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
-      if (timeB !== timeA) return timeB - timeA
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : NaN
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : NaN
+      const validB = !Number.isNaN(timeB)
+      const validA = !Number.isNaN(timeA)
+
+      if (validB && validA && timeB !== timeA) {
+        return timeB - timeA
+      }
+      if (validB && !validA) return -1
+      if (!validB && validA) return 1
+
       return (b.id || '').localeCompare(a.id || '')
     })
 
