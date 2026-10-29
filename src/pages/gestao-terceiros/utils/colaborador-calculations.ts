@@ -199,17 +199,22 @@ export function calculateColaboradorReport({
 
     const dedupedLogs = Array.from(dateLogsMap.values())
 
-    // Regra v0.0.1799: Dias sem lançamento NÃO contam como ausência (a média e total de faltas usam apenas os dias efetivamente registrados)
-    // "Dias Lançados" conta exatamente os dias distintos em que o colaborador tem registro no período/filtros aplicados
-    const loggedDays = dedupedLogs.length
-    const pres = dedupedLogs.filter((l) => isPresentLog(l)).length
-    // Garantia matemática: Total Faltas + Total Presenças = Dias Lançados
-    const faltas = loggedDays - pres
-    const mPres = loggedDays > 0 ? pres / loggedDays : 0
-    const mFaltas = loggedDays > 0 ? faltas / loggedDays : 0
+    // Regra v0.0.1799–0.0.1803:
+    // "Dias Lançados" = somatória de dias distintos no período selecionado em que o colaborador teve registro de PRESENÇA.
+    // "Total Faltas" = somatória de dias distintos no período selecionado em que o colaborador teve registro de FALTA.
+    // Cada coluna conta os dias da sua própria natureza após a deduplicação diária (preservando o log mais recente por timestamp).
+    // Dias sem nenhum lançamento não contam como falta nem presença.
+    const distinctLoggedDays = dedupedLogs.length
+    const presencas = dedupedLogs.filter((l) => isPresentLog(l)).length
+    const faltas = dedupedLogs.filter((l) => !isPresentLog(l)).length
+    // "Dias Lançados" agora reflete a somatória de presenças no período selecionado
+    const loggedDays = presencas
+
+    const mPres = distinctLoggedDays > 0 ? presencas / distinctLoggedDays : 0
+    const mFaltas = distinctLoggedDays > 0 ? faltas / distinctLoggedDays : 0
     const cont = 1
-    const taxaPresenca = loggedDays > 0 ? (pres / loggedDays) * 100 : 0
-    const absenteismo = loggedDays > 0 ? (faltas / loggedDays) * 100 : 0
+    const taxaPresenca = distinctLoggedDays > 0 ? (presencas / distinctLoggedDays) * 100 : 0
+    const absenteismo = distinctLoggedDays > 0 ? (faltas / distinctLoggedDays) * 100 : 0
 
     const absenceDates = dedupedLogs
       .filter((l) => !isPresentLog(l))
@@ -229,7 +234,7 @@ export function calculateColaboradorReport({
       'Taxa Presença': taxaPresenca,
       Absenteísmo: absenteismo,
       loggedDays,
-      presencasCount: pres,
+      presencasCount: presencas,
       absenceDates,
     })
   })

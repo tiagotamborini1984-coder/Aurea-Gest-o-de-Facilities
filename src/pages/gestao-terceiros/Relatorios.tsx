@@ -840,8 +840,8 @@ export default function Relatorios() {
                                   </span>
                                 </div>
                                 <span className="text-xs text-slate-500">
-                                  {row.loggedDays} dias registrados no período ({row.presencasCount}{' '}
-                                  presenças, {row['Total Faltas']} faltas)
+                                  {row.loggedDays} dias de presença e {row['Total Faltas']} faltas
+                                  registradas no período
                                 </span>
                               </div>
 
@@ -869,8 +869,7 @@ export default function Relatorios() {
                               ) : (
                                 <p className="text-xs text-emerald-700 font-semibold bg-emerald-50 p-2.5 rounded border border-emerald-100">
                                   Nenhuma falta registrada no período. Média composta por{' '}
-                                  {row.presencasCount} presenças em {row.loggedDays} dias lançados
-                                  (100% de presença).
+                                  {row.loggedDays} presença(s) lançada(s) (100% de presença).
                                 </p>
                               )}
                             </div>

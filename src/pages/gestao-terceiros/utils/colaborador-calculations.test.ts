@@ -61,8 +61,10 @@ describe('colaborador-calculations for Relatórios', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0].Entidade).toBe('João da Silva')
-    expect(result[0].loggedDays).toBe(2)
+    // Nova semântica: Dias Lançados = somatória de dias de presença (1)
+    expect(result[0].loggedDays).toBe(1)
     expect(result[0].presencasCount).toBe(1)
+    // Total Faltas = somatória de dias de faltas (1)
     expect(result[0]['Total Faltas']).toBe(1)
     expect(result[0]['Média Presenças']).toBeCloseTo(0.5, 4)
     expect(result[0]['Média Faltas']).toBeCloseTo(0.5, 4)
@@ -115,7 +117,7 @@ describe('colaborador-calculations for Relatórios', () => {
     })
 
     expect(result).toHaveLength(1)
-    // loggedDays = 2, ambos presença -> Média Presença = 1.0 (100%), Faltas = 0
+    // loggedDays = 2 presenças -> Média Presença = 1.0 (100%), Faltas = 0
     expect(result[0].loggedDays).toBe(2)
     expect(result[0]['Média Presenças']).toBe(1)
     expect(result[0]['Média Faltas']).toBe(0)
@@ -326,9 +328,9 @@ describe('colaborador-calculations for Relatórios', () => {
     expect(result).toHaveLength(1)
     const row = result[0]
     expect(row.Entidade).toBe('Josias Silva Cerqueira')
-    // Dias lançados deve ser exatamente 2 (2026-06-16 e 2026-06-17), NÃO 3 logs
+    // No dia 16 venceu o log-2 (status: true), no dia 17 log-3 (status: true)
+    // Dias Lançados = somatória de dias com presença = 2
     expect(row.loggedDays).toBe(2)
-    // No dia 16 venceu o log-2 (status: true)
     expect(row.presencasCount).toBe(2)
     expect(row['Total Faltas']).toBe(0)
     expect(row['Média Presenças']).toBe(1)
@@ -393,8 +395,10 @@ describe('colaborador-calculations for Relatórios', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0].Entidade).toBe('Maria Antonieta')
-    expect(result[0].loggedDays).toBe(2)
+    // Dias Lançados = somatória de dias de presença (1 no dia 2026-05-10)
+    expect(result[0].loggedDays).toBe(1)
     expect(result[0].presencasCount).toBe(1)
+    // Total Faltas = somatória de dias de faltas (1 no dia 2026-05-11)
     expect(result[0]['Total Faltas']).toBe(1)
     expect(result[0]['Média Presenças']).toBeCloseTo(0.5, 4)
     expect(result[0].absenceDates).toEqual(['2026-05-11'])
@@ -411,7 +415,7 @@ describe('colaborador-calculations for Relatórios', () => {
     ]
 
     // Período de 30 dias (2026-05-01 a 2026-05-30), mas o colaborador teve apenas 3 dias com lançamento:
-    // 2 dias presença, 1 dia falta
+    // 2 dias presença (2026-05-02 e 2026-05-04), 1 dia falta (2026-05-03)
     const logs = [
       {
         id: 'l1',
@@ -454,15 +458,91 @@ describe('colaborador-calculations for Relatórios', () => {
 
     expect(result).toHaveLength(1)
     const row = result[0]
-    expect(row.loggedDays).toBe(3)
+    // Nova regra exata do usuário:
+    // "Dias Lançados deve ser igual a somatória que o colaborador teve presença no período selecionado" -> 2
+    // "Total Faltas deve ser a somatório de dias que o colaborador teve de faltas no período." -> 1
+    expect(row.loggedDays).toBe(2)
     expect(row.presencasCount).toBe(2)
     expect(row['Total Faltas']).toBe(1)
-    // Presenças (2) + Faltas (1) = Dias Lançados (3)
-    expect(row.presencasCount + row['Total Faltas']).toBe(row.loggedDays)
+    // Total de dias avaliados na média = 2 + 1 = 3 dias registrados
     expect(row['Média Presenças']).toBeCloseTo(2 / 3, 4)
     expect(row['Média Faltas']).toBeCloseTo(1 / 3, 4)
     expect(row['Taxa Presença']).toBeCloseTo((2 / 3) * 100, 2)
     expect(row.Absenteísmo).toBeCloseTo((1 / 3) * 100, 2)
     expect(row.absenceDates).toEqual(['2026-05-03'])
+  })
+
+  it('demonstra que apenas dias com presença contam em Dias Lançados e apenas faltas em Total Faltas', () => {
+    const employees = [
+      {
+        id: 'emp-test',
+        name: 'Juliana Paes',
+        plant_id: 'p1',
+        status: 'Ativo',
+      },
+    ]
+
+    // 5 dias com lançamento: 3 presenças e 2 faltas
+    const logs = [
+      {
+        id: '1',
+        reference_id: 'emp-test',
+        plant_id: 'p1',
+        type: 'staff',
+        date: '2026-07-01',
+        status: true,
+      },
+      {
+        id: '2',
+        reference_id: 'emp-test',
+        plant_id: 'p1',
+        type: 'staff',
+        date: '2026-07-02',
+        status: false,
+      },
+      {
+        id: '3',
+        reference_id: 'emp-test',
+        plant_id: 'p1',
+        type: 'staff',
+        date: '2026-07-03',
+        status: true,
+      },
+      {
+        id: '4',
+        reference_id: 'emp-test',
+        plant_id: 'p1',
+        type: 'staff',
+        date: '2026-07-04',
+        status: false,
+      },
+      {
+        id: '5',
+        reference_id: 'emp-test',
+        plant_id: 'p1',
+        type: 'staff',
+        date: '2026-07-05',
+        status: true,
+      },
+    ]
+
+    const result = calculateColaboradorReport({
+      employees,
+      logs,
+      plants: [{ id: 'p1', name: 'Planta Principal' }],
+      effectiveSelectedPlants: ['p1'],
+      matchesCompany: () => true,
+      dateFrom: '2026-07-01',
+      dateTo: '2026-07-10',
+    })
+
+    expect(result).toHaveLength(1)
+    const row = result[0]
+    expect(row.loggedDays).toBe(3) // 3 dias de presença
+    expect(row.presencasCount).toBe(3)
+    expect(row['Total Faltas']).toBe(2) // 2 dias de falta
+    expect(row.absenceDates).toEqual(['2026-07-02', '2026-07-04'])
+    expect(row['Média Presenças']).toBeCloseTo(3 / 5, 4)
+    expect(row['Média Faltas']).toBeCloseTo(2 / 5, 4)
   })
 })
