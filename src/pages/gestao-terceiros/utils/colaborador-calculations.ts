@@ -15,10 +15,19 @@ export interface ConsolidatedColaboradorReportRow {
   absenceDates: string[]
 }
 
-export const normalizeDate = (d: string | null | undefined): string => {
+export const normalizeDate = (d: string | null | undefined | any): string => {
   if (!d) return ''
-  if (d.includes('T')) return d.slice(0, 10)
-  return d
+  if (d instanceof Date) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  const str = String(d).trim()
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10)
+  }
+  return str
 }
 
 export const normalizePersonKey = (str: string | null | undefined): string => {
@@ -31,16 +40,25 @@ export const normalizePersonKey = (str: string | null | undefined): string => {
     .trim()
 }
 
-export const getPersonDedupeKey = (emp: {
-  registration_number?: string | null
-  name?: string | null
-  id?: string
-  plant_id?: string | null
-}): string => {
-  const reg = emp.registration_number?.trim().toUpperCase()
+export const getPersonDedupeKey = (
+  emp: {
+    registration_number?: string | null
+    name?: string | null
+    id?: string
+    plant_id?: string | null
+  },
+  knownRegByPlantAndName?: Map<string, string>,
+): string => {
   const normName = normalizePersonKey(emp.name)
+  const pid = emp.plant_id || ''
+  const directReg = emp.registration_number?.trim().toUpperCase()
+  const fallbackReg =
+    !directReg && knownRegByPlantAndName && normName
+      ? knownRegByPlantAndName.get(`${normName}::${pid}`)
+      : undefined
+  const reg = directReg || fallbackReg
   const identifier = reg || normName || emp.id || ''
-  return `${identifier}-${emp.plant_id || ''}`
+  return `${identifier}-${pid}`
 }
 
 export interface CalculateColaboradorReportParams {
@@ -62,11 +80,24 @@ export function calculateColaboradorReport({
   dateFrom,
   dateTo,
 }: CalculateColaboradorReportParams): ConsolidatedColaboradorReportRow[] {
+  // Mapa de matrículas conhecidas por (nome_normalizado, planta) para unificar
+  // versões antigas que não tinham matrícula preenchida
+  const knownRegByPlantAndName = new Map<string, string>()
+  employees.forEach((e) => {
+    if (!e) return
+    const reg = e.registration_number?.trim().toUpperCase()
+    const norm = normalizePersonKey(e.name)
+    const pid = e.plant_id || ''
+    if (reg && norm) {
+      knownRegByPlantAndName.set(`${norm}::${pid}`, reg)
+    }
+  })
+
   // 1. Agrupamento de colaboradores por pessoa física + planta
   const empGroups = new Map<string, any[]>()
   employees.forEach((e) => {
     if (!e) return
-    const dedupKey = getPersonDedupeKey(e)
+    const dedupKey = getPersonDedupeKey(e, knownRegByPlantAndName)
     if (!empGroups.has(dedupKey)) empGroups.set(dedupKey, [])
     empGroups.get(dedupKey)!.push(e)
   })
@@ -122,6 +153,11 @@ export function calculateColaboradorReport({
 
   const results: ConsolidatedColaboradorReportRow[] = []
 
+  // Helper para avaliar status de presença do log de forma robusta
+  const isPresentLog = (l: any): boolean => {
+    return l.status === true || l.status === 'true' || l.status === 1 || l.status === '1'
+  }
+
   // 4. Iterar sobre os colaboradores consolidados
   empGroups.forEach((_group, groupKey) => {
     const best = personBestMap.get(groupKey)
@@ -142,13 +178,20 @@ export function calculateColaboradorReport({
     // Se o colaborador não estiver ativo e não possuir lançamentos no período, não exibe
     if (!isActive && plantLogs.length === 0) return
 
-    // Deduplicação de registros no mesmo dia: ordenação por created_at DESC para o mais recente vencer
-    const sortedLogs = [...plantLogs].sort((a, b) =>
-      (b.created_at || '').localeCompare(a.created_at || ''),
-    )
+    // Deduplicação de registros no mesmo dia: ordenação por created_at DESC (timestamp real)
+    // para que o lançamento mais recente prevaleça em caso de retificação
+    const sortedLogs = [...plantLogs].sort((a, b) => {
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+      if (timeB !== timeA) return timeB - timeA
+      return (b.id || '').localeCompare(a.id || '')
+    })
+
+    // Mapa por data normalizada (YYYY-MM-DD): exatamente um registro por dia distinto
     const dateLogsMap = new Map<string, any>()
     sortedLogs.forEach((l) => {
       const d = normalizeDate(l.date)
+      if (!d) return
       if (!dateLogsMap.has(d)) {
         dateLogsMap.set(d, { ...l, date: d })
       }
@@ -156,10 +199,12 @@ export function calculateColaboradorReport({
 
     const dedupedLogs = Array.from(dateLogsMap.values())
 
-    // Regra v0.0.1799: Dias sem lançamento NÃO contam como ausência (a média usa apenas os dias efetivamente registrados)
+    // Regra v0.0.1799: Dias sem lançamento NÃO contam como ausência (a média e total de faltas usam apenas os dias efetivamente registrados)
+    // "Dias Lançados" conta exatamente os dias distintos em que o colaborador tem registro no período/filtros aplicados
     const loggedDays = dedupedLogs.length
-    const pres = dedupedLogs.filter((l) => l.status === true).length
-    const faltas = dedupedLogs.filter((l) => l.status === false).length
+    const pres = dedupedLogs.filter((l) => isPresentLog(l)).length
+    // Garantia matemática: Total Faltas + Total Presenças = Dias Lançados
+    const faltas = loggedDays - pres
     const mPres = loggedDays > 0 ? pres / loggedDays : 0
     const mFaltas = loggedDays > 0 ? faltas / loggedDays : 0
     const cont = 1
@@ -167,7 +212,7 @@ export function calculateColaboradorReport({
     const absenteismo = loggedDays > 0 ? (faltas / loggedDays) * 100 : 0
 
     const absenceDates = dedupedLogs
-      .filter((l) => l.status === false)
+      .filter((l) => !isPresentLog(l))
       .map((l) => l.date)
       .sort()
 

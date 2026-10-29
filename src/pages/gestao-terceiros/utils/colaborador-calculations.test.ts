@@ -246,4 +246,223 @@ describe('colaborador-calculations for Relatórios', () => {
     expect(resultCompB).toHaveLength(1)
     expect(resultCompB[0].Entidade).toBe('Beto Rocha')
   })
+
+  it('lida com múltiplos lançamentos no mesmo dia vinculados a versões históricas diferentes do colaborador', () => {
+    // Caso real: colaborador com 3 versões históricas no banco.
+    // Lançamentos foram feitos referenciando IDs diferentes em dias iguais e distintos.
+    const employees = [
+      {
+        id: 'emp-v1',
+        name: 'Josias Silva Cerqueira',
+        registration_number: 'REG-00158',
+        plant_id: 'plant-1',
+        reference_month: '2026-04-01',
+        status: 'Ativo',
+        created_at: '2026-04-01T10:00:00Z',
+      },
+      {
+        id: 'emp-v2',
+        name: 'Josias Silva Cerqueira',
+        registration_number: 'REG-00158',
+        plant_id: 'plant-1',
+        reference_month: '2026-05-01',
+        status: 'Ativo',
+        created_at: '2026-05-01T10:00:00Z',
+      },
+      {
+        id: 'emp-v3',
+        name: 'Josias Silva Cerqueira',
+        registration_number: 'REG-00158',
+        plant_id: 'plant-1',
+        reference_month: '2026-06-01',
+        status: 'Ativo',
+        created_at: '2026-06-01T10:00:00Z',
+      },
+    ]
+
+    // 2 logs no dia 2026-06-16 (um com emp-v1 e outro com emp-v2)
+    // 1 log no dia 2026-06-17 (com emp-v3)
+    // Total de dias no período = 10 dias, mas apenas 2 dias com lançamento
+    const logs = [
+      {
+        id: 'log-1',
+        reference_id: 'emp-v1',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-06-16',
+        status: false,
+        created_at: '2026-06-16T13:37:25Z',
+      },
+      {
+        id: 'log-2',
+        reference_id: 'emp-v2',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-06-16',
+        status: true,
+        created_at: '2026-06-16T15:16:23Z', // mais recente: retificou para presença
+      },
+      {
+        id: 'log-3',
+        reference_id: 'emp-v3',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-06-17',
+        status: true,
+        created_at: '2026-06-17T09:00:00Z',
+      },
+    ]
+
+    const result = calculateColaboradorReport({
+      employees,
+      logs,
+      plants: [{ id: 'plant-1', name: 'Planta 1' }],
+      effectiveSelectedPlants: ['plant-1'],
+      matchesCompany: () => true,
+      dateFrom: '2026-06-10',
+      dateTo: '2026-06-20',
+    })
+
+    expect(result).toHaveLength(1)
+    const row = result[0]
+    expect(row.Entidade).toBe('Josias Silva Cerqueira')
+    // Dias lançados deve ser exatamente 2 (2026-06-16 e 2026-06-17), NÃO 3 logs
+    expect(row.loggedDays).toBe(2)
+    // No dia 16 venceu o log-2 (status: true)
+    expect(row.presencasCount).toBe(2)
+    expect(row['Total Faltas']).toBe(0)
+    expect(row['Média Presenças']).toBe(1)
+    expect(row['Média Faltas']).toBe(0)
+    expect(row['Taxa Presença']).toBe(100)
+    expect(row.Absenteísmo).toBe(0)
+    expect(row.absenceDates).toEqual([])
+  })
+
+  it('unifica versão sem matrícula quando uma versão mais recente possui matrícula preenchida', () => {
+    const employees = [
+      {
+        id: 'emp-old',
+        name: 'Maria Antonieta',
+        registration_number: null, // sem matrícula na versão antiga
+        plant_id: 'plant-1',
+        reference_month: '2026-01-01',
+        status: 'Ativo',
+        created_at: '2026-01-01T10:00:00Z',
+      },
+      {
+        id: 'emp-new',
+        name: 'Maria Antonieta',
+        registration_number: 'REG-999',
+        plant_id: 'plant-1',
+        reference_month: '2026-05-01',
+        status: 'Ativo',
+        created_at: '2026-05-01T10:00:00Z',
+      },
+    ]
+
+    const logs = [
+      {
+        id: 'l1',
+        reference_id: 'emp-old',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-05-10',
+        status: true,
+        created_at: '2026-05-10T10:00:00Z',
+      },
+      {
+        id: 'l2',
+        reference_id: 'emp-new',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-05-11',
+        status: false,
+        created_at: '2026-05-11T10:00:00Z',
+      },
+    ]
+
+    const result = calculateColaboradorReport({
+      employees,
+      logs,
+      plants: [{ id: 'plant-1', name: 'Planta 1' }],
+      effectiveSelectedPlants: ['plant-1'],
+      matchesCompany: () => true,
+      dateFrom: '2026-05-01',
+      dateTo: '2026-05-20',
+    })
+
+    expect(result).toHaveLength(1)
+    expect(result[0].Entidade).toBe('Maria Antonieta')
+    expect(result[0].loggedDays).toBe(2)
+    expect(result[0].presencasCount).toBe(1)
+    expect(result[0]['Total Faltas']).toBe(1)
+    expect(result[0]['Média Presenças']).toBeCloseTo(0.5, 4)
+    expect(result[0].absenceDates).toEqual(['2026-05-11'])
+  })
+
+  it('garante que dias sem lançamento não inflam faltas nem dias lançados e média é exata', () => {
+    const employees = [
+      {
+        id: 'emp-1',
+        name: 'Roberto Carlos',
+        plant_id: 'plant-1',
+        status: 'Ativo',
+      },
+    ]
+
+    // Período de 30 dias (2026-05-01 a 2026-05-30), mas o colaborador teve apenas 3 dias com lançamento:
+    // 2 dias presença, 1 dia falta
+    const logs = [
+      {
+        id: 'l1',
+        reference_id: 'emp-1',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-05-02',
+        status: true,
+        created_at: '2026-05-02T08:00:00Z',
+      },
+      {
+        id: 'l2',
+        reference_id: 'emp-1',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-05-03',
+        status: false,
+        created_at: '2026-05-03T08:00:00Z',
+      },
+      {
+        id: 'l3',
+        reference_id: 'emp-1',
+        plant_id: 'plant-1',
+        type: 'staff',
+        date: '2026-05-04',
+        status: true,
+        created_at: '2026-05-04T08:00:00Z',
+      },
+    ]
+
+    const result = calculateColaboradorReport({
+      employees,
+      logs,
+      plants: [{ id: 'plant-1', name: 'Planta Alfa' }],
+      effectiveSelectedPlants: ['plant-1'],
+      matchesCompany: () => true,
+      dateFrom: '2026-05-01',
+      dateTo: '2026-05-30',
+    })
+
+    expect(result).toHaveLength(1)
+    const row = result[0]
+    expect(row.loggedDays).toBe(3)
+    expect(row.presencasCount).toBe(2)
+    expect(row['Total Faltas']).toBe(1)
+    // Presenças (2) + Faltas (1) = Dias Lançados (3)
+    expect(row.presencasCount + row['Total Faltas']).toBe(row.loggedDays)
+    expect(row['Média Presenças']).toBeCloseTo(2 / 3, 4)
+    expect(row['Média Faltas']).toBeCloseTo(1 / 3, 4)
+    expect(row['Taxa Presença']).toBeCloseTo((2 / 3) * 100, 2)
+    expect(row.Absenteísmo).toBeCloseTo((1 / 3) * 100, 2)
+    expect(row.absenceDates).toEqual(['2026-05-03'])
+  })
 })
