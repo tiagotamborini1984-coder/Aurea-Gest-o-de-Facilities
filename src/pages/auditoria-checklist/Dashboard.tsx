@@ -102,18 +102,54 @@ export default function AuditoriaDashboard() {
       setLoadingNc(true)
       setNcError(null)
 
-      let query = supabase.from('audit_executions').select('*, audits!inner(*)')
+      const PAGE_SIZE = 1000
 
-      if (effectiveClientId && effectiveClientId !== 'all') {
-        query = query.eq('audits.client_id', effectiveClientId)
-      }
+      // 1. Busca de execuções de auditoria paginada em lotes de 1.000 para evitar truncamento silencioso do PostgREST
+      const fetchExecutions = async () => {
+        const allExecs: any[] = []
+        let page = 0
+        let hasMore = true
 
-      if (!isSuperAdmin) {
-        if (authPlants.length > 0) {
-          query = query.in('plant_id', authPlants)
-        } else {
-          query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+        while (hasMore) {
+          const from = page * PAGE_SIZE
+          const to = from + PAGE_SIZE - 1
+
+          let execQuery = supabase
+            .from('audit_executions')
+            .select('*, audits!inner(*)')
+            .order('created_at', { ascending: false })
+            .range(from, to)
+
+          if (effectiveClientId && effectiveClientId !== 'all') {
+            execQuery = execQuery.eq('audits.client_id', effectiveClientId)
+          }
+
+          if (!isSuperAdmin) {
+            if (authPlants.length > 0) {
+              execQuery = execQuery.in('plant_id', authPlants)
+            } else {
+              execQuery = execQuery.eq('id', '00000000-0000-0000-0000-000000000000')
+            }
+          }
+
+          const { data, error } = await execQuery
+
+          if (error) {
+            console.error('Erro ao consultar execuções de auditoria:', error)
+            return { data: allExecs, error }
+          }
+
+          if (data && data.length > 0) {
+            allExecs.push(...data)
+            page++
+          }
+
+          if (!data || data.length < PAGE_SIZE) {
+            hasMore = false
+          }
         }
+
+        return { data: allExecs, error: null }
       }
 
       // Consulta de Tipos e Status de chamados separadamente para evitar falhas silenciosas de inner joins
@@ -128,40 +164,73 @@ export default function AuditoriaDashboard() {
         statusesQuery = statusesQuery.eq('client_id', effectiveClientId)
       }
 
-      // Consulta de Tarefas (Não Conformidades e demandas de auditoria)
+      // 2. Busca de Tarefas (Não Conformidades e demandas de auditoria) paginada em lotes de 1.000
       // Escopo alinhado ao Painel de Chamados (RLS da tabela tasks já faz o isolamento por tenant/planta)
-      let ncQuery = supabase.from('tasks').select(`
-          id,
-          task_number,
-          title,
-          description,
-          plant_id,
-          client_id,
-          created_at,
-          due_date,
-          closed_at,
-          approval_status,
-          rejection_reason,
-          status_id,
-          type_id,
-          audit_id
-        `)
+      const fetchNcTasks = async () => {
+        const allTasks: any[] = []
+        let page = 0
+        let hasMore = true
 
-      if (effectiveClientId && effectiveClientId !== 'all') {
-        ncQuery = ncQuery.eq('client_id', effectiveClientId)
-      }
+        while (hasMore) {
+          const from = page * PAGE_SIZE
+          const to = from + PAGE_SIZE - 1
 
-      if (!isSuperAdmin) {
-        if (authPlants.length > 0) {
-          ncQuery = ncQuery.in('plant_id', authPlants)
-        } else {
-          ncQuery = ncQuery.eq('id', '00000000-0000-0000-0000-000000000000')
+          let ncQuery = supabase
+            .from('tasks')
+            .select(`
+              id,
+              task_number,
+              title,
+              description,
+              plant_id,
+              client_id,
+              created_at,
+              due_date,
+              closed_at,
+              approval_status,
+              rejection_reason,
+              status_id,
+              type_id,
+              audit_id
+            `)
+            .order('created_at', { ascending: false })
+            .range(from, to)
+
+          if (effectiveClientId && effectiveClientId !== 'all') {
+            ncQuery = ncQuery.eq('client_id', effectiveClientId)
+          }
+
+          if (!isSuperAdmin) {
+            if (authPlants.length > 0) {
+              ncQuery = ncQuery.in('plant_id', authPlants)
+            } else {
+              ncQuery = ncQuery.eq('id', '00000000-0000-0000-0000-000000000000')
+            }
+          }
+
+          const { data, error } = await ncQuery
+
+          if (error) {
+            console.error('Erro ao consultar tarefas de Não Conformidade:', error)
+            return { data: allTasks, error }
+          }
+
+          if (data && data.length > 0) {
+            allTasks.push(...data)
+            page++
+          }
+
+          if (!data || data.length < PAGE_SIZE) {
+            hasMore = false
+          }
         }
+
+        return { data: allTasks, error: null }
       }
 
       const [execRes, ncRes, typesRes, statusesRes] = await Promise.all([
-        query,
-        ncQuery,
+        fetchExecutions(),
+        fetchNcTasks(),
         typesQuery,
         statusesQuery,
       ])
