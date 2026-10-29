@@ -44,6 +44,9 @@ export function useDashboardCalculations(
     }
 
     const isPlantDateNonWorking = (plantId: string, date: string) => {
+      // Para equipamentos, a operação de máquinas/veículos segue todos os dias com lançamento
+      // ou cadastrados (não restrita à escala de dias úteis padrão de pessoal)
+      if (activeTab === 'equipamentos') return false
       return nonWorkingDatesByPlant[plantId]?.has(date) ?? false
     }
 
@@ -254,9 +257,47 @@ export function useDashboardCalculations(
     const globalDays = allValidDatesSet.size
 
     // Conta total de logs ativos considerando apenas dias úteis por planta
-    const validActiveLogs = activeLogs.filter((l) => !isPlantDateNonWorking(l.plant_id, l.date))
-    const totalPresentCount = validActiveLogs.filter((l) => l.status).length
-    const totalLancadoCount = validActiveLogs.length
+    // (c) e (b): Garante que para equipamentos os logs pertençam à planta do equipamento e sem duplicidade por data
+    const validActiveLogs = activeLogs.filter((l) => {
+      if (isPlantDateNonWorking(l.plant_id, l.date)) return false
+      if (typeLog === 'equipment') {
+        const eq = equipment.find((e) => e.id === l.reference_id)
+        if (eq && eq.plant_id !== l.plant_id) return false
+      }
+      return true
+    })
+
+    // Para equipamentos: soma ponderada pela quantidade contratada/ativa do equipamento
+    // (ex: trator com quantidade=1 conta 1, se não tiver contrato individual eq.quantity é a base).
+    const getEquipmentCapacity = (eqId: string, plantId: string, date: string) => {
+      const eq = equipment.find((e) => e.id === eqId)
+      const baseQty = eq?.quantity || 1
+      const eqContracted = getApplicableContracted(
+        plantId,
+        'equipamento',
+        date,
+        (c) => c.equipment_id === eqId,
+      )
+      if (eqContracted.length > 0) {
+        return eqContracted.reduce((s, c) => s + c.quantity, 0)
+      }
+      return baseQty
+    }
+
+    const totalPresentCount =
+      typeLog === 'equipment'
+        ? validActiveLogs
+            .filter((l) => l.status)
+            .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, l.plant_id, l.date), 0)
+        : validActiveLogs.filter((l) => l.status).length
+
+    const totalLancadoCount =
+      typeLog === 'equipment'
+        ? validActiveLogs.reduce(
+            (sum, l) => sum + getEquipmentCapacity(l.reference_id, l.plant_id, l.date),
+            0,
+          )
+        : validActiveLogs.length
 
     let totalContractedSum = 0
     Array.from(allValidDatesSet).forEach((date) => {
@@ -474,11 +515,18 @@ export function useDashboardCalculations(
         )
         totalAbsentDailySum += absentsInValidPlants.length
       } else {
-        // Para equipamentos, indisponíveis calculados a partir dos logs de indisponibilidade
+        // Para equipamentos, indisponíveis calculados a partir dos logs de indisponibilidade vinculados à planta
         validPlants.forEach((pid) => {
           if (!plantValidDatesMap[pid]?.has(date)) return
-          const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
-          const dExplicitAbs = dayLogs.filter((l) => !l.status).length
+          const dayLogs = activeLogs.filter((l) => {
+            if (l.plant_id !== pid || l.date !== date) return false
+            const eq = equipment.find((e) => e.id === l.reference_id)
+            if (eq && eq.plant_id !== pid) return false
+            return true
+          })
+          const dExplicitAbs = dayLogs
+            .filter((l) => !l.status)
+            .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, date), 0)
           totalAbsentDailySum += dExplicitAbs
         })
       }
@@ -516,8 +564,25 @@ export function useDashboardCalculations(
 
       // Logs de hoje
       const tLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === todayDateStr)
-      todayPresentCount += tLogs.filter((l) => l.status).length
-      todayExplicitAbsentCount += tLogs.filter((l) => !l.status).length
+      if (typeCont === 'equipamento') {
+        todayPresentCount += tLogs
+          .filter((l) => {
+            if (!l.status) return false
+            const eq = equipment.find((e) => e.id === l.reference_id)
+            return !eq || eq.plant_id === pid
+          })
+          .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, todayDateStr), 0)
+        todayExplicitAbsentCount += tLogs
+          .filter((l) => {
+            if (l.status) return false
+            const eq = equipment.find((e) => e.id === l.reference_id)
+            return !eq || eq.plant_id === pid
+          })
+          .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, todayDateStr), 0)
+      } else {
+        todayPresentCount += tLogs.filter((l) => l.status).length
+        todayExplicitAbsentCount += tLogs.filter((l) => !l.status).length
+      }
     })
 
     const todayBase = todayContractedSum > 0 ? todayContractedSum : todayFallbackSum
@@ -538,7 +603,21 @@ export function useDashboardCalculations(
         const pValidLogs = pLogs.filter((l) => pValidDates.has(l.date))
 
         const pDays = pValidDates.size
-        const pPres = pDays > 0 ? pValidLogs.filter((l) => l.status).length / pDays : 0
+        const pPres =
+          pDays > 0
+            ? typeCont === 'equipamento'
+              ? pValidLogs
+                  .filter((l) => {
+                    if (!l.status) return false
+                    const eq = equipment.find((e) => e.id === l.reference_id)
+                    return !eq || eq.plant_id === plant.id
+                  })
+                  .reduce(
+                    (sum, l) => sum + getEquipmentCapacity(l.reference_id, plant.id, l.date),
+                    0,
+                  ) / pDays
+              : pValidLogs.filter((l) => l.status).length / pDays
+            : 0
 
         let pCont = 0
         let hasContracted = false
@@ -595,8 +674,32 @@ export function useDashboardCalculations(
               return true
             }).reduce((sum, c) => sum + c.quantity, 0)
             const dDayLogs = pLogs.filter((l) => l.date === date)
-            const dPres = dDayLogs.filter((l) => l.status).length
-            const dExplicitAbs = dDayLogs.filter((l) => !l.status).length
+            const dPres =
+              typeCont === 'equipamento'
+                ? dDayLogs
+                    .filter((l) => {
+                      if (!l.status) return false
+                      const eq = equipment.find((e) => e.id === l.reference_id)
+                      return !eq || eq.plant_id === plant.id
+                    })
+                    .reduce(
+                      (sum, l) => sum + getEquipmentCapacity(l.reference_id, plant.id, date),
+                      0,
+                    )
+                : dDayLogs.filter((l) => l.status).length
+            const dExplicitAbs =
+              typeCont === 'equipamento'
+                ? dDayLogs
+                    .filter((l) => {
+                      if (l.status) return false
+                      const eq = equipment.find((e) => e.id === l.reference_id)
+                      return !eq || eq.plant_id === plant.id
+                    })
+                    .reduce(
+                      (sum, l) => sum + getEquipmentCapacity(l.reference_id, plant.id, date),
+                      0,
+                    )
+                : dDayLogs.filter((l) => !l.status).length
             const dDenom = dCont > 0 ? dCont : fallbackCountByPlant.get(plant.id) || 0
             const abs = dDenom > 0 ? Math.max(0, ((dDenom - dPres) / dDenom) * 100) : 0
 
@@ -706,8 +809,32 @@ export function useDashboardCalculations(
               (c) => c.location_id === loc.id,
             ).reduce((sum, c) => sum + c.quantity, 0)
             const dDayLogs = lLogsRaw.filter((l) => l.date === date)
-            const dPres = dDayLogs.filter((l) => l.status).length
-            const dExplicitAbs = dDayLogs.filter((l) => !l.status).length
+            const dPres =
+              typeCont === 'equipamento'
+                ? dDayLogs
+                    .filter((l) => {
+                      if (!l.status) return false
+                      const eq = equipment.find((e) => e.id === l.reference_id)
+                      return !eq || eq.plant_id === plantId
+                    })
+                    .reduce(
+                      (sum, l) => sum + getEquipmentCapacity(l.reference_id, plantId, date),
+                      0,
+                    )
+                : dDayLogs.filter((l) => l.status).length
+            const dExplicitAbs =
+              typeCont === 'equipamento'
+                ? dDayLogs
+                    .filter((l) => {
+                      if (l.status) return false
+                      const eq = equipment.find((e) => e.id === l.reference_id)
+                      return !eq || eq.plant_id === plantId
+                    })
+                    .reduce(
+                      (sum, l) => sum + getEquipmentCapacity(l.reference_id, plantId, date),
+                      0,
+                    )
+                : dDayLogs.filter((l) => !l.status).length
             const abs = dCont > 0 ? Math.max(0, ((dCont - dPres) / dCont) * 100) : 0
 
             const locEmpSet = new Set(refIds)
@@ -794,24 +921,42 @@ export function useDashboardCalculations(
                   ? Math.round(sumEqContratado / monthsInPeriod.length)
                   : eq.quantity
 
-              const eqLogs = processedLogs
-                .filter(
-                  (l) =>
-                    l.type === 'equipment' && l.reference_id === eq.id && pValidDates.has(l.date),
-                )
-                .sort((a, b) => a.date.localeCompare(b.date))
+              // (c) Vincula o registro ao equipamento correto: exige também a planta do equipamento
+              const eqLogsRaw = processedLogs.filter(
+                (l) =>
+                  l.type === 'equipment' &&
+                  l.reference_id === eq.id &&
+                  l.plant_id === plantId &&
+                  pValidDates.has(l.date),
+              )
+              // (b) Deduplica registros do mesmo equipamento na mesma data (mantém o mais recente)
+              const eqLogsMap = new Map<string, any>()
+              ;[...eqLogsRaw]
+                .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+                .forEach((l) => {
+                  const d =
+                    typeof l.date === 'string' && l.date.includes('T')
+                      ? l.date.slice(0, 10)
+                      : l.date
+                  if (!eqLogsMap.has(d)) eqLogsMap.set(d, { ...l, date: d })
+                })
+              const eqLogs = Array.from(eqLogsMap.values()).sort((a, b) =>
+                a.date.localeCompare(b.date),
+              )
 
-              const eqDays = pValidDates.size
+              const loggedDays = eqLogsMap.size
               const pres = eqLogs.filter((l) => l.status).length
               const abs = eqLogs.filter((l) => !l.status).length
-              const mPres = eqDays > 0 ? (pres / eqDays) * eqCont : 0
+              // (a) Dias sem nenhum lançamento não contam como ausência: a média considera
+              // apenas os dias efetivamente lançados para o equipamento.
+              const mPres = loggedDays > 0 ? (pres / loggedDays) * eqCont : 0
               return {
                 id: eq.id,
                 name: eq.name,
                 contratado: eqCont,
                 mediaPresenca: mPres,
-                mediaFalta: eqDays > 0 ? (abs / eqDays) * eqCont : 0,
-                taxaDisp: eqDays === 0 ? 0 : eqCont > 0 ? (mPres / eqCont) * 100 : 0,
+                mediaFalta: loggedDays > 0 ? (abs / loggedDays) * eqCont : 0,
+                taxaDisp: eqCont > 0 ? (mPres / eqCont) * 100 : 0,
                 history: eqLogs.map((log) => ({ date: log.date, status: log.status })),
               }
             })
@@ -896,8 +1041,25 @@ export function useDashboardCalculations(
 
           if (plantValidDatesMap[pid].has(date)) {
             const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
-            dPresentes += dayLogs.filter((l) => l.status).length
-            dAusentes += dayLogs.filter((l) => !l.status).length
+            if (typeCont === 'equipamento') {
+              dPresentes += dayLogs
+                .filter((l) => {
+                  if (!l.status) return false
+                  const eq = equipment.find((e) => e.id === l.reference_id)
+                  return !eq || eq.plant_id === pid
+                })
+                .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, date), 0)
+              dAusentes += dayLogs
+                .filter((l) => {
+                  if (l.status) return false
+                  const eq = equipment.find((e) => e.id === l.reference_id)
+                  return !eq || eq.plant_id === pid
+                })
+                .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, date), 0)
+            } else {
+              dPresentes += dayLogs.filter((l) => l.status).length
+              dAusentes += dayLogs.filter((l) => !l.status).length
+            }
           }
         })
 
@@ -934,9 +1096,13 @@ export function useDashboardCalculations(
           )
           totalEquipContractedSum += eCont
 
-          const ePres = processedLogs.filter(
-            (l) => l.type === 'equipment' && l.plant_id === pid && l.date === date && l.status,
-          ).length
+          const ePres = processedLogs.filter((l) => {
+            if (l.type !== 'equipment' || l.plant_id !== pid || l.date !== date || !l.status)
+              return false
+            const eq = equipment.find((e) => e.id === l.reference_id)
+            if (eq && eq.plant_id !== pid) return false
+            return true
+          }).length
           totalEquipPresentCount += ePres
         }
       })

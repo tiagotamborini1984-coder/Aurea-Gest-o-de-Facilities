@@ -15,6 +15,10 @@ export default function DashboardEquipmentTrendChart({
       label: 'Indisponibilidade (%)',
       color: 'hsl(var(--primary))',
     },
+    indisponibilidade: {
+      label: 'Indisponibilidade (%)',
+      color: 'hsl(var(--primary))',
+    },
   }
 
   return (

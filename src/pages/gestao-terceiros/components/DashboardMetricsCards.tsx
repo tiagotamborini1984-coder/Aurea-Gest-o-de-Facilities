@@ -454,7 +454,7 @@ export default function DashboardMetricsCards({
           </div>
           <div>
             <p className="text-[10px] lg:text-xs font-medium text-orange-500 uppercase tracking-wider">
-              {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Indisp.'}
+              {activeTab === 'colaboradores' ? 'Absenteísmo' : 'Indisponibilidade'}
             </p>
             <div className="flex items-baseline gap-2">
               <p className="text-xl lg:text-2xl font-bold text-foreground mt-0.5">

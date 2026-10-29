@@ -228,11 +228,27 @@ export default function Relatorios() {
         return true
       })
       result = targets.map((eq) => {
-        const eLogs = validLogs.filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
+        // (c) Vincula o registro ao equipamento correto: exige também a planta do equipamento
+        const eLogsRaw = validLogs.filter(
+          (l) => l.type === 'equipment' && l.reference_id === eq.id && l.plant_id === eq.plant_id,
+        )
+        // (b) Deduplica registros do mesmo equipamento na mesma data (mantém o lançamento mais recente)
+        const eLogsMap = new Map<string, any>()
+        ;[...eLogsRaw]
+          .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          .forEach((l) => {
+            const d =
+              typeof l.date === 'string' && l.date.includes('T') ? l.date.slice(0, 10) : l.date
+            if (!eLogsMap.has(d)) eLogsMap.set(d, { ...l, date: d })
+          })
+        const eLogs = Array.from(eLogsMap.values())
+        // (a) Dias sem nenhum lançamento não contam como ausência: a média considera
+        // apenas os dias efetivamente lançados para o equipamento.
+        const loggedDays = eLogsMap.size
         const pres = eLogs.filter((l) => l.status).length
         const faltas = eLogs.filter((l) => !l.status).length
-        const mPres = pres / validDays
-        const mFaltas = faltas / validDays
+        const mPres = loggedDays > 0 ? pres / loggedDays : 0
+        const mFaltas = loggedDays > 0 ? faltas / loggedDays : 0
         const cont =
           contracted
             .filter((c) => {
@@ -246,11 +262,11 @@ export default function Relatorios() {
             .reduce((a, b) => a + b.quantity, 0) || (selectedCompanies.length > 0 ? 0 : eq.quantity)
         return {
           Entidade: eq.name,
-          'Média Presenças': mPres,
-          'Média Faltas': mFaltas,
+          'Média Disponíveis': mPres,
+          'Média Indisponíveis': mFaltas,
           Contratado: cont,
-          'Taxa Presença': cont > 0 ? (mPres / cont) * 100 : 0,
-          Absenteísmo: cont > 0 ? (mFaltas / cont) * 100 : 0,
+          'Taxa Disponibilidade': cont > 0 ? (mPres / cont) * 100 : 0,
+          Indisponibilidade: cont > 0 ? (mFaltas / cont) * 100 : 0,
         }
       })
     } else if (activeTab === 'treinamentos') {
@@ -294,7 +310,10 @@ export default function Relatorios() {
     if (activeTab === 'treinamentos') return result
 
     return result.filter(
-      (r) => r['Média Presenças'] > 0 || r['Média Faltas'] > 0 || r.Contratado > 0,
+      (r) =>
+        (r['Média Presenças'] || r['Média Disponíveis'] || 0) > 0 ||
+        (r['Média Faltas'] || r['Média Indisponíveis'] || 0) > 0 ||
+        r.Contratado > 0,
     )
   }, [
     logs,
@@ -361,7 +380,12 @@ export default function Relatorios() {
             key !== 'Dias para o Vencimento'
           ) {
             newRow[key] =
-              row[key].toFixed(1) + (key.includes('Taxa') || key.includes('Absenteísmo') ? '%' : '')
+              row[key].toFixed(1) +
+              (key.includes('Taxa') ||
+              key.includes('Absenteísmo') ||
+              key.includes('Indisponibilidade')
+                ? '%'
+                : '')
           } else {
             newRow[key] = row[key]
           }
@@ -634,19 +658,19 @@ export default function Relatorios() {
                     {entityKey}
                   </TableHead>
                   <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
-                    Média Presenças
+                    {activeTab === 'equipamento' ? 'Média Disponíveis' : 'Média Presenças'}
                   </TableHead>
                   <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
-                    Média Faltas
+                    {activeTab === 'equipamento' ? 'Média Indisponíveis' : 'Média Faltas'}
                   </TableHead>
                   <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
                     Contratado
                   </TableHead>
                   <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
-                    Taxa Presença
+                    {activeTab === 'equipamento' ? 'Taxa Disponibilidade' : 'Taxa Presença'}
                   </TableHead>
                   <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
-                    Absenteísmo
+                    {activeTab === 'equipamento' ? 'Indisponibilidade' : 'Absenteísmo'}
                   </TableHead>
                 </TableRow>
               )}
@@ -714,29 +738,47 @@ export default function Relatorios() {
                     </TableCell>
                     <TableCell className="text-center print:p-2 print:break-inside-avoid">
                       <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-green-100 text-green-800 print:bg-transparent print:text-black">
-                        {Number(row['Média Presenças']).toFixed(1)}
+                        {Number(
+                          activeTab === 'equipamento'
+                            ? row['Média Disponíveis']
+                            : row['Média Presenças'],
+                        ).toFixed(1)}
                       </span>
                     </TableCell>
                     <TableCell className="text-center print:p-2 print:break-inside-avoid">
                       <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-red-100 text-red-800 print:bg-transparent print:text-black">
-                        {Number(row['Média Faltas']).toFixed(1)}
+                        {Number(
+                          activeTab === 'equipamento'
+                            ? row['Média Indisponíveis']
+                            : row['Média Faltas'],
+                        ).toFixed(1)}
                       </span>
                     </TableCell>
                     <TableCell className="text-center font-bold text-slate-800 print:text-black print:p-2 print:break-inside-avoid">
                       {row.Contratado}
                     </TableCell>
                     <TableCell className="text-center font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
-                      {Number(row['Taxa Presença']).toFixed(1)}%
+                      {Number(
+                        activeTab === 'equipamento'
+                          ? row['Taxa Disponibilidade']
+                          : row['Taxa Presença'],
+                      ).toFixed(1)}
+                      %
                     </TableCell>
                     <TableCell
                       className={cn(
                         'text-center font-semibold print:text-black print:p-2 print:break-inside-avoid',
-                        Number(row.Absenteísmo) > 0
+                        Number(
+                          activeTab === 'equipamento' ? row.Indisponibilidade : row.Absenteísmo,
+                        ) > 0
                           ? 'text-red-700 print:text-black'
                           : 'text-slate-700 print:text-black',
                       )}
                     >
-                      {Number(row.Absenteísmo).toFixed(1)}%
+                      {Number(
+                        activeTab === 'equipamento' ? row.Indisponibilidade : row.Absenteísmo,
+                      ).toFixed(1)}
+                      %
                     </TableCell>
                   </TableRow>
                 ))

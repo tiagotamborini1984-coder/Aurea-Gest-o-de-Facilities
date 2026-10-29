@@ -207,4 +207,96 @@ describe('useDashboardCalculations - Ausentes e Colaboradores Inativos', () => {
     expect(res2.current.metrics.periodAbsentsList).toHaveLength(0)
     expect(res2.current.metrics.ausente).toBe('0')
   })
+
+  it('cálculo por equipamento: deduplica registros no mesmo dia, vincula à planta e não conta dia sem lançamento como falta', () => {
+    const equip = [
+      {
+        id: 'trator-1',
+        name: 'Trator CBT 8440',
+        plant_id: 'plant-1',
+        quantity: 1,
+        status: 'ativo',
+      },
+      {
+        id: 'escavadeira-2',
+        name: 'Escavadeira CAT 320',
+        plant_id: 'plant-2',
+        quantity: 1,
+        status: 'ativo',
+      },
+    ]
+
+    // Logs contendo:
+    // - trator-1 em 2026-10-10 duplicado (2 logs no mesmo dia, o mais recente true)
+    // - trator-1 em 2026-10-11 status false (falta real/indisponível)
+    // - escavadeira-2 em plant-1 (equipamento pertence a plant-2, log com plant_id errado não deve contar para plant-1)
+    const eqLogs = [
+      {
+        id: 'log-eq-dup1',
+        plant_id: 'plant-1',
+        type: 'equipment',
+        reference_id: 'trator-1',
+        status: false,
+        date: '2026-10-10',
+        created_at: '2026-10-10T08:00:00Z',
+      },
+      {
+        id: 'log-eq-dup2',
+        plant_id: 'plant-1',
+        type: 'equipment',
+        reference_id: 'trator-1',
+        status: true,
+        date: '2026-10-10',
+        created_at: '2026-10-10T09:00:00Z',
+      },
+      {
+        id: 'log-eq-2',
+        plant_id: 'plant-1',
+        type: 'equipment',
+        reference_id: 'trator-1',
+        status: false,
+        date: '2026-10-11',
+        created_at: '2026-10-11T08:00:00Z',
+      },
+      {
+        id: 'log-eq-wrong-plant',
+        plant_id: 'plant-1',
+        type: 'equipment',
+        reference_id: 'escavadeira-2',
+        status: true,
+        date: '2026-10-10',
+        created_at: '2026-10-10T08:00:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useDashboardCalculations(
+        eqLogs,
+        [],
+        [],
+        plants,
+        locations,
+        [],
+        equip,
+        [],
+        ['plant-1'],
+        [],
+        'equipamentos',
+        '2026-10-01',
+        '2026-10-31',
+      ),
+    )
+
+    // equipmentStats deve ter apenas o trator-1 (pois plant-1 foi selecionada)
+    const stats = result.current.equipmentStats
+    expect(stats).toHaveLength(1)
+    const tratorStats = stats.find((s: any) => s.id === 'trator-1')
+    expect(tratorStats).toBeDefined()
+
+    // O trator teve 2 dias de registro (2026-10-10: disponível após dedup, 2026-10-11: indisponível)
+    // Dias sem registro no mês (de 1 a 9, e 12 a 31) NÃO devem inflar faltas.
+    expect(tratorStats?.mediaPresenca).toBe(0.5) // 1 dia presente em 2 dias registrados = 0.5
+    expect(tratorStats?.mediaFalta).toBe(0.5) // 1 dia falta em 2 dias registrados = 0.5
+    expect(tratorStats?.taxaDisp).toBe(50) // 50% de disponibilidade
+  })
 })

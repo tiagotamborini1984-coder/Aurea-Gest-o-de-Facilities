@@ -20,17 +20,17 @@ const TableHeader = ({ title, icon: Icon }: any) => (
   </CardHeader>
 )
 
-const TableCols = ({ isLocal }: any) => (
+const TableCols = ({ isLocal, isEq }: any) => (
   <div className="px-4 lg:px-5 py-2 lg:py-3 grid grid-cols-12 gap-2 lg:gap-4 text-[10px] lg:text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 bg-muted/30 shrink-0">
     <div className="col-span-4">{isLocal ? 'Local' : 'Planta'}</div>
-    <div className="col-span-2 text-center" title="Média Presença">
-      Pres.
+    <div className="col-span-2 text-center" title={isEq ? 'Média Disponíveis' : 'Média Presenças'}>
+      {isEq ? 'Disp.' : 'Pres.'}
     </div>
-    <div className="col-span-2 text-center" title="Média Falta">
-      Falta
+    <div className="col-span-2 text-center" title={isEq ? 'Média Indisponíveis' : 'Média Faltas'}>
+      {isEq ? 'Indisp.' : 'Falta'}
     </div>
     <div className="col-span-2 text-center">Contrat.</div>
-    <div className="col-span-2 text-right">Taxa</div>
+    <div className="col-span-2 text-right">{isEq ? 'Indisp. (%)' : 'Taxa'}</div>
   </div>
 )
 
@@ -38,6 +38,10 @@ const TrendChartDialog = ({ item, isEq, target }: { item: any; isEq: boolean; ta
   const chartConfig = {
     absenteismo: {
       label: isEq ? 'Indisponibilidade (%)' : 'Absenteísmo (%)',
+      color: 'hsl(var(--primary))',
+    },
+    indisponibilidade: {
+      label: 'Indisponibilidade (%)',
       color: 'hsl(var(--primary))',
     },
   }
@@ -58,7 +62,7 @@ const TrendChartDialog = ({ item, isEq, target }: { item: any; isEq: boolean; ta
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
-            Evolução Diária - {item.name}
+            Evolução Diária - {isEq ? 'Indisponibilidade' : 'Absenteísmo'} ({item.name})
           </DialogTitle>
         </DialogHeader>
         <div className="h-[300px] w-full mt-4">
@@ -178,7 +182,7 @@ export default function DashboardPlantSummary({
       <Card className="shadow-subtle border-border flex flex-col h-full bg-card">
         <TableHeader title="Resumo por Planta" icon={Building2} />
         <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
-          <TableCols isLocal={false} />
+          <TableCols isLocal={false} isEq={isEq} />
           <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[350px]">
             {plantStats.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground text-xs lg:text-sm">
@@ -215,7 +219,7 @@ export default function DashboardPlantSummary({
       <Card className="shadow-subtle border-border flex flex-col h-full bg-card">
         <TableHeader title="Resumo por Local" icon={MapPin} />
         <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
-          <TableCols isLocal={true} />
+          <TableCols isLocal={true} isEq={isEq} />
           <div className="divide-y divide-border/50 overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[350px]">
             {locationStats.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground text-xs lg:text-sm">
