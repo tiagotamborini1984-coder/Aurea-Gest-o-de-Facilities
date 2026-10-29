@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
@@ -31,6 +32,12 @@ import {
   Building2,
   LayoutList,
   Calendar as CalendarIcon,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
@@ -43,6 +50,7 @@ import { DateRange } from 'react-day-picker'
 import { cn } from '@/lib/utils'
 
 export default function AuditoriaDashboard() {
+  const navigate = useNavigate()
   const { profile, activeClient } = useAppStore()
   const { plants } = useMasterData()
   const hasModuleAccess = useHasAccess('Auditoria e Checklist')
@@ -51,11 +59,15 @@ export default function AuditoriaDashboard() {
 
   const [executions, setExecutions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [ncTasks, setNcTasks] = useState<any[]>([])
+  const [loadingNc, setLoadingNc] = useState(true)
 
   const [filterPlant, setFilterPlant] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [filterTitle, setFilterTitle] = useState('all')
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
+
+  const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
 
   useEffect(() => {
     if (!profile) return
@@ -64,12 +76,14 @@ export default function AuditoriaDashboard() {
 
     const load = async () => {
       setLoading(true)
+      setLoadingNc(true)
+
       let query = supabase
         .from('audit_executions')
         .select('*, audits!inner(*)')
         .eq('audits.client_id', targetClientId)
 
-      if (profile.role !== 'Administrador' && profile.role !== 'Master') {
+      if (!isSuperAdmin) {
         const authPlants = profile.authorized_plants || []
         if (authPlants.length > 0) {
           query = query.in('plant_id', authPlants)
@@ -78,12 +92,54 @@ export default function AuditoriaDashboard() {
         }
       }
 
-      const { data } = await query
-      setExecutions(data || [])
+      // Consulta única de Não Conformidades (tarefas originadas por auditorias)
+      let ncQuery = supabase
+        .from('tasks')
+        .select(`
+          id,
+          task_number,
+          title,
+          description,
+          plant_id,
+          client_id,
+          created_at,
+          due_date,
+          closed_at,
+          approval_status,
+          rejection_reason,
+          status_id,
+          audit_id,
+          task_statuses (
+            id,
+            name,
+            is_terminal,
+            color
+          ),
+          task_types!inner (
+            id,
+            name
+          )
+        `)
+        .eq('client_id', targetClientId)
+
+      if (!isSuperAdmin) {
+        const authPlants = profile.authorized_plants || []
+        if (authPlants.length > 0) {
+          ncQuery = ncQuery.in('plant_id', authPlants)
+        } else {
+          ncQuery = ncQuery.eq('id', '00000000-0000-0000-0000-000000000000')
+        }
+      }
+
+      const [execRes, ncRes] = await Promise.all([query, ncQuery])
+
+      setExecutions(execRes.data || [])
+      setNcTasks(ncRes.data || [])
       setLoading(false)
+      setLoadingNc(false)
     }
     load()
-  }, [profile, activeClient])
+  }, [profile, activeClient, isSuperAdmin])
 
   const filtered = useMemo(() => {
     return executions.filter((e) => {
@@ -126,6 +182,126 @@ export default function AuditoriaDashboard() {
 
     return { total, totalFinished, avgScore }
   }, [filtered])
+
+  // Indicadores de Não Conformidades (NCs)
+  const ncKpis = useMemo(() => {
+    const isNcType = (task: any) => {
+      const typeName = task.task_types?.name?.toLowerCase() || ''
+      const title = task.title?.toLowerCase() || ''
+      return (
+        typeName.includes('não conformidade') ||
+        typeName.includes('nao conformidade') ||
+        typeName === 'nc' ||
+        title.startsWith('não conformidade') ||
+        title.startsWith('nao conformidade') ||
+        title.startsWith('nc:')
+      )
+    }
+
+    const isExcluded = (task: any) => {
+      const statusName = task.task_statuses?.name?.toLowerCase() || ''
+      return statusName.includes('exclu')
+    }
+
+    const isResolvedOrTerminal = (task: any) => {
+      const status = task.task_statuses
+      const statusName = status?.name?.toLowerCase() || ''
+      return (
+        status?.is_terminal === true ||
+        statusName.includes('finaliz') ||
+        statusName.includes('conclu') ||
+        statusName.includes('cancel')
+      )
+    }
+
+    // Filtra as NCs conforme a planta selecionada e período (se houver)
+    const filteredNc = ncTasks.filter((t) => {
+      if (!isNcType(t)) return false
+      if (isExcluded(t)) return false
+
+      if (filterPlant !== 'all' && t.plant_id !== filterPlant) return false
+
+      if (dateRange?.from) {
+        const itemDate = new Date(t.created_at)
+        if (itemDate < dateRange.from) return false
+
+        if (!dateRange.to) {
+          const toDate = new Date(dateRange.from)
+          toDate.setHours(23, 59, 59, 999)
+          if (itemDate > toDate) return false
+        }
+      }
+      if (dateRange?.to) {
+        const itemDate = new Date(t.created_at)
+        const toDate = new Date(dateRange.to)
+        toDate.setHours(23, 59, 59, 999)
+        if (itemDate > toDate) return false
+      }
+
+      return true
+    })
+
+    const parseDueDate = (dueDate: string | null | undefined): Date | null => {
+      if (!dueDate) return null
+      if (typeof dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dueDate.trim())) {
+        return new Date(`${dueDate.trim()}T23:59:59`)
+      }
+      return new Date(dueDate)
+    }
+
+    const now = new Date()
+
+    let abertasCount = 0
+    let pendentesFechamentoCount = 0
+    let pendentesAprovacaoCount = 0
+    let reprovadasCount = 0
+    let emAtrasoCount = 0
+
+    filteredNc.forEach((task) => {
+      const isTerminal = isResolvedOrTerminal(task)
+      const statusName = task.task_statuses?.name?.toLowerCase() || ''
+      const isAwaitingApproval =
+        statusName.includes('aguardando aprova') || task.approval_status === 'pending'
+      const isRejected = task.approval_status === 'rejected'
+
+      // 1. NCs Abertas: não resolvidas / não terminais
+      if (!isTerminal) {
+        abertasCount++
+      }
+
+      // 2. Pendentes de Aprovação: marcadas 'Finalizado' pelo responsável, aguardando aprovação do solicitante
+      if (isAwaitingApproval && !isTerminal) {
+        pendentesAprovacaoCount++
+      }
+
+      // 3. Reprovadas: reprovadas pelo solicitante (com motivo)
+      if (isRejected && !isTerminal) {
+        reprovadasCount++
+      }
+
+      // 4. Pendentes de Fechamento: trabalho feito, falta fechar (aguardando aprovação/encerramento)
+      if (isAwaitingApproval && !isTerminal) {
+        pendentesFechamentoCount++
+      }
+
+      // 5. Em atraso: NCs abertas com due_date vencido (fuso Brasil, não contando concluídas/excluídas)
+      if (!isTerminal) {
+        const due = parseDueDate(task.due_date)
+        if (due && now > due) {
+          emAtrasoCount++
+        }
+      }
+    })
+
+    return {
+      total: filteredNc.length,
+      abertas: abertasCount,
+      pendentesFechamento: pendentesFechamentoCount,
+      pendentesAprovacao: pendentesAprovacaoCount,
+      reprovadas: reprovadasCount,
+      emAtraso: emAtrasoCount,
+    }
+  }, [ncTasks, filterPlant, dateRange])
 
   const plantData = useMemo(() => {
     const groups: any = {}
@@ -253,6 +429,170 @@ export default function AuditoriaDashboard() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Fileira de 5 Indicadores de Não Conformidades (NCs) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">
+                  Não Conformidades de Auditoria (NCs)
+                </h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-brand-deepBlue hover:bg-brand-deepBlue/10 gap-1 h-8"
+                onClick={() =>
+                  navigate(
+                    filterPlant !== 'all'
+                      ? `/gestao-tarefas?plant=${filterPlant}`
+                      : '/gestao-tarefas',
+                  )
+                }
+              >
+                Ver Painel de Chamados
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {/* 1. NCs Abertas — neutro */}
+              <Card
+                onClick={() =>
+                  navigate(
+                    filterPlant !== 'all'
+                      ? `/gestao-tarefas?plant=${filterPlant}`
+                      : '/gestao-tarefas',
+                  )
+                }
+                className="shadow-sm border-l-4 border-l-slate-400 border-gray-200 hover:shadow-md hover:border-slate-400 transition-all cursor-pointer"
+              >
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-slate-600 flex items-center justify-between">
+                    <span className="truncate">NCs Abertas</span>
+                    <AlertCircle className="h-4 w-4 text-slate-500 shrink-0" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                      {loadingNc ? '—' : ncKpis.abertas}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">não resolvidas</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 2. Pendentes de Fechamento — neutro/azul suave */}
+              <Card
+                onClick={() =>
+                  navigate(
+                    filterPlant !== 'all'
+                      ? `/gestao-tarefas?plant=${filterPlant}`
+                      : '/gestao-tarefas',
+                  )
+                }
+                className="shadow-sm border-l-4 border-l-blue-500 border-gray-200 hover:shadow-md hover:border-blue-400 transition-all cursor-pointer"
+              >
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-slate-600 flex items-center justify-between">
+                    <span className="truncate">Pendentes de Fechamento</span>
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                      {loadingNc ? '—' : ncKpis.pendentesFechamento}
+                    </div>
+                    <span className="text-[11px] text-blue-600 font-medium">trabalho feito</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 3. Pendentes de Aprovação — âmbar */}
+              <Card
+                onClick={() =>
+                  navigate(
+                    filterPlant !== 'all'
+                      ? `/gestao-tarefas?plant=${filterPlant}`
+                      : '/gestao-tarefas',
+                  )
+                }
+                className="shadow-sm border-l-4 border-l-amber-500 border-gray-200 hover:shadow-md hover:border-amber-400 transition-all cursor-pointer bg-amber-50/20"
+              >
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-amber-900 flex items-center justify-between">
+                    <span className="truncate">Pendentes de Aprovação</span>
+                    <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-2xl sm:text-3xl font-black text-amber-700">
+                      {loadingNc ? '—' : ncKpis.pendentesAprovacao}
+                    </div>
+                    <span className="text-[11px] text-amber-700 font-medium">solicitante</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 4. Reprovadas — vermelho */}
+              <Card
+                onClick={() =>
+                  navigate(
+                    filterPlant !== 'all'
+                      ? `/gestao-tarefas?plant=${filterPlant}`
+                      : '/gestao-tarefas',
+                  )
+                }
+                className="shadow-sm border-l-4 border-l-red-500 border-gray-200 hover:shadow-md hover:border-red-400 transition-all cursor-pointer bg-red-50/20"
+              >
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-red-900 flex items-center justify-between">
+                    <span className="truncate">Reprovadas</span>
+                    <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-2xl sm:text-3xl font-black text-red-600">
+                      {loadingNc ? '—' : ncKpis.reprovadas}
+                    </div>
+                    <span className="text-[11px] text-red-600 font-medium">com motivo</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 5. Em atraso — vermelho */}
+              <Card
+                onClick={() =>
+                  navigate(
+                    filterPlant !== 'all'
+                      ? `/gestao-tarefas?plant=${filterPlant}`
+                      : '/gestao-tarefas',
+                  )
+                }
+                className="shadow-sm border-l-4 border-l-rose-600 border-gray-200 hover:shadow-md hover:border-rose-500 transition-all cursor-pointer bg-rose-50/30"
+              >
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-rose-900 flex items-center justify-between">
+                    <span className="truncate">Em atraso</span>
+                    <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-2xl sm:text-3xl font-black text-rose-700">
+                      {loadingNc ? '—' : ncKpis.emAtraso}
+                    </div>
+                    <span className="text-[11px] text-rose-600 font-medium">prazo vencido</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="shadow-sm border-gray-200 hover:shadow-md transition-all">
               <CardContent className="p-6 flex items-center gap-4">
