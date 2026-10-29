@@ -604,8 +604,6 @@ export default function Relatorios() {
           companies={companies}
           selectedPlants={selectedPlants}
           selectedCompanies={selectedCompanies}
-          onCompanyChange={handleCompanyChange}
-          onClearCompanies={() => setSelectedCompanies([])}
           dateFrom={cargoDateFrom}
           dateTo={cargoDateTo}
           onDateFromChange={setCargoDateFrom}
