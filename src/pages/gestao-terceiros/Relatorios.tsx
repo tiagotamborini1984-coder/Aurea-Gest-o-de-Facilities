@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Table,
   TableBody,
@@ -13,7 +13,15 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
-import { FileSpreadsheet, Loader2, Printer, Briefcase } from 'lucide-react'
+import {
+  FileSpreadsheet,
+  Loader2,
+  Printer,
+  Briefcase,
+  ChevronDown,
+  ChevronRight,
+  Calendar,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useMasterData } from '@/hooks/use-master-data'
 import { exportToCSV } from '@/lib/export'
@@ -23,6 +31,10 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/AppContext'
 import RelatorioCargos from './components/RelatorioCargos'
 import { useCargoCalculations } from './hooks/useCargoCalculations'
+import {
+  calculateColaboradorReport,
+  ConsolidatedColaboradorReportRow,
+} from './utils/colaborador-calculations'
 
 export default function Relatorios() {
   const { profile, selectedMasterClient } = useAppStore()
@@ -36,6 +48,7 @@ export default function Relatorios() {
   const [activeTab, setActiveTab] = useState('colaborador')
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [expandedColaboradorId, setExpandedColaboradorId] = useState<string | null>(null)
 
   const { toast } = useToast()
   const {
@@ -138,26 +151,14 @@ export default function Relatorios() {
     let result: any[] = []
 
     if (activeTab === 'colaborador') {
-      const targets = employees.filter(
-        (e) =>
-          effectiveSelectedPlants.includes(e.plant_id) &&
-          matchesCompany(e.company_id, e.company_name),
-      )
-      result = targets.map((emp) => {
-        const eLogs = validLogs.filter((l) => l.type === 'staff' && l.reference_id === emp.id)
-        const pres = eLogs.filter((l) => l.status).length
-        const faltas = eLogs.filter((l) => !l.status).length
-        const mPres = pres / validDays
-        const mFaltas = faltas / validDays
-        const cont = 1
-        return {
-          Entidade: emp.name,
-          'Média Presenças': mPres,
-          'Média Faltas': mFaltas,
-          Contratado: cont,
-          'Taxa Presença': (mPres / cont) * 100,
-          Absenteísmo: (mFaltas / cont) * 100,
-        }
+      return calculateColaboradorReport({
+        employees,
+        logs: validLogs,
+        plants,
+        effectiveSelectedPlants,
+        matchesCompany,
+        dateFrom,
+        dateTo,
       })
     } else if (activeTab === 'local') {
       const targets = locations.filter((l) => effectiveSelectedPlants.includes(l.plant_id))
@@ -328,6 +329,8 @@ export default function Relatorios() {
     employeeTrainingRecords,
     trainings,
     companies,
+    dateFrom,
+    dateTo,
   ])
 
   // Hook auxiliar para exportação CSV dos dados por cargo
@@ -371,6 +374,34 @@ export default function Relatorios() {
     }
 
     if (reportData.length > 0) {
+      if (activeTab === 'colaborador') {
+        const exportData = (reportData as ConsolidatedColaboradorReportRow[]).map((row) => {
+          const formattedAbsenceDates = (row.absenceDates || [])
+            .map((d) => {
+              const [y, m, day] = d.split('-')
+              return `${day}/${m}/${y}`
+            })
+            .join(', ')
+
+          return {
+            Colaborador: row.Entidade,
+            Empresa: row.companyName || '—',
+            Planta: row.plantName || '—',
+            'Dias Lançados': row.loggedDays,
+            'Total Presenças': row.presencasCount,
+            'Total Faltas': row['Total Faltas'],
+            'Média Presenças': row['Média Presenças'].toFixed(2),
+            'Média Faltas': row['Média Faltas'].toFixed(2),
+            'Taxa Presença (%)': `${row['Taxa Presença'].toFixed(1)}%`,
+            'Absenteísmo (%)': `${row.Absenteísmo.toFixed(1)}%`,
+            'Datas das Faltas': formattedAbsenceDates || 'Nenhuma falta',
+          }
+        })
+        exportToCSV(`Relatorio_Por_Colaborador_${format(new Date(), 'yyyy-MM-dd')}.csv`, exportData)
+        toast({ title: 'Relatório por colaborador exportado para Excel' })
+        return
+      }
+
       const exportData = reportData.map((row) => {
         const newRow: any = {}
         Object.keys(row).forEach((key) => {
@@ -652,6 +683,31 @@ export default function Relatorios() {
                     Dias para o Vencimento
                   </TableHead>
                 </TableRow>
+              ) : activeTab === 'colaborador' ? (
+                <TableRow>
+                  <TableHead className="w-10 print:hidden" />
+                  <TableHead className="font-semibold text-slate-800 h-12 print:text-black print:p-2 text-left">
+                    Colaborador
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
+                    Dias Lançados
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
+                    Total Faltas
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
+                    Média Presença
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
+                    Taxa Presença
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-800 text-center print:text-black print:p-2">
+                    Absenteísmo
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-800 text-left hidden print:table-cell print:text-black print:p-2">
+                    Dias de Falta
+                  </TableHead>
+                </TableRow>
               ) : (
                 <TableRow>
                   <TableHead className="font-semibold text-slate-800 h-12 print:text-black print:p-2">
@@ -679,7 +735,7 @@ export default function Relatorios() {
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={activeTab === 'treinamentos' ? 4 : 6}
+                    colSpan={activeTab === 'treinamentos' ? 4 : activeTab === 'colaborador' ? 8 : 6}
                     className="text-center py-12"
                   >
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-brand-deepBlue" />
@@ -688,12 +744,142 @@ export default function Relatorios() {
               ) : reportData.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={activeTab === 'treinamentos' ? 4 : 6}
+                    colSpan={activeTab === 'treinamentos' ? 4 : activeTab === 'colaborador' ? 8 : 6}
                     className="text-center py-12 text-slate-600"
                   >
                     Sem dados para exibir no período selecionado.
                   </TableCell>
                 </TableRow>
+              ) : activeTab === 'colaborador' ? (
+                (reportData as ConsolidatedColaboradorReportRow[]).map((row) => {
+                  const isExpanded = expandedColaboradorId === row.id
+                  const hasAbsences = (row.absenceDates || []).length > 0
+                  const printAbsencesText = hasAbsences
+                    ? row.absenceDates
+                        .map((absDate) => {
+                          const [y, m, d] = absDate.split('-')
+                          return `${d}/${m}/${y}`
+                        })
+                        .join(', ')
+                    : 'Nenhuma falta'
+
+                  return (
+                    <React.Fragment key={row.id}>
+                      <TableRow
+                        onClick={() => setExpandedColaboradorId(isExpanded ? null : row.id)}
+                        className={cn(
+                          'cursor-pointer transition-colors hover:bg-slate-50/70 border-b border-gray-100 print:border-b print:border-slate-300',
+                          isExpanded ? 'bg-slate-50/80 font-medium' : '',
+                        )}
+                      >
+                        <TableCell className="w-10 text-center py-3 text-slate-400 print:hidden">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-brand-deepBlue mx-auto" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 mx-auto" />
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-900 print:text-black print:p-2 print:break-inside-avoid">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-900">{row.Entidade}</span>
+                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 print:hidden">
+                              {row.companyName && <span>{row.companyName}</span>}
+                              {row.companyName && row.plantName && <span>•</span>}
+                              {row.plantName && <span>{row.plantName}</span>}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
+                          {row.loggedDays}
+                        </TableCell>
+                        <TableCell className="text-center print:p-2 print:break-inside-avoid">
+                          <span
+                            className={cn(
+                              'inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold print:bg-transparent print:text-black',
+                              row['Total Faltas'] > 0
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-emerald-100 text-emerald-800',
+                            )}
+                          >
+                            {row['Total Faltas']}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center print:p-2 print:break-inside-avoid">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold bg-green-100 text-green-800 print:bg-transparent print:text-black">
+                            {Number(row['Média Presenças']).toFixed(2)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center font-medium text-slate-700 print:text-black print:p-2 print:break-inside-avoid">
+                          {Number(row['Taxa Presença']).toFixed(1)}%
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            'text-center font-semibold print:text-black print:p-2 print:break-inside-avoid',
+                            Number(row.Absenteísmo) > 0
+                              ? 'text-red-700 print:text-black'
+                              : 'text-slate-700 print:text-black',
+                          )}
+                        >
+                          {Number(row.Absenteísmo).toFixed(1)}%
+                        </TableCell>
+                        <TableCell className="text-left text-xs font-normal hidden print:table-cell print:text-black print:p-2 print:break-inside-avoid max-w-[200px]">
+                          {printAbsencesText}
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Linha expansível com o detalhe de faltas e dias que compõem a média */}
+                      {isExpanded && (
+                        <TableRow className="bg-slate-50/60 hover:bg-slate-50/60 border-b border-slate-200 print:hidden">
+                          <TableCell colSpan={7} className="p-4 sm:p-5">
+                            <div className="space-y-3 bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-brand-deepBlue" />
+                                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                    Detalhamento de Faltas: {row.Entidade}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-slate-500">
+                                  {row.loggedDays} dias registrados no período ({row.presencasCount}{' '}
+                                  presenças, {row['Total Faltas']} faltas)
+                                </span>
+                              </div>
+
+                              {hasAbsences ? (
+                                <div className="space-y-2">
+                                  <p className="text-xs text-slate-600 font-medium">
+                                    Datas exatas em que o colaborador esteve ausente:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {row.absenceDates.map((absDate) => {
+                                      const [y, m, d] = absDate.split('-')
+                                      const formatted = `${d}/${m}/${y}`
+                                      return (
+                                        <span
+                                          key={absDate}
+                                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-red-50 text-red-700 border border-red-200"
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                                          {formatted}
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-emerald-700 font-semibold bg-emerald-50 p-2.5 rounded border border-emerald-100">
+                                  Nenhuma falta registrada no período. Média composta por{' '}
+                                  {row.presencasCount} presenças em {row.loggedDays} dias lançados
+                                  (100% de presença).
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )
+                })
               ) : activeTab === 'treinamentos' ? (
                 reportData.map((row, i) => (
                   <TableRow
