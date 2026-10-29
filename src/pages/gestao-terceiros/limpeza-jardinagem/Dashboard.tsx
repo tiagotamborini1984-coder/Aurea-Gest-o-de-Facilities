@@ -8,7 +8,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Leaf, Sprout, Wind, Loader2 } from 'lucide-react'
+import { Leaf, Sprout, Wind, Loader2, Target, Settings2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useMasterData } from '@/hooks/use-master-data'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
@@ -21,14 +22,16 @@ import {
   XAxis,
   YAxis,
   Legend,
-  ResponsiveContainer,
   LabelList,
+  ReferenceLine,
 } from 'recharts'
 import { Navigate } from 'react-router-dom'
 import { useHasAccess } from '@/hooks/use-has-access'
 import { RankingList } from '../components/BIRankings'
 import { cn } from '@/lib/utils'
 import { deduplicateSchedules } from '@/lib/cleaning-gardening-dedupe'
+import { GoalSettingsDialog } from './components/GoalSettingsDialog'
+import { getCleaningGoals, CleaningGardeningGoal } from '@/services/cleaning-goals'
 
 export default function DashboardLJ() {
   const { profile } = useAppStore()
@@ -40,6 +43,20 @@ export default function DashboardLJ() {
   const [schedules, setSchedules] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
+  // Metas cadastradas
+  const [goals, setGoals] = useState<CleaningGardeningGoal[]>([])
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false)
+
+  const fetchGoals = async () => {
+    if (!profile?.client_id) return
+    const data = await getCleaningGoals(profile.client_id)
+    setGoals(data)
+  }
+
+  useEffect(() => {
+    fetchGoals()
+  }, [profile?.client_id])
+
   useEffect(() => {
     const fetchStats = async () => {
       if (!profile) return
@@ -47,7 +64,7 @@ export default function DashboardLJ() {
 
       let q = supabase
         .from('cleaning_gardening_schedules')
-        .select('*, areas:area_id(name, type)')
+        .select('*, areas:area_id(id, name, type, target_percentage)')
         .eq('client_id', profile.client_id)
         .gte('activity_date', startDate)
         .lte('activity_date', endDate)
@@ -92,22 +109,93 @@ export default function DashboardLJ() {
     }
   }, [consolidatedSchedules])
 
+  // Meta aplicável no contexto atual (global ou específica da planta selecionada)
+  const activeTargetPercentage = useMemo<number | null>(() => {
+    if (goals.length === 0) return null
+
+    // 1. Se estiver filtrado por planta específica, procura meta daquela planta
+    if (plantId !== 'all') {
+      const plantGoal = goals.find((g) => g.plant_id === plantId && !g.area_id)
+      if (
+        plantGoal &&
+        plantGoal.target_percentage !== null &&
+        plantGoal.target_percentage !== undefined
+      ) {
+        return Number(plantGoal.target_percentage)
+      }
+    }
+
+    // 2. Meta geral do cliente (sem planta nem área)
+    const globalGoal = goals.find((g) => !g.plant_id && !g.area_id)
+    if (
+      globalGoal &&
+      globalGoal.target_percentage !== null &&
+      globalGoal.target_percentage !== undefined
+    ) {
+      return Number(globalGoal.target_percentage)
+    }
+
+    return null
+  }, [goals, plantId])
+
+  // Gráfico Status por Área (Top 10):
+  // Denominador = total de atividades programadas na área no período filtrado.
+  // Valores expressos em porcentagem (%) de Realizado, Pendente e Não Realizado.
   const chartData = useMemo(() => {
-    const grouped: any = {}
+    const grouped: Record<
+      string,
+      {
+        area: string
+        totalProgramado: number
+        countRealizado: number
+        countPendente: number
+        countNaoRealizado: number
+        areaTarget?: number | null
+      }
+    > = {}
+
     consolidatedSchedules.forEach((s) => {
       const aName = s.areas?.name || 'Desconhecida'
-      if (!grouped[aName])
-        grouped[aName] = { area: aName, Realizado: 0, NãoRealizado: 0, Pendente: 0 }
-      if (s.status === 'Realizado') grouped[aName].Realizado++
-      else if (s.status === 'Não Realizado') grouped[aName].NãoRealizado++
-      else grouped[aName].Pendente++
+      if (!grouped[aName]) {
+        grouped[aName] = {
+          area: aName,
+          totalProgramado: 0,
+          countRealizado: 0,
+          countPendente: 0,
+          countNaoRealizado: 0,
+          areaTarget: s.areas?.target_percentage ?? null,
+        }
+      }
+      grouped[aName].totalProgramado++
+      if (s.status === 'Realizado') grouped[aName].countRealizado++
+      else if (s.status === 'Não Realizado') grouped[aName].countNaoRealizado++
+      else grouped[aName].countPendente++
     })
+
     return Object.values(grouped)
-      .sort(
-        (a: any, b: any) =>
-          b.Realizado + b.NãoRealizado + b.Pendente - (a.Realizado + a.NãoRealizado + a.Pendente),
-      )
+      .sort((a, b) => b.totalProgramado - a.totalProgramado)
       .slice(0, 10)
+      .map((item) => {
+        const total = item.totalProgramado
+        // Cálculo percentual exato em relação ao total programado no período
+        const pctRealizado =
+          total > 0 ? Number(((item.countRealizado / total) * 100).toFixed(1)) : 0
+        const pctPendente = total > 0 ? Number(((item.countPendente / total) * 100).toFixed(1)) : 0
+        const pctNaoRealizado =
+          total > 0 ? Number(((item.countNaoRealizado / total) * 100).toFixed(1)) : 0
+
+        return {
+          area: item.area,
+          totalProgramado: total,
+          countRealizado: item.countRealizado,
+          countPendente: item.countPendente,
+          countNaoRealizado: item.countNaoRealizado,
+          Realizado: pctRealizado,
+          Pendente: pctPendente,
+          NãoRealizado: pctNaoRealizado,
+          areaTarget: item.areaTarget,
+        }
+      })
   }, [consolidatedSchedules])
 
   const plantRankingData = useMemo(() => {
@@ -243,8 +331,30 @@ export default function DashboardLJ() {
 
           <div className={cn('grid gap-4 grid-cols-1', plantId === 'all' ? 'lg:grid-cols-3' : '')}>
             <Card className={cn('shadow-sm', plantId === 'all' ? 'lg:col-span-2' : '')}>
-              <CardHeader className="bg-muted/30 border-b py-4">
-                <CardTitle className="text-lg">Status por Área (Top 10)</CardTitle>
+              <CardHeader className="bg-muted/30 border-b py-3 px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">Status por Área (Top 10)</CardTitle>
+                    {activeTargetPercentage !== null && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        <Target className="h-3 w-3" />
+                        Meta: {activeTargetPercentage}%
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    % de atividades em relação ao total programado no período filtrado
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsGoalModalOpen(true)}
+                  className="gap-1.5 self-start sm:self-auto h-8 text-xs font-medium"
+                >
+                  <Settings2 className="h-3.5 w-3.5 text-brand-deepBlue" />
+                  Configurar Meta
+                </Button>
               </CardHeader>
               <CardContent className="p-6">
                 {chartData.length === 0 ? (
@@ -252,52 +362,122 @@ export default function DashboardLJ() {
                 ) : (
                   <ChartContainer
                     config={{
-                      Realizado: { label: 'Realizado', color: 'hsl(var(--primary))' },
-                      Pendente: { label: 'Pendente', color: '#f59e0b' },
-                      NãoRealizado: { label: 'Não Realizado', color: '#ef4444' },
+                      Realizado: { label: 'Realizado (%)', color: '#10b981' },
+                      Pendente: { label: 'Pendente (%)', color: '#f59e0b' },
+                      NãoRealizado: { label: 'Não Realizado (%)', color: '#ef4444' },
                     }}
-                    className="h-[300px] w-full"
+                    className="h-[320px] w-full"
                   >
-                    <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 24, right: 16, left: -10, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
                         dataKey="area"
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 12, fill: 'currentColor' }}
+                        tick={{ fontSize: 11, fill: 'currentColor' }}
                       />
                       <YAxis
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fontSize: 12, fill: 'currentColor' }}
+                        domain={[0, 100]}
+                        ticks={[0, 25, 50, 75, 100]}
+                        tickFormatter={(val) => `${val}%`}
+                        tick={{ fontSize: 11, fill: 'currentColor' }}
                       />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name, item) => {
+                              const vNum = typeof value === 'number' ? value : Number(value)
+                              const payload = item?.payload
+                              let countInfo = ''
+                              if (name === 'Realizado' && payload?.countRealizado !== undefined) {
+                                countInfo = ` (${payload.countRealizado}/${payload.totalProgramado})`
+                              } else if (
+                                (name === 'NãoRealizado' || name === 'Não Realizado') &&
+                                payload?.countNaoRealizado !== undefined
+                              ) {
+                                countInfo = ` (${payload.countNaoRealizado}/${payload.totalProgramado})`
+                              } else if (
+                                name === 'Pendente' &&
+                                payload?.countPendente !== undefined
+                              ) {
+                                countInfo = ` (${payload.countPendente}/${payload.totalProgramado})`
+                              }
+                              return (
+                                <span>
+                                  {vNum.toFixed(1)}%{countInfo}
+                                </span>
+                              )
+                            }}
+                          />
+                        }
+                      />
                       <Legend />
-                      <Bar dataKey="Realizado" fill="#10b981" radius={[0, 0, 0, 0]} stackId="a">
+
+                      {/* Linha da meta desejada sobreposta ao gráfico quando configurada */}
+                      {activeTargetPercentage !== null && (
+                        <ReferenceLine
+                          y={activeTargetPercentage}
+                          stroke="#e11d48"
+                          strokeWidth={2}
+                          strokeDasharray="4 4"
+                          label={{
+                            position: 'top',
+                            value: `Meta: ${activeTargetPercentage}%`,
+                            fill: '#e11d48',
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}
+                        />
+                      )}
+
+                      <Bar
+                        dataKey="Realizado"
+                        name="Realizado"
+                        fill="#10b981"
+                        radius={[0, 0, 0, 0]}
+                        stackId="a"
+                      >
                         <LabelList
                           dataKey="Realizado"
                           position="inside"
                           fill="#fff"
                           className="text-[10px] font-bold"
-                          formatter={(val: number) => (val > 0 ? val : '')}
+                          formatter={(val: number) => (val >= 8 ? `${val.toFixed(0)}%` : '')}
                         />
                       </Bar>
-                      <Bar dataKey="Pendente" fill="#f59e0b" radius={[0, 0, 0, 0]} stackId="a">
+                      <Bar
+                        dataKey="Pendente"
+                        name="Pendente"
+                        fill="#f59e0b"
+                        radius={[0, 0, 0, 0]}
+                        stackId="a"
+                      >
                         <LabelList
                           dataKey="Pendente"
                           position="inside"
                           fill="#fff"
                           className="text-[10px] font-bold"
-                          formatter={(val: number) => (val > 0 ? val : '')}
+                          formatter={(val: number) => (val >= 8 ? `${val.toFixed(0)}%` : '')}
                         />
                       </Bar>
-                      <Bar dataKey="NãoRealizado" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a">
+                      <Bar
+                        dataKey="NãoRealizado"
+                        name="Não Realizado"
+                        fill="#ef4444"
+                        radius={[4, 4, 0, 0]}
+                        stackId="a"
+                      >
                         <LabelList
                           dataKey="NãoRealizado"
                           position="inside"
                           fill="#fff"
                           className="text-[10px] font-bold"
-                          formatter={(val: number) => (val > 0 ? val : '')}
+                          formatter={(val: number) => (val >= 8 ? `${val.toFixed(0)}%` : '')}
                         />
                       </Bar>
                     </BarChart>
@@ -318,6 +498,18 @@ export default function DashboardLJ() {
             )}
           </div>
         </>
+      )}
+
+      {/* Modal para configurar a meta percentual do módulo / planta */}
+      {profile?.client_id && (
+        <GoalSettingsDialog
+          open={isGoalModalOpen}
+          onOpenChange={setIsGoalModalOpen}
+          clientId={profile.client_id}
+          currentPlantId={plantId}
+          plantName={plants.find((p) => p.id === plantId)?.name}
+          onSaved={fetchGoals}
+        />
       )}
     </div>
   )

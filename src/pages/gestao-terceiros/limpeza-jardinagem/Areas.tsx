@@ -147,6 +147,12 @@ export default function AreasLJ() {
         description: formData.description,
         type: formData.type,
         plant_id: formData.plant_id,
+        target_percentage:
+          formData.target_percentage !== null &&
+          formData.target_percentage !== undefined &&
+          formData.target_percentage !== ''
+            ? Number(formData.target_percentage)
+            : null,
         polygon_data: polygon,
         client_id: profile.client_id,
       }
@@ -241,6 +247,7 @@ export default function AreasLJ() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Planta</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead className="text-center">Meta Desejada (%)</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead className="w-24">Ações</TableHead>
                 </TableRow>
@@ -263,6 +270,15 @@ export default function AreasLJ() {
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
                           {area.type === 'cleaning' ? 'Limpeza' : 'Jardinagem'}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-center font-semibold">
+                        {area.target_percentage !== null && area.target_percentage !== undefined ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            {area.target_percentage}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">Geral</span>
+                        )}
                       </TableCell>
                       <TableCell>{area.description || '-'}</TableCell>
                       <TableCell>
@@ -346,6 +362,33 @@ export default function AreasLJ() {
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Meta Desejada da Área (%) (Opcional)</label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    placeholder="Ex: 95 (se vazio, herda meta geral)"
+                    value={formData.target_percentage ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        target_percentage:
+                          e.target.value === '' ? null : parseFloat(e.target.value),
+                      })
+                    }
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-2.5 text-muted-foreground text-sm font-medium">
+                    %
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Percentual de atingimento esperado para esta área específica.
+                </p>
               </div>
             </div>
 
