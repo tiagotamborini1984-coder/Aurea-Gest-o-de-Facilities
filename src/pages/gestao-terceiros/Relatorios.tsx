@@ -220,7 +220,13 @@ export default function Relatorios() {
         }
       })
     } else if (activeTab === 'equipamento') {
-      const targets = equipment.filter((e) => effectiveSelectedPlants.includes(e.plant_id))
+      const targets = equipment.filter((e) => {
+        if (!effectiveSelectedPlants.includes(e.plant_id)) return false
+        if (selectedCompanies.length > 0) {
+          if (!matchesCompany(e.company_id, e.company_name)) return false
+        }
+        return true
+      })
       result = targets.map((eq) => {
         const eLogs = validLogs.filter((l) => l.type === 'equipment' && l.reference_id === eq.id)
         const pres = eLogs.filter((l) => l.status).length
@@ -229,8 +235,15 @@ export default function Relatorios() {
         const mFaltas = faltas / validDays
         const cont =
           contracted
-            .filter((c) => c.equipment_id === eq.id && c.type === 'equipamento')
-            .reduce((a, b) => a + b.quantity, 0) || eq.quantity
+            .filter((c) => {
+              if (c.equipment_id !== eq.id || c.type !== 'equipamento') return false
+              if (selectedCompanies.length > 0) {
+                if (!c.company_id) return false
+                if (!matchesCompany(c.company_id, null)) return false
+              }
+              return true
+            })
+            .reduce((a, b) => a + b.quantity, 0) || (selectedCompanies.length > 0 ? 0 : eq.quantity)
         return {
           Entidade: eq.name,
           'Média Presenças': mPres,
@@ -466,7 +479,7 @@ export default function Relatorios() {
             </div>
           </div>
 
-          {activeTab !== 'equipamento' && availableCompanies.length > 0 && (
+          {availableCompanies.length > 0 && (
             <>
               <div className="h-px bg-slate-100 my-4" />
               <div className="space-y-3">

@@ -198,6 +198,19 @@ export function useCargoCalculations({
       return true
     })
 
+    // Filtra contracted_headcount respeitando empresa (quando selecionada)
+    // Se empresa estiver filtrada: se c.company_id existir, checa matchesCompany(c.company_id, ...).
+    // Se o registro contracted_headcount não tiver company_id, só incluímos se nenhuma empresa estiver filtrada.
+    const scopedContracted = contracted.filter((c) => {
+      if (c.type !== 'colaborador' || !c.function_id) return false
+      if (c.plant_id && !validPlantIds.includes(c.plant_id)) return false
+      if (activeSelectedCompanies.length > 0) {
+        if (!c.company_id) return false
+        if (!matchesCompany(c.company_id, null)) return false
+      }
+      return true
+    })
+
     // Lista de cargos de interesse
     let targetFunctions = functions.filter((f) => {
       if (selectedFunctionId && selectedFunctionId !== 'all') {
@@ -207,13 +220,15 @@ export function useCargoCalculations({
     })
 
     // Se nenhum cargo estiver selecionado especificamente, limitamos aos cargos que aparecem
-    // em employees ou em contracted_headcount para não poluir a tela com cargos vazios
+    // em scopedEmployees ou em scopedContracted para não poluir a tela com cargos vazios.
+    // Quando uma empresa está filtrada, somente cargos vinculados àquela empresa
+    // (colaboradores daquela empresa ou quadro contratado daquela empresa) são incluídos!
     if (!selectedFunctionId || selectedFunctionId === 'all') {
       const usedFunctionIds = new Set<string>()
       scopedEmployees.forEach((e) => {
         if (e.function_id) usedFunctionIds.add(e.function_id)
       })
-      contracted.forEach((c) => {
+      scopedContracted.forEach((c) => {
         if (c.type === 'colaborador' && c.function_id && validPlantIds.includes(c.plant_id)) {
           usedFunctionIds.add(c.function_id)
         }
@@ -272,19 +287,6 @@ export function useCargoCalculations({
       const cDate = new Date(emp.created_at || '2000-01-01')
       if (cDate < group.firstCreated) group.firstCreated = cDate
       if (cDate > group.lastCreated) group.lastCreated = cDate
-    })
-
-    // Filtra contracted_headcount respeitando empresa (quando selecionada)
-    // Se empresa estiver filtrada: se c.company_id existir, checa matchesCompany(c.company_id, ...).
-    // Se o registro contracted_headcount não tiver company_id, só incluímos se nenhuma empresa estiver filtrada.
-    const scopedContracted = contracted.filter((c) => {
-      if (c.type !== 'colaborador' || !c.function_id) return false
-      if (c.plant_id && !validPlantIds.includes(c.plant_id)) return false
-      if (activeSelectedCompanies.length > 0) {
-        if (!c.company_id) return false
-        if (!matchesCompany(c.company_id, null)) return false
-      }
-      return true
     })
 
     // Indexa contracted_headcount filtrado para consulta rápida:

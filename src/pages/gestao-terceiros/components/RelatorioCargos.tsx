@@ -123,6 +123,14 @@ export default function RelatorioCargos({
     setExpandedCargoId((prev) => (prev === fId ? null : fId))
   }
 
+  // Lista de cargos disponíveis para o Select (quando nenhuma empresa está filtrada, mostra todos com dados;
+  // se empresa estiver filtrada, mostra somente os cargos vinculados)
+  const availableFunctions = useMemo(() => {
+    // Se cargos foram computados, usamos as funções correspondentes para o select não exibir cargos órfãos
+    const functionIdsWithData = new Set(cargos.map((c) => c.functionId))
+    return functions.filter((f) => functionIdsWithData.has(f.id))
+  }, [cargos, functions])
+
   // Prepara dados para o gráfico comparativo
   const chartData = useMemo(() => {
     if (!selectedCargoForChart) return []
@@ -285,13 +293,24 @@ export default function RelatorioCargos({
               <Label className="text-xs text-slate-700 uppercase font-bold tracking-wider">
                 Cargo
               </Label>
-              <Select value={selectedFunctionId} onValueChange={setSelectedFunctionId}>
+              <Select
+                value={
+                  selectedFunctionId !== 'all' &&
+                  !availableFunctions.some((f) => f.id === selectedFunctionId)
+                    ? 'all'
+                    : selectedFunctionId
+                }
+                onValueChange={setSelectedFunctionId}
+              >
                 <SelectTrigger className="h-10 border-slate-200">
                   <SelectValue placeholder="Todos os Cargos" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
-                  <SelectItem value="all">Todos os Cargos ({functions.length})</SelectItem>
-                  {functions.map((f) => (
+                  <SelectItem value="all">
+                    Todos os Cargos (
+                    {availableFunctions.length > 0 ? availableFunctions.length : functions.length})
+                  </SelectItem>
+                  {(availableFunctions.length > 0 ? availableFunctions : functions).map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.name}
                     </SelectItem>
