@@ -12,7 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Network, Download, Loader2, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
+import {
+  Network,
+  Download,
+  Loader2,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  Minimize,
+  RotateCcw,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -88,6 +97,7 @@ export default function OrgDashboard() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [zoom, setZoom] = useState(1)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -210,6 +220,33 @@ export default function OrgDashboard() {
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.1, 2))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.1, 0.3))
   const handleZoomReset = () => setZoom(1)
+
+  const toggleFullscreen = () => {
+    setIsFullscreen((prev) => !prev)
+  }
+
+  // Permite fechar a tela cheia ao pressionar ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isFullscreen])
+
+  // Previne scroll da página de fundo quando em tela cheia
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isFullscreen])
 
   useEffect(() => {
     if (!loading && rootNodes.length > 0 && scrollRef.current) {
@@ -377,6 +414,7 @@ export default function OrgDashboard() {
               className="h-8 w-8"
               onClick={handleZoomOut}
               disabled={zoom <= 0.3}
+              title="Diminuir Zoom"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -387,6 +425,7 @@ export default function OrgDashboard() {
               className="h-8 w-8"
               onClick={handleZoomIn}
               disabled={zoom >= 2}
+              title="Aumentar Zoom"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -395,9 +434,23 @@ export default function OrgDashboard() {
               size="icon"
               className="h-8 w-8"
               onClick={handleZoomReset}
-              title="Resetar Zoom"
+              title="Resetar Zoom (100%)"
             >
-              <Maximize className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <div className="w-px h-4 bg-border mx-0.5" />
+            <Button
+              variant={isFullscreen ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-8 w-8"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Sair da Tela Cheia (ESC)' : 'Tela Cheia'}
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4 text-brand-vividBlue" />
+              ) : (
+                <Maximize className="h-4 w-4" />
+              )}
             </Button>
           </div>
 
@@ -445,46 +498,198 @@ export default function OrgDashboard() {
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        onMouseDown={handleMouseDown}
-        onMouseLeave={handleMouseLeave}
-        onMouseUp={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        className={cn(
-          'w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border overflow-auto h-[650px] shadow-inner relative',
-          isDragging ? 'cursor-grabbing select-none' : 'cursor-grab',
-        )}
-      >
-        {loading ? (
-          <div className="flex items-center justify-center h-full w-full absolute inset-0">
-            <p className="text-muted-foreground animate-pulse">Desenhando organograma...</p>
-          </div>
-        ) : rootNodes.length > 0 ? (
-          <div style={{ zoom: zoom as any }} className="min-w-max min-h-max p-8">
-            <div
-              id="org-chart-container"
-              className="w-max min-w-full min-h-full flex justify-center items-start bg-transparent"
-            >
-              <div className="org-tree mx-auto">
-                {rootNodes.map((root) => (
-                  <OrgNode key={root.id} node={root} />
-                ))}
+      {isFullscreen && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-border shrink-0">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Network className="h-5 w-5 text-brand-vividBlue" /> Organograma em Tela Cheia
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Pressione{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px] border border-border">
+                  ESC
+                </kbd>{' '}
+                ou clique no botão para voltar.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-1.5 bg-background border border-border rounded-md p-1 shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleZoomOut}
+                  disabled={zoom <= 0.3}
+                  title="Diminuir Zoom"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-xs font-medium w-10 text-center">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleZoomIn}
+                  disabled={zoom >= 2}
+                  title="Aumentar Zoom"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleZoomReset}
+                  title="Resetar Zoom (100%)"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
               </div>
+
+              <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+                <SelectTrigger className="w-full sm:w-40 h-9">
+                  <SelectValue placeholder="Filtrar Planta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Plantas</SelectItem>
+                  {plants?.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                <SelectTrigger className="w-full sm:w-48 h-9">
+                  <SelectValue placeholder="Filtrar Setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Setores</SelectItem>
+                  {units?.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPNG}
+                disabled={loading || rootNodes.length === 0 || exporting}
+                className="gap-2 h-9"
+              >
+                {exporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Exportar PNG</span>
+              </Button>
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={toggleFullscreen}
+                className="gap-2 bg-brand-vividBlue hover:bg-brand-deepBlue text-white h-9"
+                title="Sair da Tela Cheia (ESC)"
+              >
+                <Minimize className="h-4 w-4" />
+                <span>Sair da Tela Cheia</span>
+              </Button>
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto">
-            <Network className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground text-lg">
-              Nenhum colaborador encontrado para esta visualização.
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Cadastre colaboradores e defina suas subordinações no menu de Cadastros.
-            </p>
+
+          <div
+            ref={scrollRef}
+            onMouseDown={handleMouseDown}
+            onMouseLeave={handleMouseLeave}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+            className={cn(
+              'flex-1 w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border overflow-auto shadow-inner relative mt-4',
+              isDragging ? 'cursor-grabbing select-none' : 'cursor-grab',
+            )}
+          >
+            {loading ? (
+              <div className="flex items-center justify-center h-full w-full absolute inset-0">
+                <p className="text-muted-foreground animate-pulse">Desenhando organograma...</p>
+              </div>
+            ) : rootNodes.length > 0 ? (
+              <div style={{ zoom: zoom as any }} className="min-w-max min-h-max p-8">
+                <div
+                  id="org-chart-container"
+                  className="w-max min-w-full min-h-full flex justify-center items-start bg-transparent"
+                >
+                  <div className="org-tree mx-auto">
+                    {rootNodes.map((root) => (
+                      <OrgNode key={root.id} node={root} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto">
+                <Network className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                <p className="text-muted-foreground text-lg">
+                  Nenhum colaborador encontrado para esta visualização.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Cadastre colaboradores e defina suas subordinações no menu de Cadastros.
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {!isFullscreen && (
+        <div
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          className={cn(
+            'w-full bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-border overflow-auto h-[650px] shadow-inner relative',
+            isDragging ? 'cursor-grabbing select-none' : 'cursor-grab',
+          )}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center h-full w-full absolute inset-0">
+              <p className="text-muted-foreground animate-pulse">Desenhando organograma...</p>
+            </div>
+          ) : rootNodes.length > 0 ? (
+            <div style={{ zoom: zoom as any }} className="min-w-max min-h-max p-8">
+              <div
+                id="org-chart-container"
+                className="w-max min-w-full min-h-full flex justify-center items-start bg-transparent"
+              >
+                <div className="org-tree mx-auto">
+                  {rootNodes.map((root) => (
+                    <OrgNode key={root.id} node={root} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto">
+              <Network className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <p className="text-muted-foreground text-lg">
+                Nenhum colaborador encontrado para esta visualização.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Cadastre colaboradores e defina suas subordinações no menu de Cadastros.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
