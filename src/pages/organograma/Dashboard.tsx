@@ -38,13 +38,30 @@ const OrgNode = ({ node }: { node: any }) => (
       >
         {node.org_functions?.name || 'Sem função'}
       </p>
-      {node.org_units?.name && (
-        <div className="mt-2 w-full px-2">
+      <div className="mt-2 w-full px-2 space-y-1">
+        {node.org_units?.name && (
           <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-900/50 max-w-full inline-block">
             {node.org_units.name}
           </div>
-        </div>
-      )}
+        )}
+        {node.plants_list && node.plants_list.length > 0 ? (
+          <div
+            className="text-[10px] text-slate-600 dark:text-slate-300 font-medium truncate bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 max-w-full block"
+            title={node.plants_list.map((p: any) => p.name).join(', ')}
+          >
+            {node.plants_list.length > 1
+              ? `${node.plants_list.length} plantas (${node.plants_list.map((p: any) => p.name.split(' - ')[0] || p.name).join(', ')})`
+              : node.plants_list[0].name}
+          </div>
+        ) : node.plants?.name ? (
+          <div
+            className="text-[10px] text-slate-600 dark:text-slate-300 font-medium truncate bg-slate-100 dark:bg-slate-800/60 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 max-w-full block"
+            title={node.plants.name}
+          >
+            {node.plants.name}
+          </div>
+        ) : null}
+      </div>
     </Card>
     {node.children?.length > 0 && (
       <div className="org-tree-group">

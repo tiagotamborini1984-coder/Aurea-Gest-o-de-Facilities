@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { MultiSelect } from '@/components/ui/multi-select'
+import { Badge } from '@/components/ui/badge'
 import { useMasterData } from '@/hooks/use-master-data'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { supabase } from '@/lib/supabase/client'
@@ -40,6 +42,7 @@ export function ColaboradoresList() {
     phone: '',
     photo_url: '',
     plant_id: '',
+    plant_ids: [] as string[],
     unit_id: '',
     function_id: '',
     manager_id: 'none',
@@ -156,13 +159,19 @@ export function ColaboradoresList() {
     }
 
     try {
+      const selectedPlantIds: string[] = Array.isArray(formData.plant_ids)
+        ? formData.plant_ids
+        : formData.plant_id
+          ? [formData.plant_id]
+          : []
+
       const payload: any = {
         client_id: activeClient.id,
         name: formData.name.trim(),
         email: formData.email?.trim() || null,
         phone: formData.phone?.trim() || null,
         photo_url: formData.photo_url?.trim() || null,
-        plant_id: formData.plant_id || null,
+        plant_id: selectedPlantIds.length > 0 ? selectedPlantIds[0] : null,
         unit_id: formData.unit_id || null,
         function_id: formData.function_id || null,
         manager_id:
@@ -173,7 +182,7 @@ export function ColaboradoresList() {
         payload.id = formData.id
       }
 
-      await saveOrgCollaborator(payload)
+      await saveOrgCollaborator(payload, selectedPlantIds)
       toast({
         title: 'Sucesso',
         description: formData.id
@@ -258,27 +267,31 @@ export function ColaboradoresList() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Planta</label>
-                <Select
-                  value={formData.plant_id}
-                  onValueChange={(v) => setFormData({ ...formData, plant_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Planta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plants.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium flex items-center justify-between">
+                  <span>Plantas Responsáveis</span>
+                  {formData.plant_ids?.length > 1 && (
+                    <span className="text-xs text-blue-600 font-normal">
+                      {formData.plant_ids.length} plantas
+                    </span>
+                  )}
+                </label>
+                <MultiSelect
+                  options={plants.map((p) => ({ label: p.name, value: p.id }))}
+                  selected={formData.plant_ids || []}
+                  onChange={(selected) => {
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      plant_ids: selected,
+                      plant_id: selected.length > 0 ? selected[0] : '',
+                    }))
+                  }}
+                  placeholder="Selecione as plantas..."
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Unidade</label>
+                <label className="text-sm font-medium">Unidade / Setor</label>
                 <Select
                   value={formData.unit_id}
                   onValueChange={(v) => setFormData({ ...formData, unit_id: v })}
@@ -382,11 +395,27 @@ export function ColaboradoresList() {
                     </Avatar>
                     <div>
                       <h4 className="font-semibold text-sm">{c.name}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {c.org_functions?.name} • {c.plants?.name}
-                      </p>
+                      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1 mt-0.5">
+                        <span>{c.org_functions?.name || 'Sem função'}</span>
+                        <span>•</span>
+                        {c.plants_list && c.plants_list.length > 0 ? (
+                          <div className="inline-flex flex-wrap gap-1">
+                            {c.plants_list.map((p: any) => (
+                              <Badge
+                                key={p.id}
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-4 bg-muted/50"
+                              >
+                                {p.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span>{c.plants?.name || 'Sem planta'}</span>
+                        )}
+                      </div>
                       {c.manager_id && (
-                        <p className="text-[10px] text-blue-500">
+                        <p className="text-[10px] text-blue-500 mt-1">
                           Subordinado a: {collaborators.find((x) => x.id === c.manager_id)?.name}
                         </p>
                       )}
@@ -397,13 +426,20 @@ export function ColaboradoresList() {
                       variant="ghost"
                       size="icon"
                       onClick={() => {
+                        const pids =
+                          c.plant_ids && c.plant_ids.length > 0
+                            ? c.plant_ids
+                            : c.plant_id
+                              ? [c.plant_id]
+                              : []
                         setFormData({
                           id: c.id,
                           name: c.name || '',
                           email: c.email || '',
                           phone: c.phone || '',
                           photo_url: c.photo_url || '',
-                          plant_id: c.plant_id || '',
+                          plant_id: pids[0] || '',
+                          plant_ids: pids,
                           unit_id: c.unit_id || '',
                           function_id: c.function_id || '',
                           manager_id: c.manager_id || 'none',
