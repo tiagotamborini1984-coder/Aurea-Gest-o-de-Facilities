@@ -91,10 +91,12 @@ export function useDashboardLogs(
         })
 
         // 2. Busca paginada completa dos daily_logs trazendo apenas colunas necessárias
-        // Otimização v0.0.1819: Paginação determinística por keyset (cursor id > lastId, limit 5000)
-        // Evita OFFSET profundo que disparava statement timeout do Postgres ao varrer 55k+ registros
+        // Otimização v0.0.1820: Paginação determinística por keyset (cursor id > lastId, limit 1000)
+        // O PostgREST do Supabase limita respostas a 1.000 registros por padrão.
+        // Utilizar pageSize = 1000 garante que a condição data.length < pageSize não encerre prematuramente
+        // a busca de períodos longos com mais de 50.000 registros (como outubro/2026).
         let allData: DashboardLogItem[] = []
-        const pageSize = 5000
+        const pageSize = 1000
         let lastId: string | null = null
         let hasMore = true
 
@@ -122,8 +124,14 @@ export function useDashboardLogs(
           }
 
           if (data && data.length > 0) {
-            allData = [...allData, ...data]
-            lastId = data[data.length - 1].id
+            allData.push(...data)
+            const nextLastId = data[data.length - 1].id
+            if (nextLastId === lastId) {
+              // Prevenção defensiva contra cursor estagnado
+              hasMore = false
+              break
+            }
+            lastId = nextLastId
             if (data.length < pageSize) {
               hasMore = false
             }

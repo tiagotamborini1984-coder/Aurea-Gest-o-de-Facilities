@@ -78,9 +78,20 @@ export function useDashboardCalculations(
         ? new Set(employees.filter((e) => companiesSet.has(e.company_name)).map((e) => e.id))
         : new Set(employees.map((e) => e.id))
 
-    const sortedLogsForDedup = [...logs].sort((a, b) =>
-      (b.created_at || '').localeCompare(a.created_at || ''),
-    )
+    const sortedLogsForDedup = [...logs].sort((a, b) => {
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : NaN
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : NaN
+      const validB = !Number.isNaN(timeB)
+      const validA = !Number.isNaN(timeA)
+
+      if (validB && validA && timeB !== timeA) {
+        return timeB - timeA
+      }
+      if (validB && !validA) return -1
+      if (!validB && validA) return 1
+
+      return (b.id || '').localeCompare(a.id || '')
+    })
     const deduplicatedProcessedLogsMap = new Map<string, any>()
     sortedLogsForDedup.forEach((l) => {
       const lDate = normalizeDate(l.date)
@@ -1000,7 +1011,16 @@ export function useDashboardCalculations(
               // (b) Deduplica registros do mesmo equipamento na mesma data (mantém o mais recente)
               const eqLogsMap = new Map<string, any>()
               ;[...eqLogsRaw]
-                .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+                .sort((a, b) => {
+                  const timeB = b.created_at ? new Date(b.created_at).getTime() : NaN
+                  const timeA = a.created_at ? new Date(a.created_at).getTime() : NaN
+                  const validB = !Number.isNaN(timeB)
+                  const validA = !Number.isNaN(timeA)
+                  if (validB && validA && timeB !== timeA) return timeB - timeA
+                  if (validB && !validA) return -1
+                  if (!validB && validA) return 1
+                  return (b.id || '').localeCompare(a.id || '')
+                })
                 .forEach((l) => {
                   const d =
                     typeof l.date === 'string' && l.date.includes('T')

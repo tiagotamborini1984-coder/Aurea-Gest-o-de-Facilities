@@ -299,4 +299,150 @@ describe('useDashboardCalculations - Ausentes e Colaboradores Inativos', () => {
     expect(tratorStats?.mediaFalta).toBe(0.5) // 1 dia falta em 2 dias registrados = 0.5
     expect(tratorStats?.taxaDisp).toBe(50) // 50% de disponibilidade
   })
+
+  it('reprodução de outubro/2026: presentes deve ser compatível com a média contratada quando logs completos forem fornecidos', () => {
+    // Simula uma planta com 200 contratados
+    const plantsOct = [{ id: 'plant-oct', name: 'Planta Oct' }]
+    const contractedOct = [
+      {
+        plant_id: 'plant-oct',
+        type: 'colaborador',
+        reference_month: '2026-10-01',
+        quantity: 200,
+      },
+    ]
+
+    // Simula 20 colaboradores com logs diários em 2 dias úteis
+    const employeesOct: any[] = []
+    const logsOct: any[] = []
+
+    for (let i = 1; i <= 200; i++) {
+      const empId = `emp-${i}`
+      employeesOct.push({
+        id: empId,
+        name: `Colaborador ${i}`,
+        registration_number: `REG-${i}`,
+        plant_id: 'plant-oct',
+        reference_month: '2026-10-01',
+        status: 'Ativo',
+        created_at: '2026-10-01T00:00:00Z',
+      })
+
+      // Dia 1: 195 presentes, 5 faltas
+      logsOct.push({
+        id: `log-d1-${i}`,
+        plant_id: 'plant-oct',
+        type: 'staff',
+        reference_id: empId,
+        status: i <= 195,
+        date: '2026-10-01',
+        created_at: '2026-10-01T08:00:00Z',
+      })
+
+      // Dia 2: 197 presentes, 3 faltas
+      logsOct.push({
+        id: `log-d2-${i}`,
+        plant_id: 'plant-oct',
+        type: 'staff',
+        reference_id: empId,
+        status: i <= 197,
+        date: '2026-10-02',
+        created_at: '2026-10-02T08:00:00Z',
+      })
+    }
+
+    const { result } = renderHook(() =>
+      useDashboardCalculations(
+        logsOct,
+        [],
+        contractedOct,
+        plantsOct,
+        [],
+        employeesOct,
+        [],
+        [],
+        ['plant-oct'],
+        [],
+        'colaboradores',
+        '2026-10-01',
+        '2026-10-31',
+      ),
+    )
+
+    // Contratado = 200
+    expect(result.current.metrics.contratado).toBe('200')
+    // Média de presentes: (195 + 197) / 2 = 196
+    expect(result.current.metrics.presente).toBe('196')
+    // Não pode haver abismo entre contratado e presentes
+    const presNum = parseFloat(result.current.metrics.presente)
+    const contNum = parseFloat(result.current.metrics.contratado)
+    expect(presNum).toBeGreaterThan(150)
+    expect(Math.abs(contNum - presNum)).toBeLessThan(10)
+  })
+
+  it('deduplicação de lançamentos no mesmo dia preserva o created_at mais recente (timestamp ISO)', () => {
+    const plantsTest = [{ id: 'p1', name: 'Planta 1' }]
+    const contracted = [
+      {
+        plant_id: 'p1',
+        type: 'colaborador',
+        reference_month: '2026-10-01',
+        quantity: 1,
+      },
+    ]
+    const employees = [
+      {
+        id: 'e1',
+        name: 'João Silva',
+        plant_id: 'p1',
+        reference_month: '2026-10-01',
+        status: 'Ativo',
+        created_at: '2026-10-01T00:00:00Z',
+      },
+    ]
+
+    // Primeiro lançamento do dia foi falta (status: false), mas retificado 1h depois como presente (status: true)
+    const logs = [
+      {
+        id: 'log-1',
+        plant_id: 'p1',
+        type: 'staff',
+        reference_id: 'e1',
+        status: false,
+        date: '2026-10-05',
+        created_at: '2026-10-05T08:00:00Z',
+      },
+      {
+        id: 'log-2',
+        plant_id: 'p1',
+        type: 'staff',
+        reference_id: 'e1',
+        status: true,
+        date: '2026-10-05',
+        created_at: '2026-10-05T09:00:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useDashboardCalculations(
+        logs,
+        [],
+        contracted,
+        plantsTest,
+        [],
+        employees,
+        [],
+        [],
+        ['p1'],
+        [],
+        'colaboradores',
+        '2026-10-01',
+        '2026-10-31',
+      ),
+    )
+
+    // A versão mais recente (status: true) deve prevalecer!
+    expect(result.current.metrics.presente).toBe('1')
+    expect(result.current.metrics.ausente).toBe('0')
+  })
 })
