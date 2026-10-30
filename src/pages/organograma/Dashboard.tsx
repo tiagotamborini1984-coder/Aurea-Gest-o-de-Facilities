@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getOrgCollaborators, getOrgUnits } from '@/services/organograma'
+import { sortCollaboratorsByPlantAndName } from './organograma-sorter'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
 import {
@@ -168,21 +169,26 @@ export default function OrgDashboard() {
       ? collaborators
       : collaborators?.filter((c) => c.unit_id === selectedUnit) || []
 
+  const shouldGroupByPlant = selectedPlant === 'all'
+
   const buildTree = (
     nodes: any[],
     parentId: string | null = null,
     visited: Set<string> = new Set(),
   ): any[] => {
-    return nodes
-      .filter((n) => n.manager_id === parentId)
-      .map((n) => {
-        if (visited.has(n.id)) {
-          return { ...n, children: [] }
-        }
-        const newVisited = new Set(visited)
-        newVisited.add(n.id)
-        return { ...n, children: buildTree(nodes, n.id, newVisited) }
-      })
+    const children = nodes.filter((n) => n.manager_id === parentId)
+    const orderedChildren = shouldGroupByPlant
+      ? sortCollaboratorsByPlantAndName(children)
+      : children
+
+    return orderedChildren.map((n) => {
+      if (visited.has(n.id)) {
+        return { ...n, children: [] }
+      }
+      const newVisited = new Set(visited)
+      newVisited.add(n.id)
+      return { ...n, children: buildTree(nodes, n.id, newVisited) }
+    })
   }
 
   // Identifica raízes:
@@ -190,9 +196,16 @@ export default function OrgDashboard() {
   // 2. Quem tem manager_id apontando para alguém que NÃO está presente no conjunto filtrado
   // (ex.: quando filtramos uma planta/setor específico, ou quando o gestor imediato foi inativado).
   // Isso assegura que nenhum colaborador fique "invisível" ou fora da árvore hierárquica.
-  const rootNodes = filteredCollaborators
-    .filter((c) => !c.manager_id || !filteredCollaborators.some((fc) => fc.id === c.manager_id))
-    .map((r) => ({ ...r, children: buildTree(filteredCollaborators, r.id, new Set([r.id])) }))
+  const rawRoots = filteredCollaborators.filter(
+    (c) => !c.manager_id || !filteredCollaborators.some((fc) => fc.id === c.manager_id),
+  )
+
+  const orderedRoots = shouldGroupByPlant ? sortCollaboratorsByPlantAndName(rawRoots) : rawRoots
+
+  const rootNodes = orderedRoots.map((r) => ({
+    ...r,
+    children: buildTree(filteredCollaborators, r.id, new Set([r.id])),
+  }))
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.1, 2))
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.1, 0.3))
