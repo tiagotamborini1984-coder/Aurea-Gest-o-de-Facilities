@@ -91,22 +91,30 @@ export function useDashboardLogs(
         })
 
         // 2. Busca paginada completa dos daily_logs trazendo apenas colunas necessárias
+        // Otimização v0.0.1819: Paginação determinística por keyset (cursor id > lastId, limit 5000)
+        // Evita OFFSET profundo que disparava statement timeout do Postgres ao varrer 55k+ registros
         let allData: DashboardLogItem[] = []
-        let from = 0
-        const step = 1000
+        const pageSize = 5000
+        let lastId: string | null = null
         let hasMore = true
 
         while (hasMore) {
           if (isCancelled) return
 
-          const { data, error: logsError } = await supabase
+          let query = supabase
             .from('daily_logs')
             .select('id, date, plant_id, type, reference_id, status, created_at, location_id')
             .gte('date', dateFrom)
             .lte('date', dateTo)
             .in('plant_id', plantIds)
-            .order('created_at', { ascending: false })
-            .range(from, from + step - 1)
+            .order('id', { ascending: true })
+            .limit(pageSize)
+
+          if (lastId) {
+            query = query.gt('id', lastId)
+          }
+
+          const { data, error: logsError } = await query
 
           if (logsError) {
             console.error('Erro ao carregar daily_logs:', logsError)
@@ -115,10 +123,9 @@ export function useDashboardLogs(
 
           if (data && data.length > 0) {
             allData = [...allData, ...data]
-            if (data.length < step) {
+            lastId = data[data.length - 1].id
+            if (data.length < pageSize) {
               hasMore = false
-            } else {
-              from += step
             }
           } else {
             hasMore = false
