@@ -69,6 +69,11 @@ export default function Relatorios() {
     const fetchLogs = async () => {
       setLoading(true)
 
+      // Na aba Por Cargo, o período considerado para presença é [cargoDateFrom, cargoDateTo].
+      // Nas demais abas de relatórios, o período é [dateFrom, dateTo].
+      const queryDateFrom = activeTab === 'cargo' ? cargoDateFrom : dateFrom
+      const queryDateTo = activeTab === 'cargo' ? cargoDateTo : dateTo
+
       const allRows: any[] = []
       const pageSize = 1000
       let page = 0
@@ -81,8 +86,8 @@ export default function Relatorios() {
         let query = supabase
           .from('daily_logs')
           .select('*')
-          .gte('date', dateFrom)
-          .lte('date', dateTo)
+          .gte('date', queryDateFrom)
+          .lte('date', queryDateTo)
           .order('date', { ascending: true })
           .order('created_at', { ascending: false })
           .range(start, end)
@@ -117,14 +122,23 @@ export default function Relatorios() {
       }
     }
 
-    if (plants.length > 0 && activeTab !== 'treinamentos' && activeTab !== 'cargo') {
+    if (plants.length > 0 && activeTab !== 'treinamentos') {
       fetchLogs()
     }
 
     return () => {
       isCancelled = true
     }
-  }, [dateFrom, dateTo, plants, activeTab, profile, selectedMasterClient])
+  }, [
+    dateFrom,
+    dateTo,
+    cargoDateFrom,
+    cargoDateTo,
+    plants,
+    activeTab,
+    profile,
+    selectedMasterClient,
+  ])
 
   const availableCompanies = useMemo(() => {
     const empsInPlants = employees.filter(
@@ -385,6 +399,7 @@ export default function Relatorios() {
     functions,
     plants,
     companies,
+    logs,
     selectedPlants,
     selectedFunctionId: 'all',
     selectedCompanies,
@@ -705,6 +720,7 @@ export default function Relatorios() {
           functions={functions}
           plants={plants}
           companies={companies}
+          logs={logs}
           selectedPlants={selectedPlants}
           selectedCompanies={selectedCompanies}
           dateFrom={cargoDateFrom}

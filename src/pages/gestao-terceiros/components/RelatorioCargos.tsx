@@ -53,6 +53,7 @@ interface RelatorioCargosProps {
   functions: any[]
   plants: any[]
   companies: any[]
+  logs?: any[]
   selectedPlants: string[]
   selectedCompanies?: string[]
   dateFrom: string
@@ -67,6 +68,7 @@ export default function RelatorioCargos({
   functions,
   plants,
   companies,
+  logs = [],
   selectedPlants,
   selectedCompanies = [],
   dateFrom,
@@ -86,6 +88,7 @@ export default function RelatorioCargos({
     functions,
     plants,
     companies,
+    logs,
     selectedPlants,
     selectedFunctionId,
     selectedCompanies,
@@ -410,7 +413,8 @@ export default function RelatorioCargos({
                       fontSize: '12px',
                     }}
                     formatter={(value: any, name: string) => {
-                      if (name === 'Efetivo Ativo') return [value, 'Efetivo Ativo']
+                      if (name === 'Efetivo Atual' || name === 'Efetivo Ativo')
+                        return [value, 'Efetivo Atual']
                       if (name === 'Quadro Ideal') return [value, 'Quadro Ideal']
                       if (name === 'Déficit (Abaixo)') return [value, 'Déficit']
                       if (name === 'Tempo de Reposição')
@@ -422,7 +426,7 @@ export default function RelatorioCargos({
                   <Bar
                     yAxisId="left"
                     dataKey="efetivo"
-                    name="Efetivo Ativo"
+                    name="Efetivo Atual"
                     fill="#3b82f6"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={40}
@@ -643,7 +647,7 @@ export default function RelatorioCargos({
                                         Mês
                                       </TableHead>
                                       <TableHead className="font-semibold text-slate-700 text-center text-xs">
-                                        Efetivo Ativo
+                                        Efetivo Médio
                                       </TableHead>
                                       <TableHead className="font-semibold text-slate-700 text-center text-xs">
                                         Quadro Ideal

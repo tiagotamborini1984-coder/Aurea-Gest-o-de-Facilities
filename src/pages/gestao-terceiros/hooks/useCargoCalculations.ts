@@ -13,7 +13,7 @@ export interface CargoMonthPoint {
   monthKey: string // 'YYYY-MM'
   monthLabel: string // 'out/2026'
   referenceDate: Date
-  efetivo: number // colaboradores com status Ativo vigentes no mês
+  efetivo: number // Média de colaboradores da função que tiveram presença no mês (ou ativos caso não haja logs)
   quadroIdeal: number // quantity configurado em contracted_headcount para este cargo/planta
   deficit: number // max(0, quadroIdeal - efetivo)
   saldo: number // efetivo - quadroIdeal (negativo = deficit, zero = equilibrado, positivo = excedente)
@@ -22,6 +22,8 @@ export interface CargoMonthPoint {
   tempoMedioReposicaoDias: number | null // média dos dias até a próxima admissão no mesmo cargo/planta
   eventosReposicaoCount: number // quantidade de eventos medidos
   isAbaixoDoQuadro: boolean // efetivo < quadroIdeal
+  presencasMesCount?: number
+  diasComLogMesCount?: number
 }
 
 export interface CargoSummary {
@@ -29,7 +31,7 @@ export interface CargoSummary {
   functionName: string
   plantId?: string
   plantName?: string
-  currentEfetivo: number
+  currentEfetivo: number // Média de colaboradores com presença no período (ou do mês final)
   currentQuadroIdeal: number
   currentDeficit: number
   isCurrentlyAbaixo: boolean
@@ -40,6 +42,8 @@ export interface CargoSummary {
   totalMesesAnalisados: number
   taxaDeficitMeses: number // % de meses em que ficou abaixo
   series: CargoMonthPoint[]
+  totalPresencasPeriodo?: number
+  diasComLogPeriodo?: number
 }
 
 export interface CargoReportTotals {
@@ -63,6 +67,7 @@ interface ComputeParams {
   functions: any[]
   plants: any[]
   companies?: any[]
+  logs?: any[] // daily_logs para cálculo da média de colaboradores presentes
   selectedPlants: string[]
   selectedFunctionId: string // 'all' ou ID específico
   selectedCompanyId?: string // 'all' ou ID/nome ou array/set
@@ -97,6 +102,7 @@ export function useCargoCalculations({
   functions,
   plants,
   companies = [],
+  logs = [],
   selectedPlants,
   selectedFunctionId,
   selectedCompanyId,
@@ -345,6 +351,88 @@ export function useCargoCalculations({
       }
     })
 
+    // Mapeamento de employee.id para o objeto do colaborador e para sua pessoa física consolidada
+    const empIdToPersonKey = new Map<string, string>()
+    const empIdToRecord = new Map<string, any>()
+    employees.forEach((emp) => {
+      if (!emp || !emp.id) return
+      empIdToRecord.set(emp.id, emp)
+      const pid = getPersonIdentifier(emp, knownRegByPlantAndName)
+      if (pid && emp.plant_id) {
+        empIdToPersonKey.set(emp.id, `${pid}::${emp.plant_id}`)
+      }
+    })
+
+    // Helper para normalizar data (YYYY-MM-DD)
+    const normalizeDateStr = (d: any): string => {
+      if (!d) return ''
+      if (typeof d === 'string') {
+        const s = d.trim()
+        if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) {
+          return s.slice(0, 10)
+        }
+        return s
+      }
+      if (d instanceof Date) {
+        return format(d, 'yyyy-MM-dd')
+      }
+      return String(d)
+    }
+
+    const isPositiveStatus = (st: any): boolean => {
+      return st === true || st === 'true' || st === 1 || st === '1'
+    }
+
+    // Processamento e deduplicação de logs de staff no período e plantas válidas.
+    // Regra consolidada da plataforma (v0.0.1799 / v0.0.1803):
+    // 1. Apenas logs do tipo 'staff' nas plantas válidas;
+    // 2. No intervalo dateFrom a dateTo;
+    // 3. Deduplicação por colaborador (pessoa física) + dia + planta: o lançamento com created_at mais recente prevalece;
+    // 4. Dia sem lançamento não conta como falta nem presença.
+    const rawStaffLogs = (logs || []).filter((l) => {
+      if (!l || l.type !== 'staff') return false
+      if (!l.plant_id || !validPlantIds.includes(l.plant_id)) return false
+      const d = normalizeDateStr(l.date)
+      return d >= dateFrom && d <= dateTo
+    })
+
+    // Ordena logs por created_at DESC para manter o mais recente de cada pessoa/dia
+    const sortedLogs = [...rawStaffLogs].sort((a, b) => {
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : NaN
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : NaN
+      const validB = !Number.isNaN(timeB)
+      const validA = !Number.isNaN(timeA)
+      if (validB && validA && timeB !== timeA) return timeB - timeA
+      if (validB && !validA) return -1
+      if (!validB && validA) return 1
+      return (b.id || '').localeCompare(a.id || '')
+    })
+
+    // Mapa: `personKey::date` -> log deduplicado mais recente
+    const dedupedLogsByPersonAndDate = new Map<string, any>()
+    sortedLogs.forEach((l) => {
+      const d = normalizeDateStr(l.date)
+      if (!d) return
+      const pKey = empIdToPersonKey.get(l.reference_id)
+      const personKey = pKey || `${l.reference_id}::${l.plant_id}`
+      const entryKey = `${personKey}::${d}`
+      if (!dedupedLogsByPersonAndDate.has(entryKey)) {
+        dedupedLogsByPersonAndDate.set(entryKey, {
+          ...l,
+          normalizedDate: d,
+          personKey,
+        })
+      }
+    })
+
+    const dedupedLogsList = Array.from(dedupedLogsByPersonAndDate.values())
+
+    // Conjunto global de dias em que houve pelo menos 1 lançamento de presença/falta registrado no filtro
+    const globalDaysWithLogs = new Set<string>()
+    dedupedLogsList.forEach((l) => {
+      globalDaysWithLogs.add(l.normalizedDate)
+    })
+
     // Indexa contracted_headcount filtrado para consulta rápida:
     // Chave: `${functionId}_${plantId}_${monthKey}` ou cascata para mês anterior
     const contractedByCargoPlantMonth = new Map<string, number>()
@@ -422,6 +510,29 @@ export function useCargoCalculations({
       })
       if (recordsUpToMonth.length === 0) return null
       return recordsUpToMonth[0] // group.allRows já está ordenado por vigência canônica
+    }
+
+    // Helper para resolver qual o cargo vigente de uma pessoa numa data específica (ou geral)
+    const getPersonFunctionOnDate = (personKey: string, dateStr: string): string | null => {
+      const group = personHistoryMap.get(personKey)
+      if (!group) return null
+      const mKey = dateStr.substring(0, 7)
+      const eff = getEffectiveRecordAsOfMonth(group, mKey)
+      return eff?.function_id || group.functionId || null
+    }
+
+    // Helper para verificar se a pessoa está vinculada ao cargo fId
+    const isPersonInCargo = (personKey: string, fId: string, mKey?: string): boolean => {
+      const group = personHistoryMap.get(personKey)
+      if (!group) return false
+      if (mKey) {
+        const eff = getEffectiveRecordAsOfMonth(group, mKey)
+        if (eff && eff.function_id === fId) return true
+        if (!eff && group.functionId === fId) return true
+        return false
+      }
+      if (group.functionId === fId) return true
+      return group.allRows.some((r) => r.function_id === fId)
     }
 
     targetFunctions.forEach((func) => {
@@ -513,15 +624,47 @@ export function useCargoCalculations({
           }
         })
 
+        // NOVA DEFINIÇÃO DE EFETIVO DO MÊS (definida pelo usuário Tiago):
+        // "o Efetivo Atual precisa ser a média de colaboradores com aquela função que teve presença no período e planta selecionado".
+        // Para cada mês da série:
+        // - Identificamos os logs de presença (status = true) de colaboradores que pertenciam ao cargo fId naquele mês;
+        // - Dias distintos com lançamentos no mês (ou dias em que o cargo teve registros);
+        // - Efetivo do mês = (total de colaboradores presentes no mês) / (dias com presença/lançamento no mês).
+        // - Se não houver logs de presença no mês (ex: mês passado em que não havia sistema de logs ou sem apontamentos),
+        //   utiliza-se ativosNoFimDoMes como fallback natural de continuidade.
+        const monthLogs = dedupedLogsList.filter((l) => l.normalizedDate.substring(0, 7) === mKey)
+        const monthDatesWithLogs = new Set<string>()
+        let totalPresencasMes = 0
+
+        monthLogs.forEach((l) => {
+          const personFunc = getPersonFunctionOnDate(l.personKey, l.normalizedDate)
+          if (personFunc === fId) {
+            monthDatesWithLogs.add(l.normalizedDate)
+            if (isPositiveStatus(l.status)) {
+              totalPresencasMes++
+            }
+          }
+        })
+
+        const diasComLogMes = monthDatesWithLogs.size
+        let efetivoMes: number
+        if (diasComLogMes > 0) {
+          const mediaMes = totalPresencasMes / diasComLogMes
+          efetivoMes = Number(mediaMes.toFixed(2))
+        } else {
+          // Sem logs registrados para o cargo neste mês: usa a base cadastral ativa do mês
+          efetivoMes = ativosNoFimDoMes
+        }
+
         const quadroIdeal = getQuadroIdeal(fId, undefined, mKey)
-        const deficit = Math.max(0, quadroIdeal - ativosNoFimDoMes)
-        const saldo = ativosNoFimDoMes - quadroIdeal
+        const deficit = Math.max(0, Number((quadroIdeal - efetivoMes).toFixed(2)))
+        const saldo = Number((efetivoMes - quadroIdeal).toFixed(2))
 
         monthPoints.push({
           monthKey: mKey,
           monthLabel,
           referenceDate: monthRefDate,
-          efetivo: ativosNoFimDoMes,
+          efetivo: efetivoMes,
           quadroIdeal,
           deficit,
           saldo,
@@ -529,7 +672,9 @@ export function useCargoCalculations({
           desligamentos: desligamentosMes,
           tempoMedioReposicaoDias: null, // será calculado a seguir com base nos eventos
           eventosReposicaoCount: 0,
-          isAbaixoDoQuadro: quadroIdeal > 0 && ativosNoFimDoMes < quadroIdeal,
+          isAbaixoDoQuadro: quadroIdeal > 0 && efetivoMes < quadroIdeal,
+          presencasMesCount: totalPresencasMes,
+          diasComLogMesCount: diasComLogMes,
         })
       })
 
@@ -584,6 +729,33 @@ export function useCargoCalculations({
         }
       })
 
+      // Média global de colaboradores com presença no período filtrado inteiro:
+      // "o Efetivo Atual precisa ser a média de colaboradores com aquela função que teve presença no período e planta selecionado".
+      // Somatório de presenças do cargo no período / dias com apontamento no período.
+      // Caso não haja logs no período todo (ou nenhum log no banco para este cargo), faz fallback
+      // seguro para o efetivo do último mês point.
+      const cargoDatesWithLogs = new Set<string>()
+      let totalPresencasPeriodoCargo = 0
+      dedupedLogsList.forEach((l) => {
+        const personFunc = getPersonFunctionOnDate(l.personKey, l.normalizedDate)
+        if (personFunc === fId) {
+          cargoDatesWithLogs.add(l.normalizedDate)
+          if (isPositiveStatus(l.status)) {
+            totalPresencasPeriodoCargo++
+          }
+        }
+      })
+
+      const diasComLogPeriodoCargo = cargoDatesWithLogs.size
+      let currentEfetivoCargo: number
+      if (diasComLogPeriodoCargo > 0) {
+        currentEfetivoCargo = Number(
+          (totalPresencasPeriodoCargo / diasComLogPeriodoCargo).toFixed(2),
+        )
+      } else {
+        currentEfetivoCargo = monthPoints[monthPoints.length - 1]?.efetivo ?? 0
+      }
+
       // Métricas consolidadas do cargo
       const lastMonthPoint = monthPoints[monthPoints.length - 1] || {
         efetivo: 0,
@@ -591,6 +763,14 @@ export function useCargoCalculations({
         deficit: 0,
         isAbaixoDoQuadro: false,
       }
+
+      const currentQuadroIdealCargo = lastMonthPoint.quadroIdeal
+      const currentDeficitCargo = Math.max(
+        0,
+        Number((currentQuadroIdealCargo - currentEfetivoCargo).toFixed(2)),
+      )
+      const isCurrentlyAbaixoCargo =
+        currentQuadroIdealCargo > 0 && currentEfetivoCargo < currentQuadroIdealCargo
 
       const totalDesligamentos = monthPoints.reduce((s, p) => s + p.desligamentos, 0)
       const totalAdmissoes = monthPoints.reduce((s, p) => s + p.admissoes, 0)
@@ -605,10 +785,10 @@ export function useCargoCalculations({
       cargoSummaries.push({
         functionId: fId,
         functionName: fName,
-        currentEfetivo: lastMonthPoint.efetivo,
-        currentQuadroIdeal: lastMonthPoint.quadroIdeal,
-        currentDeficit: lastMonthPoint.deficit,
-        isCurrentlyAbaixo: lastMonthPoint.isAbaixoDoQuadro,
+        currentEfetivo: currentEfetivoCargo,
+        currentQuadroIdeal: currentQuadroIdealCargo,
+        currentDeficit: currentDeficitCargo,
+        isCurrentlyAbaixo: isCurrentlyAbaixoCargo,
         mediaTempoReposicaoDias: mediaReposicaoGeralCargo,
         totalDesligamentosPeriodo: totalDesligamentos,
         totalAdmissoesPeriodo: totalAdmissoes,
@@ -617,6 +797,8 @@ export function useCargoCalculations({
         taxaDeficitMeses:
           monthPoints.length > 0 ? Math.round((mesesAbaixo / monthPoints.length) * 100) : 0,
         series: monthPoints,
+        totalPresencasPeriodo: totalPresencasPeriodoCargo,
+        diasComLogPeriodo: diasComLogPeriodoCargo,
       })
     })
 
@@ -683,6 +865,7 @@ export function useCargoCalculations({
     functions,
     plants,
     companies,
+    logs,
     selectedPlants,
     selectedFunctionId,
     selectedCompanyId,

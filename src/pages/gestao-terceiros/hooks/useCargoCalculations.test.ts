@@ -276,8 +276,7 @@ describe('useCargoCalculations - Filtro de Empresa e Cargos Vinculados', () => {
     const cargoLimpeza = result.current.cargos.find((c) => c.functionId === funcLimpeza.id)
     expect(cargoLimpeza).toBeDefined()
 
-    // O efetivo atual (em Outubro de 2026) NÃO pode ser apenas 1.
-    // Deve ser 5 (os 4 cadastrados em Agosto que continuam ativos + 1 admitido em Outubro, ignorando o inativo Marcos)
+    // Quando não são passados logs diários de presença, faz fallback para ativos (5)
     expect(cargoLimpeza?.currentEfetivo).toBe(5)
 
     // Verifica a série histórica:
@@ -292,6 +291,140 @@ describe('useCargoCalculations - Filtro de Empresa e Cargos Vinculados', () => {
     expect(pontoAgo?.efetivo).toBe(4)
     expect(pontoSet?.efetivo).toBe(4)
     expect(pontoOut?.efetivo).toBe(5)
+  })
+
+  it('Critério 5B: Auxiliar de Limpeza Industrial com logs de presença calcula a MÉDIA real de colaboradores presentes', () => {
+    // Definido por Tiago: "o Efetivo Atual precisa ser a média de colaboradores com aquela função que teve presença no período e planta selecionado"
+    const funcLimpeza = { id: 'func-limpeza-ind', name: 'Auxiliar de Limpeza Industrial' }
+    const localFunctions = [...functions, funcLimpeza]
+    const plantMatriz = 'plant-1'
+
+    const testEmployees = [
+      {
+        id: 'emp-ali-1',
+        name: 'Maria Souza',
+        registration_number: 'ALI-001',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-10-01',
+        company_name: 'Prestadora Alpha',
+      },
+      {
+        id: 'emp-ali-2',
+        name: 'Joao Santos',
+        registration_number: 'ALI-002',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-10-01',
+        company_name: 'Prestadora Alpha',
+      },
+      {
+        id: 'emp-ali-3',
+        name: 'Ana Silva',
+        registration_number: 'ALI-003',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-10-01',
+        company_name: 'Prestadora Alpha',
+      },
+    ]
+
+    // Suponha 2 dias de apontamentos em Outubro/2026:
+    // Dia 2026-10-01: Maria presente, Joao presente, Ana ausente (status=false) => 2 presentes
+    // Dia 2026-10-02: Maria presente, Joao presente, Ana presente (status=true) => 3 presentes
+    // Total de presenças-dia = 2 + 3 = 5 presenças
+    // Dias com lançamento = 2 dias
+    // Média esperada = 5 / 2 = 2.50 colaboradores presentes
+    const logs = [
+      {
+        id: 'log-1',
+        type: 'staff',
+        plant_id: plantMatriz,
+        reference_id: 'emp-ali-1',
+        date: '2026-10-01',
+        status: true,
+        created_at: '2026-10-01T08:00:00Z',
+      },
+      {
+        id: 'log-2',
+        type: 'staff',
+        plant_id: plantMatriz,
+        reference_id: 'emp-ali-2',
+        date: '2026-10-01',
+        status: true,
+        created_at: '2026-10-01T08:00:00Z',
+      },
+      {
+        id: 'log-3',
+        type: 'staff',
+        plant_id: plantMatriz,
+        reference_id: 'emp-ali-3',
+        date: '2026-10-01',
+        status: false,
+        created_at: '2026-10-01T08:00:00Z',
+      },
+      {
+        id: 'log-4',
+        type: 'staff',
+        plant_id: plantMatriz,
+        reference_id: 'emp-ali-1',
+        date: '2026-10-02',
+        status: true,
+        created_at: '2026-10-02T08:00:00Z',
+      },
+      {
+        id: 'log-5',
+        type: 'staff',
+        plant_id: plantMatriz,
+        reference_id: 'emp-ali-2',
+        date: '2026-10-02',
+        status: true,
+        created_at: '2026-10-02T08:00:00Z',
+      },
+      {
+        id: 'log-6',
+        type: 'staff',
+        plant_id: plantMatriz,
+        reference_id: 'emp-ali-3',
+        date: '2026-10-02',
+        status: true,
+        created_at: '2026-10-02T08:00:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useCargoCalculations({
+        employees: testEmployees,
+        contracted: [
+          {
+            plant_id: plantMatriz,
+            function_id: funcLimpeza.id,
+            type: 'colaborador',
+            quantity: 4,
+          },
+        ],
+        functions: localFunctions,
+        plants,
+        companies,
+        logs,
+        selectedPlants: [plantMatriz],
+        selectedFunctionId: funcLimpeza.id,
+        selectedCompanies: [],
+        dateFrom: '2026-10-01',
+        dateTo: '2026-10-31',
+      }),
+    )
+
+    const cargoLimpeza = result.current.cargos.find((c) => c.functionId === funcLimpeza.id)
+    expect(cargoLimpeza).toBeDefined()
+    expect(cargoLimpeza?.currentEfetivo).toBe(2.5)
+    // Quadro ideal = 4, Déficit = 4 - 2.5 = 1.5
+    expect(cargoLimpeza?.currentQuadroIdeal).toBe(4)
+    expect(cargoLimpeza?.currentDeficit).toBe(1.5)
+    expect(cargoLimpeza?.isCurrentlyAbaixo).toBe(true)
   })
 
   it('Critério 6: Unificação de versões históricas sem matrícula vs com matrícula', () => {
@@ -339,6 +472,117 @@ describe('useCargoCalculations - Filtro de Empresa e Cargos Vinculados', () => {
 
     const cargo = result.current.cargos.find((c) => c.functionId === funcCozinheiro.id)
     // Efetivo atual deve ser 1 pessoa (não 2)
+    expect(cargo?.currentEfetivo).toBe(1)
+  })
+
+  it('Critério 7: Deduplicação de logs do mesmo dia usa o registro mais recente (created_at DESC)', () => {
+    const funcPortaria = { id: 'func-portaria', name: 'Portaria e Controle' }
+    const testEmployees = [
+      {
+        id: 'emp-p1',
+        name: 'Roberto Porteiro',
+        registration_number: 'POR-001',
+        function_id: funcPortaria.id,
+        plant_id: 'plant-1',
+        status: 'ATIVO',
+        reference_month: '2026-10-01',
+      },
+    ]
+
+    // Mesmo dia com dois lançamentos:
+    // Às 08:00 foi marcado como falta (status = false)
+    // Às 09:30 foi corrigido como presença (status = true)
+    const logs = [
+      {
+        id: 'log-errado',
+        type: 'staff',
+        plant_id: 'plant-1',
+        reference_id: 'emp-p1',
+        date: '2026-10-05',
+        status: false,
+        created_at: '2026-10-05T08:00:00Z',
+      },
+      {
+        id: 'log-corrigido',
+        type: 'staff',
+        plant_id: 'plant-1',
+        reference_id: 'emp-p1',
+        date: '2026-10-05',
+        status: true,
+        created_at: '2026-10-05T09:30:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useCargoCalculations({
+        employees: testEmployees,
+        contracted: [
+          { plant_id: 'plant-1', function_id: funcPortaria.id, quantity: 1, type: 'colaborador' },
+        ],
+        functions: [funcPortaria],
+        plants,
+        companies,
+        logs,
+        selectedPlants: ['plant-1'],
+        selectedFunctionId: funcPortaria.id,
+        selectedCompanies: [],
+        dateFrom: '2026-10-01',
+        dateTo: '2026-10-31',
+      }),
+    )
+
+    const cargo = result.current.cargos.find((c) => c.functionId === funcPortaria.id)
+    // Deve considerar a presença (status=true) do log corrigido => média 1.0 (não 0.0 nem duplicado 2)
+    expect(cargo?.currentEfetivo).toBe(1)
+  })
+
+  it('Critério 8: Dia sem lançamento não conta como ausência (considera dias com lançamento)', () => {
+    const funcVigilante = { id: 'func-vigia', name: 'Vigilante Patrimonial' }
+    const testEmployees = [
+      {
+        id: 'emp-vig-1',
+        name: 'Marcos Vigia',
+        registration_number: 'VIG-001',
+        function_id: funcVigilante.id,
+        plant_id: 'plant-1',
+        status: 'ATIVO',
+        reference_month: '2026-10-01',
+      },
+    ]
+
+    // Em um intervalo de 31 dias, houve apenas 1 dia com registro de presença
+    // A média NÃO deve ser 1 / 31 = 0.03, e sim 1.0 (1 presença / 1 dia lançado)
+    const logs = [
+      {
+        id: 'log-vig-1',
+        type: 'staff',
+        plant_id: 'plant-1',
+        reference_id: 'emp-vig-1',
+        date: '2026-10-15',
+        status: true,
+        created_at: '2026-10-15T08:00:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useCargoCalculations({
+        employees: testEmployees,
+        contracted: [
+          { plant_id: 'plant-1', function_id: funcVigilante.id, quantity: 1, type: 'colaborador' },
+        ],
+        functions: [funcVigilante],
+        plants,
+        companies,
+        logs,
+        selectedPlants: ['plant-1'],
+        selectedFunctionId: funcVigilante.id,
+        selectedCompanies: [],
+        dateFrom: '2026-10-01',
+        dateTo: '2026-10-31',
+      }),
+    )
+
+    const cargo = result.current.cargos.find((c) => c.functionId === funcVigilante.id)
     expect(cargo?.currentEfetivo).toBe(1)
   })
 })
