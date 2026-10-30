@@ -428,20 +428,75 @@ export function useDashboardCalculations(
       return personBestInPlantMap.get(dedupKey) || emp
     }
 
+    // Otimização O(1): Indexação prévia de activeLogs por data e por (planta + data)
+    // Permite lookup instantâneo sem filtrar 54.000 logs repetidamente para cada dia
+    const logsByDateMap = new Map<string, any[]>()
+    const logsByPlantAndDateMap = new Map<string, any[]>()
+    activeLogs.forEach((l) => {
+      const d = l.date
+      const pd = `${l.plant_id}_${d}`
+      let dateArr = logsByDateMap.get(d)
+      if (!dateArr) {
+        dateArr = []
+        logsByDateMap.set(d, dateArr)
+      }
+      dateArr.push(l)
+
+      let plantDateArr = logsByPlantAndDateMap.get(pd)
+      if (!plantDateArr) {
+        plantDateArr = []
+        logsByPlantAndDateMap.set(pd, plantDateArr)
+      }
+      plantDateArr.push(l)
+    })
+
+    // Mapas O(1) para lookups de colaboradores e plantas
+    const employeeByIdMap = new Map<string, any>()
+    employees.forEach((e) => {
+      if (e?.id) employeeByIdMap.set(e.id, e)
+    })
+
+    const plantByIdMap = new Map<string, any>()
+    plants.forEach((p) => {
+      if (p?.id) plantByIdMap.set(p.id, p)
+    })
+
+    const equipmentByIdMap = new Map<string, any>()
+    equipment.forEach((eq) => {
+      if (eq?.id) equipmentByIdMap.set(eq.id, eq)
+    })
+
+    // Cache memorizado por data para getStaffAbsentListForDate
+    const staffAbsentCacheByDate = new Map<
+      string,
+      Array<{
+        id: string
+        date: string
+        refName: string
+        plantId: string
+        plantName: string
+        companyName?: string
+        type: 'explicit' | 'implicit'
+      }>
+    >()
+
     // Helper para extrair a lista exata de ausentes (explícitos + sem presença) em uma data
     const getStaffAbsentListForDate = (date: string) => {
-      const dayLogs = activeLogs.filter((l) => l.date === date)
-      const presentRefIds = new Set(
-        dayLogs.filter((l) => l.status === true).map((l) => l.reference_id),
-      )
-      const explicitAbsentRefIds = new Set(
-        dayLogs.filter((l) => l.status === false).map((l) => l.reference_id),
-      )
+      const cached = staffAbsentCacheByDate.get(date)
+      if (cached) return cached
 
-      // Também indexamos as chaves normalizadas de pessoas presentes/explícitas
+      const dayLogs = logsByDateMap.get(date) || []
+      const presentRefIds = new Set<string>()
+      const explicitAbsentRefIds = new Set<string>()
       const registeredRefKeys = new Set<string>()
+
       dayLogs.forEach((l) => {
-        const emp = employees.find((e) => e.id === l.reference_id)
+        if (l.status === true) {
+          presentRefIds.add(l.reference_id)
+        } else if (l.status === false) {
+          explicitAbsentRefIds.add(l.reference_id)
+        }
+        const emp = employeeByIdMap.get(l.reference_id)
         if (emp) {
           registeredRefKeys.add(getPersonDedupeKey({ ...emp, plant_id: l.plant_id }))
         }
@@ -459,25 +514,24 @@ export function useDashboardCalculations(
 
       // 1. Ausentes explícitos com log:
       // Filtra qualquer colaborador cuja versão vigente mais recente na planta tenha status "Inativo"
-      dayLogs
-        .filter((l) => l.status === false)
-        .forEach((l) => {
-          // Se o colaborador está inativo na versão vigente, NÃO entra nos ausentes
-          if (!isEmployeeCurrentActive(l.reference_id, l.plant_id)) {
-            return
-          }
-          const emp = getEmployeeCurrentBest(l.reference_id, l.plant_id)
-          const plant = plants.find((p) => p.id === l.plant_id)
-          result.push({
-            id: `exp-${l.id || l.reference_id}-${date}`,
-            date,
-            refName: emp?.name || 'Desconhecido',
-            plantId: l.plant_id,
-            plantName: plant?.name || 'N/A',
-            companyName: emp?.company_name,
-            type: 'explicit',
-          })
+      dayLogs.forEach((l) => {
+        if (l.status !== false) return
+        // Se o colaborador está inativo na versão vigente, NÃO entra nos ausentes
+        if (!isEmployeeCurrentActive(l.reference_id, l.plant_id)) {
+          return
+        }
+        const emp = getEmployeeCurrentBest(l.reference_id, l.plant_id)
+        const plant = plantByIdMap.get(l.plant_id)
+        result.push({
+          id: `exp-${l.id || l.reference_id}-${date}`,
+          date,
+          refName: emp?.name || 'Desconhecido',
+          plantId: l.plant_id,
+          plantName: plant?.name || 'N/A',
+          companyName: emp?.company_name,
+          type: 'explicit',
         })
+      })
 
       // 2. Colaboradores ativos sem presença e sem log explícito no dia
       validActiveEmployeesForAudit.forEach((emp) => {
@@ -486,7 +540,7 @@ export function useDashboardCalculations(
         const empKey = getPersonDedupeKey(emp)
         if (registeredRefKeys.has(empKey)) return
 
-        const plant = plants.find((p) => p.id === emp.plant_id)
+        const plant = plantByIdMap.get(emp.plant_id)
         result.push({
           id: `imp-${emp.id}-${date}`,
           date,
@@ -498,6 +552,7 @@ export function useDashboardCalculations(
         })
       })
 
+      staffAbsentCacheByDate.set(date, result)
       return result
     }
 
@@ -518,14 +573,14 @@ export function useDashboardCalculations(
         // Para equipamentos, indisponíveis calculados a partir dos logs de indisponibilidade vinculados à planta
         validPlants.forEach((pid) => {
           if (!plantValidDatesMap[pid]?.has(date)) return
-          const dayLogs = activeLogs.filter((l) => {
-            if (l.plant_id !== pid || l.date !== date) return false
-            const eq = equipment.find((e) => e.id === l.reference_id)
-            if (eq && eq.plant_id !== pid) return false
-            return true
-          })
+          const dayLogs = logsByPlantAndDateMap.get(`${pid}_${date}`) || []
           const dExplicitAbs = dayLogs
-            .filter((l) => !l.status)
+            .filter((l) => {
+              if (l.status) return false
+              const eq = equipmentByIdMap.get(l.reference_id)
+              if (eq && eq.plant_id !== pid) return false
+              return true
+            })
             .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, date), 0)
           totalAbsentDailySum += dExplicitAbs
         })
@@ -562,20 +617,20 @@ export function useDashboardCalculations(
       todayContractedSum += pCont
       todayFallbackSum += fallbackCountByPlant.get(pid) || 0
 
-      // Logs de hoje
-      const tLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === todayDateStr)
+      // Logs de hoje via logsByPlantAndDateMap O(1)
+      const tLogs = logsByPlantAndDateMap.get(`${pid}_${todayDateStr}`) || []
       if (typeCont === 'equipamento') {
         todayPresentCount += tLogs
           .filter((l) => {
             if (!l.status) return false
-            const eq = equipment.find((e) => e.id === l.reference_id)
+            const eq = equipmentByIdMap.get(l.reference_id)
             return !eq || eq.plant_id === pid
           })
           .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, todayDateStr), 0)
         todayExplicitAbsentCount += tLogs
           .filter((l) => {
             if (l.status) return false
-            const eq = equipment.find((e) => e.id === l.reference_id)
+            const eq = equipmentByIdMap.get(l.reference_id)
             return !eq || eq.plant_id === pid
           })
           .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, todayDateStr), 0)
@@ -595,10 +650,21 @@ export function useDashboardCalculations(
         ? todayAbsentsList.length
         : todayExplicitAbsentCount
 
+    // Indexação prévia de activeLogs por planta para plantStats
+    const logsByPlantMap = new Map<string, any[]>()
+    activeLogs.forEach((l) => {
+      let arr = logsByPlantMap.get(l.plant_id)
+      if (!arr) {
+        arr = []
+        logsByPlantMap.set(l.plant_id, arr)
+      }
+      arr.push(l)
+    })
+
     const plantStats = plants
       .filter((p) => validPlants.includes(p.id))
       .map((plant) => {
-        const pLogs = activeLogs.filter((l) => l.plant_id === plant.id)
+        const pLogs = logsByPlantMap.get(plant.id) || []
         const pValidDates = plantValidDatesMap[plant.id]
         const pValidLogs = pLogs.filter((l) => pValidDates.has(l.date))
 
@@ -609,7 +675,7 @@ export function useDashboardCalculations(
               ? pValidLogs
                   .filter((l) => {
                     if (!l.status) return false
-                    const eq = equipment.find((e) => e.id === l.reference_id)
+                    const eq = equipmentByIdMap.get(l.reference_id)
                     return !eq || eq.plant_id === plant.id
                   })
                   .reduce(
@@ -673,13 +739,13 @@ export function useDashboardCalculations(
               }
               return true
             }).reduce((sum, c) => sum + c.quantity, 0)
-            const dDayLogs = pLogs.filter((l) => l.date === date)
+            const dDayLogs = logsByPlantAndDateMap.get(`${plant.id}_${date}`) || []
             const dPres =
               typeCont === 'equipamento'
                 ? dDayLogs
                     .filter((l) => {
                       if (!l.status) return false
-                      const eq = equipment.find((e) => e.id === l.reference_id)
+                      const eq = equipmentByIdMap.get(l.reference_id)
                       return !eq || eq.plant_id === plant.id
                     })
                     .reduce(
@@ -692,7 +758,7 @@ export function useDashboardCalculations(
                 ? dDayLogs
                     .filter((l) => {
                       if (l.status) return false
-                      const eq = equipment.find((e) => e.id === l.reference_id)
+                      const eq = equipmentByIdMap.get(l.reference_id)
                       return !eq || eq.plant_id === plant.id
                     })
                     .reduce(
@@ -737,6 +803,8 @@ export function useDashboardCalculations(
         }
       })
 
+    // Otimização: Indexar logs de colaboradores por (plant_id + date + reference_id) ou location_id
+    // Para locationStats, pré-indexamos logs por plant_id para não varrer activeLogs inteiro em cada local
     const locationStats = locations
       .filter((loc) => validPlants.includes(loc.plant_id))
       .map((loc) => {
@@ -750,10 +818,10 @@ export function useDashboardCalculations(
                 )
                 .map((e) => e.id)
             : []
+        const refIdsSet = new Set(refIds)
         const plantId = loc.plant_id
-        const lLogsRaw = activeLogs.filter(
-          (l) => l.plant_id === plantId && refIds.includes(l.reference_id),
-        )
+        const plantAllLogs = logsByPlantMap.get(plantId) || []
+        const lLogsRaw = plantAllLogs.filter((l) => refIdsSet.has(l.reference_id))
 
         const pValidDates = plantValidDatesMap[plantId]
 
@@ -962,6 +1030,17 @@ export function useDashboardCalculations(
             })
             .filter((eq) => eq.history.length > 0 || eq.contratado > 0)
 
+    // Otimização: Indexar activeLogs por reference_id para lookup O(1) em collaboratorStats
+    const logsByRefIdMap = new Map<string, any[]>()
+    activeLogs.forEach((l) => {
+      let arr = logsByRefIdMap.get(l.reference_id)
+      if (!arr) {
+        arr = []
+        logsByRefIdMap.set(l.reference_id, arr)
+      }
+      arr.push(l)
+    })
+
     const collaboratorStats =
       activeTab !== 'colaboradores'
         ? []
@@ -973,10 +1052,9 @@ export function useDashboardCalculations(
                 // Se a versão vigente do colaborador na planta for Inativo, ele não aparece na tabela
                 if (!isEmployeeCurrentActive(emp.id, emp.plant_id)) return
 
-                const empLogs = activeLogs
-                  .filter(
-                    (l) => l.reference_id === emp.id && plantValidDatesMap[l.plant_id]?.has(l.date),
-                  )
+                const rawEmpLogs = logsByRefIdMap.get(emp.id) || []
+                const empLogs = rawEmpLogs
+                  .filter((l) => plantValidDatesMap[l.plant_id]?.has(l.date))
                   .sort((a, b) => a.date.localeCompare(b.date))
                 if (empLogs.length === 0) return
 
@@ -1040,19 +1118,19 @@ export function useDashboardCalculations(
           dFallback += fallbackCountByPlant.get(pid) || 0
 
           if (plantValidDatesMap[pid].has(date)) {
-            const dayLogs = activeLogs.filter((l) => l.plant_id === pid && l.date === date)
+            const dayLogs = logsByPlantAndDateMap.get(`${pid}_${date}`) || []
             if (typeCont === 'equipamento') {
               dPresentes += dayLogs
                 .filter((l) => {
                   if (!l.status) return false
-                  const eq = equipment.find((e) => e.id === l.reference_id)
+                  const eq = equipmentByIdMap.get(l.reference_id)
                   return !eq || eq.plant_id === pid
                 })
                 .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, date), 0)
               dAusentes += dayLogs
                 .filter((l) => {
                   if (l.status) return false
-                  const eq = equipment.find((e) => e.id === l.reference_id)
+                  const eq = equipmentByIdMap.get(l.reference_id)
                   return !eq || eq.plant_id === pid
                 })
                 .reduce((sum, l) => sum + getEquipmentCapacity(l.reference_id, pid, date), 0)
@@ -1083,7 +1161,7 @@ export function useDashboardCalculations(
         }
       })
 
-    // Independent equipment calculation for goals
+    // Independent equipment calculation for goals (com lookup O(1) via logsByPlantAndDateMap)
     let totalEquipContractedSum = 0
     let totalEquipPresentCount = 0
 
@@ -1096,10 +1174,10 @@ export function useDashboardCalculations(
           )
           totalEquipContractedSum += eCont
 
-          const ePres = processedLogs.filter((l) => {
-            if (l.type !== 'equipment' || l.plant_id !== pid || l.date !== date || !l.status)
-              return false
-            const eq = equipment.find((e) => e.id === l.reference_id)
+          const dayPlantLogs = logsByPlantAndDateMap.get(`${pid}_${date}`) || []
+          const ePres = dayPlantLogs.filter((l) => {
+            if (l.type !== 'equipment' || !l.status) return false
+            const eq = equipmentByIdMap.get(l.reference_id)
             if (eq && eq.plant_id !== pid) return false
             return true
           }).length

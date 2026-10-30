@@ -120,12 +120,13 @@ export default function DashboardGestor() {
   }, [activeClient?.id, dateFrom, dateTo, selectedMasterClient])
 
   const safeFilteredPlants = Array.isArray(filteredPlants) ? filteredPlants : []
-  const { logs, monthlyGoals } = useDashboardLogs(
-    dateFrom,
-    dateTo,
-    referenceMonth,
-    safeFilteredPlants,
-  )
+  const {
+    logs,
+    monthlyGoals,
+    isLoading: isLogsLoading,
+    error: logsError,
+    reload: reloadLogs,
+  } = useDashboardLogs(dateFrom, dateTo, referenceMonth, safeFilteredPlants)
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, safeFilteredPlants)
 
   const { filteredEmployees } = useMemo(() => {
@@ -241,6 +242,24 @@ export default function DashboardGestor() {
         setActiveTab={setActiveTab}
         brandSecondary={brandSecondary}
       />
+
+      {logsError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">Erro ao carregar dados:</span>
+            <span className="text-sm">{logsError}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reloadLogs}
+            disabled={isLogsLoading}
+            className="border-destructive/30 hover:bg-destructive/20 text-destructive shrink-0"
+          >
+            {isLogsLoading ? 'Recarregando...' : 'Recarregar'}
+          </Button>
+        </div>
+      )}
 
       {selectedPlants.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-8 sm:p-12 lg:p-16 mt-4 shadow-sm">
