@@ -57,8 +57,8 @@ const OrgNode = ({ node }: { node: any }) => (
 )
 
 export default function OrgDashboard() {
-  const { activeClient } = useAppStore()
-  const { plants } = useMasterData()
+  const { activeClient, profile } = useAppStore()
+  const { plants, loading: masterDataLoading } = useMasterData()
   const { toast } = useToast()
 
   const [collaborators, setCollaborators] = useState<any[]>([])
@@ -105,14 +105,14 @@ export default function OrgDashboard() {
     if (!activeClient) return
     const loadUnits = async () => {
       try {
-        const data = await getOrgUnits(activeClient.id)
+        const data = await getOrgUnits(activeClient.id, selectedPlant)
         setUnits(data || [])
       } catch (e) {
         console.error(e)
       }
     }
     loadUnits()
-  }, [activeClient])
+  }, [activeClient, selectedPlant])
 
   useEffect(() => {
     setSelectedUnit('all')
@@ -123,7 +123,18 @@ export default function OrgDashboard() {
     const load = async () => {
       setLoading(true)
       try {
-        const data = await getOrgCollaborators(activeClient.id, selectedPlant)
+        // Se usuário tem restrição de plantas e 'all' está selecionado,
+        // restringir somente às plantas autorizadas para ele (nunca vazar plantas não autorizadas).
+        // Se for Master/Admin sem restrição, passa 'all' e traz todas as plantas da empresa.
+        const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
+        const authorizedPlants: string[] = profile?.authorized_plants || []
+
+        let plantFilter: string | string[] = selectedPlant
+        if (selectedPlant === 'all' && !isAdmin && authorizedPlants.length > 0) {
+          plantFilter = authorizedPlants
+        }
+
+        const data = await getOrgCollaborators(activeClient.id, plantFilter)
         setCollaborators(data || [])
       } catch (e) {
         console.error(e)
@@ -133,7 +144,7 @@ export default function OrgDashboard() {
       }
     }
     load()
-  }, [activeClient, selectedPlant])
+  }, [activeClient, selectedPlant, profile])
 
   const filteredCollaborators =
     selectedUnit === 'all'
@@ -157,6 +168,11 @@ export default function OrgDashboard() {
       })
   }
 
+  // Identifica raízes:
+  // 1. Quem não tem manager_id definido
+  // 2. Quem tem manager_id apontando para alguém que NÃO está presente no conjunto filtrado
+  // (ex.: quando filtramos uma planta/setor específico, ou quando o gestor imediato foi inativado).
+  // Isso assegura que nenhum colaborador fique "invisível" ou fora da árvore hierárquica.
   const rootNodes = filteredCollaborators
     .filter((c) => !c.manager_id || !filteredCollaborators.some((fc) => fc.id === c.manager_id))
     .map((r) => ({ ...r, children: buildTree(filteredCollaborators, r.id, new Set([r.id])) }))

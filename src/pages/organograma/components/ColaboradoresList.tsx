@@ -24,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { supabase } from '@/lib/supabase/client'
 
 export function ColaboradoresList() {
-  const { activeClient } = useAppStore()
+  const { activeClient, profile } = useAppStore()
   const { plants } = useMasterData()
   const { toast } = useToast()
   const [collaborators, setCollaborators] = useState<any[]>([])
@@ -50,12 +50,16 @@ export function ColaboradoresList() {
   const loadData = async () => {
     if (!activeClient) return
     try {
+      const isAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
+      const authorizedPlants: string[] = profile?.authorized_plants || []
+      const plantFilter = !isAdmin && authorizedPlants.length > 0 ? authorizedPlants : undefined
+
       const [cData, uData, fData] = await Promise.all([
-        getOrgCollaborators(activeClient.id),
+        getOrgCollaborators(activeClient.id, plantFilter),
         getOrgUnits(activeClient.id),
         getOrgFunctions(activeClient.id),
       ])
-      setCollaborators(cData.sort((a: any, b: any) => a.name.localeCompare(b.name)))
+      setCollaborators(cData.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')))
       setUnits(uData)
       setFunctions(fData)
     } catch (e: any) {
@@ -67,7 +71,7 @@ export function ColaboradoresList() {
 
   useEffect(() => {
     loadData()
-  }, [activeClient])
+  }, [activeClient, profile])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

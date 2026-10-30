@@ -1,28 +1,111 @@
 import { supabase } from '@/lib/supabase/client'
 
 export const getOrgUnits = async (clientId: string, plantId?: string) => {
-  let query = supabase.from('org_units').select('*').eq('client_id', clientId)
-  if (plantId) query = query.eq('plant_id', plantId)
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
+  const allRows: any[] = []
+  const pageSize = 1000
+  let page = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const start = page * pageSize
+    const end = start + pageSize - 1
+
+    let query = supabase
+      .from('org_units')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('name', { ascending: true })
+
+    if (plantId && plantId !== 'all') {
+      query = query.eq('plant_id', plantId)
+    }
+
+    const { data, error } = await query.range(start, end)
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      allRows.push(...data)
+      page++
+    }
+    if (!data || data.length < pageSize) {
+      hasMore = false
+    }
+  }
+
+  return allRows
 }
 
 export const getOrgFunctions = async (clientId: string) => {
-  const { data, error } = await supabase.from('org_functions').select('*').eq('client_id', clientId)
-  if (error) throw error
-  return data || []
+  const allRows: any[] = []
+  const pageSize = 1000
+  let page = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const start = page * pageSize
+    const end = start + pageSize - 1
+
+    const { data, error } = await supabase
+      .from('org_functions')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('name', { ascending: true })
+      .range(start, end)
+
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      allRows.push(...data)
+      page++
+    }
+    if (!data || data.length < pageSize) {
+      hasMore = false
+    }
+  }
+
+  return allRows
 }
 
-export const getOrgCollaborators = async (clientId: string, plantId?: string) => {
-  let query = supabase.from('org_collaborators').select('*').eq('client_id', clientId)
-  // Ensure we only retrieve active collaborators
-  query = query.not('is_active', 'eq', false)
+export const getOrgCollaborators = async (clientId: string, plantId?: string | string[]) => {
+  const allRows: any[] = []
+  const pageSize = 1000
+  let page = 0
+  let hasMore = true
 
-  if (plantId) query = query.eq('plant_id', plantId)
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
+  while (hasMore) {
+    const start = page * pageSize
+    const end = start + pageSize - 1
+
+    let query = supabase
+      .from('org_collaborators')
+      .select('*, org_functions(id, name), org_units(id, name), plants(id, name)')
+      .eq('client_id', clientId)
+      .not('is_active', 'eq', false)
+      .order('name', { ascending: true })
+
+    if (Array.isArray(plantId)) {
+      if (plantId.length === 0) {
+        // Se array vazio de plantas autorizadas, não retorna nenhum colaborador
+        return []
+      }
+      query = query.in('plant_id', plantId)
+    } else if (plantId && plantId !== 'all') {
+      query = query.eq('plant_id', plantId)
+    }
+
+    const { data, error } = await query.range(start, end)
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      allRows.push(...data)
+      page++
+    }
+    if (!data || data.length < pageSize) {
+      hasMore = false
+    }
+  }
+
+  return allRows
 }
 
 export const saveOrgUnit = async (unit: any) => {
