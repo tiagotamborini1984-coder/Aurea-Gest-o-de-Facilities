@@ -175,4 +175,170 @@ describe('useCargoCalculations - Filtro de Empresa e Cargos Vinculados', () => {
     expect(result.current.totals.totalDeficitAtual).toBe(1)
     expect(result.current.totals.cargosAbaixoAtualmente).toBe(1)
   })
+
+  it('Critério 5: Caso concreto Auxiliar de Limpeza Industrial — mantém quadro ativo cumulativo quando não há reenvio no mês', () => {
+    // Simulação do caso reportado pelo Tiago:
+    // O cargo "Auxiliar de Limpeza Industrial" possui múltiplos colaboradores ativos cadastrados em meses anteriores
+    // (ex: Agosto ou Setembro), mas no mês de Outubro apenas 1 teve importação/registro explícito no próprio mês.
+    // O Efetivo Atual de Outubro DEVE considerar todos os colaboradores ativos vigentes (não apenas o 1 reimportado).
+    const funcLimpeza = { id: 'func-limpeza-ind', name: 'Auxiliar de Limpeza Industrial' }
+    const localFunctions = [...functions, funcLimpeza]
+
+    const plantMatriz = 'plant-1'
+
+    const testEmployees = [
+      // 5 colaboradores ativos registrados em 2026-08 (Agosto)
+      {
+        id: 'emp-limp-1',
+        name: 'Abraham Jose',
+        registration_number: 'ALI-001',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-08-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-08-05T10:00:00Z',
+      },
+      {
+        id: 'emp-limp-2',
+        name: 'Alcineia Santos',
+        registration_number: 'ALI-002',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-08-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-08-05T10:00:00Z',
+      },
+      {
+        id: 'emp-limp-3',
+        name: 'Ateones Pereira',
+        registration_number: 'ALI-003',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-08-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-08-05T10:00:00Z',
+      },
+      {
+        id: 'emp-limp-4',
+        name: 'Dorikeles Silva',
+        registration_number: 'ALI-004',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-08-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-08-05T10:00:00Z',
+      },
+      // Em 2026-10 (Outubro), apenas Gleidson foi lançado com reference_month = 2026-10
+      {
+        id: 'emp-limp-5',
+        name: 'Gleidson Oliveira',
+        registration_number: 'ALI-005',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'ATIVO',
+        reference_month: '2026-10-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-10-02T10:00:00Z',
+      },
+      // E um colaborador de outro cargo que foi desligado
+      {
+        id: 'emp-limp-6',
+        name: 'Marcos Ex',
+        registration_number: 'ALI-006',
+        function_id: funcLimpeza.id,
+        plant_id: plantMatriz,
+        status: 'INATIVO',
+        reference_month: '2026-09-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-09-10T10:00:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useCargoCalculations({
+        employees: testEmployees,
+        contracted: [],
+        functions: localFunctions,
+        plants,
+        companies,
+        selectedPlants: [plantMatriz],
+        selectedFunctionId: funcLimpeza.id,
+        selectedCompanies: [],
+        dateFrom: '2026-08-01',
+        dateTo: '2026-10-31',
+      }),
+    )
+
+    const cargoLimpeza = result.current.cargos.find((c) => c.functionId === funcLimpeza.id)
+    expect(cargoLimpeza).toBeDefined()
+
+    // O efetivo atual (em Outubro de 2026) NÃO pode ser apenas 1.
+    // Deve ser 5 (os 4 cadastrados em Agosto que continuam ativos + 1 admitido em Outubro, ignorando o inativo Marcos)
+    expect(cargoLimpeza?.currentEfetivo).toBe(5)
+
+    // Verifica a série histórica:
+    // 2026-08: 4 ativos
+    // 2026-09: 4 ativos (Marcos foi inativo)
+    // 2026-10: 5 ativos (Gleidson somou)
+    const series = cargoLimpeza?.series || []
+    const pontoAgo = series.find((p) => p.monthKey === '2026-08')
+    const pontoSet = series.find((p) => p.monthKey === '2026-09')
+    const pontoOut = series.find((p) => p.monthKey === '2026-10')
+
+    expect(pontoAgo?.efetivo).toBe(4)
+    expect(pontoSet?.efetivo).toBe(4)
+    expect(pontoOut?.efetivo).toBe(5)
+  })
+
+  it('Critério 6: Unificação de versões históricas sem matrícula vs com matrícula', () => {
+    // Um colaborador lançado no passado sem matrícula e depois atualizado com matrícula não duplica a contagem
+    const funcCozinheiro = { id: 'func-cozinha', name: 'Cozinheiro Geral' }
+    const testEmployees = [
+      {
+        id: 'emp-v1',
+        name: 'Carlos da Silva',
+        registration_number: null, // sem matrícula no início
+        function_id: funcCozinheiro.id,
+        plant_id: 'plant-1',
+        status: 'ATIVO',
+        reference_month: '2026-07-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-07-01T10:00:00Z',
+      },
+      {
+        id: 'emp-v2',
+        name: 'Carlos da Silva',
+        registration_number: 'MAT-999', // mesma pessoa com matrícula
+        function_id: funcCozinheiro.id,
+        plant_id: 'plant-1',
+        status: 'ATIVO',
+        reference_month: '2026-08-01',
+        company_name: 'Prestadora Alpha',
+        created_at: '2026-08-01T10:00:00Z',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useCargoCalculations({
+        employees: testEmployees,
+        contracted: [],
+        functions: [funcCozinheiro],
+        plants,
+        companies,
+        selectedPlants: ['plant-1'],
+        selectedFunctionId: funcCozinheiro.id,
+        selectedCompanies: [],
+        dateFrom: '2026-07-01',
+        dateTo: '2026-08-31',
+      }),
+    )
+
+    const cargo = result.current.cargos.find((c) => c.functionId === funcCozinheiro.id)
+    // Efetivo atual deve ser 1 pessoa (não 2)
+    expect(cargo?.currentEfetivo).toBe(1)
+  })
 })

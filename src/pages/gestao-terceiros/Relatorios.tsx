@@ -395,22 +395,25 @@ export default function Relatorios() {
   const handleExportCSV = () => {
     if (activeTab === 'cargo') {
       if (cargosCalculados.length === 0) return
-      // Exporta formato expandido: uma linha por cargo por mês
+      // Exporta resumo consolidado do cargo (exatamente as colunas da tela principal)
+      // e inclui as séries mensais detalhadas
       const rows: any[] = []
       cargosCalculados.forEach((c) => {
-        c.series.forEach((s) => {
-          rows.push({
-            Cargo: c.functionName,
-            Mês: s.monthLabel,
-            'Efetivo Ativo': s.efetivo,
-            'Quadro Ideal': s.quadroIdeal > 0 ? s.quadroIdeal : 'Não definido',
-            Déficit: s.deficit,
-            'Abaixo do Quadro': s.isAbaixoDoQuadro ? 'SIM' : 'NÃO',
-            Admissões: s.admissoes,
-            Desligamentos: s.desligamentos,
-            'Tempo Reposição (dias)':
-              s.tempoMedioReposicaoDias !== null ? s.tempoMedioReposicaoDias : '—',
-          })
+        rows.push({
+          Cargo: c.functionName,
+          'Efetivo Atual': c.currentEfetivo,
+          'Quadro Ideal': c.currentQuadroIdeal > 0 ? c.currentQuadroIdeal : 'Não definido',
+          'Déficit Atual': c.currentDeficit,
+          'Status Atual': c.isCurrentlyAbaixo
+            ? 'Abaixo'
+            : c.currentQuadroIdeal > 0
+              ? 'Conforme'
+              : 'Não definido',
+          'Meses Abaixo': `${c.mesesAbaixoCount} de ${c.totalMesesAnalisados} (${c.taxaDeficitMeses}%)`,
+          'Admissões Período': c.totalAdmissoesPeriodo,
+          'Desligamentos Período': c.totalDesligamentosPeriodo,
+          'Tempo Médio Reposição (dias)':
+            c.mediaTempoReposicaoDias !== null ? c.mediaTempoReposicaoDias : '—',
         })
       })
       exportToCSV(`Relatorio_Por_Cargo_${format(new Date(), 'yyyy-MM-dd')}.csv`, rows)

@@ -73,18 +73,22 @@ interface ComputeParams {
 }
 
 /**
- * Normaliza o identificador único de pessoa física (matrícula sanitizada ou nome normalizado)
+ * Normaliza o identificador único de pessoa física (matrícula sanitizada ou nome normalizado),
+ * aproveitando fallback de matrícula conhecida para unificar cadastros históricos sem matrícula.
  */
-function getPersonIdentifier(emp: any): string {
-  const reg = (emp.registration_number || '').trim().toUpperCase()
-  if (reg) return reg
+function getPersonIdentifier(emp: any, knownRegMap?: Map<string, string>): string {
+  const directReg = (emp.registration_number || '').trim().toUpperCase()
   const name = (emp.name || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim()
-  return name || emp.id || ''
+  const pid = emp.plant_id || ''
+  const fallbackReg =
+    !directReg && knownRegMap && name ? knownRegMap.get(`${name}::${pid}`) : undefined
+  const reg = directReg || fallbackReg
+  return reg || name || emp.id || ''
 }
 
 export function useCargoCalculations({
@@ -189,6 +193,24 @@ export function useCargoCalculations({
       return false
     }
 
+    // Mapa de matrículas conhecidas por (nome_normalizado, planta) para unificar
+    // versões antigas que não tinham matrícula preenchida com as versões recentes que têm
+    const knownRegByPlantAndName = new Map<string, string>()
+    employees.forEach((e) => {
+      if (!e) return
+      const reg = (e.registration_number || '').trim().toUpperCase()
+      const norm = (e.name || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim()
+      const pid = e.plant_id || ''
+      if (reg && norm) {
+        knownRegByPlantAndName.set(`${norm}::${pid}`, reg)
+      }
+    })
+
     // Filtra colaboradores de acordo com as plantas e empresa
     const scopedEmployees = employees.filter((emp) => {
       if (!emp.plant_id || !validPlantIds.includes(emp.plant_id)) return false
@@ -229,7 +251,11 @@ export function useCargoCalculations({
         if (e.function_id) usedFunctionIds.add(e.function_id)
       })
       scopedContracted.forEach((c) => {
-        if (c.type === 'colaborador' && c.function_id && validPlantIds.includes(c.plant_id)) {
+        if (
+          c.type === 'colaborador' &&
+          c.function_id &&
+          (!c.plant_id || validPlantIds.includes(c.plant_id))
+        ) {
           usedFunctionIds.add(c.function_id)
         }
       })
@@ -244,15 +270,17 @@ export function useCargoCalculations({
       {
         personId: string
         plantId: string
-        snapshots: Map<string, any> // monthKey -> emp row
+        snapshots: Map<string, any> // monthKey -> emp row (resolvido por created_at / status)
+        allRows: any[] // todas as linhas para resolução de vigência cumulativa
         firstCreated: Date
         lastCreated: Date
         functionId: string | null
+        latestRecord: any
       }
     >()
 
     scopedEmployees.forEach((emp) => {
-      const pid = getPersonIdentifier(emp)
+      const pid = getPersonIdentifier(emp, knownRegByPlantAndName)
       if (!pid) return
       const groupKey = `${pid}::${emp.plant_id}`
       let group = personHistoryMap.get(groupKey)
@@ -261,17 +289,21 @@ export function useCargoCalculations({
           personId: pid,
           plantId: emp.plant_id,
           snapshots: new Map(),
+          allRows: [],
           firstCreated: new Date(emp.created_at || '2000-01-01'),
           lastCreated: new Date(emp.created_at || '2000-01-01'),
           functionId: emp.function_id || null,
+          latestRecord: emp,
         }
         personHistoryMap.set(groupKey, group)
       }
 
+      group.allRows.push(emp)
+
       const mKey = (emp.reference_month || '').substring(0, 7)
       if (mKey) {
         const existingSnap = group.snapshots.get(mKey)
-        // Se houver mais de um registro no mesmo mês, pega o mais recente (created_at)
+        // Se houver mais de um registro no mesmo mês, pega o mais recente (created_at DESC, Ativo vence empate)
         if (!existingSnap) {
           group.snapshots.set(mKey, emp)
         } else {
@@ -279,6 +311,11 @@ export function useCargoCalculations({
           const t2 = new Date(emp.created_at || 0).getTime()
           if (t2 > t1) {
             group.snapshots.set(mKey, emp)
+          } else if (t2 === t1) {
+            const isEmpActive = (emp.status || '').trim().toUpperCase() === 'ATIVO'
+            if (isEmpActive) {
+              group.snapshots.set(mKey, emp)
+            }
           }
         }
       }
@@ -287,6 +324,25 @@ export function useCargoCalculations({
       const cDate = new Date(emp.created_at || '2000-01-01')
       if (cDate < group.firstCreated) group.firstCreated = cDate
       if (cDate > group.lastCreated) group.lastCreated = cDate
+    })
+
+    // Para cada pessoa, ordenamos allRows de acordo com a regra de vigência canônica:
+    // reference_month DESC, created_at DESC, Ativo antes de Inativo em empate
+    personHistoryMap.forEach((group) => {
+      group.allRows.sort((a, b) => {
+        const tDiff =
+          new Date(b.reference_month || 0).getTime() - new Date(a.reference_month || 0).getTime()
+        if (tDiff !== 0) return tDiff
+        const cDiff = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        if (cDiff !== 0) return cDiff
+        const aActive = (a.status || '').trim().toUpperCase() === 'ATIVO' ? 0 : 1
+        const bActive = (b.status || '').trim().toUpperCase() === 'ATIVO' ? 0 : 1
+        return aActive - bActive
+      })
+      group.latestRecord = group.allRows[0]
+      if (group.latestRecord?.function_id) {
+        group.functionId = group.latestRecord.function_id
+      }
     })
 
     // Indexa contracted_headcount filtrado para consulta rápida:
@@ -356,21 +412,32 @@ export function useCargoCalculations({
     // Calcula séries para cada cargo
     const cargoSummaries: CargoSummary[] = []
 
+    // Helper para determinar a versão vigente de um colaborador até o mês mKey
+    // (isto é, registros com reference_month <= mKey).
+    // A versão com reference_month mais próximo <= mKey vence (desempate por created_at DESC, Ativo vence)
+    const getEffectiveRecordAsOfMonth = (group: { allRows: any[] }, mKey: string) => {
+      const recordsUpToMonth = group.allRows.filter((r) => {
+        const rMonth = (r.reference_month || '').substring(0, 7)
+        return rMonth <= mKey
+      })
+      if (recordsUpToMonth.length === 0) return null
+      return recordsUpToMonth[0] // group.allRows já está ordenado por vigência canônica
+    }
+
     targetFunctions.forEach((func) => {
       const fId = func.id
       const fName = func.name || 'Sem nome'
 
-      // Filtra grupos de pessoas vinculadas a este cargo
-      const cargoPersonGroups = Array.from(personHistoryMap.values()).filter(
-        (g) => g.functionId === fId,
-      )
+      // Considera todas as pessoas que tiveram histórico neste cargo ou cujo cargo atual seja fId
+      const cargoPersonGroups = Array.from(personHistoryMap.values()).filter((g) => {
+        if (g.functionId === fId) return true
+        return g.allRows.some((r) => r.function_id === fId)
+      })
 
       // Identifica eventos de admissão e desligamento mês a mês
       const transitionEvents: CargoTransitionEvent[] = []
       const monthPoints: CargoMonthPoint[] = []
 
-      // Rastreia estado do mês anterior de cada pessoa no cargo
-      // Para o primeiro mês da série histórica absoluta conhecida do colaborador
       const sortedMonths = [...monthKeys]
 
       sortedMonths.forEach((mKey, idx) => {
@@ -383,24 +450,31 @@ export function useCargoCalculations({
         let desligamentosMes = 0
 
         cargoPersonGroups.forEach((group) => {
-          const curSnap = group.snapshots.get(mKey)
-          const prevSnap = prevMKey ? group.snapshots.get(prevMKey) : undefined
+          const effCur = getEffectiveRecordAsOfMonth(group, mKey)
+          const effPrev = prevMKey ? getEffectiveRecordAsOfMonth(group, prevMKey) : null
 
-          const isAtivoAtual = curSnap && (curSnap.status || '').trim().toUpperCase() === 'ATIVO'
+          // O colaborador pertencia/pertence a este cargo neste mês e no anterior?
+          const inCargoCur = effCur && effCur.function_id === fId
+          const inCargoPrev = effPrev && effPrev.function_id === fId
+
+          const isAtivoAtual = inCargoCur && (effCur.status || '').trim().toUpperCase() === 'ATIVO'
           const isAtivoAnterior =
-            prevSnap && (prevSnap.status || '').trim().toUpperCase() === 'ATIVO'
+            inCargoPrev && (effPrev.status || '').trim().toUpperCase() === 'ATIVO'
 
           if (isAtivoAtual) {
             ativosNoFimDoMes++
           }
 
+          // Checa se houve registro explícito lançado no próprio mês mKey
+          const curSnap = group.snapshots.get(mKey)
+
           // Admissão:
-          // 1. Não existia ou não era ativo no mês anterior e agora é ativo; OU
-          // 2. É o primeiro mês histórico do sistema e a data de criação dele foi dentro deste mês
+          // 1. Passou a estar ativo neste mês no cargo e não estava ativo no cargo no mês anterior; E
+          // 2. Teve snapshot/criação neste mês OU passou a ser vigente neste mês
           if (isAtivoAtual && !isAtivoAnterior) {
             admissoesMes++
             const admDate =
-              curSnap.created_at && curSnap.created_at.substring(0, 7) === mKey
+              curSnap && curSnap.created_at && curSnap.created_at.substring(0, 7) === mKey
                 ? new Date(curSnap.created_at)
                 : monthRefDate
             transitionEvents.push({
@@ -414,39 +488,28 @@ export function useCargoCalculations({
           }
 
           // Desligamento:
-          // 1. Era ativo no mês anterior e agora está com registro Inativo ou ausente no mês atual; OU
-          // 2. Registro atual explicitamente Inativo tendo sido criado no período
+          // Era ativo no cargo no mês anterior e deixou de estar ativo no cargo no mês atual
           if (isAtivoAnterior && !isAtivoAtual) {
-            desligamentosMes++
-            const desligDate =
-              curSnap && curSnap.created_at
-                ? new Date(curSnap.created_at)
-                : new Date(`${prevMKey || mKey}-28T12:00:00`)
-            transitionEvents.push({
-              type: 'desligamento',
-              personId: group.personId,
-              plantId: group.plantId,
-              functionId: fId,
-              date: desligDate,
-              monthKey: mKey,
-            })
-          } else if (
-            curSnap &&
-            (curSnap.status || '').trim().toUpperCase() === 'INATIVO' &&
-            !prevSnap &&
-            curSnap.created_at &&
-            curSnap.created_at.substring(0, 7) === mKey
-          ) {
-            // Caso registrado inativo diretamente no mês sem snapshot prévio
-            desligamentosMes++
-            transitionEvents.push({
-              type: 'desligamento',
-              personId: group.personId,
-              plantId: group.plantId,
-              functionId: fId,
-              date: new Date(curSnap.created_at),
-              monthKey: mKey,
-            })
+            // Só conta desligamento se de fato houve um registro Inativo neste mês
+            // ou troca de função/saída explícita (para não contar meses vazios indefinidamente)
+            const wasExplicitlyDeactivated =
+              curSnap && (curSnap.status || '').trim().toUpperCase() === 'INATIVO'
+
+            if (wasExplicitlyDeactivated || (curSnap && curSnap.function_id !== fId)) {
+              desligamentosMes++
+              const desligDate =
+                curSnap && curSnap.created_at
+                  ? new Date(curSnap.created_at)
+                  : new Date(`${prevMKey || mKey}-28T12:00:00`)
+              transitionEvents.push({
+                type: 'desligamento',
+                personId: group.personId,
+                plantId: group.plantId,
+                functionId: fId,
+                date: desligDate,
+                monthKey: mKey,
+              })
+            }
           }
         })
 
