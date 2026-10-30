@@ -45,6 +45,7 @@ export function ColaboradoresList() {
     manager_id: 'none',
   }
   const [formData, setFormData] = useState<any>(defaultForm)
+  const [fileInputKey, setFileInputKey] = useState<number>(0)
 
   const loadData = async () => {
     if (!activeClient) return
@@ -70,20 +71,62 @@ export function ColaboradoresList() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !activeClient) return
+    if (!file) return
+    if (!activeClient?.id) {
+      toast({
+        title: 'Cliente não selecionado',
+        description: 'Selecione uma empresa antes de fazer upload da foto.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Arquivo inválido',
+        description: 'Selecione um arquivo de imagem válido (PNG, JPG, JPEG, WEBP).',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Limite de tamanho: 10MB
+    const maxSize = 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      toast({
+        title: 'Arquivo muito grande',
+        description: 'A imagem deve ter no máximo 10MB.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsUploading(true)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `${activeClient.id}/${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from('org_photos').upload(path, file)
-      if (error) throw error
+      const rawExt = file.name.split('.').pop() || 'jpg'
+      const ext = rawExt.toLowerCase()
+      const safeRandom = Math.random().toString(36).substring(2, 8)
+      const path = `${activeClient.id}/${Date.now()}-${safeRandom}.${ext}`
+      const { error } = await supabase.storage.from('org_photos').upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+      if (error) {
+        throw new Error(error.message || 'Falha ao salvar a imagem no storage.')
+      }
       const {
         data: { publicUrl },
       } = supabase.storage.from('org_photos').getPublicUrl(path)
-      setFormData({ ...formData, photo_url: publicUrl })
+      setFormData((prev: any) => ({ ...prev, photo_url: publicUrl }))
       toast({ title: 'Sucesso', description: 'Foto enviada com sucesso.' })
     } catch (e: any) {
-      toast({ title: 'Erro no upload', description: e.message, variant: 'destructive' })
+      const errorMsg = e?.message || 'Erro desconhecido ao enviar foto.'
+      toast({
+        title: 'Erro no upload da foto',
+        description: errorMsg,
+        variant: 'destructive',
+      })
     } finally {
       setIsUploading(false)
     }
@@ -91,18 +134,35 @@ export function ColaboradoresList() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeClient) return
+    if (!activeClient) {
+      toast({
+        title: 'Erro',
+        description: 'Nenhum cliente selecionado.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (!formData.name?.trim()) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Informe o nome do colaborador.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     try {
       const payload: any = {
         client_id: activeClient.id,
-        name: formData.name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        photo_url: formData.photo_url || null,
+        name: formData.name.trim(),
+        email: formData.email?.trim() || null,
+        phone: formData.phone?.trim() || null,
+        photo_url: formData.photo_url?.trim() || null,
         plant_id: formData.plant_id || null,
         unit_id: formData.unit_id || null,
         function_id: formData.function_id || null,
-        manager_id: formData.manager_id === 'none' ? null : formData.manager_id,
+        manager_id:
+          formData.manager_id === 'none' || !formData.manager_id ? null : formData.manager_id,
       }
 
       if (formData.id) {
@@ -110,12 +170,22 @@ export function ColaboradoresList() {
       }
 
       await saveOrgCollaborator(payload)
-      toast({ title: 'Sucesso', description: 'Colaborador salvo.' })
+      toast({
+        title: 'Sucesso',
+        description: formData.id
+          ? 'Colaborador atualizado com sucesso.'
+          : 'Colaborador adicionado com sucesso.',
+      })
       setFormData(defaultForm)
+      setFileInputKey((k) => k + 1)
       setIsEditing(false)
       loadData()
     } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e.message, variant: 'destructive' })
+      toast({
+        title: 'Erro ao salvar colaborador',
+        description: e?.message || 'Falha ao gravar os dados do colaborador.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -150,8 +220,31 @@ export function ColaboradoresList() {
               </Avatar>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Foto (Upload)</label>
-              <Input type="file" accept="image/*" onChange={handleUpload} disabled={isUploading} />
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Foto (Upload)</label>
+                {formData.photo_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      setFormData((prev: any) => ({ ...prev, photo_url: '' }))
+                      setFileInputKey((k) => k + 1)
+                    }}
+                  >
+                    Remover foto
+                  </Button>
+                )}
+              </div>
+              <Input
+                key={fileInputKey}
+                type="file"
+                accept="image/*"
+                onChange={handleUpload}
+                disabled={isUploading}
+              />
+              {isUploading && <p className="text-xs text-muted-foreground">Enviando foto...</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Nome</label>
@@ -249,6 +342,7 @@ export function ColaboradoresList() {
                   onClick={() => {
                     setIsEditing(false)
                     setFormData(defaultForm)
+                    setFileInputKey((k) => k + 1)
                   }}
                 >
                   Cancelar
@@ -299,7 +393,18 @@ export function ColaboradoresList() {
                       variant="ghost"
                       size="icon"
                       onClick={() => {
-                        setFormData({ ...c, manager_id: c.manager_id || 'none' })
+                        setFormData({
+                          id: c.id,
+                          name: c.name || '',
+                          email: c.email || '',
+                          phone: c.phone || '',
+                          photo_url: c.photo_url || '',
+                          plant_id: c.plant_id || '',
+                          unit_id: c.unit_id || '',
+                          function_id: c.function_id || '',
+                          manager_id: c.manager_id || 'none',
+                        })
+                        setFileInputKey((k) => k + 1)
                         setIsEditing(true)
                       }}
                     >
