@@ -362,9 +362,65 @@ export default function PainelChamados() {
     setIsModalOpen(true)
   }
 
+  const MAX_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024 // 50MB
+  const ALLOWED_ATTACHMENT_EXTENSIONS = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'svg',
+    'bmp',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'csv',
+    'rtf',
+    'xml',
+    'json',
+    'zip',
+    'rar',
+    '7z',
+    'eml',
+    'msg',
+  ]
+
+  const validateAttachmentFile = (file: File): string | null => {
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      return `Arquivo "${file.name}" excede o limite máximo permitido de 50 MB.`
+    }
+    if (!ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext)) {
+      return `Tipo de arquivo não permitido para "${file.name}". Tipos aceitos: e-mails (.eml, .msg), documentos (PDF, Word, Excel, PowerPoint, TXT, CSV), imagens e arquivos compactados (.zip, .rar).`
+    }
+    return null
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+      const incoming = Array.from(e.target.files)
+      const valid: File[] = []
+      for (const file of incoming) {
+        const validationError = validateAttachmentFile(file)
+        if (validationError) {
+          toast({
+            title: 'Arquivo não permitido',
+            description: validationError,
+            variant: 'destructive',
+          })
+        } else {
+          valid.push(file)
+        }
+      }
+      if (valid.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...valid])
+      }
+      e.target.value = ''
     }
   }
 
@@ -415,15 +471,27 @@ export default function PainelChamados() {
             .upload(filePath, file)
 
           if (uploadError) {
+            const msg = uploadError.message?.toLowerCase() || ''
             if (
-              uploadError.message.includes('mime type') &&
-              uploadError.message.includes('is not supported')
+              msg.includes('mime type') ||
+              msg.includes('not supported') ||
+              msg.includes('not allowed')
             ) {
               throw new Error(
-                `O formato do arquivo "${file.name}" não é suportado. Por favor, tente outro formato.`,
+                `Tipo de arquivo não permitido para "${file.name}". Tipos aceitos incluem e-mails (.eml, .msg), documentos (PDF, DOCX, XLSX, TXT) e imagens.`,
               )
             }
-            throw uploadError
+            if (
+              msg.includes('size') ||
+              msg.includes('too large') ||
+              msg.includes('limit') ||
+              msg.includes('exceeded')
+            ) {
+              throw new Error(
+                `Arquivo "${file.name}" maior que o limite de 50 MB. Reduza o arquivo e tente novamente.`,
+              )
+            }
+            throw new Error(`Falha no upload do arquivo "${file.name}": ${uploadError.message}`)
           }
 
           const { data: publicUrlData } = supabase.storage
@@ -1222,9 +1290,13 @@ export default function PainelChamados() {
                   type="file"
                   multiple
                   onChange={handleFileChange}
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.eml,message/rfc822"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.eml,.msg,message/rfc822,application/vnd.ms-outlook,application/octet-stream,.zip,.rar"
                   className="cursor-pointer file:cursor-pointer"
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Formatos aceitos: E-mails (.eml, .msg), PDFs, Documentos Word/Excel/PowerPoint,
+                  Textos (TXT, CSV), Imagens e arquivos compactados (máx. 50 MB por arquivo).
+                </p>
                 {selectedFiles.length > 0 && (
                   <div className="flex flex-col gap-2 mt-3">
                     {selectedFiles.map((file, i) => (

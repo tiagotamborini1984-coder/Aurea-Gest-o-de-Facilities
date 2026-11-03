@@ -32,6 +32,7 @@ import {
   Plus,
   X,
   Trash2,
+  Download,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { submitAuditExecution } from '@/services/audit'
@@ -556,6 +557,45 @@ export function TaskDetailsSheet({
     }
   }
 
+  const MAX_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024 // 50MB
+  const ALLOWED_ATTACHMENT_EXTENSIONS = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'svg',
+    'bmp',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'csv',
+    'rtf',
+    'xml',
+    'json',
+    'zip',
+    'rar',
+    '7z',
+    'eml',
+    'msg',
+  ]
+
+  const validateAttachmentFile = (file: File): string | null => {
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      return `Arquivo "${file.name}" excede o limite máximo permitido de 50 MB.`
+    }
+    if (!ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext)) {
+      return `Tipo de arquivo não permitido para "${file.name}". Tipos aceitos: e-mails (.eml, .msg), documentos (PDF, Word, Excel, PowerPoint, TXT, CSV), imagens e arquivos compactados (.zip, .rar).`
+    }
+    return null
+  }
+
   const attachmentUrls: string[] = []
   if (task?.attachment_url) attachmentUrls.push(task.attachment_url)
   if (task?.attachment_urls?.length) {
@@ -567,6 +607,21 @@ export function TaskDetailsSheet({
   const handleAddNewAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0 || !profile) return
+
+    // Valida previamente todos os arquivos antes de iniciar uploads
+    for (const file of files) {
+      const valError = validateAttachmentFile(file)
+      if (valError) {
+        toast({
+          title: 'Arquivo não permitido',
+          description: valError,
+          variant: 'destructive',
+        })
+        if (e.target) e.target.value = ''
+        return
+      }
+    }
+
     setIsUploadingAttachment(true)
     try {
       const newUrls = [...attachmentUrls]
@@ -580,15 +635,27 @@ export function TaskDetailsSheet({
           .upload(filePath, file)
 
         if (uploadError) {
+          const msg = uploadError.message?.toLowerCase() || ''
           if (
-            uploadError.message.includes('mime type') &&
-            uploadError.message.includes('is not supported')
+            msg.includes('mime type') ||
+            msg.includes('not supported') ||
+            msg.includes('not allowed')
           ) {
             throw new Error(
-              `O formato do arquivo "${file.name}" não é suportado. Por favor, tente outro formato.`,
+              `Tipo de arquivo não permitido para "${file.name}". Tipos aceitos incluem e-mails (.eml, .msg), documentos (PDF, DOCX, XLSX, TXT) e imagens.`,
             )
           }
-          throw uploadError
+          if (
+            msg.includes('size') ||
+            msg.includes('too large') ||
+            msg.includes('limit') ||
+            msg.includes('exceeded')
+          ) {
+            throw new Error(
+              `Arquivo "${file.name}" maior que o limite de 50 MB. Reduza o arquivo e tente novamente.`,
+            )
+          }
+          throw new Error(`Falha no upload do arquivo "${file.name}": ${uploadError.message}`)
         }
 
         const { data: publicUrlData } = supabase.storage
@@ -1261,7 +1328,7 @@ export function TaskDetailsSheet({
                       <Input
                         type="file"
                         multiple
-                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.eml,message/rfc822"
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.eml,.msg,message/rfc822,application/vnd.ms-outlook,application/octet-stream,.zip,.rar"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 file:cursor-pointer"
                         onChange={handleAddNewAttachment}
                         disabled={
@@ -1303,28 +1370,42 @@ export function TaskDetailsSheet({
                       return (
                         <div
                           key={i}
-                          className="flex items-center p-2 rounded-lg bg-muted/50 border border-border group"
+                          className="flex items-center p-2 rounded-lg bg-muted/50 border border-border group hover:bg-muted/80 transition-colors"
                         >
                           <a
                             href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center flex-1 text-sm text-brand-deepBlue dark:text-brand-vividBlue hover:underline"
+                            download={fileName}
+                            className="flex items-center flex-1 min-w-0 text-sm text-brand-deepBlue dark:text-brand-vividBlue hover:underline"
+                            title={`Abrir/baixar ${fileName}`}
                           >
                             <Paperclip className="w-4 h-4 mr-3 shrink-0 text-muted-foreground group-hover:text-brand-deepBlue dark:group-hover:text-brand-vividBlue" />
-                            <span className="truncate">{fileName}</span>
+                            <span className="truncate font-medium">{fileName}</span>
                           </a>
-                          {canDeleteAttachment && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 shrink-0 ml-2"
-                              onClick={() => handleDeleteAttachment(url)}
-                              title="Excluir anexo"
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={fileName}
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors"
+                              title="Baixar arquivo"
                             >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                            {canDeleteAttachment && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 shrink-0"
+                                onClick={() => handleDeleteAttachment(url)}
+                                title="Excluir anexo"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
