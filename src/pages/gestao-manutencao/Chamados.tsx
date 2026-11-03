@@ -68,7 +68,7 @@ const toLocalDatetime = (utcStr: string | null) => {
 }
 
 const getTicketSLA = (ticket: any, currentTime: Date) => {
-  if (!ticket.priority?.sla_hours) return null
+  if (!ticket.priority?.sla_hours && !ticket.planned_end) return null
 
   if (ticket.status?.step === 'Concluído') {
     return {
@@ -78,10 +78,23 @@ const getTicketSLA = (ticket: any, currentTime: Date) => {
     }
   }
 
-  const slaMs = ticket.priority.sla_hours * 60 * 60 * 1000
-  const start = new Date(ticket.reported_at || ticket.created_at).getTime()
-  const elapsed = currentTime.getTime() - start
-  const remaining = slaMs - elapsed
+  const nowMs = currentTime.getTime()
+  let remaining: number
+  let totalWindowMs: number
+
+  if (ticket.planned_end) {
+    const plannedEndMs = new Date(ticket.planned_end).getTime()
+    const startMs = new Date(
+      ticket.planned_start || ticket.reported_at || ticket.created_at,
+    ).getTime()
+    totalWindowMs = plannedEndMs - startMs
+    remaining = plannedEndMs - nowMs
+  } else {
+    totalWindowMs = (ticket.priority?.sla_hours || 0) * 60 * 60 * 1000
+    const startMs = new Date(ticket.reported_at || ticket.created_at).getTime()
+    const elapsed = nowMs - startMs
+    remaining = totalWindowMs - elapsed
+  }
 
   const isLate = remaining < 0
   const absRemaining = Math.abs(remaining)
@@ -102,7 +115,7 @@ const getTicketSLA = (ticket: any, currentTime: Date) => {
   if (isLate) {
     color =
       'text-red-700 bg-red-50 border-red-200 shadow-sm dark:bg-red-950/40 dark:border-red-800 dark:text-red-400'
-  } else if (remaining < slaMs * 0.2) {
+  } else if (totalWindowMs > 0 && remaining < totalWindowMs * 0.2) {
     color =
       'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400'
   }
@@ -230,6 +243,7 @@ export default function ChamadosManutencao() {
       (t) =>
         t.planned_start &&
         new Date(t.planned_start).getTime() <= nowMs &&
+        (!t.planned_end || new Date(t.planned_end).getTime() > nowMs) &&
         t.status?.step !== 'Em Execução' &&
         t.status?.step !== 'Concluído' &&
         !t.status?.is_terminal,
@@ -247,16 +261,21 @@ export default function ChamadosManutencao() {
         })
     }
     tickets.forEach((t) => {
+      const isOverdue = t.planned_end
+        ? new Date(t.planned_end).getTime() < nowMs
+        : t.planned_start && new Date(t.planned_start).getTime() < nowMs
+
       if (
-        t.planned_start &&
-        new Date(t.planned_start).getTime() < nowMs &&
+        isOverdue &&
         t.status?.step !== 'Concluído' &&
         !t.status?.is_terminal &&
         !overdueShownRef.current.has(t.id)
       ) {
         overdueShownRef.current.add(t.id)
         toast.warning(`OS ${t.ticket_number} está atrasada!`, {
-          description: 'A data planejada foi atingida. Finalize a OS.',
+          description: t.planned_end
+            ? 'A data limite planejada expirou. Finalize a OS.'
+            : 'A data planejada foi atingida. Finalize a OS.',
           duration: 10000,
           action: {
             label: 'Finalizar',
@@ -1214,7 +1233,11 @@ export default function ChamadosManutencao() {
                                   'flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap',
                                   sla.color,
                                 )}
-                                title={`SLA: ${ticket.priority?.sla_hours} horas`}
+                                title={
+                                  ticket.planned_end
+                                    ? `Janela planejada até: ${new Date(ticket.planned_end).toLocaleString('pt-BR')}`
+                                    : `SLA: ${ticket.priority?.sla_hours} horas`
+                                }
                               >
                                 <Clock className="w-2.5 h-2.5" />
                                 {sla.text}
