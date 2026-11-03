@@ -6,7 +6,7 @@
     "update-user-password": 206,
     "delete-user": 206,
     "process-recurring-audits": 148,
-    "process-preventive-maintenance": 15,
+    "process-preventive-maintenance": 16,
     "handle-subscription-webhook": 206,
     "maintenance-ai-advisor": 206,
     "import-products": 209,

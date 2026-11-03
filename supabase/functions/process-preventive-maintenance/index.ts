@@ -8,6 +8,36 @@ export const corsHeaders = {
     'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
+const BRAZIL_TZ = 'America/Sao_Paulo'
+
+/**
+ * Retorna a data no calendário civil do Brasil no formato YYYY-MM-DD.
+ */
+function getBrazilDateStr(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BRAZIL_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const y = parts.find((p) => p.type === 'year')?.value
+  const m = parts.find((p) => p.type === 'month')?.value
+  const d = parts.find((p) => p.type === 'day')?.value
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Constrói um Date UTC a partir de "YYYY-MM-DD" para operações aritméticas de calendário.
+ */
+function parseDateUTC(dateStr: string): Date {
+  const clean = (dateStr || '').split('T')[0]
+  return new Date(`${clean}T00:00:00.000Z`)
+}
+
+function fmtDateUTC(d: Date): string {
+  return d.toISOString().split('T')[0]
+}
+
 function addDaysUTC(date: Date, days: number): Date {
   const d = new Date(date.getTime())
   d.setUTCDate(d.getUTCDate() + days)
@@ -32,33 +62,54 @@ function addYearsUTC(date: Date, years: number): Date {
   return d
 }
 
+/**
+ * Interpreta todas as periodicidades configuradas no formulário de Preventivas.
+ * Suporta normalização de acentos, maiúsculas e espaços.
+ */
 function addFrequency(date: Date, frequency: string): Date {
-  const norm = (frequency || '').trim().toLowerCase()
+  const norm = (frequency || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
   switch (norm) {
-    case 'diária':
     case 'diaria':
+    case 'diario':
+    case 'dia':
+    case 'daily':
       return addDaysUTC(date, 1)
     case 'semanal':
+    case 'semana':
+    case 'weekly':
       return addDaysUTC(date, 7)
     case 'quinzenal':
+    case 'quinzena':
+    case 'biweekly':
+    case 'fortnightly':
       return addDaysUTC(date, 15)
     case 'mensal':
+    case 'mes':
+    case 'monthly':
       return addMonthsUTC(date, 1)
     case 'bimestral':
+    case 'bimonthly':
       return addMonthsUTC(date, 2)
     case 'trimestral':
+    case 'quarterly':
       return addMonthsUTC(date, 3)
     case 'semestral':
+    case 'biannual':
+    case 'semiannual':
       return addMonthsUTC(date, 6)
     case 'anual':
+    case 'ano':
+    case 'yearly':
+    case 'annual':
       return addYearsUTC(date, 1)
     default:
       return addMonthsUTC(date, 1)
   }
-}
-
-function fmtDate(d: Date): string {
-  return d.toISOString().split('T')[0]
 }
 
 Deno.serve(async (req: Request) => {
@@ -85,9 +136,10 @@ Deno.serve(async (req: Request) => {
     const filterPlantId = body?.plant_id || null
     const filterPlanId = body?.plan_id || null
 
-    const today = new Date()
-    today.setUTCHours(0, 0, 0, 0)
-    const todayStr = fmtDate(today)
+    // Data de referência no fuso horário do Brasil (America/Sao_Paulo)
+    // Evita deslocamento do dia entre 00h e 03h BRT quando o servidor roda em UTC
+    const todayStr = getBrazilDateStr()
+    const today = parseDateUTC(todayStr)
 
     let query = supabaseClient
       .from('maintenance_preventive_plans')
@@ -112,24 +164,30 @@ Deno.serve(async (req: Request) => {
     for (const plan of plans || []) {
       evaluatedCount++
       const startDateStr = (plan.start_date || todayStr).split('T')[0]
-      const planStart = new Date(startDateStr + 'T00:00:00Z')
+      const planStart = parseDateUTC(startDateStr)
       const advanceDays = Math.max(0, Number(plan.advance_days) || 0)
 
       let nextDue: Date
       if (plan.last_generated_date) {
-        const lastGenStr = plan.last_generated_date.split('T')[0]
-        const lastGen = new Date(lastGenStr + 'T00:00:00Z')
+        const lastGen = parseDateUTC(plan.last_generated_date)
         nextDue = addFrequency(lastGen, plan.frequency)
       } else {
         nextDue = planStart
       }
 
-      // Se a data calculada ainda estiver no passado distante em relação a hoje e já teve geração,
-      // avança respeitando a periodicidade até alcançar ou ultrapassar hoje
-      // considerando também os advanceDays
-      if (plan.last_generated_date && nextDue < today) {
+      // Loop de avanço ("catch-up"):
+      // Caso 1: Já teve geração, mas nextDue ainda está no passado distante.
+      // Caso 2: Não tem geração anterior, mas a data inicial (start_date) já está no passado.
+      // Em ambos os casos, avança respeitando a periodicidade até alcançar a ocorrência atual
+      // onde a data de disparo (nextDue - advanceDays) alcança hoje, ou nextDue >= hoje.
+      // Guard contra loop infinito (máx 1000 iterações).
+      if (nextDue.getTime() < today.getTime()) {
         let guard = 0
-        while (addDaysUTC(nextDue, -advanceDays) < today && nextDue < today && guard < 1000) {
+        while (
+          addDaysUTC(nextDue, -advanceDays).getTime() < today.getTime() &&
+          nextDue.getTime() < today.getTime() &&
+          guard < 1000
+        ) {
           const adv = addFrequency(nextDue, plan.frequency)
           if (adv.getTime() <= nextDue.getTime()) break
           nextDue = adv
@@ -139,22 +197,22 @@ Deno.serve(async (req: Request) => {
 
       // A OS deve ser gerada quando (data planejada - dias de antecedência) <= hoje
       const triggerDate = addDaysUTC(nextDue, -advanceDays)
-      const isDue = today >= triggerDate
+      const isDue = today.getTime() >= triggerDate.getTime()
 
       if (!isDue) {
         details.push({
           plan_id: plan.id,
           title: plan.title,
           status: 'skipped_not_due',
-          next_due: fmtDate(nextDue),
-          trigger_date: fmtDate(triggerDate),
+          next_due: fmtDateUTC(nextDue),
+          trigger_date: fmtDateUTC(triggerDate),
           advance_days: advanceDays,
         })
         continue
       }
 
-      // A data planejada de execução da OS é nextDue (não a data de hoje nem triggerDate)
-      const scheduledDateStr = fmtDate(nextDue)
+      // A data planejada de execução da OS é nextDue
+      const scheduledDateStr = fmtDateUTC(nextDue)
 
       // Verificar idempotência: já existe OS gerada para este plano nesta data planejada?
       const plannedDayStart = `${scheduledDateStr}T00:00:00.000Z`
@@ -186,7 +244,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // Determinar número sequencial da OS (atômico por client e ano)
-      const year = new Date().getFullYear()
+      const year = todayStr.split('-')[0]
       const { data: latestTickets } = await supabaseClient
         .from('maintenance_tickets')
         .select('ticket_number')
@@ -244,9 +302,10 @@ Deno.serve(async (req: Request) => {
           notes: '',
         })) || []
 
+      // Correção da data fim: planned_end deve ser o fim do MESMO dia planejado (18:00 do próprio scheduledDateStr),
+      // e NUNCA a ocorrência do próximo período.
       const plannedStart = `${scheduledDateStr}T08:00:00.000Z`
-      const endCalc = addFrequency(new Date(scheduledDateStr + 'T00:00:00Z'), plan.frequency)
-      const plannedEnd = `${fmtDate(endCalc)}T18:00:00.000Z`
+      const plannedEnd = `${scheduledDateStr}T18:00:00.000Z`
 
       const insertPayload: any = {
         client_id: plan.client_id,
@@ -284,7 +343,7 @@ Deno.serve(async (req: Request) => {
         continue
       }
 
-      // Atualiza last_generated_date do plano preventivo
+      // Atualiza last_generated_date do plano preventivo com a data planejada executada
       await supabaseClient
         .from('maintenance_preventive_plans')
         .update({ last_generated_date: scheduledDateStr })
