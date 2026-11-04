@@ -77,6 +77,8 @@ export default function AuditoriaDashboard() {
     filterTitle: 'all',
     dateRange: undefined as { from?: string; to?: string } | undefined,
   })
+  // O intervalo fica persistido como ISO strings (JSON) e é convertido para Date aqui;
+  // o `to` é restringido ao fim do dia para incluir o dia inteiro na comparação.
   const dateRange: DateRange | undefined = persistedDateRange
     ? {
         from: persistedDateRange.from ? new Date(persistedDateRange.from) : undefined,
