@@ -271,18 +271,49 @@ export default function DashboardGestor() {
         brandSecondary={brandSecondary}
       />
 
-      <DashboardMetricsCards data={dashboardData} />
+      <DashboardMetricsCards
+        metrics={dashboardData.metrics}
+        activeTab={activeTab}
+        logs={logs}
+        employees={filteredEmployees}
+        equipment={filteredEquipment}
+        selectedPlants={selectedPlants}
+        selectedCompanies={selectedCompanies}
+      />
 
-      <DashboardPlantSummary data={dashboardData} />
+      <DashboardPlantSummary
+        plantStats={dashboardData.plantStats}
+        locationStats={dashboardData.locationStats}
+        activeTab={activeTab}
+        absenteeismTarget={absenteeismTarget}
+        nonWorkingDays={nonWorkingDays}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+      />
 
-      <DashboardTrendChart data={dashboardData} target={absenteeismTarget} />
-      <DashboardEquipmentTrendChart data={dashboardData} target={absenteeismTarget} />
+      <DashboardTrendChart data={dashboardData.dailyTrend} target={absenteeismTarget} />
+      <DashboardEquipmentTrendChart data={dashboardData.dailyTrend} target={absenteeismTarget} />
 
-      <DashboardSnapshotWriter data={dashboardData} dateFrom={dateFrom} dateTo={dateTo} />
+      <DashboardSnapshotWriter
+        metrics={dashboardData.metrics}
+        plantStats={dashboardData.plantStats}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        activeTab={activeTab}
+        clientId={activeClientId}
+      />
 
-      <DashboardDetails data={dashboardData} activeTab={activeTab} />
+      <DashboardDetails
+        activeTab={activeTab}
+        equipmentStats={dashboardData.equipmentStats}
+        collaboratorStats={dashboardData.collaboratorStats}
+      />
 
-      <DashboardAureaAI data={dashboardData} />
+      <DashboardAureaAI
+        metrics={dashboardData.metrics}
+        activeTab={activeTab}
+        plantStats={dashboardData.plantStats}
+      />
     </div>
   )
 }
