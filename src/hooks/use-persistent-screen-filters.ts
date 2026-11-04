@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Persistência de filtros por tela.
@@ -120,8 +120,15 @@ function sanitizeField(key: string, saved: unknown, def: unknown): unknown {
 export interface ScreenFilterStore<T extends Record<string, unknown>> {
   /** Valores atuais (restaurados do storage na montagem). */
   values: T
-  /** Salva um ou mais campos do filtro desta tela. */
-  set: (patch: Partial<T>) => void
+  /**
+   * Salva um ou mais campos do filtro desta tela.
+   * Aceita também função de atualização `(prev) => patch`, no formato
+   * Dispatch<SetStateAction> — varios filhos (Checkbox etc.) chamam o setter
+   * no formato funcional; antes da v0.0.1832 a função era PARADA como valor
+   * do campo (values.selectedPlants virava uma function) e a tela quebrava
+   * com "Cannot read properties of function ..." ao filtrar.
+   */
+  set: (patch: Partial<T> | ((prev: T) => Partial<T>)) => void
   /** Restaura os padrões e limpa o armazenamento desta tela. */
   reset: () => void
 }
@@ -131,6 +138,13 @@ export function usePersistentScreenFilters<T extends Record<string, unknown>>(
   defaults: T,
 ): ScreenFilterStore<T> {
   const storageKey = `${PREFIX}:${screenId}`
+
+  // defaults costuma ser um literal inline (nova identidade a cada render);
+  // o ref evita que o reset dependa da identidade do objeto da tela.
+  const defaultsRef = useRef<T>(defaults)
+  useEffect(() => {
+    defaultsRef.current = defaults
+  }, [defaults])
 
   const [values, setValues] = useState<T>(() => {
     try {
@@ -175,12 +189,26 @@ export function usePersistentScreenFilters<T extends Record<string, unknown>>(
     }
   }, [storageKey, values])
 
-  const set = (patch: Partial<T>) => {
-    setValues((prev) => ({ ...prev, ...patch }))
+  const set = (patch: Partial<T> | ((prev: T) => Partial<T>)) => {
+    setValues((prev) => {
+      const resolved = typeof patch === 'function' ? patch(prev) : patch
+      // Compatibilidade com Dispatch<SetStateAction> por campo: os wrappers
+      // das telas repassam o argumento recebido direto para o campo, então um
+      // updater `(prevCampo) => proximoCampo` precisa ser resolvido aqui
+      // contra o valor ATUAL do campo — e não gravado como função no estado
+      // (o que derrubava a tela com TypeError ao filtrar).
+      const safe: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(resolved || {})) {
+        const next =
+          typeof v === 'function' ? (v as (p: unknown) => unknown)(prev[k as keyof T]) : v
+        if (typeof next !== 'function') safe[k] = next
+      }
+      return { ...prev, ...safe }
+    })
   }
 
   const reset = () => {
-    setValues({ ...defaults })
+    setValues({ ...defaultsRef.current })
   }
 
   return { values, set, reset }

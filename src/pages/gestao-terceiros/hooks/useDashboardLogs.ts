@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { parseISO, format } from 'date-fns'
 
@@ -31,6 +31,20 @@ export function useDashboardLogs(
   const reload = useCallback(() => {
     setReloadTrigger((prev) => prev + 1)
   }, [])
+
+  // Identidade estável da lista de plantas: sem isso, o array `plants` recebido
+  // da tela muda de referência a cada render (useMemo inline / literal novo) e
+  // reexecuta estes efeitos em loop — cada execução troca `logs`/`isLoading`,
+  // que re-renderiza a tela e recria o array outra vez (piscar ao filtrar).
+  const plantsKey = useMemo(
+    () =>
+      (plants || [])
+        .map((p: any) => String(p?.id ?? ''))
+        .sort()
+        .join('|'),
+    [plants],
+  )
+  const stablePlants = useMemo(() => plants || [], [plantsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let isCancelled = false
@@ -168,7 +182,7 @@ export function useDashboardLogs(
     return () => {
       isCancelled = true
     }
-  }, [dateFrom, dateTo, plants, reloadTrigger])
+  }, [dateFrom, dateTo, stablePlants, reloadTrigger])
 
   useEffect(() => {
     let isCancelled = false
@@ -237,7 +251,7 @@ export function useDashboardLogs(
     return () => {
       isCancelled = true
     }
-  }, [referenceMonth, plants, reloadTrigger])
+  }, [referenceMonth, stablePlants, reloadTrigger])
 
   return { logs, rawLogs, monthlyGoals, isLoading, error, reload }
 }

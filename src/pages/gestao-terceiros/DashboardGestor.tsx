@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { format, subDays } from 'date-fns'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -62,11 +62,27 @@ export default function DashboardGestor() {
     activeTab: 'colaboradores' as 'colaboradores' | 'equipamentos',
   })
 
-  const setDateFrom = (v: string) => setPersistedFilters({ dateFrom: v })
-  const setDateTo = (v: string) => setPersistedFilters({ dateTo: v })
-  const setReferenceMonth = (v: string) => setPersistedFilters({ referenceMonth: v })
-  const setSelectedPlants = (v: string[]) => setPersistedFilters({ selectedPlants: v })
-  const setSelectedCompanies = (v: string[]) => setPersistedFilters({ selectedCompanies: v })
+  // Wrappers tolerantes a Dispatch<SetStateAction>: o DashboardFilters usa o
+  // formato funcional (setSelectedPlants((prev) => ...)) — gravar o updater
+  // direto como valor do filtro derrubava a tela ao aplicar/remover filtro.
+  const setDateFrom = (v: string | ((prev: string) => string)) =>
+    setPersistedFilters((prev) => ({
+      dateFrom: typeof v === 'function' ? v(prev.dateFrom) : v,
+    }))
+  const setDateTo = (v: string | ((prev: string) => string)) =>
+    setPersistedFilters((prev) => ({ dateTo: typeof v === 'function' ? v(prev.dateTo) : v }))
+  const setReferenceMonth = (v: string | ((prev: string) => string)) =>
+    setPersistedFilters((prev) => ({
+      referenceMonth: typeof v === 'function' ? v(prev.referenceMonth) : v,
+    }))
+  const setSelectedPlants = (v: string[] | ((prev: string[]) => string[])) =>
+    setPersistedFilters((prev) => ({
+      selectedPlants: Array.isArray(v) ? v : v(prev.selectedPlants),
+    }))
+  const setSelectedCompanies = (v: string[] | ((prev: string[]) => string[])) =>
+    setPersistedFilters((prev) => ({
+      selectedCompanies: Array.isArray(v) ? v : v(prev.selectedCompanies),
+    }))
   const setActiveTab = (v: 'colaboradores' | 'equipamentos') =>
     setPersistedFilters({ activeTab: v })
 
@@ -81,6 +97,9 @@ export default function DashboardGestor() {
 
   const { plants, contracted, locations, goals, employees, equipment } = useMasterData()
   const activeClientId = activeClient?.id || (profile as any)?.client_id
+
+  // "hasLoadedOnce" só é declarado depois do hook de logs; placeholder vira
+  // estado de "primeira carga em andamento" via render abaixo.
 
   const filteredPlants = plants || []
   const filteredContracted = contracted || []
@@ -155,6 +174,13 @@ export default function DashboardGestor() {
 
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, safeFilteredPlants)
 
+  // Primeira carga concluída: depois dela o dashboard NÃO volta mais para o
+  // skeleton quando um filtro dispara novo fetch — era isso que fazia a tela
+  // "apagar e voltar" a cada filtro aplicado (isLogsLoading pisca true/false).
+  const hasLoadedOnceRef = useRef(false)
+  if (!isLogsLoading) hasLoadedOnceRef.current = true
+  const showSkeleton = (isLoading || isLogsLoading) && !hasLoadedOnceRef.current
+
   const { filteredEmployees } = useMemo(() => {
     if (!employees) return { filteredEmployees: [] }
     const uniqueEmpGroups = new Map<string, any[]>()
@@ -220,7 +246,7 @@ export default function DashboardGestor() {
 
   if (!profile) return null
 
-  if (isLoading || isLogsLoading) {
+  if (showSkeleton) {
     return (
       <div className="w-full max-w-[1600px] mx-auto space-y-4 lg:space-y-6 pb-12 animate-fade-in">
         <div className="space-y-2">

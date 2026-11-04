@@ -70,7 +70,14 @@ export function useDashboardCalculations(
       } as any
     }
 
-    const validPlants = selectedPlants.length > 0 ? selectedPlants : plants.map((p) => p.id)
+    // selectedPlants pode chegar como função (updater repassado direto pelo
+    // setter de filtro) ou array misturado; sanitiza antes de usar para não
+    // derrubar a renderização (`.length`/`.includes` de função = TypeError,
+    // que fazia a tela cair no Error Boundary e voltar ao Login).
+    const selectedPlantIds = Array.isArray(selectedPlants)
+      ? selectedPlants.filter((p) => typeof p === 'string')
+      : []
+    const validPlants = selectedPlantIds.length > 0 ? selectedPlantIds : plants.map((p) => p.id)
     const companiesSet = new Set(selectedCompanies)
 
     const validEmpIds =
@@ -404,7 +411,7 @@ export function useDashboardCalculations(
             empGroups.forEach((group) => {
               const best = group[0]
               if (best.status?.trim().toUpperCase() !== 'ATIVO') return
-              if (selectedPlants.length > 0 && !validPlants.includes(best.plant_id)) return
+              if (selectedPlantIds.length > 0 && !validPlants.includes(best.plant_id)) return
               if (selectedCompanies.length > 0 && !companiesSet.has(best.company_name)) return
               list.push(best)
             })
@@ -1067,7 +1074,7 @@ export function useDashboardCalculations(
         : (() => {
             const empMap = new Map<string, any>()
             employees
-              .filter((e) => selectedCompanies.length === 0 || companiesSet.has(e.company_name))
+              .filter((e) => companiesSet.size === 0 || companiesSet.has(e.company_name))
               .forEach((emp) => {
                 // Se a versão vigente do colaborador na planta for Inativo, ele não aparece na tabela
                 if (!isEmployeeCurrentActive(emp.id, emp.plant_id)) return
