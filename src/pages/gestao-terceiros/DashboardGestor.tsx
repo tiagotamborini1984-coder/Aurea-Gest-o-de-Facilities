@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { format, subDays } from 'date-fns'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
+import { usePersistentScreenFilters } from '@/hooks/use-persistent-screen-filters'
 import { getAccessibleColors } from '@/lib/contrast-utils'
 import { Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -48,14 +49,27 @@ export default function DashboardGestor() {
     return format(date, 'yyyy-MM-dd')
   }
 
-  const [dateFrom, setDateFrom] = useState(() => format(subDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(() => getCuiabaDateStr(new Date()))
-  const [referenceMonth, setReferenceMonth] = useState(() =>
-    getCuiabaDateStr(new Date()).substring(0, 7),
-  )
-  const [selectedPlants, setSelectedPlants] = useState<string[]>([])
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<'colaboradores' | 'equipamentos'>('colaboradores')
+  // Filtros persistidos por tela: sobrevivem a recarga (F5), troca de janela e remount.
+  const {
+    values: { dateFrom, dateTo, referenceMonth, selectedPlants, selectedCompanies, activeTab },
+    set: setPersistedFilters,
+  } = usePersistentScreenFilters('gestao-terceiros:dashboard-gestor', {
+    dateFrom: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
+    dateTo: getCuiabaDateStr(new Date()),
+    referenceMonth: getCuiabaDateStr(new Date()).substring(0, 7),
+    selectedPlants: [] as string[],
+    selectedCompanies: [] as string[],
+    activeTab: 'colaboradores' as 'colaboradores' | 'equipamentos',
+  })
+
+  const setDateFrom = (v: string) => setPersistedFilters({ dateFrom: v })
+  const setDateTo = (v: string) => setPersistedFilters({ dateTo: v })
+  const setReferenceMonth = (v: string) => setPersistedFilters({ referenceMonth: v })
+  const setSelectedPlants = (v: string[]) => setPersistedFilters({ selectedPlants: v })
+  const setSelectedCompanies = (v: string[]) => setPersistedFilters({ selectedCompanies: v })
+  const setActiveTab = (v: 'colaboradores' | 'equipamentos') =>
+    setPersistedFilters({ activeTab: v })
+
   const [absenteeismTarget, setAbsenteeismTarget] = useState<number>(() => {
     const saved = localStorage.getItem('aurea_absenteeism_target')
     return saved ? Number(saved) : 4
@@ -78,8 +92,13 @@ export default function DashboardGestor() {
   const [nonWorkingDays, setNonWorkingDays] = useState<any[]>([])
 
   useEffect(() => {
-    setSelectedPlants([])
-    setSelectedCompanies([])
+    if (!selectedMasterClient || selectedMasterClient === 'all') return
+    // Troca de cliente (Master): volta ao padrão para não misturar dados de outro cliente.
+    setPersistedFilters({
+      selectedPlants: [],
+      selectedCompanies: [],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMasterClient])
 
   useEffect(() => {
@@ -100,7 +119,8 @@ export default function DashboardGestor() {
           .range(page * pageSize, (page + 1) * pageSize - 1)
 
         if (error) {
-          console.error('Erro ao carregar plant_non_working_days:', error)
+          console.error('Erro ao buscar dias não úteis:', error.message)
+          hasMore = false
           break
         }
 
@@ -116,10 +136,15 @@ export default function DashboardGestor() {
 
       setNonWorkingDays(allNwd)
     }
-    fetchNWD()
-  }, [activeClient?.id, dateFrom, dateTo, selectedMasterClient])
 
-  const safeFilteredPlants = Array.isArray(filteredPlants) ? filteredPlants : []
+    fetchNWD()
+  }, [activeClient?.id, dateFrom, dateTo])
+
+  const safeFilteredPlants = useMemo(
+    () => (filteredPlants.length > 0 ? filteredPlants : [{ id: 'none', name: 'Nenhuma' }]),
+    [filteredPlants],
+  )
+
   const {
     logs,
     monthlyGoals,
@@ -127,6 +152,7 @@ export default function DashboardGestor() {
     error: logsError,
     reload: reloadLogs,
   } = useDashboardLogs(dateFrom, dateTo, referenceMonth, safeFilteredPlants)
+
   const { schedules, areas } = useDashboardSchedules(dateFrom, dateTo, safeFilteredPlants)
 
   const { filteredEmployees } = useMemo(() => {
@@ -194,7 +220,7 @@ export default function DashboardGestor() {
 
   if (!profile) return null
 
-  if (isLoading) {
+  if (isLoading || isLogsLoading) {
     return (
       <div className="w-full max-w-[1600px] mx-auto space-y-4 lg:space-y-6 pb-12 animate-fade-in">
         <div className="space-y-2">
@@ -222,12 +248,14 @@ export default function DashboardGestor() {
         <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
           Dashboard do Gestor
         </h2>
-        <p className="text-sm text-muted-foreground">Visão geral do efetivo por período</p>
+        <p className="text-sm text-muted-foreground">
+          Acompanhe os indicadores de Terceiros por planta e período.
+        </p>
       </div>
 
       <DashboardFilters
         plants={filteredPlants}
-        employees={filteredEmployees}
+        employees={employees || []}
         selectedPlants={selectedPlants}
         setSelectedPlants={setSelectedPlants}
         selectedCompanies={selectedCompanies}
@@ -243,101 +271,18 @@ export default function DashboardGestor() {
         brandSecondary={brandSecondary}
       />
 
-      {logsError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">Erro ao carregar dados:</span>
-            <span className="text-sm">{logsError}</span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={reloadLogs}
-            disabled={isLogsLoading}
-            className="border-destructive/30 hover:bg-destructive/20 text-destructive shrink-0"
-          >
-            {isLogsLoading ? 'Recarregando...' : 'Recarregar'}
-          </Button>
-        </div>
-      )}
+      <DashboardMetricsCards data={dashboardData} />
 
-      {selectedPlants.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center p-8 sm:p-12 lg:p-16 mt-4 shadow-sm">
-          <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg lg:text-xl font-semibold text-foreground text-center">
-            Nenhuma planta selecionada
-          </h3>
-          <p className="text-sm text-muted-foreground mt-2 text-center max-w-md">
-            Selecione uma planta para visualizar os dados do dashboard.
-          </p>
-        </Card>
-      ) : activeTab !== ('metas' as any) ? (
-        <div className="space-y-4 lg:space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-          <DashboardMetricsCards
-            metrics={dashboardData.metrics}
-            activeTab={activeTab}
-            logs={dashboardData.activeLogs}
-            employees={employees}
-            equipment={filteredEquipment}
-            selectedPlants={selectedPlants}
-            selectedCompanies={selectedCompanies}
-          />
-          <DashboardSnapshotWriter
-            metrics={dashboardData.metrics}
-            plantStats={dashboardData.plantStats}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            activeTab={activeTab}
-            clientId={activeClientId}
-          />
+      <DashboardPlantSummary data={dashboardData} />
 
-          <DashboardAureaAI
-            metrics={dashboardData.metrics}
-            activeTab={activeTab}
-            plantStats={dashboardData.plantStats}
-            dailyTrend={dashboardData.dailyTrend}
-          />
+      <DashboardTrendChart data={dashboardData} target={absenteeismTarget} />
+      <DashboardEquipmentTrendChart data={dashboardData} target={absenteeismTarget} />
 
-          {activeTab === 'colaboradores' && (
-            <DashboardTrendChart data={dashboardData.dailyTrend} target={absenteeismTarget} />
-          )}
+      <DashboardSnapshotWriter data={dashboardData} dateFrom={dateFrom} dateTo={dateTo} />
 
-          {activeTab === 'equipamentos' && (
-            <DashboardEquipmentTrendChart
-              data={dashboardData.dailyTrend}
-              target={absenteeismTarget}
-            />
-          )}
+      <DashboardDetails data={dashboardData} activeTab={activeTab} />
 
-          <DashboardPlantSummary
-            plantStats={dashboardData.plantStats}
-            locationStats={dashboardData.locationStats}
-            activeTab={activeTab}
-            absenteeismTarget={absenteeismTarget}
-            nonWorkingDays={nonWorkingDays}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-          />
-          <DashboardDetails
-            activeTab={activeTab}
-            equipmentStats={dashboardData.equipmentStats}
-            collaboratorStats={dashboardData.collaboratorStats}
-          />
-        </div>
-      ) : (
-        <Card className="flex flex-col items-center justify-center p-8 sm:p-12 lg:p-16 mt-4 shadow-sm">
-          <h3 className="text-lg lg:text-xl font-semibold text-foreground text-center">
-            O Book de Metas mudou!
-          </h3>
-          <p className="text-sm text-muted-foreground mt-2 text-center max-w-md">
-            O Book de Metas agora é um módulo independente. Acesse-o através do menu lateral ou
-            clique no botão abaixo.
-          </p>
-          <Button asChild className="mt-6">
-            <Link to="/gestao-terceiros/metas">Acessar Book de Metas</Link>
-          </Button>
-        </Card>
-      )}
+      <DashboardAureaAI data={dashboardData} />
     </div>
   )
 }

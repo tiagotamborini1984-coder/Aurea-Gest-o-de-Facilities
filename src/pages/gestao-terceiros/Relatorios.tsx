@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { usePersistentScreenFilters } from '@/hooks/use-persistent-screen-filters'
 import {
   Table,
   TableBody,
@@ -38,14 +39,30 @@ import {
 
 export default function Relatorios() {
   const { profile, selectedMasterClient } = useAppStore()
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
+  // Filtros persistidos: sobrevivem a recarga (F5), troca de janela e remount da tela.
+  const {
+    values: { dateFrom, dateTo },
+    set: setRelatoriosFilters,
+  } = usePersistentScreenFilters('gestao-terceiros:relatorios', {
+    dateFrom: format(subDays(new Date(), 14), 'yyyy-MM-dd'),
+    dateTo: format(new Date(), 'yyyy-MM-dd'),
+  })
+  const setDateFrom = (v: string) => setRelatoriosFilters({ dateFrom: v })
+  const setDateTo = (v: string) => setRelatoriosFilters({ dateTo: v })
   // Para a aba por cargo, default de período de 6 meses para visualização mensal
   const [cargoDateFrom, setCargoDateFrom] = useState(format(subMonths(new Date(), 6), 'yyyy-MM-01'))
   const [cargoDateTo, setCargoDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [selectedPlants, setSelectedPlants] = useState<string[]>([])
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState('colaborador')
+  const {
+    values: { selectedPlants, selectedCompanies, activeTab },
+    set: setRelatoriosTabFilters,
+  } = usePersistentScreenFilters('gestao-terceiros:relatorios-selecao', {
+    selectedPlants: [] as string[],
+    selectedCompanies: [] as string[],
+    activeTab: 'colaborador',
+  })
+  const setSelectedPlants = (v: string[]) => setRelatoriosTabFilters({ selectedPlants: v })
+  const setSelectedCompanies = (v: string[]) => setRelatoriosTabFilters({ selectedCompanies: v })
+  const setActiveTab = (v: string) => setRelatoriosTabFilters({ activeTab: v })
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [expandedColaboradorId, setExpandedColaboradorId] = useState<string | null>(null)

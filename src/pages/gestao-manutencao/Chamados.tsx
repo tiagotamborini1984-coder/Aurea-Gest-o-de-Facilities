@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { usePersistentScreenFilters } from '@/hooks/use-persistent-screen-filters'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -160,12 +161,22 @@ export default function ChamadosManutencao() {
   const [assignees, setAssignees] = useState<any[]>([])
   const [workers, setWorkers] = useState<any[]>([])
 
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
+  // Filtros persistidos: sobrevivem a recarga (F5), troca de janela e remount da tela.
+  const {
+    values: { selectedPlant: persistedSelectedPlant, concludedDateFilter: persistedConcludedDate },
+    set: setChamadosFilters,
+  } = usePersistentScreenFilters('gestao-manutencao:chamados', {
+    selectedPlant: 'all',
+    concludedDateFilter: '',
+  })
+  const selectedPlant = persistedSelectedPlant
+  const setSelectedPlant = (v: string) => setChamadosFilters({ selectedPlant: v })
   const [closureModalOpen, setClosureModalOpen] = useState(false)
   const [closureTicket, setClosureTicket] = useState<any>(null)
   const [closureForm, setClosureForm] = useState({ closure_notes: '', actual_end: '' })
   const [closureFiles, setClosureFiles] = useState<File[]>([])
-  const [concludedDateFilter, setConcludedDateFilter] = useState<string>('')
+  const concludedDateFilter = persistedConcludedDate
+  const setConcludedDateFilter = (v: string) => setChamadosFilters({ concludedDateFilter: v })
   const [closingTicket, setClosingTicket] = useState(false)
   const overdueShownRef = useRef<Set<string>>(new Set())
   const loadTicketsRef = useRef<() => void>(() => {})

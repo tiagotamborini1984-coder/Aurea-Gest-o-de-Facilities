@@ -5,6 +5,7 @@ import { getOrgCollaborators, getOrgUnits } from '@/services/organograma'
 import { sortCollaboratorsByPlantAndName } from './organograma-sorter'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
+import { usePersistentScreenFilters } from '@/hooks/use-persistent-screen-filters'
 import {
   Select,
   SelectContent,
@@ -91,8 +92,16 @@ export default function OrgDashboard() {
   const [collaborators, setCollaborators] = useState<any[]>([])
   const [units, setUnits] = useState<any[]>([])
 
-  const [selectedPlant, setSelectedPlant] = useState('all')
-  const [selectedUnit, setSelectedUnit] = useState('all')
+  // Filtros persistidos: sobrevivem a recarga (F5), troca de janela e remount da tela.
+  const {
+    values: { selectedPlant, selectedUnit },
+    set: setOrgFilters,
+  } = usePersistentScreenFilters('organograma:dashboard', {
+    selectedPlant: 'all',
+    selectedUnit: 'all',
+  })
+  const setSelectedPlant = (v: string) => setOrgFilters({ selectedPlant: v })
+  const setSelectedUnit = (v: string) => setOrgFilters({ selectedUnit: v })
 
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)

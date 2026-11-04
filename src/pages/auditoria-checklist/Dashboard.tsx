@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { usePersistentScreenFilters } from '@/hooks/use-persistent-screen-filters'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -66,10 +67,34 @@ export default function AuditoriaDashboard() {
   const [ncError, setNcError] = useState<string | null>(null)
   const [reloadTrigger, setReloadTrigger] = useState(0)
 
-  const [filterPlant, setFilterPlant] = useState('all')
-  const [filterType, setFilterType] = useState('all')
-  const [filterTitle, setFilterTitle] = useState('all')
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  // Filtros persistidos: sobrevivem a recarga (F5), troca de janela e remount da tela.
+  const {
+    values: { filterPlant, filterType, filterTitle, dateRange: persistedDateRange },
+    set: setAuditFilters,
+  } = usePersistentScreenFilters('auditoria-checklist:dashboard', {
+    filterPlant: 'all',
+    filterType: 'all',
+    filterTitle: 'all',
+    dateRange: undefined as { from?: string; to?: string } | undefined,
+  })
+  const dateRange: DateRange | undefined = persistedDateRange
+    ? {
+        from: persistedDateRange.from ? new Date(persistedDateRange.from) : undefined,
+        to: persistedDateRange.to ? new Date(persistedDateRange.to) : undefined,
+      }
+    : undefined
+  const setDateRange = (r: DateRange | undefined) =>
+    setAuditFilters({
+      dateRange: r?.from
+        ? {
+            from: r.from.toISOString(),
+            to: r.to?.toISOString(),
+          }
+        : undefined,
+    })
+  const setFilterPlant = (v: string) => setAuditFilters({ filterPlant: v })
+  const setFilterType = (v: string) => setAuditFilters({ filterType: v })
+  const setFilterTitle = (v: string) => setAuditFilters({ filterTitle: v })
 
   const isMaster = profile?.role === 'Master'
   const roleLower = String(profile?.role || '').toLowerCase()
