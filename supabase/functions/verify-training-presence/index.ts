@@ -55,6 +55,32 @@ Deno.serve(async (req: Request) => {
     }
     const recordId = body.record_id
     const jobId = body.job_id
+
+    // ===== CALLBACK EM LOTE =====
+    // results: [{job_id, status, notes, signed_name, confidence, completion_date}, ...]
+    if (Array.isArray(body?.results) && body.results.length > 0) {
+      let n = 0
+      for (const r of body.results) {
+        if (!r?.job_id) continue
+        const st = r.status === 'verified' ? 'verified' : 'rejected'
+        const jp: any = {
+          status: st,
+          notes: String(r.notes || '').slice(0, 500),
+          signed_name: String(r.signed_name || '').slice(0, 200),
+          confidence: typeof r.confidence === 'number' ? r.confidence : 50,
+          updated_at: new Date().toISOString(),
+        }
+        const cd = String(r.completion_date || '').match(/^\d{4}-\d{2}-\d{2}$/)
+        if (cd) jp.completion_date = r.completion_date
+        const { error } = await admin
+          .from('training_verification_jobs')
+          .update(jp)
+          .eq('id', r.job_id)
+        if (!error) n++
+      }
+      return jsonRes({ success: true, updated: n })
+    }
+
     if (!recordId && !jobId) return jsonRes({ error: 'Missing record_id/job_id' }, 400)
 
     const status = body.status === 'verified' ? 'verified' : 'rejected'
@@ -188,6 +214,88 @@ Deno.serve(async (req: Request) => {
       return jsonRes({ error: 'Integração de conferência não configurada' }, 500)
     }
 
+    // ===== LOTE POR DOCUMENTO =====
+    // Um mesmo dossiê gera vários jobs (um por treinamento) e o MESMO arquivo pode
+    // ser reenviado com URL diferente. Analisar o mesmo PDF N vezes deixa a fila
+    // lentíssima (>20 min) e estoura o tempo do usuário. Aqui juntamos todos os jobs
+    // pendentes cujo CONTEÚDO é o mesmo (hash do arquivo) num pedido só: o agente lê
+    // o documento UMA vez e responde todos os itens.
+    const batchJobs: Array<{
+      job_id: string
+      training_name: string
+      employee_name: string
+    }> = []
+    if (jobId) {
+      // Pequena espera: o usuário anexa as listas do mesmo dossiê em sequência.
+      await new Promise((r) => setTimeout(r, 6000))
+
+      // Hash do conteúdo deste documento
+      let myHash = ''
+      try {
+        const f = await fetch(documentUrl)
+        if (f.ok) {
+          const buf = await f.arrayBuffer()
+          const digest = await crypto.subtle.digest('SHA-256', buf)
+          myHash = Array.from(new Uint8Array(digest))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('')
+        }
+      } catch (_e) {
+        // sem hash: segue sem lote (nunca bloqueia a conferência)
+      }
+
+      const since = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      const { data: pending } = await admin
+        .from('training_verification_jobs')
+        .select('id, training_name, employee_name, document_url')
+        .eq('status', 'analyzing')
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(40)
+
+      const sameDoc: any[] = []
+      for (const p of pending || []) {
+        if ((p as any).id === jobId) {
+          sameDoc.push(p)
+          continue
+        }
+        const url = (p as any).document_url as string
+        if (!url) continue
+        if (url === documentUrl) {
+          sameDoc.push(p)
+          continue
+        }
+        if (!myHash) continue
+        try {
+          const r = await fetch(url)
+          if (!r.ok) continue
+          const b = await r.arrayBuffer()
+          const dg = await crypto.subtle.digest('SHA-256', b)
+          const h = Array.from(new Uint8Array(dg))
+            .map((x) => x.toString(16).padStart(2, '0'))
+            .join('')
+          if (h === myHash) sameDoc.push(p)
+        } catch (_e) {
+          // ignora irmão inacessível
+        }
+      }
+
+      for (const s of sameDoc) {
+        batchJobs.push({
+          job_id: (s as any).id,
+          training_name: (s as any).training_name || '',
+          employee_name: (s as any).employee_name || '',
+        })
+      }
+      if (!batchJobs.some((b) => b.job_id === jobId)) {
+        batchJobs.unshift({
+          job_id: jobId,
+          training_name: trainingName,
+          employee_name: employeeName,
+        })
+      }
+    }
+
     // marca o registro (se existir) como em análise
     if (recordId) {
       await admin
@@ -208,6 +316,8 @@ Deno.serve(async (req: Request) => {
       document_url: documentUrl,
       training_name: trainingName,
       employee_name: employeeName,
+      // Lote: demais jobs do MESMO documento (o agente lê o arquivo uma vez só)
+      batch_jobs: batchJobs.length > 1 ? batchJobs : undefined,
       callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/verify-training-presence`,
       callback_secret: cbSecret,
     })
