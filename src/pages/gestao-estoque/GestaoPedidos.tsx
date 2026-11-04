@@ -26,6 +26,11 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Package, Filter, Trash } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import {
+  getOrderRequestedTotal,
+  getOrderReservedTotal,
+  getOrderReservedTotalFromQuantities,
+} from '@/lib/order-totals'
 import { supabase } from '@/lib/supabase/client'
 import {
   AlertDialog,
@@ -234,6 +239,7 @@ export default function GestaoPedidos() {
                 <TableHead>Responsável</TableHead>
                 <TableHead>Planta / Área</TableHead>
                 <TableHead>Itens</TableHead>
+                <TableHead className="text-right">Total do Pedido (Reservado)</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>SAP</TableHead>
                 <TableHead className="text-right">Ação</TableHead>
@@ -253,6 +259,9 @@ export default function GestaoPedidos() {
                     <div className="text-xs text-slate-500">{req.area?.name}</div>
                   </TableCell>
                   <TableCell>{req.total_items}</TableCell>
+                  <TableCell className="text-right font-medium text-slate-800">
+                    {formatCurrency(getOrderReservedTotal(req.items))}
+                  </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(req.status)} variant="outline">
                       {req.status}
@@ -283,7 +292,7 @@ export default function GestaoPedidos() {
               ))}
               {filteredRequests.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={10} className="text-center py-8 text-slate-500">
                     Nenhum pedido encontrado.
                   </TableCell>
                 </TableRow>
@@ -435,22 +444,28 @@ export default function GestaoPedidos() {
               </div>
 
               {selectedRequest.items && selectedRequest.items.length > 0 && (
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-sm font-semibold text-slate-700">
-                    Total do Pedido
-                    {selectedRequest.status === 'Pendente' ? ' (Solicitado)' : ' (Reservado)'}
-                  </span>
-                  <span className="text-lg font-bold text-slate-900">
-                    {formatCurrency(
-                      selectedRequest.items.reduce(
-                        (acc: number, item: any) =>
-                          acc +
-                          (item.product?.item_value ?? 0) *
-                            (item.reserved_quantity ?? item.quantity ?? 0),
-                        0,
-                      ),
-                    )}
-                  </span>
+                <div className="pt-2 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-600">
+                      Total do Pedido (Solicitado)
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {formatCurrency(getOrderRequestedTotal(selectedRequest.items))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold text-slate-700">
+                      Total do Pedido (Reservado)
+                    </span>
+                    <span className="text-lg font-bold text-slate-900">
+                      {formatCurrency(
+                        getOrderReservedTotalFromQuantities(
+                          selectedRequest.items,
+                          reservedQuantities,
+                        ),
+                      )}
+                    </span>
+                  </div>
                 </div>
               )}
 

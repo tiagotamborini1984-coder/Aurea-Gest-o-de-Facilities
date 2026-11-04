@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
+import { getOrderRequestedTotal, getOrderReservedTotal } from '@/lib/order-totals'
 
 export default function MeusPedidos() {
   const { activeClient } = useAppStore()
@@ -100,6 +101,7 @@ export default function MeusPedidos() {
                 <TableHead>Data</TableHead>
                 <TableHead>Planta / Área</TableHead>
                 <TableHead>Itens</TableHead>
+                <TableHead className="text-right">Total do Pedido (Reservado)</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Reserva SAP</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -114,6 +116,9 @@ export default function MeusPedidos() {
                     <div className="text-xs text-slate-500">{req.area?.name}</div>
                   </TableCell>
                   <TableCell>{req.total_items}</TableCell>
+                  <TableCell className="text-right font-medium text-slate-800">
+                    {formatCurrency(getOrderReservedTotal(req.items))}
+                  </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(req.status)} variant="outline">
                       {req.status}
@@ -147,7 +152,7 @@ export default function MeusPedidos() {
               ))}
               {requests.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     Você ainda não fez nenhum pedido.
                   </TableCell>
                 </TableRow>
@@ -230,22 +235,23 @@ export default function MeusPedidos() {
                   ))}
                 </div>
                 {selectedRequest.items?.some((item: any) => item.product?.item_value != null) && (
-                  <div className="flex justify-between items-center mt-4 pt-3 border-t">
-                    <span className="font-semibold text-slate-700">
-                      Total do Pedido
-                      {selectedRequest.status === 'Pendente' ? ' (Solicitado)' : ' (Reservado)'}
-                    </span>
-                    <span className="text-lg font-bold text-slate-900">
-                      {formatCurrency(
-                        selectedRequest.items.reduce(
-                          (acc: number, item: any) =>
-                            acc +
-                            (item.product?.item_value ?? 0) *
-                              (item.reserved_quantity ?? item.quantity ?? 0),
-                          0,
-                        ),
-                      )}
-                    </span>
+                  <div className="mt-4 pt-3 border-t space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-slate-600">
+                        Total do Pedido (Solicitado)
+                      </span>
+                      <span className="text-sm font-semibold text-slate-700">
+                        {formatCurrency(getOrderRequestedTotal(selectedRequest.items))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-slate-700">
+                        Total do Pedido (Reservado)
+                      </span>
+                      <span className="text-lg font-bold text-slate-900">
+                        {formatCurrency(getOrderReservedTotal(selectedRequest.items))}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
