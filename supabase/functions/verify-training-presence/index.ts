@@ -280,15 +280,33 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      for (const s of sameDoc) {
+      // ===== CLAIM ATÔMICO (com lease de 15 min) =====
+      // Só UMA requisição analisa um dado documento. Sem isso, cada job do mesmo
+      // dossiê dispara seu próprio lote e todos leem o PDF em paralelo — trabalho
+      // duplicado e estouro do tempo do usuário. O lease expira para não travar
+      // um job cujo pedido morreu no meio.
+      const claimIds: string[] = sameDoc.map((s: any) => s.id)
+      const leaseCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+      if (claimIds.length > 0) {
+        const { data: claimed } = await admin
+          .from('training_verification_jobs')
+          .update({ claimed_at: new Date().toISOString() })
+          .in('id', claimIds)
+          .or(`claimed_at.is.null,claimed_at.lt.${leaseCutoff}`)
+          .select('id, training_name, employee_name')
+        if (!claimed || claimed.length === 0) {
+          // outro pedido já assumiu este documento
+          return jsonRes({ success: true, handedOff: true })
+        }
+        for (const c of claimed as any[]) {
+          batchJobs.push({
+            job_id: c.id,
+            training_name: c.training_name || '',
+            employee_name: c.employee_name || '',
+          })
+        }
+      } else {
         batchJobs.push({
-          job_id: (s as any).id,
-          training_name: (s as any).training_name || '',
-          employee_name: (s as any).employee_name || '',
-        })
-      }
-      if (!batchJobs.some((b) => b.job_id === jobId)) {
-        batchJobs.unshift({
           job_id: jobId,
           training_name: trainingName,
           employee_name: employeeName,
