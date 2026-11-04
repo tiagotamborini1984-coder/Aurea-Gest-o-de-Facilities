@@ -54,7 +54,9 @@ export async function verifyByJob(params: {
   employeeName?: string
   timeoutMs?: number
 }): Promise<TrainingVerificationResult> {
-  const { documentUrl, trainingName, employeeName = '', timeoutMs = 240000 } = params
+  // Teto longo: a análise de um dossiê pode levar alguns minutos; desistir cedo
+  // fazia o usuário ver "tempo esgotado" com a lista correta.
+  const { documentUrl, trainingName, employeeName = '', timeoutMs = 900000 } = params
 
   const ins = await supabase
     .from('training_verification_jobs')
@@ -77,7 +79,12 @@ export async function verifyByJob(params: {
     return { ok: false, status: 'failed', notes: start?.error || 'Falha ao acionar conferência.' }
   }
 
+  // A análise de um dossiê multi-página é naturalmente lenta (o agente lê o arquivo
+  // uma vez e responde todos os treinamentos). Por isso NÃO desistimos nem apagamos
+  // o job: continuamos esperando até o resultado chegar (teto de segurança longo)
+  // e, se a entrega falhar de verdade, re-acionamos o pedido uma vez.
   const deadline = Date.now() + timeoutMs
+  let nextRetryAt = Date.now() + 180000
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2000))
     const { data } = await supabase
@@ -101,38 +108,52 @@ export async function verifyByJob(params: {
         completion_date: row.completion_date || undefined,
       }
     }
-  }
-  // Tempo esgotado: NÃO apagar o job — o agente pode ainda responder (entrega atrasada).
-  // Re-aciona a conferência uma vez (retry do webhook) e estende a espera.
-  const retry = await callFn({ job_id: jobId })
-  if (retry?.success) {
-    const deadline2 = Date.now() + 120000
-    while (Date.now() < deadline2) {
-      await new Promise((r) => setTimeout(r, 2000))
-      const { data } = await supabase
-        .from('training_verification_jobs')
-        .select('status, notes, signed_name, confidence, completion_date')
-        .eq('id', jobId)
-        .single()
-      const row = data as any
-      if (
-        row &&
-        (row.status === 'verified' || row.status === 'rejected' || row.status === 'failed')
-      ) {
-        supabase.from('training_verification_jobs').delete().eq('id', jobId)
-        return {
-          ok: row.status === 'verified',
-          status: row.status,
-          notes: row.notes || undefined,
-          signed_name: row.signed_name || undefined,
-          confidence: row.confidence ?? undefined,
-          completion_date: row.completion_date || undefined,
-        }
-      }
+    // a cada 3 min sem resposta, garante que o pedido está vivo (retry limitado)
+    if (Date.now() >= nextRetryAt) {
+      nextRetryAt = Date.now() + 180000
+      await callFn({ job_id: jobId })
     }
   }
-  supabase.from('training_verification_jobs').delete().eq('id', jobId)
-  return { ok: false, status: 'failed', notes: 'Tempo esgotado aguardando a conferência.' }
+  // NÃO apagar o job: manter para o resultado tardio aparecer no selo ao recarregar.
+  return {
+    ok: false,
+    status: 'failed',
+    notes:
+      'A conferência está demorando mais que o normal — o resultado aparecerá no selo assim que ficar pronto. Recarregue a página em instantes.',
+  }
+}
+
+/**
+ * Espera o resultado de uma conferência já pedida (job por document_url), sem
+ * disparar nada novo. Usado no SALVAR: se a lista ainda está em análise, o
+ * cadastro espera o veredito em vez de falhar com "tempo esgotado".
+ */
+export async function awaitPendingVerification(
+  documentUrl: string,
+  timeoutMs = 300000,
+): Promise<TrainingVerificationResult | null> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const { data } = await supabase
+      .from('training_verification_jobs')
+      .select('status, notes, signed_name, confidence, completion_date')
+      .eq('document_url', documentUrl)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const row = (data || [])[0] as any
+    if (row && (row.status === 'verified' || row.status === 'rejected')) {
+      return {
+        ok: row.status === 'verified',
+        status: row.status,
+        notes: row.notes || undefined,
+        signed_name: row.signed_name || undefined,
+        confidence: row.confidence ?? undefined,
+        completion_date: row.completion_date || undefined,
+      }
+    }
+    await new Promise((r) => setTimeout(r, 3000))
+  }
+  return null
 }
 
 /**
@@ -145,13 +166,14 @@ export async function verifyTrainingPresence(
   if (!start?.success) {
     return { ok: false, status: 'failed', notes: start?.error || 'Falha ao acionar conferência.' }
   }
-  const deadline = Date.now() + 180000
+  const deadline = Date.now() + 900000
+  let nextRetryAt = Date.now() + 180000
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2000))
     const { data } = await supabase
       .from('employee_training_records')
       .select(
-        'verification_status, verification_notes, verification_signed_name, verification_confidence',
+        'verification_status, verification_notes, verification_signed_name, verification_confidence, completion_date',
       )
       .eq('id', recordId)
       .single()
@@ -171,6 +193,10 @@ export async function verifyTrainingPresence(
         completion_date: row.completion_date || undefined,
       }
     }
+    if (Date.now() >= nextRetryAt) {
+      nextRetryAt = Date.now() + 180000
+      await callFn({ record_id: recordId })
+    }
   }
-  return { ok: false, status: 'failed', notes: 'Tempo esgotado aguardando a conferência.' }
+  return { ok: false, status: 'failed', notes: 'A conferência está demorando mais que o normal.' }
 }

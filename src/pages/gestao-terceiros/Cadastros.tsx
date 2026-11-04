@@ -21,7 +21,7 @@ import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
 import { logAudit } from '@/services/audit'
 
-import { isListValidated } from '@/lib/training-verification'
+import { isListValidated, awaitPendingVerification } from '@/lib/training-verification'
 
 export default function Cadastros() {
   const { type } = useParams()
@@ -271,18 +271,42 @@ export default function Cadastros() {
                 const formRecsByTraining = new Map<string, any>(
                   formRecs.map((f: any) => [f.training_id, f]),
                 )
+                // Se alguma lista ainda está em análise, ESPERA o veredito em vez de
+                // recusar o cadastro (antes o usuário via "tempo esgotado" com a
+                // lista correta e o cadastro era bloqueado sem motivo real).
+                const pendentes = (trPayload || []).filter((p: any) => {
+                  if (!p.document_url) return false
+                  const tr = formRecsByTraining.get(p.training_id) || p
+                  return !isListValidated(tr)
+                })
+                for (const p of pendentes) {
+                  const r = await awaitPendingVerification(p.document_url)
+                  if (r?.status === 'verified') {
+                    const tr = formRecsByTraining.get(p.training_id)
+                    if (tr) {
+                      tr.verification_status = 'verified'
+                      tr.verification_notes = r.notes || null
+                      tr.verification_signed_name = r.signed_name || null
+                      tr.verification_confidence = r.confidence ?? null
+                      tr.verified_document_url = tr.document_url
+                      if (r.completion_date && !tr.completion_date)
+                        tr.completion_date = r.completion_date
+                    }
+                  }
+                }
                 const invalid = (trPayload || []).filter((p: any) => {
                   if (!p.document_url) return false
                   const tr = formRecsByTraining.get(p.training_id) || p
                   return !isListValidated(tr)
                 })
                 if (invalid.length > 0) {
+                  const motivo =
+                    formRecsByTraining.get(invalid[0].training_id)?.verification_notes || ''
                   await supabase.from('employees').delete().eq('id', data.id)
                   return {
                     success: false,
                     error: {
-                      message:
-                        'Cadastro não salvo: há lista de presença não validada pelo agente (anexe uma lista válida e aguarde a conferência no momento do anexo).',
+                      message: `Cadastro não salvo: lista de presença não validada pelo agente.${motivo ? ` Motivo: ${motivo}` : ' (anexe uma lista válida)'}`,
                     },
                   }
                 }

@@ -265,7 +265,13 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
       trainingName,
       employeeName,
     })
-    updateRecord(index, 'verification_status', res.status || 'failed')
+    // Se ainda não há veredito (análise em andamento), mantém "analyzing" para o
+    // usuário entender que o resultado vem — e não marca falha indevidamente.
+    const finalStatus =
+      res.status === 'failed' && res.notes?.includes('demorando')
+        ? 'analyzing'
+        : res.status || 'failed'
+    updateRecord(index, 'verification_status', finalStatus)
     updateRecord(index, 'verification_notes', res.notes || null)
     updateRecord(index, 'verification_signed_name', res.signed_name || null)
     updateRecord(index, 'verified_document_url', url)
