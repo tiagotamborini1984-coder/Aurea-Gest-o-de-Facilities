@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { verifyByJob } from '@/lib/training-verification'
+import { verifyByJob, awaitPendingVerification } from '@/lib/training-verification'
+import type { TrainingVerificationResult } from '@/lib/training-verification'
 import { mergeFilesToPdf } from '@/lib/merge-files'
 import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
 import { cn } from '@/lib/utils'
@@ -260,35 +261,60 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     const employeeName = form.name || ''
     updateRecord(index, 'verification_status', 'analyzing')
     toast({ title: 'Documento anexado. Agente conferindo a lista…' })
-    const res = await verifyByJob({
-      documentUrl: url,
-      trainingName,
-      employeeName,
-    })
-    // Se ainda não há veredito (análise em andamento), mantém "analyzing" para o
-    // usuário entender que o resultado vem — e não marca falha indevidamente.
-    const finalStatus =
-      res.status === 'failed' && res.notes?.includes('demorando')
-        ? 'analyzing'
-        : res.status || 'failed'
-    updateRecord(index, 'verification_status', finalStatus)
-    updateRecord(index, 'verification_notes', res.notes || null)
-    updateRecord(index, 'verification_signed_name', res.signed_name || null)
-    updateRecord(index, 'verified_document_url', url)
-    // Data de conclusão extraída da lista pelo agente (se veio e o campo está vazio)
-    if (res.completion_date) {
-      const rec = (form.training_records || [])[index]
-      if (!rec?.completion_date) updateRecord(index, 'completion_date', res.completion_date)
+    const applyResult = (res: TrainingVerificationResult, isFinal: boolean) => {
+      const finalStatus =
+        res.status === 'failed' && res.notes?.includes('demorando')
+          ? 'analyzing'
+          : res.status || 'failed'
+      updateRecord(index, 'verification_status', finalStatus)
+      updateRecord(index, 'verification_notes', res.notes || null)
+      updateRecord(index, 'verification_signed_name', res.signed_name || null)
+      if (finalStatus === 'verified') updateRecord(index, 'verified_document_url', url)
+      if (res.completion_date && !isFinal) {
+        const rec = (form.training_records || [])[index]
+        if (!rec?.completion_date) updateRecord(index, 'completion_date', res.completion_date)
+      } else if (res.completion_date) {
+        const rec = (form.training_records || [])[index]
+        if (!rec?.completion_date) updateRecord(index, 'completion_date', res.completion_date)
+      }
     }
+
+    // 1ª espera: pega o resultado na maioria dos casos
+    const res = await verifyByJob({ documentUrl: url, trainingName, employeeName })
+    applyResult(res, true)
+
     if (res.status === 'verified') {
       toast({ title: 'Lista conferida pelo agente ✓', description: res.notes })
-    } else {
+    } else if (res.status === 'rejected') {
       toast({
         title: 'Lista NÃO validada',
         description: res.notes || 'Documento não confere.',
         variant: 'destructive',
         duration: 12000,
       })
+    } else {
+      // Ainda em análise: avisa e SEGUE esperando em segundo plano, atualizando
+      // o selo sozinho — o usuário não precisa recarregar nem reanexar.
+      toast({
+        title: 'Conferência em andamento',
+        description: 'O resultado aparece no selo assim que ficar pronto.',
+      })
+      void (async () => {
+        const later = await awaitPendingVerification(url, 900000)
+        if (later) {
+          applyResult(later, true)
+          if (later.status === 'verified') {
+            toast({ title: 'Lista conferida pelo agente ✓', description: later.notes })
+          } else {
+            toast({
+              title: 'Lista NÃO validada',
+              description: later.notes || 'Documento não confere.',
+              variant: 'destructive',
+              duration: 12000,
+            })
+          }
+        }
+      })()
     }
   }
 
