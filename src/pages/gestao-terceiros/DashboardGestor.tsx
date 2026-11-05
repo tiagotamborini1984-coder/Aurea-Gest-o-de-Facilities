@@ -110,7 +110,15 @@ export default function DashboardGestor() {
 
   const [nonWorkingDays, setNonWorkingDays] = useState<any[]>([])
 
+  // Guarda o cliente do ciclo anterior: o reset de plantas/empresas só pode
+  // disparar quando o cliente TROCA de verdade. Na montagem (F5, relogin,
+  // volta de outra janela) NENHUM reset ocorre — antes, o efeito rodava no
+  // mount e, com selectedMasterClient restaurado do localStorage (≠ 'all'),
+  // zerava o filtro persistido logo após a restauração.
+  const prevMasterClientRef = useRef(selectedMasterClient)
   useEffect(() => {
+    if (prevMasterClientRef.current === selectedMasterClient) return
+    prevMasterClientRef.current = selectedMasterClient
     if (!selectedMasterClient || selectedMasterClient === 'all') return
     // Troca de cliente (Master): volta ao padrão para não misturar dados de outro cliente.
     setPersistedFilters({
