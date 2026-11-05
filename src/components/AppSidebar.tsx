@@ -26,6 +26,8 @@ import {
   Plane,
   HeartHandshake,
   Bot,
+  KeyRound,
+  Clock,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -73,6 +75,7 @@ export function AppSidebar() {
         icon: Briefcase,
         subItems: [
           { title: 'Dashboard do Gestor', path: '/gestao-terceiros/dashboard-gestor' },
+          { title: 'Horas Extras', path: '/gestao-terceiros/horas-extras' },
           { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
           { title: 'Treinamentos', path: '/gestao-terceiros/treinamentos' },
           { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
@@ -278,6 +281,11 @@ export function AppSidebar() {
         icon: ClipboardList,
         path: '/admin/auditoria',
       },
+      {
+        title: 'Chaves de API (HE)',
+        icon: KeyRound,
+        path: '/admin/api-keys',
+      },
     ],
     [],
   )
@@ -297,6 +305,11 @@ export function AppSidebar() {
           }
 
           if (item.title === 'Log de Auditoria') {
+            if (role !== 'Master' && role !== 'Administrador') return null
+            return item
+          }
+
+          if (item.title === 'Chaves de API (HE)') {
             if (role !== 'Master' && role !== 'Administrador') return null
             return item
           }
@@ -482,7 +495,8 @@ export function AppSidebar() {
                   userMenus.includes(`Gestão de Terceiros:${sub.title}`) ||
                   userMenus.includes(sub.title) ||
                   hasLegacyDashboard ||
-                  sub.title === 'Treinamentos'
+                  sub.title === 'Treinamentos' ||
+                  sub.title === 'Horas Extras'
                 )
               })
             }

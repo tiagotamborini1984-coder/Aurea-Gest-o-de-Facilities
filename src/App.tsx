@@ -13,6 +13,8 @@ import ConfiguracoesEncomendas from './pages/gestao-terceiros/ConfiguracoesEncom
 import BIDashboard from './pages/gestao-terceiros/BIDashboard'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
 import Auditoria from './pages/admin/Auditoria'
+import HorasExtras from './pages/gestao-terceiros/HorasExtras'
+import HorasExtrasApiKeys from './pages/admin/HorasExtrasApiKeys'
 import EmailReports from './pages/gestao-terceiros/EmailReports'
 import BookMetas from './pages/gestao-terceiros/BookMetas'
 import Clientes from './pages/admin/Clientes'
@@ -165,6 +167,7 @@ const App = () => (
                         path="/gestao-terceiros/dashboard-gestor"
                         element={<DashboardGestor />}
                       />
+                      <Route path="/gestao-terceiros/horas-extras" element={<HorasExtras />} />
                       <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
                       <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
 
@@ -336,6 +339,7 @@ const App = () => (
                       <Route path="/gestao-terceiros/metas" element={<BookMetas />} />
                       <Route path="/gestao-terceiros/email-reports" element={<EmailReports />} />
                       <Route path="/admin/auditoria" element={<Auditoria />} />
+                      <Route path="/admin/api-keys" element={<HorasExtrasApiKeys />} />
                       <Route path="/usuarios" element={<Usuarios />} />
                     </Route>
                   </Route>

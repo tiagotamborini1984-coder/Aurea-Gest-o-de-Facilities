@@ -1,0 +1,217 @@
+import { useState, useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+
+export interface SolicitacaoHe {
+  id: string
+  client_id: string
+  employee_id: string
+  employee_name: string
+  company_id: string | null
+  company_name: string
+  plant_id: string
+  date: string
+  hours: number
+  reason: string | null
+  status: 'pendente' | 'aprovada' | 'recusada'
+  created_by: string | null
+  created_by_name: string | null
+  approved_by: string | null
+  approved_by_name: string | null
+  approved_at: string | null
+  manager_observation: string | null
+  created_at: string
+  updated_at: string
+  plants?: {
+    id: string
+    name: string
+    code: string
+  }
+}
+
+interface HorasExtrasTableProps {
+  solicitacoes: SolicitacaoHe[]
+  loading: boolean
+  canManage: boolean
+  onApprove: (solicitacao: SolicitacaoHe) => void
+  onReject: (solicitacao: SolicitacaoHe) => void
+  onDelete?: (solicitacao: SolicitacaoHe) => void
+}
+
+export function HorasExtrasTable({
+  solicitacoes,
+  loading,
+  canManage,
+  onApprove,
+  onReject,
+}: HorasExtrasTableProps) {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'aprovada':
+        return (
+          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1 w-fit">
+            <CheckCircle2 className="h-3 w-3" />
+            Aprovada
+          </Badge>
+        )
+      case 'recusada':
+        return (
+          <Badge
+            variant="outline"
+            className="bg-rose-50 text-rose-700 border-rose-200 flex items-center gap-1 w-fit"
+          >
+            <XCircle className="h-3 w-3" />
+            Recusada
+          </Badge>
+        )
+      case 'pendente':
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1 w-fit"
+          >
+            <Clock className="h-3 w-3" />
+            Pendente
+          </Badge>
+        )
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold">
+          Solicitações Registradas ({solicitacoes.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Colaborador Terceiro</TableHead>
+              <TableHead>Empresa Parceira</TableHead>
+              <TableHead>Planta</TableHead>
+              <TableHead>Data da HE</TableHead>
+              <TableHead className="text-right">Qtd. Horas</TableHead>
+              <TableHead>Motivo / Justificativa</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Gestor / Histórico</TableHead>
+              {canManage && <TableHead className="text-right">Ação do Gestor</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={canManage ? 9 : 8} className="text-center py-10 text-slate-500">
+                  Carregando solicitações de horas extras...
+                </TableCell>
+              </TableRow>
+            ) : solicitacoes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={canManage ? 9 : 8} className="text-center py-10 text-slate-500">
+                  Nenhuma solicitação de horas extras encontrada com os filtros atuais.
+                </TableCell>
+              </TableRow>
+            ) : (
+              solicitacoes.map((item) => (
+                <TableRow key={item.id} className="hover:bg-slate-50/70">
+                  <TableCell className="font-medium text-slate-900">
+                    <div>{item.employee_name}</div>
+                    <div className="text-xs text-slate-400">
+                      Solicitado por: {item.created_by_name || 'Usuário'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-slate-700 text-sm">{item.company_name}</TableCell>
+                  <TableCell className="text-slate-700 text-sm">
+                    {item.plants?.name || '—'}
+                  </TableCell>
+                  <TableCell className="text-slate-700 text-sm">
+                    {format(new Date(item.date + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-slate-900">
+                    {Number(item.hours).toFixed(2)}h
+                  </TableCell>
+                  <TableCell
+                    className="max-w-[240px] truncate text-slate-600 text-xs"
+                    title={item.reason || ''}
+                  >
+                    {item.reason || <span className="text-slate-400 italic">Sem observação</span>}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell className="text-xs text-slate-500">
+                    {item.status === 'pendente' && (
+                      <span className="text-amber-600 italic">Aguardando aprovação</span>
+                    )}
+                    {item.status !== 'pendente' && (
+                      <div>
+                        <div className="font-medium text-slate-700">
+                          {item.approved_by_name || 'Administrador'}
+                        </div>
+                        {item.approved_at && (
+                          <div className="text-[11px] text-slate-400">
+                            {format(new Date(item.approved_at), "dd/MM/yyyy 'às' HH:mm", {
+                              locale: ptBR,
+                            })}
+                          </div>
+                        )}
+                        {item.manager_observation && (
+                          <div
+                            className="text-[11px] text-rose-600 italic mt-0.5 truncate max-w-[180px]"
+                            title={item.manager_observation}
+                          >
+                            Obs: {item.manager_observation}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
+                  {canManage && (
+                    <TableCell className="text-right">
+                      {item.status === 'pendente' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 text-xs"
+                            onClick={() => onApprove(item)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Aprovar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 h-8 px-2.5 text-xs"
+                            onClick={() => onReject(item)}
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Recusar
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Concluído</span>
+                      )}
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}

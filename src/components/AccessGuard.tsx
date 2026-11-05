@@ -21,6 +21,7 @@ const routeMenuMap: Record<string, string> = {
   '/gestao-epis': 'Gestão de EPIs',
   '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-terceiros/dashboard-gestor': 'Gestão de Terceiros:Dashboard do Gestor',
+  '/gestao-terceiros/horas-extras': 'Gestão de Terceiros:Horas Extras',
   '/gestao-terceiros/lancamentos': 'Lançamentos',
   '/gestao-terceiros/relatorios': 'Relatórios',
   '/gestao-terceiros/bi': 'BI Dashboard',

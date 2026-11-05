@@ -18,6 +18,7 @@
     "verify-training-presence": 18,
     "daily-report": 19,
     "monthly-report": 7,
-    "facilities-copilot": 13
+    "facilities-copilot": 13,
+    "horas-extras-api": 1
   }
 }

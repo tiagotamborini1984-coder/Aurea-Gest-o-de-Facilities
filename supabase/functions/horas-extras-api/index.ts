@@ -1,0 +1,216 @@
+import { corsHeaders } from '../_shared/cors.ts'
+import { getSupabaseClient, jsonBody, errorBody } from '../_shared/supabase.ts'
+
+/**
+ * Calcula o hash SHA-256 de uma chave em formato hexadecimal.
+ */
+async function hashApiKey(key: string): Promise<string> {
+  const enc = new TextEncoder().encode(key)
+  const buf = await crypto.subtle.digest('SHA-256', enc)
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/**
+ * Extrai a chave de API dos cabeçalhos:
+ * 1. X-API-Key: <key>
+ * 2. Authorization: Bearer <key>
+ * 3. query param: ?api_key=<key> (útil para testes rápidos)
+ */
+function extractApiKey(req: Request): string | null {
+  const xApiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key')
+  if (xApiKey && xApiKey.trim()) return xApiKey.trim()
+
+  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
+  if (authHeader) {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i)
+    if (match && match[1].trim()) return match[1].trim()
+  }
+
+  const url = new URL(req.url)
+  const qKey = url.searchParams.get('api_key') || url.searchParams.get('key')
+  if (qKey && qKey.trim()) return qKey.trim()
+
+  return null
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  if (req.method !== 'GET') {
+    return new Response(
+      JSON.stringify({ error: 'Método não permitido. Utilize GET para consultar solicitações.' }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  }
+
+  const rawApiKey = extractApiKey(req)
+  if (!rawApiKey) {
+    return new Response(
+      JSON.stringify({
+        error:
+          'Chave de API ausente. Forneça o header "X-API-Key: <chave>" ou "Authorization: Bearer <chave>".',
+      }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  }
+
+  const keyHash = await hashApiKey(rawApiKey)
+  const supabase = getSupabaseClient()
+
+  // Buscar a chave de API ativa
+  const { data: keyData, error: keyError } = await supabase
+    .from('horas_extras_api_keys')
+    .select('id, client_id, company_id, name, is_active, revoked_at')
+    .eq('key_hash', keyHash)
+    .single()
+
+  if (keyError || !keyData || !keyData.is_active || keyData.revoked_at) {
+    return new Response(
+      JSON.stringify({
+        error: 'Chave de API inválida, inativa ou revogada.',
+      }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  }
+
+  // Atualiza last_used_at de forma assíncrona (não bloqueia a resposta)
+  supabase
+    .from('horas_extras_api_keys')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', keyData.id)
+    .then()
+
+  // Buscar informações da empresa contratada
+  const { data: companyData } = await supabase
+    .from('companies')
+    .select('id, name, service_type')
+    .eq('id', keyData.company_id)
+    .single()
+
+  // Parâmetros opcionais de busca: status, data_inicio, data_fim, limite
+  const url = new URL(req.url)
+  const statusParam = url.searchParams.get('status')
+  const dateFromParam = url.searchParams.get('data_inicio') || url.searchParams.get('date_from')
+  const dateToParam = url.searchParams.get('data_fim') || url.searchParams.get('date_to')
+  const limitParam = parseInt(
+    url.searchParams.get('limite') || url.searchParams.get('limit') || '100',
+    10,
+  )
+  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 500) : 100
+
+  // Consulta solicitações de HE estritamente limitadas à empresa da chave
+  let query = supabase
+    .from('horas_extras_solicitacoes')
+    .select(`
+      id,
+      date,
+      hours,
+      reason,
+      status,
+      created_at,
+      updated_at,
+      approved_at,
+      manager_observation,
+      approved_by_name,
+      created_by_name,
+      employee_id,
+      employee_name,
+      company_id,
+      company_name,
+      plant_id,
+      plants (
+        id,
+        name,
+        code,
+        city
+      )
+    `)
+    .eq('company_id', keyData.company_id)
+    .order('date', { ascending: false })
+    .limit(limit)
+
+  if (statusParam && ['pendente', 'aprovada', 'recusada'].includes(statusParam.toLowerCase())) {
+    query = query.eq('status', statusParam.toLowerCase())
+  }
+
+  if (dateFromParam) {
+    query = query.gte('date', dateFromParam)
+  }
+
+  if (dateToParam) {
+    query = query.lte('date', dateToParam)
+  }
+
+  const { data: solicitacoes, error: solError } = await query
+
+  if (solError) {
+    console.error('Erro ao consultar solicitações de HE:', solError)
+    return new Response(
+      JSON.stringify({ error: 'Erro interno ao consultar solicitações de horas extras.' }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  }
+
+  // Formatando resposta em JSON limpo e estruturado
+  const formatted = (solicitacoes || []).map((item: any) => ({
+    id: item.id,
+    colaborador: {
+      id: item.employee_id,
+      nome: item.employee_name,
+    },
+    empresa: {
+      id: item.company_id,
+      nome: item.company_name,
+    },
+    planta: item.plants
+      ? {
+          id: item.plants.id,
+          nome: item.plants.name,
+          codigo: item.plants.code,
+          cidade: item.plants.city,
+        }
+      : { id: item.plant_id },
+    data: item.date,
+    horas: Number(item.hours),
+    motivo: item.reason,
+    status: item.status,
+    solicitado_em: item.created_at,
+    solicitado_por: item.created_by_name,
+    aprovacao: {
+      aprovado_em: item.approved_at,
+      aprovado_por: item.approved_by_name,
+      observacao_gestor: item.manager_observation,
+    },
+    atualizado_em: item.updated_at,
+  }))
+
+  const responseBody = {
+    empresa: companyData || { id: keyData.company_id },
+    chave_api: {
+      nome: keyData.name,
+    },
+    total: formatted.length,
+    solicitacoes: formatted,
+  }
+
+  return new Response(JSON.stringify(responseBody), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+})
