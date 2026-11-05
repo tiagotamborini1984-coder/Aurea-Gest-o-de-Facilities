@@ -49,6 +49,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { TaskDetailsSheet } from './TaskDetailsSheet'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
@@ -123,7 +124,11 @@ export default function PainelChamados() {
   const [localPlants, setLocalPlants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [searchTerm, setSearchTerm] = useState('')
+  const filters = usePersistentScreenFilters('gestao-tarefas:painel-chamados', {
+    searchTerm: '',
+    selectedStatuses: [] as string[],
+  })
+  const [searchTerm, setSearchTerm] = useFilterField(filters, 'searchTerm')
 
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
@@ -152,7 +157,7 @@ export default function PainelChamados() {
     )
   }
 
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedStatuses, setSelectedStatuses] = useFilterField(filters, 'selectedStatuses')
 
   const isMaster = profile?.role === 'Master'
   const isSuperAdmin = profile?.role === 'Administrador' || profile?.role === 'Master'
@@ -212,12 +217,30 @@ export default function PainelChamados() {
     }
   }, [showTodos, activeTab])
 
+  // Preserva a seleção restaurada do storage na primeira carga dos status
+  // (efeito que reseta filtro persistido ignora a primeira execução — v0.0.1835);
+  // nas cargas seguintes (troca de cliente) volta ao padrão.
+  const restoredSelectionRef = useRef(selectedStatuses.length > 0)
+  const firstStatusesRunRef = useRef(true)
   useEffect(() => {
-    if (taskStatuses.length > 0) {
-      setSelectedStatuses(taskStatuses.filter((s) => !s.is_terminal).map((s) => s.id))
-    } else {
-      setSelectedStatuses([])
+    if (firstStatusesRunRef.current) {
+      firstStatusesRunRef.current = false
+      return
     }
+    if (taskStatuses.length === 0) {
+      setSelectedStatuses([])
+      return
+    }
+    if (restoredSelectionRef.current) {
+      restoredSelectionRef.current = false
+      const valid = taskStatuses.filter((s) => !s.is_terminal).map((s) => s.id)
+      setSelectedStatuses((prev) => {
+        const kept = prev.filter((id) => valid.includes(id))
+        return kept.length > 0 ? kept : valid
+      })
+      return
+    }
+    setSelectedStatuses(taskStatuses.filter((s) => !s.is_terminal).map((s) => s.id))
   }, [taskStatuses])
 
   const loadData = async () => {

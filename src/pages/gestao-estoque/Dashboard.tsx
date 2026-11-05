@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { DatePickerWithRange } from '@/components/ui/date-range-picker'
 import { DateRange } from 'react-day-picker'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { addDays, isWithinInterval, parseISO } from 'date-fns'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -47,8 +48,12 @@ export default function DashboardEstoque() {
     from: addDays(new Date(), -30),
     to: new Date(),
   })
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedArea, setSelectedArea] = useState<string>('all')
+  const filters = usePersistentScreenFilters('gestao-estoque:dashboard', {
+    selectedPlant: 'all',
+    selectedArea: 'all',
+  })
+  const [selectedPlant, setSelectedPlant] = useFilterField(filters, 'selectedPlant')
+  const [selectedArea, setSelectedArea] = useFilterField(filters, 'selectedArea')
 
   const loadData = async () => {
     if (!activeClient) return

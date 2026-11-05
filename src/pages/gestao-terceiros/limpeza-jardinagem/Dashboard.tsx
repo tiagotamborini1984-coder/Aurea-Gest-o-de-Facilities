@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -37,9 +38,14 @@ export default function DashboardLJ() {
   const { profile } = useAppStore()
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Limpeza e Jardinagem')
-  const [plantId, setPlantId] = useState('all')
-  const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
-  const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
+  const filters = usePersistentScreenFilters('gestao-terceiros:limpeza-jardinagem:dashboard', {
+    plantId: 'all',
+    startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+    endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+  })
+  const [plantId, setPlantId] = useFilterField(filters, 'plantId')
+  const [startDate, setStartDate] = useFilterField(filters, 'startDate')
+  const [endDate, setEndDate] = useFilterField(filters, 'endDate')
   const [schedules, setSchedules] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
@@ -39,9 +40,14 @@ export default function QuadroContratado() {
   const [companies, setCompanies] = useState<any[]>([])
   const [records, setRecords] = useState<any[]>([])
 
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedType, setSelectedType] = useState<'colaborador' | 'equipamento'>('colaborador')
-  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'))
+  const filters = usePersistentScreenFilters('gestao-terceiros:quadro-contratado', {
+    selectedPlant: 'all',
+    selectedType: 'colaborador',
+    selectedMonth: format(new Date(), 'yyyy-MM'),
+  })
+  const [selectedPlant, setSelectedPlant] = useFilterField(filters, 'selectedPlant')
+  const [selectedType, setSelectedType] = useFilterField(filters, 'selectedType')
+  const [selectedMonth, setSelectedMonth] = useFilterField(filters, 'selectedMonth')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<any | null>(null)

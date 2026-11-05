@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import {
   Leaf,
   Plus,
@@ -54,7 +55,13 @@ export default function AreasLJ() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [polygon, setPolygon] = useState<{ x: number; y: number }[]>([])
-  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('all')
+  const filters = usePersistentScreenFilters('gestao-terceiros:limpeza-jardinagem:areas', {
+    selectedPlantFilter: 'all',
+  })
+  const [selectedPlantFilter, setSelectedPlantFilter] = useFilterField(
+    filters,
+    'selectedPlantFilter',
+  )
   const [zoom, setZoom] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -64,6 +71,16 @@ export default function AreasLJ() {
     if (profile.role === 'Master' || profile.role === 'Administrador') return plants
     return plants.filter((p) => profile.authorized_plants?.includes(p.id))
   }, [plants, profile])
+
+  // Planta só é restaurada se autorizada para o perfil
+  useEffect(() => {
+    if (
+      selectedPlantFilter !== 'all' &&
+      !authorizedPlants.some((p: any) => p.id === selectedPlantFilter)
+    ) {
+      setSelectedPlantFilter('all')
+    }
+  }, [selectedPlantFilter, authorizedPlants])
 
   const loadAreas = async () => {
     if (!profile) return

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { format, subDays } from 'date-fns'
 import { useAppStore } from '@/store/AppContext'
 import { useMasterData } from '@/hooks/use-master-data'
@@ -17,9 +18,14 @@ export default function BookMetas() {
   const { activeClient, profile } = useAppStore()
   const brandSecondary = activeClient?.secondaryColor || '#1e3a8a'
 
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [selectedPlants, setSelectedPlants] = useState<string[]>([])
+  const filters = usePersistentScreenFilters('gestao-terceiros:book-metas', {
+    dateFrom: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
+    dateTo: format(new Date(), 'yyyy-MM-dd'),
+    selectedPlants: [] as string[],
+  })
+  const [dateFrom, setDateFrom] = useFilterField(filters, 'dateFrom')
+  const [dateTo, setDateTo] = useFilterField(filters, 'dateTo')
+  const [selectedPlants, setSelectedPlants] = useFilterField(filters, 'selectedPlants')
 
   const [absenteeismTarget, setAbsenteeismTarget] = useState<number>(() => {
     const saved = localStorage.getItem('aurea_absenteeism_target')

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { useAppStore } from '@/store/AppContext'
 import { inventoryService } from '@/services/inventory'
 import { useAuth } from '@/hooks/use-auth'
@@ -59,9 +60,14 @@ export default function GestaoPedidos() {
   const [sapNumber, setSapNumber] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [reservedQuantities, setReservedQuantities] = useState<Record<string, number>>({})
-  const [statusFilter, setStatusFilter] = useState('Todos')
-  const [plantFilter, setPlantFilter] = useState('Todas')
-  const [responsibleFilter, setResponsibleFilter] = useState('Todos')
+  const filters = usePersistentScreenFilters('gestao-estoque:gestao-pedidos', {
+    statusFilter: 'Todos',
+    plantFilter: 'Todas',
+    responsibleFilter: 'Todos',
+  })
+  const [statusFilter, setStatusFilter] = useFilterField(filters, 'statusFilter')
+  const [plantFilter, setPlantFilter] = useFilterField(filters, 'plantFilter')
+  const [responsibleFilter, setResponsibleFilter] = useFilterField(filters, 'responsibleFilter')
   const [plants, setPlants] = useState<any[]>([])
   const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)

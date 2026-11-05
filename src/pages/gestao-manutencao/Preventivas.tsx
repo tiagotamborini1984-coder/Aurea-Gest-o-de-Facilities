@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -76,10 +77,25 @@ export default function PreventivasManutencao() {
   const [checklist, setChecklist] = useState<{ id: string; description: string }[]>([])
   const [generatingTickets, setGeneratingTickets] = useState(false)
 
-  // Filtros de planta e busca textual
+  // Filtros de planta e busca textual (persistidos; parâmetro de URL tem prioridade)
   const initialPlantParam = searchParams.get('plant') || searchParams.get('planta') || 'all'
-  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>(initialPlantParam)
-  const [searchQuery, setSearchQuery] = useState('')
+  const filters = usePersistentScreenFilters('gestao-manutencao:preventivas', {
+    selectedPlantFilter: initialPlantParam,
+    searchQuery: '',
+  })
+  const [selectedPlantFilter, setSelectedPlantFilter] = useFilterField(
+    filters,
+    'selectedPlantFilter',
+  )
+  const [searchQuery, setSearchQuery] = useFilterField(filters, 'searchQuery')
+
+  // Deep-link (?plant=) tem prioridade sobre o valor salvo no storage
+  useEffect(() => {
+    if (searchParams.get('plant') || searchParams.get('planta')) {
+      filters.set({ selectedPlantFilter: initialPlantParam })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPlantParam])
 
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPlantId, setAiPlantId] = useState('')
@@ -95,6 +111,18 @@ export default function PreventivasManutencao() {
     const list = effectiveProfile?.authorized_plants
     return Array.isArray(list) ? list : []
   }, [isAdmin, effectiveProfile])
+
+  // Planta só é restaurada se autorizada para o perfil
+  useEffect(() => {
+    if (
+      selectedPlantFilter !== 'all' &&
+      authPlantIds !== null &&
+      !authPlantIds.includes(selectedPlantFilter)
+    ) {
+      filters.set({ selectedPlantFilter: 'all' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlantFilter, authPlantIds])
 
   const authorizedPlants = useMemo(() => {
     if (isAdmin) return plants

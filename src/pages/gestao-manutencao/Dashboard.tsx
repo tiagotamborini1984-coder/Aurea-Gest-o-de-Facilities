@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -36,16 +37,19 @@ export default function DashboardManutencao() {
 
   const [plants, setPlants] = useState<any[]>([])
   const [areas, setAreas] = useState<any[]>([])
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedArea, setSelectedArea] = useState<string>('all')
-  const [dateStart, setDateStart] = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const filters = usePersistentScreenFilters('gestao-manutencao:dashboard', {
+    selectedPlant: 'all',
+    selectedArea: 'all',
+    dateStart: monthStart,
+    dateEnd: monthEnd,
   })
-  const [dateEnd, setDateEnd] = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })
+  const [selectedPlant, setSelectedPlant] = useFilterField(filters, 'selectedPlant')
+  const [selectedArea, setSelectedArea] = useFilterField(filters, 'selectedArea')
+  const [dateStart, setDateStart] = useFilterField(filters, 'dateStart')
+  const [dateEnd, setDateEnd] = useFilterField(filters, 'dateEnd')
 
   useEffect(() => {
     loadAuxData()

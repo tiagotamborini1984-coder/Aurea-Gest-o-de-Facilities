@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import {
   Table,
   TableBody,
@@ -51,11 +52,18 @@ export default function RelatoriosLJ() {
   const { plants } = useMasterData()
   const hasAccess = useHasAccess('Limpeza e Jardinagem')
 
-  const [plantId, setPlantId] = useState('all')
-  const [serviceType, setServiceType] = useState('all')
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [statusFilter, setStatusFilter] = useState('all')
+  const filters = usePersistentScreenFilters('gestao-terceiros:limpeza-jardinagem:relatorios', {
+    plantId: 'all',
+    serviceType: 'all',
+    dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+    dateTo: format(new Date(), 'yyyy-MM-dd'),
+    statusFilter: 'all',
+  })
+  const [plantId, setPlantId] = useFilterField(filters, 'plantId')
+  const [serviceType, setServiceType] = useFilterField(filters, 'serviceType')
+  const [dateFrom, setDateFrom] = useFilterField(filters, 'dateFrom')
+  const [dateTo, setDateTo] = useFilterField(filters, 'dateTo')
+  const [statusFilter, setStatusFilter] = useFilterField(filters, 'statusFilter')
 
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)

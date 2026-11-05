@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -44,9 +45,14 @@ export default function PlanejamentoManutencao() {
   const [assignees, setAssignees] = useState<any[]>([])
   const [workers, setWorkers] = useState<any[]>([])
 
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [selectedArea, setSelectedArea] = useState<string>('all')
-  const [selectedAssignee, setSelectedAssignee] = useState<string>('all')
+  const filters = usePersistentScreenFilters('gestao-manutencao:planejamento', {
+    selectedPlant: 'all',
+    selectedArea: 'all',
+    selectedAssignee: 'all',
+  })
+  const [selectedPlant, setSelectedPlant] = useFilterField(filters, 'selectedPlant')
+  const [selectedArea, setSelectedArea] = useFilterField(filters, 'selectedArea')
+  const [selectedAssignee, setSelectedAssignee] = useFilterField(filters, 'selectedAssignee')
 
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const [editForm, setEditForm] = useState({

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   FileText,
   Save,
@@ -15,6 +15,7 @@ import {
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -94,20 +95,24 @@ export default function Lancamentos() {
   const isReadOnlyProfile = profile?.role !== 'Master' && profile?.role !== 'Administrador'
 
   const [clients, setClients] = useState<any[]>([])
-  const [selectedClient, setSelectedClient] = useState<string>('')
 
   const [costCenters, setCostCenters] = useState<any[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
 
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([
-    new Date().toISOString().substring(0, 7),
-  ])
+  // Filtros persistidos por tela (aurea_filters:gestao-budget:lancamentos)
+  const filters = usePersistentScreenFilters('gestao-budget:lancamentos', {
+    selectedClient: '',
+    selectedMonths: [new Date().toISOString().substring(0, 7)],
+    selectedCCs: [] as string[],
+    selectedAccounts: [] as string[],
+  })
+  const [selectedClient, setSelectedClient] = useFilterField(filters, 'selectedClient')
+  const [selectedMonths, setSelectedMonths] = useFilterField(filters, 'selectedMonths')
+  const [selectedCCs, setSelectedCCs] = useFilterField(filters, 'selectedCCs')
+  const [selectedAccounts, setSelectedAccounts] = useFilterField(filters, 'selectedAccounts')
+
   const [tempMonth, setTempMonth] = useState('')
-
-  const [selectedCCs, setSelectedCCs] = useState<string[]>([])
   const [ccPopoverOpen, setCcPopoverOpen] = useState(false)
-
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
   const [accPopoverOpen, setAccPopoverOpen] = useState(false)
 
   const [entries, setEntries] = useState<
@@ -152,7 +157,15 @@ export default function Lancamentos() {
     }
   }, [profile, selectedMasterClient, activeClient])
 
+  // Ignora a primeira execução: na montagem os filtros restaurados do storage
+  // (selectedCCs/selectedAccounts) não podem ser zerados (regra v0.0.1835).
+  const prevActiveClientIdRef = useRef<string | null | undefined>(undefined)
   useEffect(() => {
+    const clientChanged =
+      prevActiveClientIdRef.current !== undefined &&
+      prevActiveClientIdRef.current !== activeClientId
+    prevActiveClientIdRef.current = activeClientId
+
     if (!activeClientId) {
       setCostCenters([])
       setAccounts([])
@@ -174,8 +187,10 @@ export default function Lancamentos() {
       .order('name')
       .then(({ data }) => setAccounts(data || []))
 
-    setSelectedCCs([])
-    setSelectedAccounts([])
+    if (clientChanged) {
+      setSelectedCCs([])
+      setSelectedAccounts([])
+    }
     setEntries({})
   }, [activeClientId])
 

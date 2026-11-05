@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { Plus, Edit2, Trash2, Search, BookOpen } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
@@ -45,7 +46,8 @@ export default function ContasContabeis() {
   const { toast } = useToast()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const filters = usePersistentScreenFilters('gestao-budget:contas-contabeis', { search: '' })
+  const [search, setSearch] = useFilterField(filters, 'search')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<any>(null)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { useAppStore } from '@/store/AppContext'
 import { inventoryService } from '@/services/inventory'
 import { Card, CardContent } from '@/components/ui/card'
@@ -54,7 +55,14 @@ export default function Produtos() {
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('all')
+  const filters = usePersistentScreenFilters('gestao-estoque:produtos', {
+    statusFilter: 'all',
+    search: '',
+    categoryFilter: 'all',
+  })
+  const [statusFilter, setStatusFilter] = useFilterField(filters, 'statusFilter')
+  const [search, setSearch] = useFilterField(filters, 'search')
+  const [categoryFilter, setCategoryFilter] = useFilterField(filters, 'categoryFilter')
   const [reactivateTarget, setReactivateTarget] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<{
@@ -79,8 +87,6 @@ export default function Produtos() {
   const [sdsFile, setSdsFile] = useState<File | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('all')
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null)
 
   const clientId = activeClient?.id || profile?.client_id

@@ -50,6 +50,7 @@ import { useToast } from '@/hooks/use-toast'
 import { differenceInDays, format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useHasAccess } from '@/hooks/use-has-access'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { Navigate } from 'react-router-dom'
 
 export default function Encomendas() {
@@ -66,9 +67,22 @@ export default function Encomendas() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('gestao')
 
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterPlant, setFilterPlant] = useState('all')
-  const [filterStatuses, setFilterStatuses] = useState<string[]>(['Aguardando Retirada'])
+  const filters = usePersistentScreenFilters('gestao-terceiros:encomendas', {
+    searchTerm: '',
+    filterPlant: 'all',
+    filterStatuses: ['Aguardando Retirada'],
+  })
+  const [searchTerm, setSearchTerm] = useFilterField(filters, 'searchTerm')
+  const [filterPlant, setFilterPlant] = useFilterField(filters, 'filterPlant')
+  const [filterStatuses, setFilterStatuses] = useFilterField(filters, 'filterStatuses')
+
+  // Planta só é restaurada se autorizada para o perfil
+  useEffect(() => {
+    if (filterPlant !== 'all' && !authPlants.some((p: any) => p.id === filterPlant)) {
+      setFilterPlant('all')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterPlant])
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)

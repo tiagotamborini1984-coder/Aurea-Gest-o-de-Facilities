@@ -26,6 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { verifyTrainingPresence } from '@/lib/training-verification'
 import { mergeFilesToPdf } from '@/lib/merge-files'
 import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
@@ -50,8 +51,12 @@ export default function Treinamentos() {
   const { toast } = useToast()
 
   const [plants, setPlants] = useState<any[]>([])
-  const [selectedPlant, setSelectedPlant] = useState<string>('all')
-  const [searchTerm, setSearchTerm] = useState('')
+  const filters = usePersistentScreenFilters('gestao-terceiros:treinamentos', {
+    selectedPlant: 'all',
+    searchTerm: '',
+  })
+  const [selectedPlant, setSelectedPlant] = useFilterField(filters, 'selectedPlant')
+  const [searchTerm, setSearchTerm] = useFilterField(filters, 'searchTerm')
 
   const [employees, setEmployees] = useState<any[]>([])
   const [trainingStatuses, setTrainingStatuses] = useState<Record<string, string>>({})
