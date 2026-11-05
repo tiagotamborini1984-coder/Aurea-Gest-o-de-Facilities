@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Lock, Loader2, Fingerprint, ArrowLeft, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/use-auth'
 import logoUrl from '@/assets/logo_aurea_hd-d19bc.png'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
+import { consumeLastRoute } from '@/lib/last-route'
 
 type ViewState = 'login' | 'recovery' | 'update_password'
 
@@ -22,6 +23,13 @@ export default function Login() {
   const { signIn, user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+
+  // Retorna o usuário à última tela onde ele estava (salva antes de um deslog
+  // por inatividade ou ao navegar autenticado); cai na home se não houver rota.
+  const navigateToLastRoute = useCallback(() => {
+    const lastRoute = consumeLastRoute()
+    navigate(lastRoute || '/gestao-terceiros', { replace: true })
+  }, [navigate])
 
   useEffect(() => {
     let isMounted = true
@@ -40,19 +48,19 @@ export default function Login() {
             console.warn('Erro ao verificar perfil no login:', error.message)
             // Se der erro ao ler profiles, ainda assim redireciona para a rota protegida
             // que possui seus próprios guards com fallback gracioso
-            navigate('/gestao-terceiros', { replace: true })
+            navigateToLastRoute()
             return
           }
 
           if (data?.force_password_change) {
             setView('update_password')
           } else {
-            navigate('/gestao-terceiros', { replace: true })
+            navigateToLastRoute()
           }
         } catch (err) {
           console.error('Falha ao checar usuário:', err)
           if (isMounted) {
-            navigate('/gestao-terceiros', { replace: true })
+            navigateToLastRoute()
           }
         }
       }
@@ -61,7 +69,7 @@ export default function Login() {
     return () => {
       isMounted = false
     }
-  }, [user, navigate, view])
+  }, [user, navigate, view, navigateToLastRoute])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -141,7 +149,7 @@ export default function Login() {
       description: 'Sua credencial foi reconfigurada com sucesso.',
       className: 'bg-brand-deepBlue text-white border-brand-deepBlue/50 backdrop-blur-md',
     })
-    navigate('/gestao-terceiros', { replace: true })
+    navigateToLastRoute()
   }
 
   const handleRecovery = async (e: React.FormEvent) => {

@@ -54,6 +54,27 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 const PROFILE_CACHE_PREFIX = 'aurea_cached_profile_'
+const MASTER_CLIENT_KEY = 'aurea_global_selected_master_client'
+const PLANT_KEY = 'aurea_global_selected_plant'
+
+const readStoredValue = (key: string): string | 'all' | null => {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return typeof parsed === 'string' && parsed ? (parsed as string) : null
+  } catch {
+    return null
+  }
+}
+
+const writeStoredValue = (key: string, value: string | 'all') => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // ignore — localStorage pode estar bloqueado
+  }
+}
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth()
@@ -74,8 +95,57 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   })
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true)
   const [activeClient, setActiveClient] = useState<Client | null>(null)
-  const [selectedMasterClient, setSelectedMasterClient] = useState<string | 'all'>('all')
-  const [selectedPlant, setSelectedPlant] = useState<string | 'all'>('all')
+  // Filtros globais do cabeçalho persistidos para sobreviver a F5,
+  // descarte da aba pelo navegador e deslog por inatividade.
+  const [selectedMasterClient, setSelectedMasterClient] = useState<string | 'all'>(() => {
+    const stored = readStoredValue(MASTER_CLIENT_KEY)
+    // Guarda: só Master pode restaurar cliente salvo — outros perfis caem em 'all'.
+    return stored && stored !== 'all' ? stored : 'all'
+  })
+  const [selectedPlant, setSelectedPlant] = useState<string | 'all'>(() => {
+    const stored = readStoredValue(PLANT_KEY)
+    return stored && stored !== 'all' ? stored : 'all'
+  })
+
+  useEffect(() => {
+    writeStoredValue(MASTER_CLIENT_KEY, selectedMasterClient)
+  }, [selectedMasterClient])
+
+  useEffect(() => {
+    writeStoredValue(PLANT_KEY, selectedPlant)
+  }, [selectedPlant])
+
+  // Validação pós-carga do perfil: restaura apenas o que o usuário tem direito.
+  useEffect(() => {
+    if (!profile) return
+    if (profile.role !== 'Master') {
+      // Perfil não-Master não usa filtro de cliente: cai em 'all'.
+      if (selectedMasterClient !== 'all') setSelectedMasterClient('all')
+      return
+    }
+    if (
+      selectedMasterClient !== 'all' &&
+      clients.length > 0 &&
+      !clients.some((c) => c.id === selectedMasterClient)
+    ) {
+      setSelectedMasterClient('all')
+    }
+  }, [profile, clients, selectedMasterClient])
+
+  // Planta salva só permanece se for autorizada para o perfil. Perfis
+  // Master/Administrador veem todas as plantas (sem restrição no hook de
+  // dados); perfis restritos só mantêm a planta se ela estiver autorizada.
+  useEffect(() => {
+    if (!profile) return
+    const isUnrestricted = profile.role === 'Master' || profile.role === 'Administrador'
+    if (isUnrestricted) return
+    if (
+      selectedPlant !== 'all' &&
+      (!profile.authorized_plants || !profile.authorized_plants.includes(selectedPlant))
+    ) {
+      setSelectedPlant('all')
+    }
+  }, [profile, selectedPlant])
 
   const fetchProfileWithRetry = useCallback(
     async (userId: string, retries = 3): Promise<Profile | null> => {

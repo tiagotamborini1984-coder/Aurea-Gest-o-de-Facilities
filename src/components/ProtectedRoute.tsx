@@ -1,13 +1,24 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { Loader2, MailWarning } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import { saveLastRoute } from '@/lib/last-route'
 
 export function ProtectedRoute() {
   const { user, loading } = useAuth()
   const { toast } = useToast()
+  const location = useLocation()
+
+  // Registra a rota atual enquanto o usuário está autenticado, para
+  // restaurá-la após o login (deslog por inatividade, recarregamento etc.)
+  useEffect(() => {
+    if (user && user.email_confirmed_at) {
+      saveLastRoute(location.pathname)
+    }
+  }, [location.pathname, user])
 
   if (loading) {
     return (

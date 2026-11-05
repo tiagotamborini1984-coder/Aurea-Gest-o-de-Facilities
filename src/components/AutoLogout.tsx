@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
+import { saveLastRoute } from '@/lib/last-route'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -120,6 +121,9 @@ export function AutoLogout() {
     setShowWarning(false)
     warningActiveRef.current = false
 
+    // Garante que o usuário volte à tela onde estava ao logar novamente
+    saveLastRoute(location.pathname)
+
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -134,7 +138,7 @@ export function AutoLogout() {
       navigate('/login', { replace: true })
       isLoggingOutRef.current = false
     }
-  }, [signOut, navigate])
+  }, [signOut, navigate, location.pathname])
 
   // Timer de checagem regular a cada 1 segundo
   useEffect(() => {

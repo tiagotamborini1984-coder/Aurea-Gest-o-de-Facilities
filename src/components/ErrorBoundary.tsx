@@ -2,6 +2,20 @@ import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw, LogOut, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+/**
+ * Chaves que devem sobreviver a "Limpar Sessão e Recarregar":
+ * filtros salvos por tela (aurea_filters:*) e a última rota visitada.
+ */
+const PRESERVED_KEY_PREFIXES = ['aurea_filters:', 'aurea_last_route']
+/** Chaves de sessão/cache que podem ser removidas individualmente. */
+const REMOVABLE_KEYS = ['aurea_last_user_activity']
+
+const isPreservedKey = (key: string) => PRESERVED_KEY_PREFIXES.some((p) => key.startsWith(p))
+const isRemovableKey = (key: string) =>
+  REMOVABLE_KEYS.includes(key) ||
+  key.startsWith('sb-') || // chaves de autenticação do Supabase
+  key.startsWith('aurea_cached_profile_')
+
 interface Props {
   children: ReactNode
   fallbackTitle?: string
@@ -36,7 +50,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleClearAndReload = () => {
     try {
-      localStorage.clear()
+      // Limpeza seletiva: remove apenas chaves de sessão/auth, preservando
+      // os filtros salvos por tela (aurea_filters:*) e a última rota.
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && !isPreservedKey(key) && isRemovableKey(key)) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key))
       sessionStorage.clear()
     } catch {
       // ignore
