@@ -67,6 +67,7 @@ export function SolicitacaoHeDialog({
   onSubmit,
 }: SolicitacaoHeDialogProps) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
+  const [selectedPlantId, setSelectedPlantId] = useState('')
   const [searchEmployeeText, setSearchEmployeeText] = useState('')
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [hours, setHours] = useState('2')
@@ -83,11 +84,20 @@ export function SolicitacaoHeDialog({
     return uniqueEmployees.find((e) => e.id === selectedEmployeeId) || null
   }, [uniqueEmployees, selectedEmployeeId])
 
-  // Planta vinculada ao colaborador
-  const employeePlant = useMemo(() => {
-    if (!selectedEmployee) return null
-    return plants.find((p) => p.id === selectedEmployee.plant_id) || null
-  }, [selectedEmployee, plants])
+  // Ao selecionar o colaborador, pré-seleciona a planta dele (se existir nas opções autorizadas ou adiciona como fallback)
+  const handleSelectEmployee = (empId: string) => {
+    setSelectedEmployeeId(empId)
+    const emp = uniqueEmployees.find((e) => e.id === empId)
+    if (emp?.plant_id) {
+      setSelectedPlantId(emp.plant_id)
+    }
+  }
+
+  // Planta atualmente selecionada no seletor
+  const currentSelectedPlant = useMemo(() => {
+    if (!selectedPlantId) return null
+    return plants.find((p) => p.id === selectedPlantId) || null
+  }, [selectedPlantId, plants])
 
   // Lista de colaboradores filtrada pelo campo de busca
   const filteredEmployees = useMemo(() => {
@@ -104,6 +114,11 @@ export function SolicitacaoHeDialog({
     e.preventDefault()
     if (!selectedEmployee) {
       toast.error('Selecione o colaborador terceiro.')
+      return
+    }
+
+    if (!selectedPlantId) {
+      toast.error('Selecione a planta / unidade da solicitação.')
       return
     }
 
@@ -147,7 +162,7 @@ export function SolicitacaoHeDialog({
         employee_name: selectedEmployee.name,
         company_id: selectedEmployee.company_id || null,
         company_name: selectedEmployee.company_name || 'Terceiro',
-        plant_id: selectedEmployee.plant_id,
+        plant_id: selectedPlantId,
         date,
         hours: sanitizedHours,
         reason: reason.trim(),
@@ -155,6 +170,7 @@ export function SolicitacaoHeDialog({
 
       // Reset
       setSelectedEmployeeId('')
+      setSelectedPlantId('')
       setSearchEmployeeText('')
       setHours('2')
       setReason('')
@@ -196,7 +212,7 @@ export function SolicitacaoHeDialog({
                 />
               </div>
 
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select value={selectedEmployeeId} onValueChange={handleSelectEmployee}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o colaborador terceiro..." />
                 </SelectTrigger>
@@ -217,7 +233,37 @@ export function SolicitacaoHeDialog({
               </Select>
             </div>
 
-            {/* Informações automáticas da empresa e planta */}
+            {/* Seletor de Planta em Lista Suspensa */}
+            <div className="space-y-2">
+              <Label htmlFor="hePlant" className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-brand-vividBlue" />
+                <span>Planta / Unidade</span>
+              </Label>
+              <Select value={selectedPlantId} onValueChange={setSelectedPlantId}>
+                <SelectTrigger id="hePlant">
+                  <SelectValue placeholder="Selecione a planta autorizada..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {plants.length === 0 ? (
+                    <div className="p-2 text-xs text-slate-500 text-center">
+                      Nenhuma planta autorizada disponível.
+                    </div>
+                  ) : (
+                    plants.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.code ? `(${p.code})` : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-slate-500">
+                Pré-seleciona a planta do colaborador selecionado, permitindo troca conforme a
+                unidade do serviço.
+              </p>
+            </div>
+
+            {/* Informações da empresa do colaborador */}
             {selectedEmployee && (
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 text-slate-700">
                 <div className="flex items-center gap-1.5">
@@ -229,16 +275,18 @@ export function SolicitacaoHeDialog({
                 <div className="flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 text-slate-500" />
                   <span>
-                    <strong>Empresa Contratada:</strong> {selectedEmployee.company_name}
+                    <strong>Empresa Contratada:</strong>{' '}
+                    {selectedEmployee.company_name || 'Não informada'}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-slate-500" />
-                  <span>
-                    <strong>Planta / Unidade:</strong>{' '}
-                    {employeePlant?.name || 'Vinculada ao cadastro'}
-                  </span>
-                </div>
+                {currentSelectedPlant && (
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-slate-500" />
+                    <span>
+                      <strong>Planta Selecionada:</strong> {currentSelectedPlant.name}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

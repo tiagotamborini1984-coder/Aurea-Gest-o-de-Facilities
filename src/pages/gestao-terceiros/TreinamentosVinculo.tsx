@@ -13,7 +13,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { verifyByJob, awaitPendingVerification } from '@/lib/training-verification'
+import {
+  verifyByJob,
+  awaitPendingVerification,
+  getVerificationConfig,
+} from '@/lib/training-verification'
 import type { TrainingVerificationResult } from '@/lib/training-verification'
 import { mergeFilesToPdf } from '@/lib/merge-files'
 import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
@@ -24,8 +28,15 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
   const [, setRequiredTrainings] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [verificationMode, setVerificationMode] = useState<'auto' | 'manual' | 'off'>('auto')
   const { activeClient } = useAppStore()
   const { toast } = useToast()
+
+  // Modo da conferência de listas deste cliente (auto / manual / off)
+  useEffect(() => {
+    if (!activeClient) return
+    getVerificationConfig(activeClient.id).then((c) => setVerificationMode(c.mode))
+  }, [activeClient])
 
   useEffect(() => {
     if (!activeClient) return
@@ -259,6 +270,23 @@ export function EmployeeTrainingsForm({ form, setForm }: any) {
     const trainingName =
       trainings.find((t: any) => t.id === currentRec?.training_id)?.name || 'Treinamento'
     const employeeName = form.name || ''
+    // Modo da conferência do cliente: 'auto' confere no anexo; 'manual' e 'off'
+    // NÃO disparam nada sozinhos (o anexo é salvo na hora e o usuário decide).
+    const cfg = await getVerificationConfig(activeClient?.id)
+    if (cfg.mode !== 'auto') {
+      updateRecord(index, 'verification_status', cfg.mode === 'off' ? null : 'pending')
+      updateRecord(index, 'verification_notes', null)
+      updateRecord(index, 'verified_document_url', url)
+      if (cfg.mode === 'manual') {
+        toast({
+          title: 'Documento anexado',
+          description:
+            'A conferência está em modo manual: use "Conferir com IA" quando quiser validar.',
+        })
+      }
+      return
+    }
+
     updateRecord(index, 'verification_status', 'analyzing')
     toast({ title: 'Documento anexado. Agente conferindo a lista…' })
     const applyResult = (res: TrainingVerificationResult, isFinal: boolean) => {

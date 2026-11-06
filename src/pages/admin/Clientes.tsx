@@ -55,6 +55,7 @@ export default function Clientes() {
     status: 'Ativo',
     plan_type: 'Profissional',
     modules: [] as string[],
+    settings: {} as Record<string, any>,
   })
   const { toast } = useToast()
 
@@ -96,6 +97,7 @@ export default function Clientes() {
             status: client.status,
             plan_type: client.plan_type || 'Profissional',
             modules: client.modules || [],
+            settings: client.settings || {},
           }
         : {
             name: '',
@@ -104,9 +106,28 @@ export default function Clientes() {
             status: 'Ativo',
             plan_type: 'Profissional',
             modules: [],
+            settings: {},
           },
     )
     setIsOpen(true)
+  }
+
+  // Modo da conferência de listas de presença deste cliente
+  const verificationMode: 'auto' | 'manual' | 'off' = (() => {
+    const cfg = formData.settings?.training_verification
+    if (!cfg) return 'auto'
+    if (cfg.enabled === false) return 'off'
+    return cfg.mode === 'manual' ? 'manual' : 'auto'
+  })()
+
+  const setVerificationMode = (mode: 'auto' | 'manual' | 'off') => {
+    setFormData({
+      ...formData,
+      settings: {
+        ...formData.settings,
+        training_verification: { enabled: mode !== 'off', mode },
+      },
+    })
   }
 
   return (
@@ -197,6 +218,57 @@ export default function Clientes() {
                       })
                     }}
                   />
+                </div>
+              </div>
+              <div className="col-span-2 space-y-3 mt-2 p-4 rounded-lg border border-blue-200 bg-blue-50/40">
+                <label className="text-sm font-medium border-b pb-1 block">
+                  Conferência de Listas de Presença (IA)
+                </label>
+                <p className="text-xs text-slate-600">
+                  Define o que acontece quando um colaborador anexa a lista de presença de um
+                  treinamento.
+                </p>
+                <div className="space-y-2 mt-2">
+                  {(
+                    [
+                      {
+                        id: 'auto',
+                        titulo: 'Automática',
+                        desc: 'Confere assim que o anexo é enviado e exige a validação para salvar.',
+                      },
+                      {
+                        id: 'manual',
+                        titulo: 'Manual',
+                        desc: 'Não confere sozinha: o usuário pede a conferência quando quiser.',
+                      },
+                      {
+                        id: 'off',
+                        titulo: 'Desligada',
+                        desc: 'Não confere e não exige validação: o anexo é apenas arquivo.',
+                      },
+                    ] as const
+                  ).map((op) => (
+                    <label
+                      key={op.id}
+                      className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
+                        verificationMode === op.id
+                          ? 'border-blue-500 bg-white'
+                          : 'border-transparent hover:bg-white/60'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="verification-mode"
+                        className="mt-1"
+                        checked={verificationMode === op.id}
+                        onChange={() => setVerificationMode(op.id)}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{op.titulo}</p>
+                        <p className="text-xs text-slate-500">{op.desc}</p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
               <div className="col-span-2 space-y-2 mt-2">

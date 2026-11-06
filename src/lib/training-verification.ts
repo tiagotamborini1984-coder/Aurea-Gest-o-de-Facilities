@@ -10,6 +10,15 @@ export function isListValidated(tr?: any): boolean {
   return !!tr && tr.verification_status === 'verified'
 }
 
+/**
+ * O salvamento exige lista validada?
+ * Só quando a conferência está em modo 'auto'. Em 'manual' e 'off' o anexo
+ * não bloqueia o cadastro — a validação é opcional.
+ */
+export function requiresValidation(mode: VerificationMode): boolean {
+  return mode === 'auto'
+}
+
 export type TrainingVerificationResult = {
   ok: boolean
   status?: 'pending' | 'analyzing' | 'verified' | 'rejected' | 'failed'
@@ -48,6 +57,50 @@ async function callFn(payload: Record<string, unknown>): Promise<any> {
  * Verificação por job avulso (no momento do ANEXO, antes de salvar o colaborador).
  * Cria o job, aciona o agente e faz polling até o resultado.
  */
+/**
+ * Configuração da conferência automática do cliente ativo.
+ * 'auto'   → confere no anexo e trava o salvamento até o veredito
+ * 'manual' → só confere quando o usuário clica em "Conferir com IA"
+ * 'off'    → não confere (o anexo é apenas arquivo)
+ */
+export type VerificationMode = 'auto' | 'manual' | 'off'
+
+export async function getVerificationConfig(
+  clientId?: string | null,
+): Promise<{ enabled: boolean; mode: VerificationMode }> {
+  try {
+    const { data, error } = await (supabase.rpc as any)('training_verification_config', {
+      p_client_id: clientId || null,
+    })
+    if (!error && data) {
+      const d = data as any
+      const mode: VerificationMode =
+        d.enabled === false ? 'off' : d.mode === 'manual' ? 'manual' : 'auto'
+      return { enabled: mode !== 'off', mode }
+    }
+  } catch {
+    // fallback silencioso: mantém o comportamento automático
+  }
+  return { enabled: true, mode: 'auto' }
+}
+
+/**
+ * Grava a configuração da conferência para um cliente (só Administrador/Master).
+ */
+export async function saveVerificationConfig(
+  clientId: string,
+  mode: VerificationMode,
+): Promise<boolean> {
+  const { error } = await (supabase.from('clients') as any)
+    .update({
+      settings: {
+        training_verification: { enabled: mode !== 'off', mode },
+      },
+    })
+    .eq('id', clientId)
+  return !error
+}
+
 export async function verifyByJob(params: {
   documentUrl: string
   trainingName: string

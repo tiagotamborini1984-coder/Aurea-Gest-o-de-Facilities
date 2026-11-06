@@ -34,9 +34,12 @@ import {
   MapPin,
   FilterX,
   FileSpreadsheet,
+  FileText,
+  FileCode,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
+import { exportHorasExtrasToPdf, exportHorasExtrasToXml } from './utils/horas-extras-export'
 import { HorasExtrasTable, type SolicitacaoHe } from './components/HorasExtrasTable'
 import { SolicitacaoHeDialog } from './components/SolicitacaoHeDialog'
 import { DecisaoHeDialog } from './components/DecisaoHeDialog'
@@ -332,6 +335,82 @@ export default function HorasExtras() {
     fetchSolicitacoes()
   }
 
+  // Metadados dos filtros ativos para exibição e exportações
+  const filterMeta = useMemo(() => {
+    const selectedPlantObj =
+      filters.plant && filters.plant !== 'all'
+        ? visiblePlants.find((p) => p.id === filters.plant)
+        : null
+
+    const plantLabel = selectedPlantObj
+      ? selectedPlantObj.name
+      : !isAdminOrMaster && visiblePlants.length > 0
+        ? `Plantas Autorizadas (${visiblePlants.map((p) => p.name).join(', ')})`
+        : 'Todas as Plantas'
+
+    let periodLabel = 'Todo o período'
+    if (filters.dateFrom && filters.dateTo) {
+      const fromFormatted = filters.dateFrom.split('-').reverse().join('/')
+      const toFormatted = filters.dateTo.split('-').reverse().join('/')
+      periodLabel = `${fromFormatted} a ${toFormatted}`
+    } else if (filters.dateFrom) {
+      const fromFormatted = filters.dateFrom.split('-').reverse().join('/')
+      periodLabel = `A partir de ${fromFormatted}`
+    } else if (filters.dateTo) {
+      const toFormatted = filters.dateTo.split('-').reverse().join('/')
+      periodLabel = `Até ${toFormatted}`
+    }
+
+    const companyObj =
+      filters.company && filters.company !== 'all'
+        ? companies.find((c) => c.id === filters.company)
+        : null
+
+    const statusMap: Record<string, string> = {
+      all: 'Todos os Status',
+      pendente: 'Pendente',
+      aprovada: 'Aprovada',
+      recusada: 'Recusada',
+    }
+
+    return {
+      plantName: plantLabel,
+      periodLabel,
+      companyName: companyObj?.name,
+      statusLabel: statusMap[filters.status] || filters.status,
+      clientName: activeClient?.name || 'Sistema Aurea',
+    }
+  }, [filters, visiblePlants, isAdminOrMaster, companies, activeClient])
+
+  // Ações de exportação no Dashboard
+  const handleExportPdf = () => {
+    if (solicitacoes.length === 0) {
+      toast.error('Nenhuma solicitação de horas extras no filtro atual para exportar.')
+      return
+    }
+    try {
+      exportHorasExtrasToPdf(solicitacoes, filterMeta)
+      toast.success('Relatório em PDF gerado com sucesso!')
+    } catch (err: any) {
+      console.error('Erro ao exportar PDF:', err)
+      toast.error(err.message || 'Erro ao gerar PDF das horas extras.')
+    }
+  }
+
+  const handleExportXml = () => {
+    if (solicitacoes.length === 0) {
+      toast.error('Nenhuma solicitação de horas extras no filtro atual para exportar.')
+      return
+    }
+    try {
+      exportHorasExtrasToXml(solicitacoes, filterMeta)
+      toast.success('Arquivo XML exportado com sucesso!')
+    } catch (err: any) {
+      console.error('Erro ao exportar XML:', err)
+      toast.error('Erro ao gerar XML das horas extras.')
+    }
+  }
+
   // Cards de resumo
   const summary = useMemo(() => {
     let pendentes = 0
@@ -385,21 +464,44 @@ export default function HorasExtras() {
             gestor e integração via API REST.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={loading || solicitacoes.length === 0}
+            title="Exportar lista de HE filtrada em PDF"
+            className="border-slate-300 text-slate-700 hover:text-brand-vividBlue"
+          >
+            <FileText className="h-4 w-4 mr-1.5 text-rose-500" />
+            Exportar PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportXml}
+            disabled={loading || solicitacoes.length === 0}
+            title="Exportar lista de HE filtrada em XML"
+            className="border-slate-300 text-slate-700 hover:text-brand-vividBlue"
+          >
+            <FileCode className="h-4 w-4 mr-1.5 text-emerald-600" />
+            Exportar XML
+          </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => fetchSolicitacoes()}
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
           <Button
             onClick={() => setIsNewDialogOpen(true)}
+            size="sm"
             className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-1.5" />
             Nova Solicitação de HE
           </Button>
         </div>
@@ -581,7 +683,7 @@ export default function HorasExtras() {
         open={isNewDialogOpen}
         onOpenChange={setIsNewDialogOpen}
         employees={employees}
-        plants={plants}
+        plants={visiblePlants}
         onSubmit={handleCreateSolicitacao}
       />
 

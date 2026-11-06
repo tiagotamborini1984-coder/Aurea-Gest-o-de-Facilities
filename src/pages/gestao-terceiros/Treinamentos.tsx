@@ -27,7 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
-import { verifyTrainingPresence } from '@/lib/training-verification'
+import { verifyTrainingPresence, getVerificationConfig } from '@/lib/training-verification'
 import { mergeFilesToPdf } from '@/lib/merge-files'
 import { VerificationBadge } from '@/components/gestao-terceiros/VerificationBadge'
 import {
@@ -271,6 +271,26 @@ export default function Treinamentos() {
           )
           return [newRecord, ...filtered]
         })
+        // Modo do cliente: 'auto' confere agora; 'manual'/'off' não disparam nada.
+        const cfg = await getVerificationConfig(activeClient?.id)
+        if (cfg.mode !== 'auto') {
+          if (cfg.mode === 'off') {
+            await supabase
+              .from('employee_training_records')
+              .update({ verification_status: null, verification_notes: null })
+              .eq('id', newRecord.id)
+          }
+          toast({
+            title: 'Documento anexado',
+            description:
+              cfg.mode === 'manual'
+                ? 'Conferência em modo manual: use "Conferir com IA" quando quiser validar.'
+                : undefined,
+          })
+          fetchData()
+          return
+        }
+
         toast({ title: 'Documento anexado. Aguardando conferência do agente…' })
         // Conferência pelo agente; reprovado = registro removido (anexo não vale)
         verifyTrainingPresence(newRecord.id).then((res: any) => {
