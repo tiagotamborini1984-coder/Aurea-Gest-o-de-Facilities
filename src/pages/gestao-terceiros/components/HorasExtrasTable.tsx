@@ -10,7 +10,17 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, AlertCircle, Trash2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -56,7 +66,22 @@ export function HorasExtrasTable({
   canManage,
   onApprove,
   onReject,
+  onDelete,
 }: HorasExtrasTableProps) {
+  const [itemToDelete, setItemToDelete] = useState<SolicitacaoHe | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete || !onDelete) return
+    setIsDeleting(true)
+    try {
+      await onDelete(itemToDelete)
+      setItemToDelete(null)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'aprovada':
@@ -180,30 +205,42 @@ export function HorasExtrasTable({
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
-                      {item.status === 'pendente' ? (
-                        <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {item.status === 'pendente' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 text-xs"
+                              onClick={() => onApprove(item)}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 h-8 px-2.5 text-xs"
+                              onClick={() => onReject(item)}
+                            >
+                              <XCircle className="h-3.5 w-3.5 mr-1" />
+                              Recusar
+                            </Button>
+                          </>
+                        )}
+                        {onDelete && (
                           <Button
                             size="sm"
-                            variant="default"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 text-xs"
-                            onClick={() => onApprove(item)}
+                            variant="ghost"
+                            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 h-8 w-8 p-0"
+                            title="Excluir solicitação de HE (Administrador)"
+                            onClick={() => setItemToDelete(item)}
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                            Aprovar
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Excluir Solicitação</span>
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 border-rose-200 h-8 px-2.5 text-xs"
-                            onClick={() => onReject(item)}
-                          >
-                            <XCircle className="h-3.5 w-3.5 mr-1" />
-                            Recusar
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">Concluído</span>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -212,6 +249,47 @@ export function HorasExtrasTable({
           </TableBody>
         </Table>
       </CardContent>
+
+      {/* Confirmação de Exclusão (Apenas Administrador) */}
+      <AlertDialog
+        open={!!itemToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setItemToDelete(null)
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Excluir Solicitação de Horas Extras?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-600 space-y-2">
+              <p>
+                Tem certeza de que deseja excluir definitivamente a solicitação de horas extras de{' '}
+                <strong className="text-slate-900">{itemToDelete?.employee_name}</strong> (
+                {itemToDelete?.hours}h em{' '}
+                {itemToDelete?.date ? itemToDelete.date.split('-').reverse().join('/') : ''})?
+              </p>
+              <p className="text-xs text-rose-600 font-medium">
+                Esta ação é irreversível e remove o registro do banco de dados.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDelete()
+              }}
+              disabled={isDeleting}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {isDeleting ? 'Excluindo...' : 'Sim, Excluir Solicitação'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

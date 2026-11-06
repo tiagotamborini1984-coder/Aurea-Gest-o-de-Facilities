@@ -335,6 +335,34 @@ export default function HorasExtras() {
     fetchSolicitacoes()
   }
 
+  // Ação de exclusão (Disponível e permitida APENAS para Administrador/Master)
+  const handleDeleteSolicitacao = async (solicitacao: SolicitacaoHe) => {
+    if (!isAdminOrMaster) {
+      toast.error(
+        'Apenas usuários Administradores têm permissão para excluir solicitações de Horas Extras.',
+      )
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('horas_extras_solicitacoes')
+        .delete()
+        .eq('id', solicitacao.id)
+
+      if (error) {
+        toast.error('Erro ao excluir solicitação: ' + error.message)
+        throw error
+      }
+
+      toast.success('Solicitação de Horas Extras excluída com sucesso!')
+      fetchSolicitacoes()
+    } catch (err: any) {
+      console.error('Erro ao excluir solicitação de HE:', err)
+      throw err
+    }
+  }
+
   // Metadados dos filtros ativos para exibição e exportações
   const filterMeta = useMemo(() => {
     const selectedPlantObj =
@@ -676,6 +704,7 @@ export default function HorasExtras() {
         canManage={isAdminOrMaster}
         onApprove={(sol) => setDecisaoModal({ open: true, solicitacao: sol, action: 'aprovar' })}
         onReject={(sol) => setDecisaoModal({ open: true, solicitacao: sol, action: 'recusar' })}
+        onDelete={isAdminOrMaster ? handleDeleteSolicitacao : undefined}
       />
 
       {/* Modal: Nova Solicitação */}
