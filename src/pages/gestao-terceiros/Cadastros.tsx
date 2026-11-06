@@ -49,6 +49,28 @@ export default function Cadastros() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
   })
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false)
+  // Modo da conferência de listas do cliente: 'auto' trava o salvamento até o
+  // veredito; 'manual' e 'off' não disparam nem bloqueiam nada.
+  const [verificationMode, setVerificationMode] = useState<'auto' | 'manual' | 'off'>('auto')
+
+  useEffect(() => {
+    const cid =
+      profile?.role === 'Master' && selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : profile?.client_id
+    getVerificationConfig(cid).then((c) => setVerificationMode(c.mode))
+  }, [profile, selectedMasterClient])
+  // Modo da conferência de listas do cliente: 'auto' trava o salvamento até o
+  // veredito; 'manual' e 'off' não disparam nem bloqueiam nada.
+  const [verificationMode, setVerificationMode] = useState<'auto' | 'manual' | 'off'>('auto')
+
+  useEffect(() => {
+    const cid =
+      profile?.role === 'Master' && selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : profile?.client_id
+    getVerificationConfig(cid).then((c) => setVerificationMode(c.mode))
+  }, [profile, selectedMasterClient])
 
   const monthOptions = useMemo(() => {
     const options = []
@@ -274,11 +296,15 @@ export default function Cadastros() {
                 // Se alguma lista ainda está em análise, ESPERA o veredito em vez de
                 // recusar o cadastro (antes o usuário via "tempo esgotado" com a
                 // lista correta e o cadastro era bloqueado sem motivo real).
-                const pendentes = (trPayload || []).filter((p: any) => {
-                  if (!p.document_url) return false
-                  const tr = formRecsByTraining.get(p.training_id) || p
-                  return !isListValidated(tr)
-                })
+                // Modo do cliente: só 'auto' espera/bloqueia por validação.
+                const pendentes =
+                  verificationMode === 'auto'
+                    ? (trPayload || []).filter((p: any) => {
+                        if (!p.document_url) return false
+                        const tr = formRecsByTraining.get(p.training_id) || p
+                        return !isListValidated(tr)
+                      })
+                    : []
                 for (const p of pendentes) {
                   const r = await awaitPendingVerification(p.document_url)
                   if (r?.status === 'verified') {
@@ -294,11 +320,14 @@ export default function Cadastros() {
                     }
                   }
                 }
-                const invalid = (trPayload || []).filter((p: any) => {
-                  if (!p.document_url) return false
-                  const tr = formRecsByTraining.get(p.training_id) || p
-                  return !isListValidated(tr)
-                })
+                const invalid =
+                  verificationMode === 'auto'
+                    ? (trPayload || []).filter((p: any) => {
+                        if (!p.document_url) return false
+                        const tr = formRecsByTraining.get(p.training_id) || p
+                        return !isListValidated(tr)
+                      })
+                    : []
                 if (invalid.length > 0) {
                   const motivo =
                     formRecsByTraining.get(invalid[0].training_id)?.verification_notes || ''
