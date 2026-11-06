@@ -36,6 +36,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { HorasExtrasTable, type SolicitacaoHe } from './components/HorasExtrasTable'
 import { SolicitacaoHeDialog } from './components/SolicitacaoHeDialog'
 import { DecisaoHeDialog } from './components/DecisaoHeDialog'
@@ -138,8 +139,9 @@ export default function HorasExtras() {
     try {
       let empQuery = supabase
         .from('employees')
-        .select('id, name, company_id, company_name, plant_id, client_id, status')
-        .eq('status', 'Ativo')
+        .select(
+          'id, name, company_id, company_name, plant_id, client_id, status, registration_number, reference_month, created_at',
+        )
         .order('name')
 
       let compQuery = supabase
@@ -157,7 +159,12 @@ export default function HorasExtras() {
       }
 
       const [empRes, compRes] = await Promise.all([empQuery, compQuery])
-      if (empRes.data) setEmployees(empRes.data)
+      if (empRes.data) {
+        // Aplica a regra de vigência oficial do projeto para deduplicar versões históricas
+        // e descartar colaboradores cuja versão vigente não seja 'Ativo'
+        const uniqueActive = resolveActiveEmployees(empRes.data as any[])
+        setEmployees(uniqueActive)
+      }
       if (compRes.data) setCompanies(compRes.data)
     } catch (err) {
       console.error('Erro ao buscar dados auxiliares de colaboradores:', err)
@@ -261,11 +268,22 @@ export default function HorasExtras() {
       return
     }
 
+    // Se company_id vier nulo, tenta resolver pelo nome na lista de empresas do cliente
+    let resolvedCompanyId = data.company_id
+    if (!resolvedCompanyId && data.company_name && companies.length > 0) {
+      const matchComp = companies.find(
+        (c) => c.name?.trim().toLowerCase() === data.company_name?.trim().toLowerCase(),
+      )
+      if (matchComp?.id) {
+        resolvedCompanyId = matchComp.id
+      }
+    }
+
     const { error } = await supabase.from('horas_extras_solicitacoes').insert({
       client_id: targetClientId,
       employee_id: data.employee_id,
       employee_name: data.employee_name,
-      company_id: data.company_id,
+      company_id: resolvedCompanyId || null,
       company_name: data.company_name,
       plant_id: data.plant_id,
       date: data.date,

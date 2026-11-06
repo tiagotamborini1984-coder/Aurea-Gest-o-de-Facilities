@@ -21,15 +21,19 @@ import {
 import { Clock, UserCheck, Building2, MapPin, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 
 interface EmployeeOption {
   id: string
   name: string
-  company_id: string
-  company_name: string
+  company_id?: string | null
+  company_name?: string | null
   plant_id: string
-  client_id: string
-  status: string
+  client_id?: string
+  status?: string | null
+  registration_number?: string | null
+  reference_month?: string | null
+  created_at?: string | null
 }
 
 interface PlantOption {
@@ -65,14 +69,19 @@ export function SolicitacaoHeDialog({
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
   const [searchEmployeeText, setSearchEmployeeText] = useState('')
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [hours, setHours] = useState('2.0')
+  const [hours, setHours] = useState('2')
   const [reason, setReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Deduplicação defensiva: garante que cada pessoa apareça uma única vez
+  const uniqueEmployees = useMemo(() => {
+    return resolveActiveEmployees(employees as any[])
+  }, [employees])
+
   // Colaborador atualmente selecionado
   const selectedEmployee = useMemo(() => {
-    return employees.find((e) => e.id === selectedEmployeeId) || null
-  }, [employees, selectedEmployeeId])
+    return uniqueEmployees.find((e) => e.id === selectedEmployeeId) || null
+  }, [uniqueEmployees, selectedEmployeeId])
 
   // Planta vinculada ao colaborador
   const employeePlant = useMemo(() => {
@@ -82,14 +91,14 @@ export function SolicitacaoHeDialog({
 
   // Lista de colaboradores filtrada pelo campo de busca
   const filteredEmployees = useMemo(() => {
-    if (!searchEmployeeText.trim()) return employees.slice(0, 100)
+    if (!searchEmployeeText.trim()) return uniqueEmployees.slice(0, 100)
     const term = searchEmployeeText.toLowerCase()
-    return employees
+    return uniqueEmployees
       .filter(
         (e) => e.name.toLowerCase().includes(term) || e.company_name?.toLowerCase().includes(term),
       )
       .slice(0, 100)
-  }, [employees, searchEmployeeText])
+  }, [uniqueEmployees, searchEmployeeText])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,11 +107,33 @@ export function SolicitacaoHeDialog({
       return
     }
 
-    const numHours = parseFloat(hours.replace(',', '.'))
-    if (isNaN(numHours) || numHours <= 0 || numHours > 24) {
-      toast.error('Informe uma quantidade de horas válida (entre 0.1 e 24h).')
+    const trimmedHours = (hours || '').toString().trim()
+    if (!trimmedHours) {
+      toast.error('Informe a quantidade de horas extras (ex.: 2 ou 1,5).')
       return
     }
+
+    // Aceita formato com vírgula ou ponto (ex: 2, 1,5, 2.5)
+    const normalizedHoursStr = trimmedHours.replace(',', '.')
+    const numHours = parseFloat(normalizedHoursStr)
+
+    if (isNaN(numHours)) {
+      toast.error('Quantidade de horas inválida. Digite um número positivo como 2 ou 1,5.')
+      return
+    }
+
+    if (numHours <= 0) {
+      toast.error('A quantidade de horas deve ser maior que zero (ex.: 0,5, 1 ou 2).')
+      return
+    }
+
+    if (numHours > 24) {
+      toast.error('A quantidade de horas diárias não pode ultrapassar 24h.')
+      return
+    }
+
+    // Arredonda para 2 casas decimais (compatível com numeric(5,2) do banco)
+    const sanitizedHours = Math.round(numHours * 100) / 100
 
     if (!date) {
       toast.error('Informe a data da hora extra.')
@@ -118,14 +149,14 @@ export function SolicitacaoHeDialog({
         company_name: selectedEmployee.company_name || 'Terceiro',
         plant_id: selectedEmployee.plant_id,
         date,
-        hours: numHours,
+        hours: sanitizedHours,
         reason: reason.trim(),
       })
 
       // Reset
       setSelectedEmployeeId('')
       setSearchEmployeeText('')
-      setHours('2.0')
+      setHours('2')
       setReason('')
       onOpenChange(false)
     } catch (err) {
@@ -227,15 +258,16 @@ export function SolicitacaoHeDialog({
                 <Label htmlFor="heHours">Quantidade de Horas</Label>
                 <Input
                   id="heHours"
-                  type="number"
-                  step="0.5"
-                  min="0.1"
-                  max="24"
-                  placeholder="Ex: 2.0"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ex: 2 ou 1,5"
                   value={hours}
                   onChange={(e) => setHours(e.target.value)}
                   required
                 />
+                <span className="text-[11px] text-slate-500">
+                  Aceita números inteiros ou fracionados com vírgula ou ponto (ex.: 2, 1,5, 2.5).
+                </span>
               </div>
             </div>
 
