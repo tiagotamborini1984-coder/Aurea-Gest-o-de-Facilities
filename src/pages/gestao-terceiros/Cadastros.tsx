@@ -60,17 +60,6 @@ export default function Cadastros() {
         : profile?.client_id
     getVerificationConfig(cid).then((c) => setVerificationMode(c.mode))
   }, [profile, selectedMasterClient])
-  // Modo da conferência de listas do cliente: 'auto' trava o salvamento até o
-  // veredito; 'manual' e 'off' não disparam nem bloqueiam nada.
-  const [verificationMode, setVerificationMode] = useState<'auto' | 'manual' | 'off'>('auto')
-
-  useEffect(() => {
-    const cid =
-      profile?.role === 'Master' && selectedMasterClient !== 'all'
-        ? selectedMasterClient
-        : profile?.client_id
-    getVerificationConfig(cid).then((c) => setVerificationMode(c.mode))
-  }, [profile, selectedMasterClient])
 
   const monthOptions = useMemo(() => {
     const options = []
