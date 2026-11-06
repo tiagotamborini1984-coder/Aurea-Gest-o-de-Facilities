@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
+import { useMasterData } from '@/hooks/use-master-data'
 import { usePersistentScreenFilters } from '@/hooks/use-persistent-screen-filters'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +40,7 @@ import { HorasExtrasTable, type SolicitacaoHe } from './components/HorasExtrasTa
 import { SolicitacaoHeDialog } from './components/SolicitacaoHeDialog'
 import { DecisaoHeDialog } from './components/DecisaoHeDialog'
 
-interface FilterState {
+type FilterState = Record<string, unknown> & {
   plant: string
   company: string
   status: string
@@ -56,13 +57,19 @@ const DEFAULT_FILTERS: FilterState = {
 }
 
 export default function HorasExtras() {
-  const { profile, activeClient, selectedMasterClient, plants } = useAppStore()
+  const { profile, activeClient, selectedMasterClient } = useAppStore()
+  const { plants } = useMasterData()
 
   // 1. Filtros persistidos por tela (regra permanente: usePersistentScreenFilters)
-  const [filters, setFilters, resetFilters] = usePersistentScreenFilters<FilterState>(
-    'horas-extras',
+  const filterStore = usePersistentScreenFilters<FilterState>(
+    'gestao-terceiros:horas-extras',
     DEFAULT_FILTERS,
   )
+  const filters = filterStore.values
+  const setFilter = <K extends keyof FilterState>(key: K, val: FilterState[K]) => {
+    filterStore.set({ [key]: val } as Partial<FilterState>)
+  }
+  const resetFilters = filterStore.reset
 
   // Guard: se trocar de cliente, resetar filtros apenas em transição (nunca no mount)
   const prevClientRef = useRef<string | null>(null)
@@ -266,7 +273,7 @@ export default function HorasExtras() {
       reason: data.reason || null,
       status: 'pendente',
       created_by: profile?.id || null,
-      created_by_name: profile?.full_name || profile?.email || 'Usuário',
+      created_by_name: profile?.name || profile?.email || 'Usuário',
     })
 
     if (error) {
@@ -292,7 +299,7 @@ export default function HorasExtras() {
       .update({
         status: newStatus,
         approved_by: profile?.id || null,
-        approved_by_name: profile?.full_name || profile?.email || 'Gestor Administrador',
+        approved_by_name: profile?.name || profile?.email || 'Gestor Administrador',
         approved_at: new Date().toISOString(),
         manager_observation: observacao || null,
       })
@@ -453,10 +460,7 @@ export default function HorasExtras() {
               <Label className="text-xs text-slate-600 flex items-center gap-1">
                 <MapPin className="h-3 w-3" /> Planta / Unidade
               </Label>
-              <Select
-                value={filters.plant}
-                onValueChange={(val) => setFilters((prev) => ({ ...prev, plant: val }))}
-              >
+              <Select value={filters.plant} onValueChange={(val) => setFilter('plant', val)}>
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue placeholder="Todas as Plantas" />
                 </SelectTrigger>
@@ -475,10 +479,7 @@ export default function HorasExtras() {
               <Label className="text-xs text-slate-600 flex items-center gap-1">
                 <Building2 className="h-3 w-3" /> Empresa Terceira
               </Label>
-              <Select
-                value={filters.company}
-                onValueChange={(val) => setFilters((prev) => ({ ...prev, company: val }))}
-              >
+              <Select value={filters.company} onValueChange={(val) => setFilter('company', val)}>
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue placeholder="Todas as Empresas" />
                 </SelectTrigger>
@@ -497,10 +498,7 @@ export default function HorasExtras() {
               <Label className="text-xs text-slate-600 flex items-center gap-1">
                 <Clock className="h-3 w-3" /> Status da Solicitação
               </Label>
-              <Select
-                value={filters.status}
-                onValueChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
-              >
+              <Select value={filters.status} onValueChange={(val) => setFilter('status', val)}>
                 <SelectTrigger className="h-9 text-xs bg-white">
                   <SelectValue placeholder="Todos os Status" />
                 </SelectTrigger>
@@ -521,7 +519,7 @@ export default function HorasExtras() {
                 type="date"
                 className="h-9 text-xs bg-white"
                 value={filters.dateFrom}
-                onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
+                onChange={(e) => setFilter('dateFrom', e.target.value)}
               />
             </div>
 
@@ -534,7 +532,7 @@ export default function HorasExtras() {
                   type="date"
                   className="h-9 text-xs bg-white"
                   value={filters.dateTo}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
+                  onChange={(e) => setFilter('dateTo', e.target.value)}
                 />
                 <Button
                   variant="outline"
