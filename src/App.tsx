@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import DashboardGestor from './pages/gestao-terceiros/DashboardGestor'
 import Lancamentos from './pages/gestao-terceiros/Lancamentos'
 import Treinamentos from './pages/gestao-terceiros/Treinamentos'
+import ConfiguracoesTreinamentos from './pages/gestao-terceiros/ConfiguracoesTreinamentos'
 import Cadastros from './pages/gestao-terceiros/Cadastros'
 import Relatorios from './pages/gestao-terceiros/Relatorios'
 import Encomendas from './pages/gestao-terceiros/Encomendas'
@@ -170,6 +171,10 @@ const App = () => (
                       <Route path="/gestao-terceiros/horas-extras" element={<HorasExtras />} />
                       <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
                       <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
+                      <Route
+                        path="/gestao-terceiros/treinamentos/configuracoes"
+                        element={<ConfiguracoesTreinamentos />}
+                      />
 
                       {/* Limpeza e Jardinagem */}
                       <Route path="/limpeza-jardinagem/mapa" element={<MapaLJ />} />

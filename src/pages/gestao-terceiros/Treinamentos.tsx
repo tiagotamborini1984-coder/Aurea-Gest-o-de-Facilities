@@ -42,6 +42,7 @@ import {
   Loader2,
   FileText,
   Trash2,
+  Settings,
 } from 'lucide-react'
 import { DocumentViewer, DocumentViewerRef } from '@/components/DocumentViewer'
 
@@ -393,14 +394,22 @@ export default function Treinamentos() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-          <FileBadge className="h-8 w-8 text-brand-vividBlue" />
-          Gestão de Treinamentos
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Monitore o histórico unificado e a validade dos treinamentos obrigatórios por função.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <FileBadge className="h-8 w-8 text-brand-vividBlue" />
+            Gestão de Treinamentos
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Monitore o histórico unificado e a validade dos treinamentos obrigatórios por função.
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <a href="/gestao-terceiros/treinamentos/configuracoes">
+            <Settings className="h-4 w-4 mr-2" />
+            Configurar conferência
+          </a>
+        </Button>
       </div>
 
       <Card>
