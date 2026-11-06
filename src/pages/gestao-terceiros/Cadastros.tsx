@@ -21,7 +21,11 @@ import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { EmployeeTrainingsForm, FunctionTrainingsForm } from './TreinamentosVinculo'
 import { logAudit } from '@/services/audit'
 
-import { isListValidated, awaitPendingVerification } from '@/lib/training-verification'
+import {
+  isListValidated,
+  awaitPendingVerification,
+  getVerificationConfig,
+} from '@/lib/training-verification'
 
 export default function Cadastros() {
   const { type } = useParams()
