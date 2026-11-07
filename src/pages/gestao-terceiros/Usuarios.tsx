@@ -205,9 +205,26 @@ export default function Usuarios() {
       },
       body: JSON.stringify({ userId: id }),
     })
-    const data = await res.json()
+    let data: any = null
+    try {
+      data = await res.json()
+    } catch {
+      data = null
+    }
     if (!res.ok) {
-      return { success: false, error: { message: data.error || 'Erro ao excluir usuário' } }
+      const raw = data?.error || 'Erro ao excluir usuário'
+      // Traduz erros técnicos do GoTrue/Postgres para o usuário
+      const message =
+        raw === 'Insufficient permissions to delete users'
+          ? 'Você não tem permissão para excluir usuários.'
+          : raw === 'Unauthorized' || raw === 'Missing Authorization header'
+            ? 'Sessão expirada. Faça login novamente.'
+            : raw === 'Cannot delete your own user'
+              ? 'Não é possível excluir o seu próprio usuário.'
+              : raw.includes('Database error deleting user')
+                ? 'Não foi possível excluir o usuário: existem registros vinculados a ele no sistema.'
+                : raw
+      return { success: false, error: { message } }
     }
     return { success: true }
   }
