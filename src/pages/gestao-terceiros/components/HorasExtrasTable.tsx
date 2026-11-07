@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, XCircle, Clock, AlertCircle, Trash2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, AlertCircle, Trash2, Wallet } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +34,12 @@ export interface SolicitacaoHe {
   plant_id: string
   date: string
   hours: number
+  cost_center_id?: string | null
+  budget_cost_centers?: {
+    id: string
+    name: string
+    code: string | null
+  } | null
   reason: string | null
   status: 'pendente' | 'aprovada' | 'recusada'
   created_by: string | null
@@ -131,6 +137,7 @@ export function HorasExtrasTable({
               <TableHead>Planta</TableHead>
               <TableHead>Data da HE</TableHead>
               <TableHead className="text-right">Qtd. Horas</TableHead>
+              <TableHead>Centro de Custo pagador</TableHead>
               <TableHead>Motivo / Justificativa</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Gestor / Histórico</TableHead>
@@ -140,13 +147,19 @@ export function HorasExtrasTable({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={canManage ? 9 : 8} className="text-center py-10 text-slate-500">
+                <TableCell
+                  colSpan={canManage ? 10 : 9}
+                  className="text-center py-10 text-slate-500"
+                >
                   Carregando solicitações de horas extras...
                 </TableCell>
               </TableRow>
             ) : solicitacoes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canManage ? 9 : 8} className="text-center py-10 text-slate-500">
+                <TableCell
+                  colSpan={canManage ? 10 : 9}
+                  className="text-center py-10 text-slate-500"
+                >
                   Nenhuma solicitação de horas extras encontrada com os filtros atuais.
                 </TableCell>
               </TableRow>
@@ -168,6 +181,19 @@ export function HorasExtrasTable({
                   </TableCell>
                   <TableCell className="text-right font-semibold text-slate-900">
                     {Number(item.hours).toFixed(2)}h
+                  </TableCell>
+                  <TableCell className="text-slate-700 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Wallet className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span
+                        className="truncate max-w-[160px]"
+                        title={item.budget_cost_centers?.name || ''}
+                      >
+                        {item.budget_cost_centers?.name || (
+                          <span className="text-slate-400 italic">Não informado</span>
+                        )}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell
                     className="max-w-[240px] truncate text-slate-600 text-xs"

@@ -78,6 +78,11 @@ export function DecisaoHeDialog({
               <strong>Data / Horas:</strong> {solicitacao.date} (
               {Number(solicitacao.hours).toFixed(2)}h)
             </div>
+            {solicitacao.budget_cost_centers?.name && (
+              <div>
+                <strong>Centro de Custo pagador:</strong> {solicitacao.budget_cost_centers.name}
+              </div>
+            )}
             {solicitacao.reason && (
               <div className="text-xs text-slate-500 pt-1 border-t mt-1">
                 <strong>Motivo informado:</strong> {solicitacao.reason}

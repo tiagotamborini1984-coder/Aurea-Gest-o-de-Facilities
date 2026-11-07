@@ -33,6 +33,7 @@ import {
   Building2,
   MapPin,
   FilterX,
+  Wallet,
   FileSpreadsheet,
   FileText,
   FileCode,
@@ -114,9 +115,12 @@ export default function HorasExtras() {
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoHe[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Colaboradores terceiros e empresas para o formulário
+  // Colaboradores terceiros, empresas e centros de custo para o formulário
   const [employees, setEmployees] = useState<any[]>([])
   const [companies, setCompanies] = useState<any[]>([])
+  const [costCenters, setCostCenters] = useState<
+    { id: string; name: string; code?: string | null }[]
+  >([])
 
   // Modais
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false)
@@ -152,16 +156,19 @@ export default function HorasExtras() {
         .select('id, name, service_type, client_id')
         .order('name')
 
+      let ccQuery = supabase.from('budget_cost_centers').select('id, name, code').order('name')
+
       if (effectiveClientId) {
         empQuery = empQuery.eq('client_id', effectiveClientId)
         compQuery = compQuery.eq('client_id', effectiveClientId)
+        ccQuery = ccQuery.eq('client_id', effectiveClientId)
       }
 
       if (!isAdminOrMaster && authorizedPlantIds && authorizedPlantIds.length > 0) {
         empQuery = empQuery.in('plant_id', authorizedPlantIds)
       }
 
-      const [empRes, compRes] = await Promise.all([empQuery, compQuery])
+      const [empRes, compRes, ccRes] = await Promise.all([empQuery, compQuery, ccQuery])
       if (empRes.data) {
         // Aplica a regra de vigência oficial do projeto para deduplicar versões históricas
         // e descartar colaboradores cuja versão vigente não seja 'Ativo'
@@ -190,6 +197,12 @@ export default function HorasExtras() {
           plant_id,
           date,
           hours,
+          cost_center_id,
+          budget_cost_centers (
+            id,
+            name,
+            code
+          ),
           reason,
           status,
           created_by,
@@ -261,6 +274,7 @@ export default function HorasExtras() {
     company_id: string | null
     company_name: string
     plant_id: string
+    cost_center_id: string
     date: string
     hours: number
     reason: string
@@ -289,6 +303,7 @@ export default function HorasExtras() {
       company_id: resolvedCompanyId || null,
       company_name: data.company_name,
       plant_id: data.plant_id,
+      cost_center_id: data.cost_center_id || null,
       date: data.date,
       hours: data.hours,
       reason: data.reason || null,
@@ -713,6 +728,7 @@ export default function HorasExtras() {
         onOpenChange={setIsNewDialogOpen}
         employees={employees}
         plants={visiblePlants}
+        costCenters={costCenters}
         onSubmit={handleCreateSolicitacao}
       />
 

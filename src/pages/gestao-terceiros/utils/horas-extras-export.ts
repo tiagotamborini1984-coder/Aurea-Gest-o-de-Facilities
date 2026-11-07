@@ -74,6 +74,9 @@ export function exportHorasExtrasToPdf(
           ? 'Aguardando decisão'
           : `${s.approved_by_name || 'Gestor'} em ${formatDateTime(s.approved_at)}`
 
+      const ccLabel = s.budget_cost_centers?.name || 'Não informado'
+      const ccCode = s.budget_cost_centers?.code
+
       const obs = s.manager_observation
         ? `<div class="obs-box">Obs: ${esc(s.manager_observation)}</div>`
         : ''
@@ -88,6 +91,7 @@ export function exportHorasExtrasToPdf(
           </td>
           <td>${esc(s.company_name)}</td>
           <td>${esc(plantLabel)}</td>
+          <td>${esc(ccLabel)}${ccCode ? ` (${esc(ccCode)})` : ''}</td>
           <td style="text-align: center; white-space: nowrap;">${formatIsoDate(s.date)}</td>
           <td style="text-align: right; font-weight: bold; white-space: nowrap;">
             ${Number(s.hours).toFixed(1)}h
@@ -287,6 +291,7 @@ export function exportHorasExtrasToPdf(
         <th>Colaborador / Justificativa</th>
         <th>Empresa</th>
         <th>Planta</th>
+        <th>Centro de Custo pagador</th>
         <th style="text-align: center;">Data HE</th>
         <th style="text-align: right;">Horas</th>
         <th style="text-align: center;">Status</th>
@@ -296,7 +301,7 @@ export function exportHorasExtrasToPdf(
     <tbody>
       ${
         rowsHtml ||
-        '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #64748b;">Nenhuma solicitação encontrada para os filtros selecionados.</td></tr>'
+        '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #64748b;">Nenhuma solicitação encontrada para os filtros selecionados.</td></tr>'
       }
     </tbody>
   </table>
@@ -348,6 +353,11 @@ export function exportHorasExtrasToXml(
         <nome>${esc(s.plants?.name || '')}</nome>
         <codigo>${esc(s.plants?.code || '')}</codigo>
       </planta>
+      <centro_custo_pagador>
+        <id>${esc(s.cost_center_id || '')}</id>
+        <nome>${esc(s.budget_cost_centers?.name || '')}</nome>
+        <codigo>${esc(s.budget_cost_centers?.code || '')}</codigo>
+      </centro_custo_pagador>
       <detalhes>
         <data_hora_extra>${esc(s.date)}</data_hora_extra>
         <horas>${Number(s.hours).toFixed(2)}</horas>
