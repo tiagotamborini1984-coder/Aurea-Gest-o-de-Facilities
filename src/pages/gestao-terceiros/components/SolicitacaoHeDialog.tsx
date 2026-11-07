@@ -22,6 +22,7 @@ import { Clock, UserCheck, Building2, MapPin, Search, Wallet } from 'lucide-reac
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
+import type { SolicitacaoHe } from './HorasExtrasTable'
 
 interface EmployeeOption {
   id: string
@@ -54,6 +55,8 @@ interface SolicitacaoHeDialogProps {
   employees: EmployeeOption[]
   plants: PlantOption[]
   costCenters: CostCenterOption[]
+  /** Solicitação em edição (modo edição quando preenchido) */
+  editingSolicitacao?: SolicitacaoHe | null
   onSubmit: (data: {
     employee_id: string
     employee_name: string
@@ -73,6 +76,7 @@ export function SolicitacaoHeDialog({
   employees,
   plants,
   costCenters,
+  editingSolicitacao = null,
   onSubmit,
 }: SolicitacaoHeDialogProps) {
   const [selectedPlantId, setSelectedPlantId] = useState('')
@@ -84,7 +88,9 @@ export function SolicitacaoHeDialog({
   const [reason, setReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Deduplicação defensiva: garante que cada pessoa apareça uma única vez
+  // Modo edição quando uma solicitação é passada
+  const isEditMode = !!editingSolicitacao
+
   const uniqueEmployees = useMemo(() => {
     return resolveActiveEmployees(employees as any[])
   }, [employees])
@@ -100,8 +106,41 @@ export function SolicitacaoHeDialog({
     return uniqueEmployees.filter((e) => e.plant_id === selectedPlantId)
   }, [uniqueEmployees, selectedPlantId])
 
-  // Ao selecionar a planta, pré-seleciona um centro de custo do mesmo cliente? (não: CC é escolha do usuário).
-  // Ao selecionar o colaborador, mantém a planta escolhida (pode ter sido trocada antes).
+  // Em modo edição, garante que a planta da solicitação esteja entre as opções
+  const displayPlants = useMemo(() => {
+    if (
+      isEditMode &&
+      editingSolicitacao &&
+      !plants.some((p) => p.id === editingSolicitacao.plant_id)
+    ) {
+      return [
+        ...plants,
+        {
+          id: editingSolicitacao.plant_id,
+          name: editingSolicitacao.plants?.name || 'Planta da solicitação',
+        },
+      ]
+    }
+    return plants
+  }, [plants, isEditMode, editingSolicitacao])
+
+  // Ao abrir: preenche com os dados atuais (edição) ou reseta (nova solicitação)
+  useEffect(() => {
+    if (!open) return
+    if (editingSolicitacao) {
+      setSelectedPlantId(editingSolicitacao.plant_id)
+      setSelectedEmployeeId(editingSolicitacao.employee_id)
+      setSelectedCostCenterId(editingSolicitacao.cost_center_id || '')
+      setSearchEmployeeText('')
+      setDate(editingSolicitacao.date)
+      setHours(String(Number(editingSolicitacao.hours)).replace('.', ','))
+      setReason(editingSolicitacao.reason || '')
+    } else {
+      resetForm()
+      setDate(format(new Date(), 'yyyy-MM-dd'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingSolicitacao])
 
   // Lista de colaboradores filtrada pelo campo de busca (limitada pela planta quando houver)
   const filteredEmployees = useMemo(() => {
@@ -216,11 +255,21 @@ export function SolicitacaoHeDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-slate-900">
               <Clock className="h-5 w-5 text-brand-vividBlue" />
-              Solicitação de Horas Extras
+              {isEditMode ? 'Editar Solicitação de Horas Extras' : 'Solicitação de Horas Extras'}
             </DialogTitle>
             <DialogDescription>
-              Registre uma solicitação de HE para um colaborador terceiro. A solicitação nascerá
-              como <strong>Pendente</strong> e aguardará aprovação do Gestor/Administrador.
+              {isEditMode ? (
+                <>
+                  Altere os dados da solicitação de{' '}
+                  <strong>{editingSolicitacao?.employee_name}</strong>. Ela continua com status{' '}
+                  <strong>Pendente</strong> até a decisão do gestor.
+                </>
+              ) : (
+                <>
+                  Registre uma solicitação de HE para um colaborador terceiro. A solicitação nascerá
+                  como <strong>Pendente</strong> e aguardará aprovação do Gestor/Administrador.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -236,12 +285,12 @@ export function SolicitacaoHeDialog({
                   <SelectValue placeholder="Selecione a planta autorizada..." />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  {plants.length === 0 ? (
+                  {displayPlants.length === 0 ? (
                     <div className="p-2 text-xs text-slate-500 text-center">
                       Nenhuma planta autorizada disponível.
                     </div>
                   ) : (
-                    plants.map((p) => (
+                    displayPlants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.code ? `(${p.code})` : ''}
                       </SelectItem>
@@ -272,9 +321,12 @@ export function SolicitacaoHeDialog({
                 <SelectTrigger>
                   <SelectValue
                     placeholder={
-                      selectedPlantId
-                        ? 'Selecione o colaborador da planta...'
-                        : 'Selecione a planta para listar os colaboradores...'
+                      selectedEmployeeId
+                        ? employees.find((e) => e.id === selectedEmployeeId)?.name ||
+                          editingSolicitacao?.employee_name
+                        : selectedPlantId
+                          ? 'Selecione o colaborador da planta...'
+                          : 'Selecione a planta para listar os colaboradores...'
                     }
                   />
                 </SelectTrigger>
@@ -334,19 +386,22 @@ export function SolicitacaoHeDialog({
             </div>
 
             {/* Informações da empresa do colaborador */}
-            {selectedEmployee && (
+            {(selectedEmployee || isEditMode) && (
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 text-slate-700">
                 <div className="flex items-center gap-1.5">
                   <UserCheck className="h-3.5 w-3.5 text-brand-vividBlue" />
                   <span>
-                    <strong>Colaborador:</strong> {selectedEmployee.name}
+                    <strong>Colaborador:</strong>{' '}
+                    {selectedEmployee?.name || editingSolicitacao?.employee_name || '—'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 text-slate-500" />
                   <span>
                     <strong>Empresa Contratada:</strong>{' '}
-                    {selectedEmployee.company_name || 'Não informada'}
+                    {selectedEmployee?.company_name ||
+                      editingSolicitacao?.company_name ||
+                      'Não informada'}
                   </span>
                 </div>
                 {selectedPlantId && (
@@ -354,7 +409,7 @@ export function SolicitacaoHeDialog({
                     <MapPin className="h-3.5 w-3.5 text-slate-500" />
                     <span>
                       <strong>Planta Selecionada:</strong>{' '}
-                      {plants.find((p) => p.id === selectedPlantId)?.name || selectedPlantId}
+                      {displayPlants.find((p) => p.id === selectedPlantId)?.name || selectedPlantId}
                     </span>
                   </div>
                 )}
@@ -417,7 +472,13 @@ export function SolicitacaoHeDialog({
               className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
               disabled={isSubmitting || !selectedEmployeeId}
             >
-              {isSubmitting ? 'Registrando...' : 'Registrar Solicitação'}
+              {isEditMode
+                ? isSubmitting
+                  ? 'Salvando...'
+                  : 'Salvar Alterações'
+                : isSubmitting
+                  ? 'Registrando...'
+                  : 'Registrar Solicitação'}
             </Button>
           </DialogFooter>
         </form>

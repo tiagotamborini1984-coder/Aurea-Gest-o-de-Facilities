@@ -124,6 +124,8 @@ export default function HorasExtras() {
 
   // Modais
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false)
+  const [editingSolicitacao, setEditingSolicitacao] = useState<SolicitacaoHe | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [decisaoModal, setDecisaoModal] = useState<{
     open: boolean
     solicitacao: SolicitacaoHe | null
@@ -347,6 +349,62 @@ export default function HorasExtras() {
     }
 
     toast.success(`Solicitação ${newStatus === 'aprovada' ? 'Aprovada' : 'Recusada'} com sucesso!`)
+    fetchSolicitacoes()
+  }
+
+  // Pode editar: apenas o criador da solicitação e somente enquanto Pendente
+  const canEditSolicitacao = useCallback(
+    (sol: SolicitacaoHe) => {
+      if (!sol || sol.status !== 'pendente') return false
+      return !!sol.created_by && sol.created_by === profile?.id
+    },
+    [profile?.id],
+  )
+
+  // Ação de edição (apenas o criador, enquanto Pendente) — atualiza o registro existente
+  const handleUpdateSolicitacao = async (data: {
+    employee_id: string
+    employee_name: string
+    company_id: string | null
+    company_name: string
+    plant_id: string
+    cost_center_id: string
+    date: string
+    hours: number
+    reason: string
+  }) => {
+    if (!editingSolicitacao) return
+    if (!canEditSolicitacao(editingSolicitacao)) {
+      toast.error(
+        'Você só pode editar solicitações criadas por você e enquanto estiverem Pendentes.',
+      )
+      return
+    }
+
+    const { error } = await supabase
+      .from('horas_extras_solicitacoes')
+      .update({
+        employee_id: data.employee_id,
+        employee_name: data.employee_name,
+        company_id: data.company_id || null,
+        company_name: data.company_name,
+        plant_id: data.plant_id,
+        cost_center_id: data.cost_center_id || null,
+        date: data.date,
+        hours: data.hours,
+        reason: data.reason || null,
+        status: 'pendente',
+      })
+      .eq('id', editingSolicitacao.id)
+
+    if (error) {
+      toast.error('Erro ao atualizar solicitação: ' + error.message)
+      throw error
+    }
+
+    toast.success('Solicitação de Horas Extras atualizada com sucesso!')
+    setIsEditDialogOpen(false)
+    setEditingSolicitacao(null)
     fetchSolicitacoes()
   }
 
@@ -717,6 +775,11 @@ export default function HorasExtras() {
         solicitacoes={solicitacoes}
         loading={loading}
         canManage={isAdminOrMaster}
+        canEdit={canEditSolicitacao}
+        onEdit={(sol) => {
+          setEditingSolicitacao(sol)
+          setIsEditDialogOpen(true)
+        }}
         onApprove={(sol) => setDecisaoModal({ open: true, solicitacao: sol, action: 'aprovar' })}
         onReject={(sol) => setDecisaoModal({ open: true, solicitacao: sol, action: 'recusar' })}
         onDelete={isAdminOrMaster ? handleDeleteSolicitacao : undefined}
@@ -730,6 +793,20 @@ export default function HorasExtras() {
         plants={visiblePlants}
         costCenters={costCenters}
         onSubmit={handleCreateSolicitacao}
+      />
+
+      {/* Modal: Editar Solicitação (apenas criador, enquanto Pendente) */}
+      <SolicitacaoHeDialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) setEditingSolicitacao(null)
+        }}
+        employees={employees}
+        plants={visiblePlants}
+        costCenters={costCenters}
+        editingSolicitacao={editingSolicitacao}
+        onSubmit={handleUpdateSolicitacao}
       />
 
       {/* Modal: Decisão (Aprovar / Recusar) */}

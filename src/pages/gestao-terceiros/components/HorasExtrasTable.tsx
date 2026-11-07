@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, XCircle, Clock, AlertCircle, Trash2, Wallet } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, AlertCircle, Trash2, Wallet, Pencil } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +61,8 @@ interface HorasExtrasTableProps {
   solicitacoes: SolicitacaoHe[]
   loading: boolean
   canManage: boolean
+  canEdit: (solicitacao: SolicitacaoHe) => boolean
+  onEdit: (solicitacao: SolicitacaoHe) => void
   onApprove: (solicitacao: SolicitacaoHe) => void
   onReject: (solicitacao: SolicitacaoHe) => void
   onDelete?: (solicitacao: SolicitacaoHe) => void
@@ -70,6 +72,8 @@ export function HorasExtrasTable({
   solicitacoes,
   loading,
   canManage,
+  canEdit,
+  onEdit,
   onApprove,
   onReject,
   onDelete,
@@ -141,7 +145,9 @@ export function HorasExtrasTable({
               <TableHead>Motivo / Justificativa</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Gestor / Histórico</TableHead>
-              {canManage && <TableHead className="text-right">Ação do Gestor</TableHead>}
+              {(canManage || solicitacoes.some((s) => canEdit(s))) && (
+                <TableHead className="text-right">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,7 +173,22 @@ export function HorasExtrasTable({
               solicitacoes.map((item) => (
                 <TableRow key={item.id} className="hover:bg-slate-50/70">
                   <TableCell className="font-medium text-slate-900">
-                    <div>{item.employee_name}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span>{item.employee_name}</span>
+                      {canEdit(item) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-slate-400 hover:text-brand-vividBlue hover:bg-brand-vividBlue/10 h-7 w-7 p-0"
+                          title="Editar solicitação de HE (apenas enquanto Pendente)"
+                          aria-label={`Editar solicitação de HE de ${item.employee_name}`}
+                          onClick={() => onEdit(item)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          <span className="sr-only">Editar Solicitação</span>
+                        </Button>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-400">
                       Solicitado por: {item.created_by_name || 'Usuário'}
                     </div>
