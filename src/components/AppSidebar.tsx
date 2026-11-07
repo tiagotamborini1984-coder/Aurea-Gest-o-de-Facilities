@@ -76,6 +76,7 @@ export function AppSidebar() {
         subItems: [
           { title: 'Dashboard do Gestor', path: '/gestao-terceiros/dashboard-gestor' },
           { title: 'Horas Extras', path: '/gestao-terceiros/horas-extras' },
+          { title: 'Configurações de HE', path: '/gestao-terceiros/horas-extras/configuracoes' },
           { title: 'Lançamentos', path: '/gestao-terceiros/lancamentos' },
           { title: 'Treinamentos', path: '/gestao-terceiros/treinamentos' },
           { title: 'Relatórios', path: '/gestao-terceiros/relatorios' },
@@ -496,7 +497,8 @@ export function AppSidebar() {
                   userMenus.includes(sub.title) ||
                   hasLegacyDashboard ||
                   sub.title === 'Treinamentos' ||
-                  sub.title === 'Horas Extras'
+                  sub.title === 'Horas Extras' ||
+                  sub.title === 'Configurações de HE'
                 )
               })
             }

@@ -7,7 +7,7 @@ import { getSupabaseClient, jsonBody, errorBody } from '../_shared/supabase.ts'
  * Dispara e-mails de notificação do módulo de Horas Extras:
  *
  * 1) APROVAÇÃO (action = 'aprovada' | padrão):
- *    - Destinatário principal: e-mail da empresa parceira (companies.email ou company_email).
+ *    - Destinatários principais: TODOS os e-mails cadastrados na empresa parceira (companies.emails/companies.email ou company_email).
  *    - Cópias (CC): solicitante (created_by) e aprovador (approved_by).
  *    - Registra email_sent_at e email_error no banco.
  *
@@ -17,11 +17,15 @@ import { getSupabaseClient, jsonBody, errorBody } from '../_shared/supabase.ts'
  *    - Registra email_error em caso de falha.
  *
  * 3) CRIAÇÃO DE HE (action = 'criada'):
- *    - Destinatários: gestores Aprovadores elegíveis da planta/cliente (perfis Administrador com acesso à planta).
- *    - Informa que há uma HE aguardando aprovação/recusa.
+ *    - Destinatários: APROVADOR configurado nas Configurações de HE da planta/cliente.
+ *      Configurações suportadas:
+ *        a) Modo 'all': todas as plantas com o mesmo aprovador (gestor ou administrador).
+ *        b) Modo 'per_plant': cada planta com um aprovador específico.
+ *      Fallback: administradores elegíveis da planta/cliente caso não haja aprovador configurado.
  *    - Inclui link direto clicável para o módulo HE (https://www.aureafacilities.com/gestao-terceiros/horas-extras)
  *      logo abaixo da mensagem.
  *
+ * Texto do e-mail: a expressão "Gestor Administrador" foi substituída pelo nome da empresa/cliente.
  * Rótulo de horas em TODOS os templates: "Quantidade de Horas previstas".
  * Envio NUNCA é bloqueante — falha não impede criação, aprovação ou recusa.
  *
@@ -55,6 +59,7 @@ interface SolicitacaoRow {
   status: string
   plants: { name: string | null; code: string | null } | null
   budget_cost_centers: { name: string | null; code: string | null } | null
+  clients: { name: string | null } | null
 }
 
 function formatDateTime(iso: string | null): string {
@@ -98,6 +103,10 @@ function getAppUrl(): string {
   return `${base}${HE_MODULE_PATH}`
 }
 
+function resolveClientName(row: SolicitacaoRow): string {
+  return row.clients?.name?.trim() || 'Aurea Facilities'
+}
+
 /* =========================================================================
    TEMPLATE 1: APROVAÇÃO (Envia para Empresa + CC Solicitante/Aprovador)
    ========================================================================= */
@@ -105,10 +114,11 @@ function buildApprovalEmail(
   row: SolicitacaoRow,
   cc: string[],
 ): { subject: string; html: string; text: string } {
+  const clientName = resolveClientName(row)
   const plantName = row.plants?.name || '—'
   const costCenter =
     row.cost_center_text || row.budget_cost_centers?.name || row.budget_cost_centers?.code || '—'
-  const approvedBy = row.approved_by_name || 'Gestor Administrador'
+  const approvedBy = row.approved_by_name || clientName
   const approvedAt = formatDateTime(row.approved_at || new Date().toISOString())
   const hours = Number(row.hours).toFixed(2).replace('.', ',')
   const date = formatDate(row.date)
@@ -123,6 +133,7 @@ function buildApprovalEmail(
   const rowsHtml: Array<[string, string]> = [
     ['Colaborador', row.employee_name],
     ['Empresa (prestadora)', companyName],
+    ['Cliente', clientName],
     ['Planta', plantName],
     ['Data da HE', date],
     ['Quantidade de Horas previstas', `${hours} h`],
@@ -144,14 +155,14 @@ function buildApprovalEmail(
           <tr>
             <td style="background:#166534;padding:20px 24px;">
               <h1 style="margin:0;font-size:18px;color:#ffffff;">Solicitação de Horas Extras aprovada</h1>
-              <p style="margin:4px 0 0;font-size:13px;color:#dcfce7;">Aurea — Gestão de Terceiros</p>
+              <p style="margin:4px 0 0;font-size:13px;color:#dcfce7;">${escapeHtml(clientName)} — Gestão de Terceiros</p>
             </td>
           </tr>
           <tr>
             <td style="padding:24px;">
               <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">
                 Olá, <strong>${escapeHtml(companyName)}</strong>. A solicitação de horas extras abaixo foi
-                <strong style="color:#166534;">APROVADA</strong> pelo gestor Administrador.
+                <strong style="color:#166534;">APROVADA</strong> por <strong>${escapeHtml(clientName)}</strong>.
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
                 ${rowsHtml
@@ -168,8 +179,8 @@ function buildApprovalEmail(
                 ${escapeHtml(ccNote)}
               </p>
               <p style="margin:8px 0 0;font-size:12px;color:#64748b;">
-                Este é um e-mail automático do sistema Aurea. Em caso de divergência, entre em
-                contato com o gestor da planta.
+                Este é um e-mail automático enviado por ${escapeHtml(clientName)}. Em caso de divergência, entre em
+                contato com o gestor responsável da unidade.
               </p>
             </td>
           </tr>
@@ -185,7 +196,7 @@ function buildApprovalEmail(
     ...rowsHtml.map(([label, value]) => `${label}: ${value}`),
     '',
     ccNote,
-    '— Enviado automaticamente pelo sistema Aurea.',
+    `— Enviado automaticamente pelo sistema (${clientName}).`,
   ].join('\n')
 
   return { subject, html, text }
@@ -196,10 +207,11 @@ function buildApprovalEmail(
    A EMPRESA PARCEIRA NUNCA RECEBE ESTE E-MAIL.
    ========================================================================= */
 function buildRejectionEmail(row: SolicitacaoRow): { subject: string; html: string; text: string } {
+  const clientName = resolveClientName(row)
   const plantName = row.plants?.name || '—'
   const costCenter =
     row.cost_center_text || row.budget_cost_centers?.name || row.budget_cost_centers?.code || '—'
-  const rejectedBy = row.approved_by_name || 'Gestor Administrador'
+  const rejectedBy = row.approved_by_name || clientName
   const rejectedAt = formatDateTime(row.approved_at || new Date().toISOString())
   const hours = Number(row.hours).toFixed(2).replace('.', ',')
   const date = formatDate(row.date)
@@ -211,6 +223,7 @@ function buildRejectionEmail(row: SolicitacaoRow): { subject: string; html: stri
   const rowsHtml: Array<[string, string]> = [
     ['Colaborador', row.employee_name],
     ['Empresa (prestadora)', companyName],
+    ['Cliente', clientName],
     ['Planta', plantName],
     ['Data da HE', date],
     ['Quantidade de Horas previstas', `${hours} h`],
@@ -229,14 +242,14 @@ function buildRejectionEmail(row: SolicitacaoRow): { subject: string; html: stri
           <tr>
             <td style="background:#b91c1c;padding:20px 24px;">
               <h1 style="margin:0;font-size:18px;color:#ffffff;">Solicitação de Horas Extras reprovada</h1>
-              <p style="margin:4px 0 0;font-size:13px;color:#fee2e2;">Aurea — Gestão de Terceiros</p>
+              <p style="margin:4px 0 0;font-size:13px;color:#fee2e2;">${escapeHtml(clientName)} — Gestão de Terceiros</p>
             </td>
           </tr>
           <tr>
             <td style="padding:24px;">
               <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">
                 A solicitação de horas extras do colaborador <strong>${escapeHtml(row.employee_name)}</strong> foi
-                <strong style="color:#b91c1c;">REPROVADA</strong> no sistema Aurea.
+                <strong style="color:#b91c1c;">REPROVADA</strong> por <strong>${escapeHtml(clientName)}</strong>.
               </p>
               <div style="background:#fef2f2;border-left:4px solid #b91c1c;padding:12px 16px;margin:0 0 16px;border-radius:4px;">
                 <p style="margin:0;font-size:13px;color:#991b1b;font-weight:600;">Motivo informado pelo gestor:</p>
@@ -257,7 +270,7 @@ function buildRejectionEmail(row: SolicitacaoRow): { subject: string; html: stri
                 Aviso: Este e-mail é destinado exclusivamente ao requisitante e ao gestor responsável. A empresa parceira não foi notificada.
               </p>
               <p style="margin:8px 0 0;font-size:12px;color:#64748b;">
-                Este é um e-mail automático do sistema Aurea.
+                Este é um e-mail automático do sistema (${escapeHtml(clientName)}).
               </p>
             </td>
           </tr>
@@ -273,7 +286,7 @@ function buildRejectionEmail(row: SolicitacaoRow): { subject: string; html: stri
     ...rowsHtml.map(([label, value]) => `${label}: ${value}`),
     '',
     'Aviso: Este e-mail é destinado exclusivamente ao requisitante e ao gestor responsável. A empresa parceira não foi notificada.',
-    '— Enviado automaticamente pelo sistema Aurea.',
+    `— Enviado automaticamente pelo sistema (${clientName}).`,
   ].join('\n')
 
   return { subject, html, text }
@@ -287,6 +300,7 @@ function buildCreationNotificationEmail(row: SolicitacaoRow): {
   html: string
   text: string
 } {
+  const clientName = resolveClientName(row)
   const plantName = row.plants?.name || '—'
   const costCenter =
     row.cost_center_text || row.budget_cost_centers?.name || row.budget_cost_centers?.code || '—'
@@ -301,6 +315,7 @@ function buildCreationNotificationEmail(row: SolicitacaoRow): {
   const rowsHtml: Array<[string, string]> = [
     ['Colaborador', row.employee_name],
     ['Empresa (prestadora)', companyName],
+    ['Cliente', clientName],
     ['Planta', plantName],
     ['Data da HE', date],
     ['Quantidade de Horas previstas', `${hours} h`],
@@ -321,14 +336,14 @@ function buildCreationNotificationEmail(row: SolicitacaoRow): {
           <tr>
             <td style="background:#1e40af;padding:20px 24px;">
               <h1 style="margin:0;font-size:18px;color:#ffffff;">Nova Solicitação de Horas Extras</h1>
-              <p style="margin:4px 0 0;font-size:13px;color:#dbeafe;">Aurea — Gestão de Terceiros</p>
+              <p style="margin:4px 0 0;font-size:13px;color:#dbeafe;">${escapeHtml(clientName)} — Gestão de Terceiros</p>
             </td>
           </tr>
           <tr>
             <td style="padding:24px;">
               <p style="margin:0 0 16px;font-size:14px;line-height:1.6;">
-                Olá, Gestor. Há uma nova solicitação de Horas Extras aguardando sua análise para
-                <strong>aprovar ou reprovar</strong> no Aurea.
+                Olá. Há uma nova solicitação de Horas Extras aguardando sua análise para
+                <strong>aprovar ou reprovar</strong> no ${escapeHtml(clientName)}.
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
                 ${rowsHtml
@@ -345,7 +360,7 @@ function buildCreationNotificationEmail(row: SolicitacaoRow): {
               <!-- Link clicável do módulo de Horas Extras logo abaixo da mensagem -->
               <div style="margin:24px 0 8px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;text-align:center;">
                 <p style="margin:0 0 12px;font-size:13px;color:#475569;">
-                  Acesse o módulo de Horas Extras no Aurea para avaliar esta solicitação:
+                  Acesse o módulo de Horas Extras no ${escapeHtml(clientName)} para avaliar esta solicitação:
                 </p>
                 <a href="${escapeHtml(moduleUrl)}"
                    target="_blank"
@@ -359,7 +374,7 @@ function buildCreationNotificationEmail(row: SolicitacaoRow): {
               </div>
 
               <p style="margin:16px 0 0;font-size:12px;color:#64748b;">
-                Este é um e-mail automático do sistema Aurea enviado aos gestores da unidade.
+                Este é um e-mail automático enviado pelo sistema ${escapeHtml(clientName)} aos responsáveis pela unidade.
               </p>
             </td>
           </tr>
@@ -372,14 +387,14 @@ function buildCreationNotificationEmail(row: SolicitacaoRow): {
   const text = [
     'NOVA SOLICITAÇÃO DE HORAS EXTRAS PENDENTE',
     '',
-    'Há uma nova solicitação de Horas Extras para você aprovar ou reprovar no Aurea.',
+    `Há uma nova solicitação de Horas Extras para você aprovar ou reprovar no ${clientName}.`,
     '',
     ...rowsHtml.map(([label, value]) => `${label}: ${value}`),
     '',
     'Acesse o módulo de Horas Extras para avaliar:',
     moduleUrl,
     '',
-    '— Enviado automaticamente pelo sistema Aurea.',
+    `— Enviado automaticamente pelo sistema (${clientName}).`,
   ].join('\n')
 
   return { subject, html, text }
@@ -494,7 +509,8 @@ Deno.serve(async (req) => {
        manager_observation, reason,
        plant_id, date, hours, cost_center_text, cost_center_id, status,
        plants ( name, code ),
-       budget_cost_centers ( name, code )`,
+       budget_cost_centers ( name, code ),
+       clients ( name )`,
     )
     .eq('id', solicitacaoId)
     .single()
@@ -574,61 +590,109 @@ Deno.serve(async (req) => {
 
   // -----------------------------------------------------------------------
   // CASO 2: CRIAÇÃO (Pendente)
-  // E-mail para os APROVADORES elegíveis da planta/cliente com link do módulo
+  // E-mail para o APROVADOR configurado nas Configurações de HE:
+  //   - Modo 'all': default_approver_id da tabela horas_extras_config
+  //   - Modo 'per_plant': approver_id correspondente à planta em horas_extras_plant_approvers
+  //   - Fallback: administradores da planta/cliente
   // -----------------------------------------------------------------------
   if (action === 'criada') {
-    // Busca Administradores do mesmo client_id
-    const { data: adminProfiles, error: adminErr } = await supabase
-      .from('profiles')
-      .select('id, email, name, role, authorized_plants')
+    let configuredApproverEmail: string | null = null
+
+    // 1. Consulta tabela horas_extras_config do cliente
+    const { data: configData } = await supabase
+      .from('horas_extras_config')
+      .select('mode, default_approver_id')
       .eq('client_id', sol.client_id)
-      .eq('role', 'Administrador')
+      .maybeSingle()
 
-    if (adminErr) {
-      console.error(`[${solicitacaoId}] Erro ao buscar aprovadores da planta:`, adminErr)
+    if (configData) {
+      let approverIdToLookup: string | null = null
+
+      if (configData.mode === 'all' && configData.default_approver_id) {
+        approverIdToLookup = configData.default_approver_id
+      } else if (configData.mode === 'per_plant' && sol.plant_id) {
+        const { data: plantApprover } = await supabase
+          .from('horas_extras_plant_approvers')
+          .select('approver_id')
+          .eq('client_id', sol.client_id)
+          .eq('plant_id', sol.plant_id)
+          .maybeSingle()
+
+        if (plantApprover?.approver_id) {
+          approverIdToLookup = plantApprover.approver_id
+        } else if (configData.default_approver_id) {
+          approverIdToLookup = configData.default_approver_id
+        }
+      }
+
+      if (approverIdToLookup) {
+        const { data: approverProfile } = await supabase
+          .from('profiles')
+          .select('id, email, name, role')
+          .eq('id', approverIdToLookup)
+          .maybeSingle()
+
+        if (approverProfile?.email && EMAIL_RE.test(String(approverProfile.email))) {
+          configuredApproverEmail = String(approverProfile.email).trim()
+        }
+      }
     }
 
-    // Filtra administradores que tenham acesso à planta solicitada (ou authorized_plants vazio/nulo = todas)
     const eligibleEmails: string[] = []
-    for (const adm of adminProfiles || []) {
-      const email = String(adm.email || '').trim()
-      if (!email || !EMAIL_RE.test(email)) continue
 
-      let plantOk = true
-      if (sol.plant_id && adm.authorized_plants) {
-        let authList: string[] = []
-        if (Array.isArray(adm.authorized_plants)) {
-          authList = adm.authorized_plants as string[]
-        } else if (typeof adm.authorized_plants === 'string') {
-          try {
-            authList = JSON.parse(adm.authorized_plants)
-          } catch {
-            authList = []
-          }
-        }
-        if (authList.length > 0 && !authList.includes(sol.plant_id)) {
-          plantOk = false
-        }
+    if (configuredApproverEmail) {
+      eligibleEmails.push(configuredApproverEmail)
+    } else {
+      // Fallback: Busca Administradores do mesmo client_id com acesso à planta
+      const { data: adminProfiles, error: adminErr } = await supabase
+        .from('profiles')
+        .select('id, email, name, role, authorized_plants')
+        .eq('client_id', sol.client_id)
+        .eq('role', 'Administrador')
+
+      if (adminErr) {
+        console.error(`[${solicitacaoId}] Erro ao buscar aprovadores fallback da planta:`, adminErr)
       }
 
-      if (plantOk && !eligibleEmails.includes(email)) {
-        eligibleEmails.push(email)
-      }
-    }
-
-    // Se nenhum Admin da planta tiver e-mail válido, fallback para qualquer Admin do tenant
-    if (eligibleEmails.length === 0) {
       for (const adm of adminProfiles || []) {
         const email = String(adm.email || '').trim()
-        if (email && EMAIL_RE.test(email) && !eligibleEmails.includes(email)) {
+        if (!email || !EMAIL_RE.test(email)) continue
+
+        let plantOk = true
+        if (sol.plant_id && adm.authorized_plants) {
+          let authList: string[] = []
+          if (Array.isArray(adm.authorized_plants)) {
+            authList = adm.authorized_plants as string[]
+          } else if (typeof adm.authorized_plants === 'string') {
+            try {
+              authList = JSON.parse(adm.authorized_plants)
+            } catch {
+              authList = []
+            }
+          }
+          if (authList.length > 0 && !authList.includes(sol.plant_id)) {
+            plantOk = false
+          }
+        }
+
+        if (plantOk && !eligibleEmails.includes(email)) {
           eligibleEmails.push(email)
+        }
+      }
+
+      if (eligibleEmails.length === 0) {
+        for (const adm of adminProfiles || []) {
+          const email = String(adm.email || '').trim()
+          if (email && EMAIL_RE.test(email) && !eligibleEmails.includes(email)) {
+            eligibleEmails.push(email)
+          }
         }
       }
     }
 
     if (eligibleEmails.length === 0) {
       const msg =
-        'Nenhum administrador com e-mail cadastrado encontrado para receber aviso de nova HE.'
+        'Nenhum aprovador ou administrador com e-mail cadastrado encontrado para receber aviso de nova HE.'
       console.warn(`[${solicitacaoId}] ${msg}`)
       return jsonBody({ sent: false, error: msg })
     }
@@ -650,33 +714,69 @@ Deno.serve(async (req) => {
   }
 
   // -----------------------------------------------------------------------
-  // CASO 3: APROVAÇÃO (Aprovada) — Mantém fluxo original estendido
-  // Destinatário: EMPRESA PARCEIRA
+  // CASO 3: APROVAÇÃO (Aprovada)
+  // Destinatários: TODOS os e-mails da EMPRESA PARCEIRA
+  // Suporta múltiplos e-mails cadastrados em companies (emails text[] ou email string separado por vírgula/ponto-e-vírgula)
+  // Fallback: company_email da solicitação
   // CC: Solicitante e Aprovador
   // -----------------------------------------------------------------------
   if (sol.status !== 'aprovada') {
     return errorBody('Somente solicitações APROVADAS disparam este e-mail.', 409)
   }
 
-  // Destinatário principal: companies.email -> fallback company_email
-  let recipient: string | null = null
+  const companyRecipients: string[] = []
   let recipientSource = ''
+
   if (sol.company_id) {
     const { data: comp } = await supabase
       .from('companies')
-      .select('email')
+      .select('email, emails')
       .eq('id', sol.company_id)
       .maybeSingle()
-    if (comp?.email && EMAIL_RE.test(String(comp.email))) {
-      recipient = String(comp.email).trim()
-      recipientSource = 'cadastro da empresa'
+
+    if (comp) {
+      // 1. Array emails
+      if (Array.isArray(comp.emails)) {
+        for (const e of comp.emails) {
+          const trimmed = String(e || '').trim()
+          if (trimmed && EMAIL_RE.test(trimmed) && !companyRecipients.includes(trimmed)) {
+            companyRecipients.push(trimmed)
+          }
+        }
+      }
+      // 2. Campo clássico email (pode ser único ou separado por vírgula/ponto-e-vírgula)
+      if (comp.email) {
+        const parts = String(comp.email)
+          .split(/[,;\s]+/)
+          .map((s) => s.trim())
+        for (const part of parts) {
+          if (part && EMAIL_RE.test(part) && !companyRecipients.includes(part)) {
+            companyRecipients.push(part)
+          }
+        }
+      }
+      if (companyRecipients.length > 0) {
+        recipientSource = 'cadastro da empresa (múltiplos e-mails)'
+      }
     }
   }
-  if (!recipient && sol.company_email && EMAIL_RE.test(sol.company_email)) {
-    recipient = sol.company_email.trim()
-    recipientSource = 'solicitação (ajuste pontual)'
+
+  // Fallback: se não encontrou no cadastro, tenta company_email da solicitação
+  if (companyRecipients.length === 0 && sol.company_email) {
+    const parts = String(sol.company_email)
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+    for (const part of parts) {
+      if (part && EMAIL_RE.test(part) && !companyRecipients.includes(part)) {
+        companyRecipients.push(part)
+      }
+    }
+    if (companyRecipients.length > 0) {
+      recipientSource = 'solicitação (ajuste pontual)'
+    }
   }
-  if (!recipient) {
+
+  if (companyRecipients.length === 0) {
     const msg =
       'Empresa parceira sem e-mail cadastrado (nem no cadastro da empresa nem na solicitação).'
     console.warn(`[${solicitacaoId}] ${msg}`)
@@ -694,7 +794,10 @@ Deno.serve(async (req) => {
     const { data: ccProfiles } = await supabase.from('profiles').select('id, email').in('id', ccIds)
     for (const p of ccProfiles || []) {
       const email = String((p as { email?: string | null }).email || '').trim()
-      if (email && EMAIL_RE.test(email) && email.toLowerCase() !== recipient.toLowerCase()) {
+      const isAlreadyRecipient = companyRecipients.some(
+        (r) => r.toLowerCase() === email.toLowerCase(),
+      )
+      if (email && EMAIL_RE.test(email) && !isAlreadyRecipient && !cc.includes(email)) {
         cc.push(email)
       }
     }
@@ -707,12 +810,20 @@ Deno.serve(async (req) => {
     .eq('id', solicitacaoId)
     .single()
   if (sentRow?.email_sent_at) {
-    return jsonBody({ sent: true, alreadySent: true, recipient, recipientSource })
+    return jsonBody({
+      sent: true,
+      alreadySent: true,
+      recipients: companyRecipients,
+      recipientSource,
+    })
   }
 
-  // Envia via Resend
+  // Envia via Resend para todos os e-mails da empresa
   const { subject, html, text } = buildApprovalEmail(sol, cc)
-  const result = await sendViaResend(from, [recipient], cc, subject, html, text)
+  const [primaryCompanyEmail, ...otherCompanyEmails] = companyRecipients
+  const allCc = [...otherCompanyEmails, ...cc]
+
+  const result = await sendViaResend(from, [primaryCompanyEmail], allCc, subject, html, text)
 
   if (!result.ok) {
     const msg = `Falha ao enviar e-mail (HTTP ${result.status || 'n/a'}): ${result.detail.slice(0, 500)}`
@@ -725,12 +836,12 @@ Deno.serve(async (req) => {
   }
 
   console.log(
-    `[${solicitacaoId}] E-mail de aprovação aceito pelo Resend (status ${result.status}) para ${recipient} (fonte: ${recipientSource})`,
+    `[${solicitacaoId}] E-mail de aprovação aceito pelo Resend (status ${result.status}) para [${companyRecipients.join(', ')}] (fonte: ${recipientSource})`,
   )
   await supabase
     .from('horas_extras_solicitacoes')
     .update({ email_sent_at: new Date().toISOString(), email_error: null })
     .eq('id', solicitacaoId)
 
-  return jsonBody({ sent: true, recipient, recipientSource })
+  return jsonBody({ sent: true, recipients: companyRecipients, recipientSource })
 })

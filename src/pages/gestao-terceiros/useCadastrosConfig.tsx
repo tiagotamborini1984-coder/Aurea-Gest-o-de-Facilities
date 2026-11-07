@@ -125,9 +125,27 @@ export function useCadastrosConfig(
             { header: 'Nome da Empresa', accessor: 'name' },
             { header: 'Tipo de Serviço', accessor: 'service_type' },
             {
-              header: 'E-mail',
-              accessor: 'email',
-              render: (item: any) => item.email || '-',
+              header: 'E-mails (Notificação HE)',
+              accessor: 'emails',
+              render: (item: any) => {
+                const list: string[] = []
+                if (Array.isArray(item.emails)) {
+                  list.push(...item.emails.filter(Boolean))
+                }
+                if (item.email && !list.includes(item.email)) {
+                  list.unshift(item.email)
+                }
+                if (list.length === 0) return '-'
+                return (
+                  <div className="flex flex-col gap-0.5">
+                    {list.map((m, idx) => (
+                      <span key={idx} className="text-xs text-slate-700">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                )
+              },
             },
           ],
           fields: [
@@ -135,8 +153,8 @@ export function useCadastrosConfig(
             { name: 'service_type', label: 'Tipo de Serviço', type: 'text' },
             {
               name: 'email',
-              label: 'E-mail da Empresa',
-              type: 'email',
+              label: 'E-mails da Empresa (separar múltiplos por vírgula ou ponto e vírgula)',
+              type: 'text',
               required: false,
             },
           ],

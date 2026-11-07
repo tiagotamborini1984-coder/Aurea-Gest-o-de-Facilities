@@ -15,6 +15,7 @@ import BIDashboard from './pages/gestao-terceiros/BIDashboard'
 import Usuarios from './pages/gestao-terceiros/Usuarios'
 import Auditoria from './pages/admin/Auditoria'
 import HorasExtras from './pages/gestao-terceiros/HorasExtras'
+import ConfiguracoesHorasExtras from './pages/gestao-terceiros/ConfiguracoesHorasExtras'
 import HorasExtrasApiKeys from './pages/admin/HorasExtrasApiKeys'
 import EmailReports from './pages/gestao-terceiros/EmailReports'
 import BookMetas from './pages/gestao-terceiros/BookMetas'
@@ -169,6 +170,10 @@ const App = () => (
                         element={<DashboardGestor />}
                       />
                       <Route path="/gestao-terceiros/horas-extras" element={<HorasExtras />} />
+                      <Route
+                        path="/gestao-terceiros/horas-extras/configuracoes"
+                        element={<ConfiguracoesHorasExtras />}
+                      />
                       <Route path="/gestao-terceiros/lancamentos" element={<Lancamentos />} />
                       <Route path="/gestao-terceiros/treinamentos" element={<Treinamentos />} />
                       <Route

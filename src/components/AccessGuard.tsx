@@ -22,6 +22,7 @@ const routeMenuMap: Record<string, string> = {
   '/gestao-ferramentas': 'Gestão de Ferramentas',
   '/gestao-terceiros/dashboard-gestor': 'Gestão de Terceiros:Dashboard do Gestor',
   '/gestao-terceiros/horas-extras': 'Gestão de Terceiros:Horas Extras',
+  '/gestao-terceiros/horas-extras/configuracoes': 'Gestão de Terceiros:Horas Extras',
   '/gestao-terceiros/lancamentos': 'Lançamentos',
   '/gestao-terceiros/relatorios': 'Relatórios',
   '/gestao-terceiros/bi': 'BI Dashboard',
