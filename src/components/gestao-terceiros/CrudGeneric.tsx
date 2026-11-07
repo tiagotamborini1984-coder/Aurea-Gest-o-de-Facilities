@@ -128,7 +128,12 @@ export function CrudGeneric({
   }
 
   const openEdit = (item: any) => {
-    setForm({ ...item })
+    const itemData = { ...item }
+    // Se a tabela tiver array emails (ex: companies), serializa no campo email para edição amigável
+    if (Array.isArray(itemData.emails) && itemData.emails.length > 0) {
+      itemData.email = itemData.emails.join(', ')
+    }
+    setForm(itemData)
     setEditingItem(item)
     setFormErrors({})
     setIsModalOpen(true)

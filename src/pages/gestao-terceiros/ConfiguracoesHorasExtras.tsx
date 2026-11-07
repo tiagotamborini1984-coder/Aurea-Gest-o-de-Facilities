@@ -37,7 +37,7 @@ interface ApproverProfile {
   authorized_plants: string[] | string | null
 }
 
-interface HeConfigFilterState {
+type HeConfigFilterState = Record<string, unknown> & {
   searchPlant: string
 }
 
@@ -147,10 +147,6 @@ export default function ConfiguracoesHorasExtras() {
     loadData()
   }, [effectiveClientId])
 
-  if (!canAccess) {
-    return <Navigate to="/gestao-terceiros/horas-extras" replace />
-  }
-
   // Plantas filtradas do cliente atual
   const clientPlants = useMemo(() => {
     if (!effectiveClientId) return plants
@@ -164,6 +160,10 @@ export default function ConfiguracoesHorasExtras() {
       (p) => p.name.toLowerCase().includes(term) || (p.code && p.code.toLowerCase().includes(term)),
     )
   }, [clientPlants, filterStore.values.searchPlant])
+
+  if (!canAccess) {
+    return <Navigate to="/gestao-terceiros/horas-extras" replace />
+  }
 
   const handlePlantApproverChange = (plantId: string, approverId: string) => {
     setPlantApprovers((prev) => {

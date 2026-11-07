@@ -232,6 +232,17 @@ export default function Cadastros() {
             }
           }
 
+          if (type === 'empresas') {
+            // Normaliza múltiplos e-mails no array emails text[] e mantém email sincronizado
+            const raw = String(payload.email || '')
+            const list = raw
+              .split(/[,;\n\r]+/)
+              .map((s: string) => s.trim())
+              .filter(Boolean)
+            payload.emails = list
+            payload.email = list[0] || null
+          }
+
           if (config.hasMonthFilter) {
             payload.reference_month = `${selectedMonth}-01`
           }
@@ -392,6 +403,17 @@ export default function Cadastros() {
             if (comp) {
               payload.company_name = comp.name
             }
+          }
+
+          if (type === 'empresas') {
+            // Normaliza múltiplos e-mails no array emails text[] e mantém email sincronizado
+            const raw = String(payload.email || '')
+            const list = raw
+              .split(/[,;\n\r]+/)
+              .map((s: string) => s.trim())
+              .filter(Boolean)
+            payload.emails = list
+            payload.email = list[0] || null
           }
 
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)

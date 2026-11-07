@@ -153,8 +153,9 @@ export function useCadastrosConfig(
             { name: 'service_type', label: 'Tipo de Serviço', type: 'text' },
             {
               name: 'email',
-              label: 'E-mails da Empresa (separar múltiplos por vírgula ou ponto e vírgula)',
-              type: 'text',
+              label:
+                'E-mails da Empresa (separar múltiplos por vírgula, ponto e vírgula ou nova linha)',
+              type: 'textarea',
               required: false,
             },
           ],

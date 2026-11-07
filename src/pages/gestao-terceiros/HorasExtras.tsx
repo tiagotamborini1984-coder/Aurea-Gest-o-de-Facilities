@@ -22,6 +22,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { Link } from 'react-router-dom'
 import {
   Clock,
   Plus,
@@ -37,6 +38,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileCode,
+  Settings,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
@@ -616,6 +618,20 @@ export default function HorasExtras() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isAdminOrMaster && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="border-slate-300 text-slate-700 hover:text-brand-vividBlue"
+              title="Configurar regras de aprovação de HE por planta"
+            >
+              <Link to="/gestao-terceiros/horas-extras/configuracoes">
+                <Settings className="h-4 w-4 mr-1.5 text-slate-600" />
+                Configurações de HE
+              </Link>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
