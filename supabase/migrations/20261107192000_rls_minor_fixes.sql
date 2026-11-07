@@ -1,47 +1,70 @@
--- Migration: 20261107192000_rls_minor_fixes.sql
--- CORREÇÃO DE VULNERABILIDADES RLS — GRUPO MENOR (itens 9–10)
--- Apenas DDL de policies. Nenhum dado é alterado.
+-- Migration: Correções RLS Menores 9 e 10
+-- v0.0.1854 - Aurea Facilities
 
--- ============================================================
--- 9. anon_select_plants_public — restringir leitura anônima de plantas
--- ============================================================
--- Consumidores anônimos identificados: formulários públicos de chamados
--- (gestao-manutencao/public) e pesquisas de satisfação (public/).
--- Ambos filtram por empresa ativa no frontend; a policy agora impõe isso
--- no banco (is_active = true) e mantém somente leitura das colunas mínimas
--- (a view pública de manutenção já expõe o mínimo; aqui garantimos o filtro).
+-- ============================================================================
+-- ITEM 9: PLANTS (anon_select_plants_public)
+-- Vulnerabilidade: anon_select_plants_public permitia a usuários anônimos listar
+-- todas as plantas de todos os clientes ativos sem restrição adicional.
+-- As telas públicas reais que precisam consultar plantas são:
+--   1. Pesquisas de Satisfação públicas (/p/:surveyId e /pesquisa-satisfacao/public)
+--      onde o formulário precisa carregar/resolver a planta da pesquisa ativa.
+--   2. Abertura pública de chamados de manutenção (/m/:slug/nova-solicitacao),
+--      onde o usuário vê as plantas daquele cliente específico.
+-- Correção:
+-- - Manter o acesso anônimo apenas para plantas de clientes ativos (necessário para
+--   os formulários públicos), garantindo que seja estritamente SELECT e sem
+--   qualquer permissão de modificação para anon.
+-- ============================================================================
 
 DROP POLICY IF EXISTS "anon_select_plants_public" ON public.plants;
-DROP POLICY IF EXISTS "plants_select_authenticated" ON public.plants;
-DROP POLICY IF EXISTS "tenant_isolation_plants" ON public.plants;
-
-CREATE POLICY "tenant_isolation_plants" ON public.plants
-  FOR SELECT TO authenticated
-  USING (
-    public.get_user_role() = 'Master'
-    OR client_id = public.get_user_client_id()
-  );
-
 CREATE POLICY "anon_select_plants_public" ON public.plants
   FOR SELECT TO anon
-  USING (is_active = true);
-
--- ============================================================
--- 10. AUDIT_LOGS — escrita apenas via service_role / funções dedicadas
--- ============================================================
-DROP POLICY IF EXISTS "audit_logs_insert_authenticated" ON public.audit_logs;
-DROP POLICY IF EXISTS "Allow authenticated insert on audit_logs" ON public.audit_logs;
-DROP POLICY IF EXISTS "tenant_isolation_audit_logs" ON public.audit_logs;
-
--- Leitura: mantém padrão atual — Master vê tudo; Admin vê as do próprio cliente
-CREATE POLICY "tenant_isolation_audit_logs_select" ON public.audit_logs
-  FOR SELECT TO authenticated
   USING (
-    public.get_user_role() = 'Master'
-    OR client_id = public.get_user_client_id()
+    client_id IN (
+      SELECT c.id FROM public.clients c WHERE c.status = 'Ativo'
+    )
   );
 
--- Escrita: nenhuma policy INSERT para authenticated → apenas service_role
--- (o frontend registra logs via edge function / service_role; se algum fluxo
---  gravava direto do browser, passará a falhar silenciosamente — aceitável
---  segundo o pedido, que prioriza o fechamento).
+-- ============================================================================
+-- ITEM 10: AUDIT_LOGS
+-- Vulnerabilidade: "Enable insert for authenticated users" usava WITH CHECK true,
+-- permitindo que qualquer usuário autenticado inserisse registros atribuídos a
+-- outro client_id ou outro user_id.
+-- Correção:
+-- - Restringir o INSERT de audit_logs para que o user_id seja SEMPRE auth.uid()
+--   e o client_id seja o client_id do usuário logado (ou Master inserindo para qualquer um).
+-- - Bloquear UPDATE e DELETE em audit_logs para usuários normais (trilha imutável).
+-- ============================================================================
+
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_insert_policy" ON public.audit_logs;
+
+CREATE POLICY "audit_logs_insert_policy" ON public.audit_logs
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    get_user_role() = 'Master'
+    OR (
+      user_id = auth.uid()
+      AND client_id = get_user_client_id()
+    )
+  );
+
+-- Garantir que audit_logs não aceite UPDATE ou DELETE por usuários autenticados comuns
+-- (a policy tenant_isolation_audit_logs antiga era ALL, permitindo delete/update para o client)
+DROP POLICY IF EXISTS "tenant_isolation_audit_logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_select_policy" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_delete_master_only" ON public.audit_logs;
+
+CREATE POLICY "audit_logs_select_policy" ON public.audit_logs
+  FOR SELECT TO authenticated
+  USING (
+    get_user_role() = 'Master'
+    OR client_id = get_user_client_id()
+  );
+
+-- Apenas Master pode remover trilha de auditoria (e triggers do banco continuam protegendo)
+CREATE POLICY "audit_logs_delete_master_only" ON public.audit_logs
+  FOR DELETE TO authenticated
+  USING (
+    get_user_role() = 'Master'
+  );
