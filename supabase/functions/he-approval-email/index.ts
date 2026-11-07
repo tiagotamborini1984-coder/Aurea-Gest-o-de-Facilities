@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
     return errorBody('Somente solicitações APROVADAS disparam o e-mail.', 409)
   }
 
-  const from = Deno.env.get('RESEND_FROM') || 'onboarding@resend.dev'
+  const from = Deno.env.get('RESEND_FROM') || 'nao-responda@aureafacilities.com'
   const sol = row as SolicitacaoRow
 
   // 5) Destinatário principal: e-mail da EMPRESA PARCEIRA no cadastro (companies.email).
