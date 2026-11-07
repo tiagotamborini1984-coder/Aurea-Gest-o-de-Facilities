@@ -21,6 +21,9 @@ import { getSupabaseClient, jsonBody, errorBody } from '../_shared/supabase.ts'
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 
+// Validação simples de formato de e-mail (mesma regra usada no frontend)
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 interface SolicitacaoRow {
   id: string
   client_id: string
@@ -28,6 +31,8 @@ interface SolicitacaoRow {
   company_id: string | null
   company_name: string | null
   company_email: string | null
+  created_by: string | null
+  approved_by: string | null
   plant_id: string | null
   date: string
   hours: number
@@ -61,7 +66,10 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function buildEmail(row: SolicitacaoRow): { subject: string; html: string; text: string } {
+function buildEmail(
+  row: SolicitacaoRow,
+  cc: string[],
+): { subject: string; html: string; text: string } {
   const plantName = row.plants?.name || '—'
   const costCenter =
     row.cost_center_text || row.budget_cost_centers?.name || row.budget_cost_centers?.code || '—'
@@ -70,6 +78,10 @@ function buildEmail(row: SolicitacaoRow): { subject: string; html: string; text:
   const hours = Number(row.hours).toFixed(2).replace('.', ',')
   const date = formatDateTime(`${row.date}T12:00:00`)
   const companyName = row.company_name || 'Empresa parceira'
+  const ccNote =
+    cc.length > 0
+      ? `Cópia deste e-mail enviada para: ${cc.join(', ')}.`
+      : 'Sem cópias para usuários do sistema (solicitante/aprovador sem e-mail válido).'
 
   const subject = `Solicitação de Horas Extras aprovada — ${row.employee_name}`
 
@@ -114,6 +126,9 @@ function buildEmail(row: SolicitacaoRow): { subject: string; html: string; text:
                   .join('')}
               </table>
               <p style="margin:20px 0 0;font-size:12px;color:#64748b;">
+                ${escapeHtml(ccNote)}
+              </p>
+              <p style="margin:8px 0 0;font-size:12px;color:#64748b;">
                 Este é um e-mail automático do sistema Aurea. Em caso de divergência, entre em
                 contato com o gestor da planta.
               </p>
@@ -130,6 +145,7 @@ function buildEmail(row: SolicitacaoRow): { subject: string; html: string; text:
     '',
     ...rowsHtml.map(([label, value]) => `${label}: ${value}`),
     '',
+    ccNote,
     '— Enviado automaticamente pelo sistema Aurea.',
   ].join('\n')
 
@@ -139,6 +155,7 @@ function buildEmail(row: SolicitacaoRow): { subject: string; html: string; text:
 async function sendViaResend(
   from: string,
   to: string,
+  cc: string[],
   subject: string,
   html: string,
   text: string,
@@ -154,7 +171,14 @@ async function sendViaResend(
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from, to: [to], subject, html, text }),
+    body: JSON.stringify({
+      from,
+      to: [to],
+      ...(cc.length > 0 ? { cc } : {}),
+      subject,
+      html,
+      text,
+    }),
   })
 
   const detail = await res.text()
@@ -221,6 +245,7 @@ Deno.serve(async (req) => {
     .from('horas_extras_solicitacoes')
     .select(
       `id, client_id, employee_name, company_id, company_name, company_email,
+       created_by, approved_by,
        plant_id, date, hours, cost_center_text, cost_center_id,
        approved_by_name, approved_at, status,
        plants ( name, code ),
@@ -245,12 +270,31 @@ Deno.serve(async (req) => {
   }
 
   const from = Deno.env.get('RESEND_FROM') || 'onboarding@resend.dev'
+  const sol = row as SolicitacaoRow
 
-  // 5) Destinatário: e-mail da empresa na própria solicitação
-  //    (cair para o perfil criador seria mandar para o nosso próprio domínio).
-  const recipient = (row as SolicitacaoRow).company_email
+  // 5) Destinatário principal: e-mail da EMPRESA PARCEIRA no cadastro (companies.email).
+  //    Fallback: e-mail informado na própria solicitação (company_email). Sem e-mail
+  //    em nenhum dos dois, registra email_error sem bloquear a aprovação.
+  let recipient: string | null = null
+  let recipientSource = ''
+  if (sol.company_id) {
+    const { data: comp } = await supabase
+      .from('companies')
+      .select('email')
+      .eq('id', sol.company_id)
+      .maybeSingle()
+    if (comp?.email && EMAIL_RE.test(String(comp.email))) {
+      recipient = String(comp.email).trim()
+      recipientSource = 'cadastro da empresa'
+    }
+  }
+  if (!recipient && sol.company_email && EMAIL_RE.test(sol.company_email)) {
+    recipient = sol.company_email.trim()
+    recipientSource = 'solicitação (ajuste pontual)'
+  }
   if (!recipient) {
-    const msg = 'Empresa parceira sem e-mail cadastrado (company_email vazio).'
+    const msg =
+      'Empresa parceira sem e-mail cadastrado (nem no cadastro da empresa nem na solicitação).'
     console.warn(`[${solicitacaoId}] ${msg}`)
     await supabase
       .from('horas_extras_solicitacoes')
@@ -259,7 +303,21 @@ Deno.serve(async (req) => {
     return jsonBody({ sent: false, error: msg })
   }
 
-  // 6) Idempotência: já enviado com sucesso, não reenvia em re-execuções
+  // 6) Cópias (CC): e-mail do usuário solicitante e do aprovador (profiles.email).
+  //    Falha/ausência de um CC NUNCA bloqueia o envio principal.
+  const ccIds = Array.from(new Set([sol.created_by, sol.approved_by].filter(Boolean))) as string[]
+  const cc: string[] = []
+  if (ccIds.length > 0) {
+    const { data: ccProfiles } = await supabase.from('profiles').select('id, email').in('id', ccIds)
+    for (const p of ccProfiles || []) {
+      const email = String((p as { email?: string | null }).email || '').trim()
+      if (email && EMAIL_RE.test(email) && email.toLowerCase() !== recipient.toLowerCase()) {
+        cc.push(email)
+      }
+    }
+  }
+
+  // 7) Idempotência: já enviado com sucesso, não reenvia em re-execuções
   const { data: sentRow } = await supabase
     .from('horas_extras_solicitacoes')
     .select('email_sent_at')
@@ -269,9 +327,9 @@ Deno.serve(async (req) => {
     return jsonBody({ sent: true, alreadySent: true, recipient })
   }
 
-  // 7) Envia via Resend — falha NÃO reverte a aprovação, só registra email_error
-  const { subject, html, text } = buildEmail(row as SolicitacaoRow)
-  const result = await sendViaResend(from, recipient, subject, html, text)
+  // 8) Envia via Resend — falha NÃO reverte a aprovação, só registra email_error
+  const { subject, html, text } = buildEmail(sol, cc)
+  const result = await sendViaResend(from, recipient, cc, subject, html, text)
 
   if (!result.ok) {
     const msg = `Falha ao enviar e-mail (HTTP ${result.status || 'n/a'}): ${result.detail.slice(0, 500)}`

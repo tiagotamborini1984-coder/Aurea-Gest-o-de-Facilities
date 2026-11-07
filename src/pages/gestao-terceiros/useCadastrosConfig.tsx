@@ -124,10 +124,21 @@ export function useCadastrosConfig(
           columns: [
             { header: 'Nome da Empresa', accessor: 'name' },
             { header: 'Tipo de Serviço', accessor: 'service_type' },
+            {
+              header: 'E-mail',
+              accessor: 'email',
+              render: (item: any) => item.email || '-',
+            },
           ],
           fields: [
             { name: 'name', label: 'Nome da Empresa', type: 'text' },
             { name: 'service_type', label: 'Tipo de Serviço', type: 'text' },
+            {
+              name: 'email',
+              label: 'E-mail da Empresa',
+              type: 'email',
+              required: false,
+            },
           ],
         }
       case 'plantas':

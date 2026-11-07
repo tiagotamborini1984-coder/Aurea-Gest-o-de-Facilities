@@ -42,6 +42,7 @@ export interface SolicitacaoHe {
   employee_name: string
   company_id: string | null
   company_name: string
+  company_email?: string | null
   plant_id: string
   date: string
   hours: number

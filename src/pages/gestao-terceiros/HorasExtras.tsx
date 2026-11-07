@@ -152,7 +152,7 @@ export default function HorasExtras() {
 
       let compQuery = supabase
         .from('companies')
-        .select('id, name, service_type, client_id')
+        .select('id, name, service_type, client_id, email')
         .order('name')
 
       if (effectiveClientId) {
@@ -190,6 +190,7 @@ export default function HorasExtras() {
           employee_name,
           company_id,
           company_name,
+          company_email,
           plant_id,
           date,
           hours,
@@ -274,6 +275,7 @@ export default function HorasExtras() {
     company_name: string
     plant_id: string
     cost_center_text: string
+    company_email: string | null
     date: string
     hours: number
     reason: string
@@ -303,6 +305,7 @@ export default function HorasExtras() {
       company_name: data.company_name,
       plant_id: data.plant_id,
       cost_center_text: data.cost_center_text,
+      company_email: data.company_email || null,
       date: data.date,
       hours: data.hours,
       reason: data.reason || null,
@@ -397,6 +400,7 @@ export default function HorasExtras() {
     company_name: string
     plant_id: string
     cost_center_text: string
+    company_email: string | null
     date: string
     hours: number
     reason: string
@@ -418,6 +422,7 @@ export default function HorasExtras() {
         company_name: data.company_name,
         plant_id: data.plant_id,
         cost_center_text: data.cost_center_text,
+        company_email: data.company_email || null,
         date: data.date,
         hours: data.hours,
         reason: data.reason || null,
@@ -819,6 +824,7 @@ export default function HorasExtras() {
         onOpenChange={setIsNewDialogOpen}
         employees={employees}
         plants={visiblePlants}
+        companies={companies}
         onSubmit={handleCreateSolicitacao}
       />
 
@@ -831,6 +837,7 @@ export default function HorasExtras() {
         }}
         employees={employees}
         plants={visiblePlants}
+        companies={companies}
         editingSolicitacao={editingSolicitacao}
         onSubmit={handleUpdateSolicitacao}
       />

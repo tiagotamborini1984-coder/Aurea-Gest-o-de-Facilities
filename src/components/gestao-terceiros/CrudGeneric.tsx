@@ -39,7 +39,16 @@ import { cn } from '@/lib/utils'
 export type FieldDef = {
   name: string
   label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'toggle' | 'image' | 'file-multi' | 'date'
+  type:
+    | 'text'
+    | 'textarea'
+    | 'number'
+    | 'select'
+    | 'toggle'
+    | 'image'
+    | 'file-multi'
+    | 'date'
+    | 'email'
   options?: { value: string; label: string }[] | ((form: any) => { value: string; label: string }[])
   required?: boolean
   hidden?: (form: any) => boolean
@@ -160,7 +169,29 @@ export function CrudGeneric({
       }
     }
 
+    // Validação simples de formato de e-mail para campos do tipo 'email'
+    const emailFields = fields.filter((f: FieldDef) => f.type === 'email')
+    for (const field of emailFields) {
+      const val = (form[field.name] || '').toString().trim()
+      if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        errors[field.name] = true
+        hasError = true
+      }
+    }
+
     if (hasError) {
+      if (emailFields.some((f: FieldDef) => errors[f.name])) {
+        toast({
+          title: 'E-mail inválido',
+          description: `Verifique o formato do e-mail em: ${emailFields
+            .filter((f: FieldDef) => errors[f.name])
+            .map((f: FieldDef) => f.label)
+            .join(', ')}.`,
+          variant: 'destructive',
+        })
+        setFormErrors(errors)
+        return
+      }
       const missingFields = fields
         .filter((f: FieldDef) => errors[f.name])
         .map((f: FieldDef) => f.label)
@@ -549,9 +580,12 @@ export function CrudGeneric({
                         {f.label} {f.required !== false && <span className="text-red-500">*</span>}
                       </label>
                     )}
-                    {(f.type === 'text' || f.type === 'number' || f.type === 'date') && (
+                    {(f.type === 'text' ||
+                      f.type === 'number' ||
+                      f.type === 'date' ||
+                      f.type === 'email') && (
                       <Input
-                        type={f.type}
+                        type={f.type === 'email' ? 'email' : f.type}
                         value={form[f.name] ?? ''}
                         onChange={(e) => {
                           setForm({

@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, UserCheck, Building2, MapPin, Search, Wallet } from 'lucide-react'
+import { Clock, UserCheck, Building2, MapPin, Search, Wallet, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
@@ -44,11 +44,19 @@ interface PlantOption {
   code?: string
 }
 
+interface CompanyOption {
+  id: string
+  name: string
+  email?: string | null
+}
+
 interface SolicitacaoHeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   employees: EmployeeOption[]
   plants: PlantOption[]
+  /** Empresas parceiras do cliente (para pré-preencher o e-mail do destinatário) */
+  companies?: CompanyOption[]
   /** Solicitação em edição (modo edição quando preenchido) */
   editingSolicitacao?: SolicitacaoHe | null
   onSubmit: (data: {
@@ -58,6 +66,7 @@ interface SolicitacaoHeDialogProps {
     company_name: string
     plant_id: string
     cost_center_text: string
+    company_email: string | null
     date: string
     hours: number
     reason: string
@@ -77,12 +86,14 @@ export function SolicitacaoHeDialog({
   onOpenChange,
   employees,
   plants,
+  companies = [],
   editingSolicitacao = null,
   onSubmit,
 }: SolicitacaoHeDialogProps) {
   const [selectedPlantId, setSelectedPlantId] = useState('')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
   const [costCenterText, setCostCenterText] = useState('')
+  const [companyEmail, setCompanyEmail] = useState('')
   const [searchEmployeeText, setSearchEmployeeText] = useState('')
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [hours, setHours] = useState('2')
@@ -138,6 +149,7 @@ export function SolicitacaoHeDialog({
       setDate(editingSolicitacao.date)
       setHours(String(Number(editingSolicitacao.hours)).replace('.', ','))
       setReason(editingSolicitacao.reason || '')
+      setCompanyEmail(editingSolicitacao.company_email || '')
     } else {
       resetForm()
       setDate(format(new Date(), 'yyyy-MM-dd'))
@@ -172,10 +184,23 @@ export function SolicitacaoHeDialog({
     setSelectedPlantId('')
     setSelectedEmployeeId('')
     setCostCenterText('')
+    setCompanyEmail('')
     setSearchEmployeeText('')
     setHours('2')
     setReason('')
   }
+
+  // Pré-preenche o e-mail a partir do cadastro da Empresa Parceira do colaborador
+  // (nova solicitação). Em edição, o valor salvo na solicitação tem prioridade.
+  useEffect(() => {
+    if (isEditMode) return
+    const compId = selectedEmployee?.company_id
+    const compName = selectedEmployee?.company_name
+    const comp = companies.find(
+      (c) => (compId && c.id === compId) || (!!compName && c.name === compName),
+    )
+    setCompanyEmail(comp?.email?.trim() || '')
+  }, [selectedEmployee?.company_id, selectedEmployee?.company_name, companies, isEditMode])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,6 +230,14 @@ export function SolicitacaoHeDialog({
     const trimmedHours = (hours || '').toString().trim()
     if (!trimmedHours) {
       toast.error('Informe a quantidade de horas extras (ex.: 2 ou 1,5).')
+      return
+    }
+
+    // E-mail do destinatário (opcional): pré-preenchido com o e-mail do cadastro
+    // da empresa; se informado, valida formato simples.
+    const normalizedCompanyEmail = companyEmail.trim()
+    if (normalizedCompanyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedCompanyEmail)) {
+      toast.error('E-mail da empresa inválido. Verifique o formato digitado.')
       return
     }
 
@@ -244,6 +277,7 @@ export function SolicitacaoHeDialog({
         company_name: selectedEmployee.company_name || 'Terceiro',
         plant_id: selectedPlantId,
         cost_center_text: normalizedCostCenter,
+        company_email: normalizedCompanyEmail || null,
         date,
         hours: sanitizedHours,
         reason: reason.trim(),
@@ -388,6 +422,28 @@ export function SolicitacaoHeDialog({
                 convertidas para maiúsculas automaticamente.
               </p>
             </div>
+
+            {/* E-mail do destinatário (pré-preenchido com o e-mail da Empresa Parceira) */}
+            {(selectedEmployee || isEditMode) && (
+              <div className="space-y-2">
+                <Label htmlFor="heCompanyEmail" className="flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-brand-vividBlue" />
+                  <span>E-mail da Empresa (destinatário da aprovação)</span>
+                </Label>
+                <Input
+                  id="heCompanyEmail"
+                  type="email"
+                  placeholder="email@empresa.com.br"
+                  value={companyEmail}
+                  onChange={(e) => setCompanyEmail(e.target.value)}
+                  autoComplete="off"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Pré-preenchido com o e-mail cadastrado na empresa parceira. Pode ser ajustado
+                  pontualmente nesta solicitação. Sem e-mail, nada é enviado na aprovação.
+                </p>
+              </div>
+            )}
 
             {/* Informações da empresa do colaborador */}
             {(selectedEmployee || isEditMode) && (
