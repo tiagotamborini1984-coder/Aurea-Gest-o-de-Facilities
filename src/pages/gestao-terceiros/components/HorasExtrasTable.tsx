@@ -10,7 +10,17 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, XCircle, Clock, AlertCircle, Trash2, Wallet, Pencil } from 'lucide-react'
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertCircle,
+  Trash2,
+  Wallet,
+  Pencil,
+  MailCheck,
+  MailWarning,
+} from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +60,8 @@ export interface SolicitacaoHe {
   approved_by_name: string | null
   approved_at: string | null
   manager_observation: string | null
+  email_sent_at?: string | null
+  email_error?: string | null
   created_at: string
   updated_at: string
   plants?: {
@@ -244,6 +256,26 @@ export function HorasExtrasTable({
                             title={item.manager_observation}
                           >
                             Obs: {item.manager_observation}
+                          </div>
+                        )}
+                        {item.status === 'aprovada' && item.email_sent_at && (
+                          <div
+                            className="text-[11px] text-emerald-600 flex items-center gap-1 mt-0.5"
+                            title={`E-mail enviado à empresa em ${format(
+                              new Date(item.email_sent_at),
+                              "dd/MM/yyyy 'às' HH:mm",
+                              { locale: ptBR },
+                            )}`}
+                          >
+                            <MailCheck className="h-3 w-3" /> E-mail enviado à empresa
+                          </div>
+                        )}
+                        {item.status === 'aprovada' && !item.email_sent_at && item.email_error && (
+                          <div
+                            className="text-[11px] text-amber-600 italic flex items-center gap-1 mt-0.5"
+                            title={item.email_error}
+                          >
+                            <MailWarning className="h-3 w-3" /> E-mail não enviado
                           </div>
                         )}
                       </div>

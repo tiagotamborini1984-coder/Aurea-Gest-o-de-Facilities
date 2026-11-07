@@ -208,6 +208,8 @@ export default function HorasExtras() {
           approved_by_name,
           approved_at,
           manager_observation,
+          email_sent_at,
+          email_error,
           created_at,
           updated_at,
           plants (
@@ -345,6 +347,37 @@ export default function HorasExtras() {
 
     toast.success(`Solicitação ${newStatus === 'aprovada' ? 'Aprovada' : 'Recusada'} com sucesso!`)
     fetchSolicitacoes()
+
+    // E-mail automático para a empresa (somente em aprovação). Fire-and-forget:
+    // a aprovação permanece válida mesmo se o envio falhar (auditoria em email_error).
+    if (newStatus === 'aprovada') {
+      notifyApprovalEmail(solicitacaoId)
+    }
+  }
+
+  // Dispara a edge function he-approval-email sem bloquear a UI
+  const notifyApprovalEmail = async (solicitacaoId: string) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const jwt = sessionData.session?.access_token
+      if (!jwt) return
+
+      const { data: fnData, error: fnError } = await supabase.functions.invoke(
+        'he-approval-email',
+        { body: { solicitacao_id: solicitacaoId } },
+      )
+      if (fnError) {
+        console.error('Falha ao acionar o envio de e-mail de aprovação de HE:', fnError)
+        return
+      }
+      if (fnData && fnData.sent === false && fnData.error) {
+        console.warn('E-mail de aprovação de HE não enviado:', fnData.error)
+        toast.warning(`HE aprovada, mas o e-mail não foi enviado: ${fnData.error}`)
+      }
+    } catch (err) {
+      // NÃO reverter a aprovação por falha de e-mail — apenas loga
+      console.error('Erro inesperado no envio de e-mail de aprovação de HE:', err)
+    }
   }
 
   // Pode editar: apenas o criador da solicitação e somente enquanto Pendente
