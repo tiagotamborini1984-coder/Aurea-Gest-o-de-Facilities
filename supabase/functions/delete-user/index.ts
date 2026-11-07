@@ -129,10 +129,7 @@ Deno.serve(async (req: Request) => {
       console.warn('deleteUser blocked by FK, falling back to manual unlink:', rawMessage)
 
       const unlinkTables: Array<{ table: string; columns: string[] }> = [
-        {
-          table: 'tasks',
-          columns: ['requester_id', 'assignee_id', 'previous_assignee_id', 'approved_by'],
-        },
+        { table: 'tasks', columns: ['requester_id', 'assignee_id', 'previous_assignee_id', 'approved_by'] },
         { table: 'task_timeline', columns: ['user_id'] },
         { table: 'audit_assignments', columns: ['assignee_id'] },
         { table: 'audit_logs', columns: ['user_id'] },
