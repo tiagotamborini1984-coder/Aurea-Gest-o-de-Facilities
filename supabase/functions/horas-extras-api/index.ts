@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
       company_name,
       plant_id,
       cost_center_id,
+      cost_center_text,
       budget_cost_centers (
         id,
         name,
@@ -192,15 +193,17 @@ Deno.serve(async (req) => {
           cidade: item.plants.city,
         }
       : { id: item.plant_id },
-    centro_custo_pagador: item.budget_cost_centers
-      ? {
-          id: item.budget_cost_centers.id,
-          nome: item.budget_cost_centers.name,
-          codigo: item.budget_cost_centers.code,
-        }
-      : item.cost_center_id
-        ? { id: item.cost_center_id }
-        : null,
+    centro_custo_pagador: item.cost_center_text
+      ? { texto: item.cost_center_text }
+      : item.budget_cost_centers
+        ? {
+            id: item.budget_cost_centers.id,
+            nome: item.budget_cost_centers.name,
+            codigo: item.budget_cost_centers.code,
+          }
+        : item.cost_center_id
+          ? { id: item.cost_center_id }
+          : null,
     data: item.date,
     horas: Number(item.hours),
     motivo: item.reason,

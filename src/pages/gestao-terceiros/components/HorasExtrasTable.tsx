@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { getCostCenterLabel } from './DecisaoHeDialog'
 
 export interface SolicitacaoHe {
   id: string
@@ -35,6 +36,7 @@ export interface SolicitacaoHe {
   date: string
   hours: number
   cost_center_id?: string | null
+  cost_center_text?: string | null
   budget_cost_centers?: {
     id: string
     name: string
@@ -206,11 +208,8 @@ export function HorasExtrasTable({
                   <TableCell className="text-slate-700 text-sm">
                     <div className="flex items-center gap-1.5">
                       <Wallet className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span
-                        className="truncate max-w-[160px]"
-                        title={item.budget_cost_centers?.name || ''}
-                      >
-                        {item.budget_cost_centers?.name || (
+                      <span className="truncate max-w-[160px]" title={getCostCenterLabel(item)}>
+                        {getCostCenterLabel(item) || (
                           <span className="text-slate-400 italic">Não informado</span>
                         )}
                       </span>

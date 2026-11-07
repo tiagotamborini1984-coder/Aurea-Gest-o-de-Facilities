@@ -22,6 +22,7 @@ import { Clock, UserCheck, Building2, MapPin, Search, Wallet } from 'lucide-reac
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
+import { maskCostCenterPagador, isValidCostCenterPagador } from './cost-center-mask'
 import type { SolicitacaoHe } from './HorasExtrasTable'
 
 interface EmployeeOption {
@@ -43,18 +44,11 @@ interface PlantOption {
   code?: string
 }
 
-export interface CostCenterOption {
-  id: string
-  name: string
-  code?: string | null
-}
-
 interface SolicitacaoHeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   employees: EmployeeOption[]
   plants: PlantOption[]
-  costCenters: CostCenterOption[]
   /** Solicitação em edição (modo edição quando preenchido) */
   editingSolicitacao?: SolicitacaoHe | null
   onSubmit: (data: {
@@ -63,11 +57,19 @@ interface SolicitacaoHeDialogProps {
     company_id: string | null
     company_name: string
     plant_id: string
-    cost_center_id: string
+    cost_center_text: string
     date: string
     hours: number
     reason: string
   }) => Promise<void>
+}
+
+/** Deriva um texto inicial para o centro de custo em edições de registros antigos (legado) */
+function resolveCostCenterInitialText(solicitacao: SolicitacaoHe): string {
+  const name = solicitacao.budget_cost_centers?.name || ''
+  const code = solicitacao.budget_cost_centers?.code || ''
+  const candidate = code || name
+  return isValidCostCenterPagador(candidate) ? candidate.toUpperCase() : ''
 }
 
 export function SolicitacaoHeDialog({
@@ -75,13 +77,12 @@ export function SolicitacaoHeDialog({
   onOpenChange,
   employees,
   plants,
-  costCenters,
   editingSolicitacao = null,
   onSubmit,
 }: SolicitacaoHeDialogProps) {
   const [selectedPlantId, setSelectedPlantId] = useState('')
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
-  const [selectedCostCenterId, setSelectedCostCenterId] = useState('')
+  const [costCenterText, setCostCenterText] = useState('')
   const [searchEmployeeText, setSearchEmployeeText] = useState('')
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [hours, setHours] = useState('2')
@@ -130,7 +131,9 @@ export function SolicitacaoHeDialog({
     if (editingSolicitacao) {
       setSelectedPlantId(editingSolicitacao.plant_id)
       setSelectedEmployeeId(editingSolicitacao.employee_id)
-      setSelectedCostCenterId(editingSolicitacao.cost_center_id || '')
+      setCostCenterText(
+        editingSolicitacao.cost_center_text || resolveCostCenterInitialText(editingSolicitacao),
+      )
       setSearchEmployeeText('')
       setDate(editingSolicitacao.date)
       setHours(String(Number(editingSolicitacao.hours)).replace('.', ','))
@@ -168,7 +171,7 @@ export function SolicitacaoHeDialog({
   const resetForm = () => {
     setSelectedPlantId('')
     setSelectedEmployeeId('')
-    setSelectedCostCenterId('')
+    setCostCenterText('')
     setSearchEmployeeText('')
     setHours('2')
     setReason('')
@@ -186,8 +189,16 @@ export function SolicitacaoHeDialog({
       return
     }
 
-    if (!selectedCostCenterId) {
-      toast.error('O Centro de Custo pagador é obrigatório. Selecione um centro de custo.')
+    // Centro de Custo pagador: obrigatório e no formato 1111aaa (4 números + 3 letras)
+    const normalizedCostCenter = costCenterText.trim().toUpperCase()
+    if (!normalizedCostCenter) {
+      toast.error('O Centro de Custo pagador é obrigatório. Digite o centro de custo.')
+      return
+    }
+    if (!isValidCostCenterPagador(normalizedCostCenter)) {
+      toast.error(
+        'Centro de Custo pagador inválido. Use o formato 1111aaa: 4 números seguidos de 3 letras.',
+      )
       return
     }
 
@@ -232,7 +243,7 @@ export function SolicitacaoHeDialog({
         company_id: selectedEmployee.company_id || null,
         company_name: selectedEmployee.company_name || 'Terceiro',
         plant_id: selectedPlantId,
-        cost_center_id: selectedCostCenterId,
+        cost_center_text: normalizedCostCenter,
         date,
         hours: sanitizedHours,
         reason: reason.trim(),
@@ -353,7 +364,7 @@ export function SolicitacaoHeDialog({
               </p>
             </div>
 
-            {/* Centro de Custo pagador — campo obrigatório */}
+            {/* Centro de Custo pagador — campo digitado no formato 1111aaa */}
             <div className="space-y-2">
               <Label htmlFor="heCostCenter" className="flex items-center gap-1.5">
                 <Wallet className="h-3.5 w-3.5 text-brand-vividBlue" />
@@ -361,27 +372,20 @@ export function SolicitacaoHeDialog({
                   Centro de Custo pagador <span className="text-rose-600">*</span>
                 </span>
               </Label>
-              <Select value={selectedCostCenterId} onValueChange={setSelectedCostCenterId}>
-                <SelectTrigger id="heCostCenter">
-                  <SelectValue placeholder="Selecione o centro de custo que pagará a HE..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {costCenters.length === 0 ? (
-                    <div className="p-2 text-xs text-slate-500 text-center">
-                      Nenhum centro de custo cadastrado para este cliente
-                      (módulo&nbsp;Gestão&nbsp;Budget).
-                    </div>
-                  ) : (
-                    costCenters.map((cc) => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        {cc.name} {cc.code ? `(${cc.code})` : ''}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <Input
+                id="heCostCenter"
+                type="text"
+                inputMode="text"
+                maxLength={7}
+                placeholder="1111aaa"
+                value={costCenterText}
+                onChange={(e) => setCostCenterText(maskCostCenterPagador(e.target.value))}
+                autoComplete="off"
+                required
+              />
               <p className="text-[11px] text-slate-500">
-                Obrigatório: identifica qual centro de custo absorverá o custo das horas extras.
+                Formato: <strong>1111aaa</strong> (4 números + 3 letras). Letras minúsculas são
+                convertidas para maiúsculas automaticamente.
               </p>
             </div>
 

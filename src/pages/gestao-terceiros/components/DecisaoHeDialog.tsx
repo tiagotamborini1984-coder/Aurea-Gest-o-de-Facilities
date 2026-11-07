@@ -13,6 +13,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import type { SolicitacaoHe } from './HorasExtrasTable'
 
+/** Rótulo do centro de custo pagador: texto digitado (novo) ou nome/código do legado */
+export function getCostCenterLabel(item: SolicitacaoHe): string {
+  return (
+    item.cost_center_text || item.budget_cost_centers?.name || item.budget_cost_centers?.code || ''
+  )
+}
+
 interface DecisaoHeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -78,9 +85,9 @@ export function DecisaoHeDialog({
               <strong>Data / Horas:</strong> {solicitacao.date} (
               {Number(solicitacao.hours).toFixed(2)}h)
             </div>
-            {solicitacao.budget_cost_centers?.name && (
+            {getCostCenterLabel(solicitacao) && (
               <div>
-                <strong>Centro de Custo pagador:</strong> {solicitacao.budget_cost_centers.name}
+                <strong>Centro de Custo pagador:</strong> {getCostCenterLabel(solicitacao)}
               </div>
             )}
             {solicitacao.reason && (

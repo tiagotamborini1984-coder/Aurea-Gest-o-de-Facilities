@@ -74,8 +74,8 @@ export function exportHorasExtrasToPdf(
           ? 'Aguardando decisão'
           : `${s.approved_by_name || 'Gestor'} em ${formatDateTime(s.approved_at)}`
 
-      const ccLabel = s.budget_cost_centers?.name || 'Não informado'
-      const ccCode = s.budget_cost_centers?.code
+      const ccLabel = s.cost_center_text || s.budget_cost_centers?.name || 'Não informado'
+      const ccCode = s.cost_center_text ? undefined : s.budget_cost_centers?.code
 
       const obs = s.manager_observation
         ? `<div class="obs-box">Obs: ${esc(s.manager_observation)}</div>`
@@ -355,6 +355,7 @@ export function exportHorasExtrasToXml(
       </planta>
       <centro_custo_pagador>
         <id>${esc(s.cost_center_id || '')}</id>
+        <texto>${esc(s.cost_center_text || '')}</texto>
         <nome>${esc(s.budget_cost_centers?.name || '')}</nome>
         <codigo>${esc(s.budget_cost_centers?.code || '')}</codigo>
       </centro_custo_pagador>
