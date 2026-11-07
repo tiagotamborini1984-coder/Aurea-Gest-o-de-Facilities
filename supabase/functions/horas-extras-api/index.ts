@@ -93,10 +93,10 @@ Deno.serve(async (req) => {
     .eq('id', keyData.id)
     .then()
 
-  // Buscar informações da empresa contratada
+  // Buscar informações da empresa contratada (inclui o e-mail cadastrado — aditivo)
   const { data: companyData } = await supabase
     .from('companies')
-    .select('id, name, service_type')
+    .select('id, name, service_type, email')
     .eq('id', keyData.company_id)
     .single()
 
@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
   }))
 
   const responseBody = {
-    empresa: companyData || { id: keyData.company_id },
+    empresa: companyData || { id: keyData.company_id, email: null },
     chave_api: {
       nome: keyData.name,
     },

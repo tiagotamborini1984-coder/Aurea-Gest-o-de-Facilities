@@ -324,7 +324,7 @@ Deno.serve(async (req) => {
     .eq('id', solicitacaoId)
     .single()
   if (sentRow?.email_sent_at) {
-    return jsonBody({ sent: true, alreadySent: true, recipient })
+    return jsonBody({ sent: true, alreadySent: true, recipient, recipientSource })
   }
 
   // 8) Envia via Resend — falha NÃO reverte a aprovação, só registra email_error
@@ -342,12 +342,12 @@ Deno.serve(async (req) => {
   }
 
   console.log(
-    `[${solicitacaoId}] E-mail de aprovação aceito pelo Resend (status ${result.status}) para ${recipient}`,
+    `[${solicitacaoId}] E-mail de aprovação aceito pelo Resend (status ${result.status}) para ${recipient} (fonte: ${recipientSource})`,
   )
   await supabase
     .from('horas_extras_solicitacoes')
     .update({ email_sent_at: new Date().toISOString(), email_error: null })
     .eq('id', solicitacaoId)
 
-  return jsonBody({ sent: true, recipient })
+  return jsonBody({ sent: true, recipient, recipientSource })
 })
