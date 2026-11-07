@@ -68,8 +68,8 @@ export function DecisaoHeDialog({
           </DialogTitle>
           <DialogDescription>
             {isApproval
-              ? 'Confirme a aprovação das horas extras para o colaborador.'
-              : 'Informe a recusa da solicitação. A empresa parceira e o solicitante serão notificados do status.'}
+              ? 'Confirme a aprovação das horas extras para o colaborador. A empresa parceira, o solicitante e o aprovador serão notificados por e-mail.'
+              : 'Informe a recusa da solicitação. Apenas o solicitante e você receberão a notificação por e-mail (a empresa parceira não será notificada).'}
           </DialogDescription>
         </DialogHeader>
 
@@ -82,7 +82,7 @@ export function DecisaoHeDialog({
               <strong>Empresa:</strong> {solicitacao.company_name}
             </div>
             <div>
-              <strong>Data / Horas:</strong> {solicitacao.date} (
+              <strong>Data / Horas previstas:</strong> {solicitacao.date} (
               {Number(solicitacao.hours).toFixed(2)}h)
             </div>
             {getCostCenterLabel(solicitacao) && (

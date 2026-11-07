@@ -297,22 +297,26 @@ export default function HorasExtras() {
       }
     }
 
-    const { error } = await supabase.from('horas_extras_solicitacoes').insert({
-      client_id: targetClientId,
-      employee_id: data.employee_id,
-      employee_name: data.employee_name,
-      company_id: resolvedCompanyId || null,
-      company_name: data.company_name,
-      plant_id: data.plant_id,
-      cost_center_text: data.cost_center_text,
-      company_email: data.company_email || null,
-      date: data.date,
-      hours: data.hours,
-      reason: data.reason || null,
-      status: 'pendente',
-      created_by: profile?.id || null,
-      created_by_name: profile?.name || profile?.email || 'Usuário',
-    })
+    const { data: inserted, error } = await supabase
+      .from('horas_extras_solicitacoes')
+      .insert({
+        client_id: targetClientId,
+        employee_id: data.employee_id,
+        employee_name: data.employee_name,
+        company_id: resolvedCompanyId || null,
+        company_name: data.company_name,
+        plant_id: data.plant_id,
+        cost_center_text: data.cost_center_text,
+        company_email: data.company_email || null,
+        date: data.date,
+        hours: data.hours,
+        reason: data.reason || null,
+        status: 'pendente',
+        created_by: profile?.id || null,
+        created_by_name: profile?.name || profile?.email || 'Usuário',
+      })
+      .select('id')
+      .single()
 
     if (error) {
       toast.error('Erro ao registrar solicitação: ' + error.message)
@@ -321,6 +325,11 @@ export default function HorasExtras() {
 
     toast.success('Solicitação de Horas Extras registrada com status Pendente!')
     fetchSolicitacoes()
+
+    // Notifica aprovadores por e-mail com link do módulo (não-bloqueante)
+    if (inserted?.id) {
+      notifyHeEmail(inserted.id, 'criada')
+    }
   }
 
   // Ação de aprovar/recusar (Apenas Admin/Master)
@@ -351,15 +360,21 @@ export default function HorasExtras() {
     toast.success(`Solicitação ${newStatus === 'aprovada' ? 'Aprovada' : 'Recusada'} com sucesso!`)
     fetchSolicitacoes()
 
-    // E-mail automático para a empresa (somente em aprovação). Fire-and-forget:
-    // a aprovação permanece válida mesmo se o envio falhar (auditoria em email_error).
+    // Disparo de e-mail (não-bloqueante):
+    // - aprovada: empresa parceira (to) + solicitante e aprovador (cc)
+    // - recusada: SOMENTE solicitante e usuário que reprovou (a empresa NÃO recebe)
     if (newStatus === 'aprovada') {
-      notifyApprovalEmail(solicitacaoId)
+      notifyHeEmail(solicitacaoId, 'aprovada')
+    } else if (newStatus === 'recusada') {
+      notifyHeEmail(solicitacaoId, 'recusada')
     }
   }
 
   // Dispara a edge function he-approval-email sem bloquear a UI
-  const notifyApprovalEmail = async (solicitacaoId: string) => {
+  const notifyHeEmail = async (
+    solicitacaoId: string,
+    action: 'aprovada' | 'recusada' | 'criada',
+  ) => {
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const jwt = sessionData.session?.access_token
@@ -367,19 +382,21 @@ export default function HorasExtras() {
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke(
         'he-approval-email',
-        { body: { solicitacao_id: solicitacaoId } },
+        { body: { solicitacao_id: solicitacaoId, action } },
       )
       if (fnError) {
-        console.error('Falha ao acionar o envio de e-mail de aprovação de HE:', fnError)
+        console.error(`Falha ao acionar e-mail de HE (${action}):`, fnError)
         return
       }
       if (fnData && fnData.sent === false && fnData.error) {
-        console.warn('E-mail de aprovação de HE não enviado:', fnData.error)
-        toast.warning(`HE aprovada, mas o e-mail não foi enviado: ${fnData.error}`)
+        console.warn(`E-mail de HE (${action}) não enviado:`, fnData.error)
+        if (action === 'aprovada') {
+          toast.warning(`HE aprovada, mas o e-mail não foi enviado: ${fnData.error}`)
+        }
       }
     } catch (err) {
-      // NÃO reverter a aprovação por falha de e-mail — apenas loga
-      console.error('Erro inesperado no envio de e-mail de aprovação de HE:', err)
+      // NUNCA reverter ação de HE por falha de e-mail — apenas loga
+      console.error(`Erro inesperado no envio de e-mail de HE (${action}):`, err)
     }
   }
 

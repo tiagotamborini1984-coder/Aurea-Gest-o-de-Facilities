@@ -489,7 +489,7 @@ export function SolicitacaoHeDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="heHours">Quantidade de Horas</Label>
+                <Label htmlFor="heHours">Quantidade de Horas previstas</Label>
                 <Input
                   id="heHours"
                   type="text"

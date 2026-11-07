@@ -155,7 +155,7 @@ export function HorasExtrasTable({
               <TableHead>Empresa Parceira</TableHead>
               <TableHead>Planta</TableHead>
               <TableHead>Data da HE</TableHead>
-              <TableHead className="text-right">Qtd. Horas</TableHead>
+              <TableHead className="text-right">Qtd. Horas previstas</TableHead>
               <TableHead>Centro de Custo pagador</TableHead>
               <TableHead>Motivo / Justificativa</TableHead>
               <TableHead>Status</TableHead>
