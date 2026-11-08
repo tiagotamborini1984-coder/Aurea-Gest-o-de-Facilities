@@ -343,6 +343,59 @@ export default function HorasExtrasApiKeys() {
             </code>
             , <code className="text-slate-800 bg-slate-200 px-1 py-0.5 rounded">limite=100</code>.
           </p>
+
+          <details className="mt-2 text-xs bg-white rounded border p-2.5 cursor-pointer">
+            <summary className="font-semibold text-slate-700 select-none hover:text-slate-900">
+              Ver exemplo do payload JSON retornado pela API (inclui requisitante e aprovador)
+            </summary>
+            <pre className="mt-2 p-2 bg-slate-900 text-slate-100 rounded text-[11px] overflow-x-auto font-mono">
+              {JSON.stringify(
+                {
+                  empresa: {
+                    id: 'ef05997d-5ca3-426b-b16f-037207fc6511',
+                    name: 'FCG Construções',
+                    service_type: 'Engenharia / Obras',
+                    email: 'contato@fcgconstrucoes.com.br',
+                  },
+                  chave_api: { nome: 'FCG Construções' },
+                  total: 1,
+                  solicitacoes: [
+                    {
+                      id: 'd28e4fc0-7628-450b-8162-5ace1bf3cf66',
+                      colaborador: { id: '...', nome: 'Carlos Silva' },
+                      empresa: { id: '...', nome: 'FCG Construções' },
+                      planta: { id: '...', nome: 'Unidade Sorocaba', codigo: 'SOR' },
+                      centro_custo_pagador: { texto: '1234ABC' },
+                      data: '2026-11-08',
+                      horas: 2.5,
+                      motivo: 'Apoio em manutenção corretiva',
+                      status: 'aprovada',
+                      solicitado_em: '2026-11-08T10:00:00Z',
+                      solicitado_por: 'Johnny Henrique Carmo Farias',
+                      requisitante: {
+                        id: '2811b500-447b-4a88-86e2-685b2e59b956',
+                        nome: 'Johnny Henrique Carmo Farias',
+                        email: 'johnny.farias.ext@fs-ext.agr.br',
+                      },
+                      aprovacao: {
+                        aprovado_em: '2026-11-08T11:30:00Z',
+                        aprovado_por: 'Tiago Tamborini',
+                        observacao_gestor: 'Aprovado conforme planejado',
+                        aprovador: {
+                          id: '6cd66503-5a03-49fe-8495-abc506899feb',
+                          nome: 'Tiago Tamborini',
+                          email: 'tiagotamborini1984@gmail.com',
+                        },
+                      },
+                      atualizado_em: '2026-11-08T11:30:00Z',
+                    },
+                  ],
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </details>
         </CardContent>
       </Card>
 

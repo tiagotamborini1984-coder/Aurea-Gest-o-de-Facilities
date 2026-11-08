@@ -124,8 +124,10 @@ Deno.serve(async (req) => {
       updated_at,
       approved_at,
       manager_observation,
-      approved_by_name,
+      created_by,
       created_by_name,
+      approved_by,
+      approved_by_name,
       employee_id,
       employee_name,
       company_id,
@@ -174,49 +176,99 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Formatando resposta em JSON limpo e estruturado
-  const formatted = (solicitacoes || []).map((item: any) => ({
-    id: item.id,
-    colaborador: {
-      id: item.employee_id,
-      nome: item.employee_name,
-    },
-    empresa: {
-      id: item.company_id,
-      nome: item.company_name,
-    },
-    planta: item.plants
-      ? {
-          id: item.plants.id,
-          nome: item.plants.name,
-          codigo: item.plants.code,
-          cidade: item.plants.city,
-        }
-      : { id: item.plant_id },
-    centro_custo_pagador: item.cost_center_text
-      ? { texto: item.cost_center_text }
-      : item.budget_cost_centers
+  // Coleta IDs de perfis (solicitantes e aprovadores) para buscar e-mails e garantir nomes mais atualizados
+  const profileIds = new Set<string>()
+  for (const item of (solicitacoes || []) as any[]) {
+    if (item.created_by) profileIds.add(item.created_by)
+    if (item.approved_by) profileIds.add(item.approved_by)
+  }
+
+  const profilesMap = new Map<string, { id: string; name: string | null; email: string | null }>()
+  if (profileIds.size > 0) {
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .in('id', Array.from(profileIds))
+
+    if (profilesData) {
+      for (const p of profilesData) {
+        profilesMap.set(p.id, { id: p.id, name: p.name || null, email: p.email || null })
+      }
+    }
+  }
+
+  // Formatando resposta em JSON limpo, estruturado e 100% retrocompatível (aditivo)
+  const formatted = (solicitacoes || []).map((item: any) => {
+    const creatorProfile = item.created_by ? profilesMap.get(item.created_by) : null
+    const approverProfile = item.approved_by ? profilesMap.get(item.approved_by) : null
+
+    // Resolução resiliente: prioriza profile atual, com fallback para o snapshot salvo na solicitação
+    const requisitanteNome = creatorProfile?.name || item.created_by_name || null
+    const requisitanteEmail = creatorProfile?.email || null
+
+    const aprovadorNome = approverProfile?.name || item.approved_by_name || null
+    const aprovadorEmail = approverProfile?.email || null
+
+    return {
+      id: item.id,
+      colaborador: {
+        id: item.employee_id,
+        nome: item.employee_name,
+      },
+      empresa: {
+        id: item.company_id,
+        nome: item.company_name,
+      },
+      planta: item.plants
         ? {
-            id: item.budget_cost_centers.id,
-            nome: item.budget_cost_centers.name,
-            codigo: item.budget_cost_centers.code,
+            id: item.plants.id,
+            nome: item.plants.name,
+            codigo: item.plants.code,
+            cidade: item.plants.city,
           }
-        : item.cost_center_id
-          ? { id: item.cost_center_id }
-          : null,
-    data: item.date,
-    horas: Number(item.hours),
-    motivo: item.reason,
-    status: item.status,
-    solicitado_em: item.created_at,
-    solicitado_por: item.created_by_name,
-    aprovacao: {
-      aprovado_em: item.approved_at,
-      aprovado_por: item.approved_by_name,
-      observacao_gestor: item.manager_observation,
-    },
-    atualizado_em: item.updated_at,
-  }))
+        : { id: item.plant_id },
+      centro_custo_pagador: item.cost_center_text
+        ? { texto: item.cost_center_text }
+        : item.budget_cost_centers
+          ? {
+              id: item.budget_cost_centers.id,
+              nome: item.budget_cost_centers.name,
+              codigo: item.budget_cost_centers.code,
+            }
+          : item.cost_center_id
+            ? { id: item.cost_center_id }
+            : null,
+      data: item.date,
+      horas: Number(item.hours),
+      motivo: item.reason,
+      status: item.status,
+      solicitado_em: item.created_at,
+      // Campo retrocompatível (mantém exatamente a string anterior para não quebrar integrações existentes)
+      solicitado_por: requisitanteNome,
+      // Objeto aditivo enriquecido com nome, e-mail e id do requisitante
+      requisitante: {
+        id: item.created_by || null,
+        nome: requisitanteNome,
+        email: requisitanteEmail,
+      },
+      aprovacao: {
+        aprovado_em: item.approved_at,
+        // Campo retrocompatível mantido
+        aprovado_por: aprovadorNome,
+        observacao_gestor: item.manager_observation,
+        // Objeto aditivo enriquecido (quando houver aprovação/reprovação com aprovador identificado)
+        aprovador:
+          aprovadorNome || aprovadorEmail
+            ? {
+                id: item.approved_by || null,
+                nome: aprovadorNome,
+                email: aprovadorEmail,
+              }
+            : null,
+      },
+      atualizado_em: item.updated_at,
+    }
+  })
 
   const responseBody = {
     empresa: companyData || { id: keyData.company_id, email: null },
