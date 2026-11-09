@@ -465,19 +465,27 @@ export default function Cadastros() {
               )
 
               // Portão (ANTES de gravar): listas novas ou trocadas precisam estar
-              // validadas (isListValidated). Listas pré-existentes não modificadas
+              // validadas (isListValidated) — MAS só no modo 'auto'. Em 'manual' e
+              // 'off' o anexo não bloqueia o salvamento (no 'off' o anexo novo fica
+              // com status null no momento do upload, e era exatamente ele que era
+              // barrado aqui indevidamente). Listas pré-existentes não modificadas
               // preservam o status do banco e não bloqueiam o salvamento.
               // Mapeamento SEMPRE por training_id — NUNCA por índice posicional.
-              const invalid = formRecs.filter((tr: any) => {
-                if (!tr.document_url) return false
-                const old = oldByTraining.get(tr.training_id)
-                const isUnchanged = !!old && (old.document_url || '') === (tr.document_url || '')
-                // Se o usuário na UI vê a lista validada (verification_status 'verified')
-                // OU a lista pré-existente não teve o documento trocado, permite.
-                if (isListValidated(tr)) return false
-                if (isUnchanged) return false
-                return true
-              })
+              const invalid =
+                verificationMode === 'auto'
+                  ? formRecs.filter((tr: any) => {
+                      if (!tr.document_url) return false
+                      const old = oldByTraining.get(tr.training_id)
+                      const isUnchanged =
+                        !!old && (old.document_url || '') === (tr.document_url || '')
+                      // Se o usuário na UI vê a lista validada (verification_status
+                      // 'verified') OU a lista pré-existente não teve o documento
+                      // trocado, permite.
+                      if (isListValidated(tr)) return false
+                      if (isUnchanged) return false
+                      return true
+                    })
+                  : []
               if (invalid.length > 0) {
                 return {
                   success: false,
