@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -34,6 +34,7 @@ import {
 import { Loader2, Trash2, Edit2, Search, Plus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store/AppContext'
+import { useWindowFocusGuard } from '@/hooks/use-window-focus-guard'
 import { cn } from '@/lib/utils'
 
 export type FieldDef = {
@@ -100,29 +101,14 @@ export function CrudGeneric({
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
   // Guarda de foco da janela: quando o usuário abre o seletor de arquivos do
-  // sistema operacional (ou troca de janela) com o modal aberto, o navegador
-  // dispara blur/focus e o Radix interpreta o primeiro clique/pointerdown ao
-  // voltar como interação FORA do modal, fechando-o — o usuário era expulso da
-  // edição e voltava para a listagem. Ignoramos qualquer interação externa por
-  // um curto intervalo após a janela retomar o foco.
-  const windowBlurAtRef = useRef<number>(0)
-
-  useEffect(() => {
-    if (!isModalOpen) return
-    const handleBlur = () => {
-      windowBlurAtRef.current = Date.now()
-    }
-    window.addEventListener('blur', handleBlur)
-    return () => window.removeEventListener('blur', handleBlur)
-  }, [isModalOpen])
-
-  const guardDismiss = (e: Event) => {
-    const recentWindowBlur = Date.now() - windowBlurAtRef.current < 2000
-    if (recentWindowBlur || isUploading || isSubmitting) {
-      e.preventDefault()
-      return
-    }
-  }
+  // sistema operacional (ou dá Alt+Tab) com o modal aberto, o navegador dispara
+  // blur/focus e o Radix interpreta o primeiro clique/pointerdown ao voltar
+  // como interação FORA do modal, fechando-o — o usuário era expulso da edição
+  // e voltava para a listagem. A tolerância é medida a partir do RETORNO do
+  // foco (v0.0.1867 media a partir do blur e expirava em Alt+Tabs longos).
+  const guardDismiss = useWindowFocusGuard(isModalOpen, {
+    isBusy: isUploading || isSubmitting,
+  })
 
   const load = useCallback(async () => {
     setLoading(true)

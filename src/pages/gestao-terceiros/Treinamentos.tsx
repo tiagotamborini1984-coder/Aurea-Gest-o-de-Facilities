@@ -45,6 +45,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { DocumentViewer, DocumentViewerRef } from '@/components/DocumentViewer'
+import { useWindowFocusGuard } from '@/hooks/use-window-focus-guard'
 
 export default function Treinamentos() {
   const { activeClient } = useAppStore()
@@ -71,6 +72,13 @@ export default function Treinamentos() {
 
   // Viewer State
   const viewerRef = useRef<DocumentViewerRef>(null)
+
+  // Guarda de foco da janela: o Alt+Tab/seletor de arquivos com este diálogo
+  // aberto não pode fechar o histórico ao voltar (o clique de retorno é
+  // interpretado como interação fora do modal).
+  const guardWindowDismiss = useWindowFocusGuard(!!selectedEmp, {
+    isBusy: isUploading,
+  })
 
   useEffect(() => {
     if (activeClient) {
@@ -508,7 +516,12 @@ export default function Treinamentos() {
       </Card>
 
       <Dialog open={!!selectedEmp} onOpenChange={(v) => !v && setSelectedEmp(null)}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogContent
+          onPointerDownOutside={guardWindowDismiss}
+          onInteractOutside={guardWindowDismiss}
+          onFocusOutside={guardWindowDismiss}
+          className="sm:max-w-3xl max-h-[85vh] flex flex-col"
+        >
           <DialogHeader>
             <DialogTitle>Histórico de Treinamentos</DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">

@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Plus, Edit2, Trash2, Copy } from 'lucide-react'
+import { useWindowFocusGuard } from '@/hooks/use-window-focus-guard'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
@@ -55,6 +56,13 @@ export default function QuadroContratado() {
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false)
   const [duplicateFrom, setDuplicateFrom] = useState<string>('')
   const [duplicateTo, setDuplicateTo] = useState<string>('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Guarda de foco da janela: Alt+Tab/seletor de arquivos com o modal aberto
+  // não pode fechar o diálogo ao voltar — o clique de retorno é interpretado
+  // pelo Radix como interação fora do modal.
+  const guardFormDismiss = useWindowFocusGuard(isModalOpen, { isBusy: isSaving })
+  const guardDuplicateDismiss = useWindowFocusGuard(isDuplicateOpen)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -154,6 +162,7 @@ export default function QuadroContratado() {
     const client_id =
       plants.find((p) => p.id === formData.plant_id)?.client_id || profile?.client_id
 
+    setIsSaving(true)
     const payload = {
       client_id,
       plant_id: formData.plant_id,
@@ -190,6 +199,7 @@ export default function QuadroContratado() {
         toast.error('Erro ao criar')
       }
     }
+    setIsSaving(false)
   }
 
   const handleDelete = async (id: string) => {
@@ -405,7 +415,12 @@ export default function QuadroContratado() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent
+          onPointerDownOutside={guardFormDismiss}
+          onInteractOutside={guardFormDismiss}
+          onFocusOutside={guardFormDismiss}
+          className="sm:max-w-[500px]"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingRecord ? 'Editar' : 'Adicionar'}{' '}
@@ -540,7 +555,12 @@ export default function QuadroContratado() {
       </Dialog>
 
       <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent
+          onPointerDownOutside={guardDuplicateDismiss}
+          onInteractOutside={guardDuplicateDismiss}
+          onFocusOutside={guardDuplicateDismiss}
+          className="sm:max-w-[400px]"
+        >
           <DialogHeader>
             <DialogTitle>Duplicar Quadro Contratado</DialogTitle>
           </DialogHeader>
