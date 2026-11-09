@@ -272,10 +272,22 @@ export default function Cadastros() {
                   verified_at: tr.verified_at || null,
                 }))
               if (trPayload.length > 0) {
-                const { error: trError, data: trRows } = await supabase
-                  .from('employee_training_records')
-                  .insert(trPayload)
-                  .select('id, document_url')
+                // Insere em lotes pequenos (máx. 5 por comando), mantendo cada
+                // comando dentro do limite aceito pelo guard de operações em massa.
+                const newTrBatchSize = 5
+                let trRows: any[] = []
+                let trError: any = null
+                for (let b = 0; b < trPayload.length; b += newTrBatchSize) {
+                  const r = await supabase
+                    .from('employee_training_records')
+                    .insert(trPayload.slice(b, b + newTrBatchSize))
+                    .select('id, document_url')
+                  if (r.error) {
+                    trError = r.error
+                    break
+                  }
+                  trRows = trRows.concat(r.data || [])
+                }
                 if (trError) {
                   return {
                     success: false,
@@ -335,6 +347,11 @@ export default function Cadastros() {
                 if (invalid.length > 0) {
                   const motivo =
                     formRecsByTraining.get(invalid[0].training_id)?.verification_notes || ''
+                  // Desfaz o cadastro parcial: apaga os treinamentos inseridos (um
+                  // comando por registro, respeitando o guard) e depois o colaborador.
+                  for (const row of trRows || []) {
+                    await supabase.from('employee_training_records').delete().eq('id', row.id)
+                  }
                   await supabase.from('employees').delete().eq('id', data.id)
                   return {
                     success: false,
@@ -354,9 +371,19 @@ export default function Cadastros() {
                   training_id: tr.training_id,
                 }))
               if (frPayload.length > 0) {
-                const { error: frError } = await supabase
-                  .from('function_required_trainings')
-                  .insert(frPayload)
+                // Lotes pequenos (máx. 5 por comando), padrão consistente com o
+                // restante do módulo (guard de operações em massa).
+                const frBatchSize = 5
+                let frError: any = null
+                for (let b = 0; b < frPayload.length; b += frBatchSize) {
+                  const r = await supabase
+                    .from('function_required_trainings')
+                    .insert(frPayload.slice(b, b + frBatchSize))
+                  if (r.error) {
+                    frError = r.error
+                    break
+                  }
+                }
                 if (frError) {
                   return {
                     success: false,
@@ -419,51 +446,131 @@ export default function Cadastros() {
           const { error } = await supabase.from(config.tableName).update(payload).eq('id', id)
           if (!error) {
             if (training_records && config.tableName === 'employees') {
+              // SALVAMENTO POR DIFERENÇA (delta): o guard do banco bloqueia DELETE de
+              // mais de 5 registros no mesmo comando, portanto NUNCA apagamos a lista
+              // inteira para reinseri-la. Comparamos o formulário com o que existe no
+              // banco e aplicamos apenas: UPDATE nos alterados, DELETE só dos removidos
+              // (um comando por registro) e INSERT dos novos.
               const { data: oldRows } = await supabase
                 .from('employee_training_records')
                 .select('*')
                 .eq('employee_id', id)
-              const { error: delError } = await supabase
-                .from('employee_training_records')
-                .delete()
-                .eq('employee_id', id)
-              if (delError) {
-                return {
-                  success: false,
-                  error: {
-                    message: `Erro ao atualizar treinamentos: ${delError.message}`,
-                  },
-                }
-              }
               const oldByTraining = new Map<string, any>(
                 (oldRows || []).map((o: any) => [o.training_id, o]),
               )
-              const trPayload = training_records
-                .filter((tr: any) => tr.training_id)
-                .map((tr: any) => {
-                  // Lista não reanexada = preserva o estado MAIS RECENTE do banco
-                  // (evita que formulário desatualizado sobrescreva verificação nova)
-                  const old = oldByTraining.get(tr.training_id)
-                  const unchanged = !!old && (old.document_url || '') === (tr.document_url || '')
-                  const src = unchanged ? old : tr
-                  return {
-                    client_id: updateClientId,
-                    employee_id: id,
-                    training_id: tr.training_id,
-                    document_url: src.document_url || '',
-                    completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
-                    verification_status: src.verification_status || 'pending',
-                    verification_notes: src.verification_notes || null,
-                    verification_signed_name: src.verification_signed_name || null,
-                    verification_confidence: src.verification_confidence ?? null,
-                    verified_at: src.verified_at || null,
-                  }
-                })
-              if (trPayload.length > 0) {
-                const { error: trError, data: trRows } = await supabase
+
+              const formRecs = training_records.filter((tr: any) => tr.training_id)
+              const formRecsByTraining = new Map<string, any>(
+                formRecs.map((f: any) => [f.training_id, f]),
+              )
+
+              // Portão (ANTES de gravar): listas novas ou trocadas precisam estar
+              // validadas (isListValidated). Listas pré-existentes não modificadas
+              // preservam o status do banco e não bloqueiam o salvamento.
+              // Mapeamento SEMPRE por training_id — NUNCA por índice posicional.
+              const invalid = formRecs.filter((tr: any) => {
+                if (!tr.document_url) return false
+                const old = oldByTraining.get(tr.training_id)
+                const isUnchanged = !!old && (old.document_url || '') === (tr.document_url || '')
+                // Se o usuário na UI vê a lista validada (verification_status 'verified')
+                // OU a lista pré-existente não teve o documento trocado, permite.
+                if (isListValidated(tr)) return false
+                if (isUnchanged) return false
+                return true
+              })
+              if (invalid.length > 0) {
+                return {
+                  success: false,
+                  error: {
+                    message:
+                      'Alteração não salva: há lista de presença não validada pelo agente (anexe uma lista válida e aguarde a conferência no momento do anexo).',
+                  },
+                }
+              }
+
+              // 1) ALTERAR: registros existentes cujos dados mudaram no formulário.
+              //    O status de verificação NUNCA é reescrito aqui: quem muda o anexo
+              //    já recebe o novo status na hora do anexo (TreinamentosVinculo);
+              //    quem não tocou no anexo mantém o status gravado no banco.
+              for (const tr of formRecs) {
+                const old = oldByTraining.get(tr.training_id)
+                if (!old) continue
+                const changed =
+                  (old.document_url || '') !== (tr.document_url || '') ||
+                  (old.completion_date || '') !== (tr.completion_date || '') ||
+                  (old.verification_status || null) !== (tr.verification_status || null)
+                if (!changed) continue
+                const { error: updError } = await supabase
                   .from('employee_training_records')
-                  .insert(trPayload)
-                  .select('id, document_url')
+                  .update({
+                    document_url: tr.document_url || '',
+                    completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                    verification_status: tr.verification_status || 'pending',
+                    verification_notes: tr.verification_notes || null,
+                    verification_signed_name: tr.verification_signed_name || null,
+                    verification_confidence: tr.verification_confidence ?? null,
+                    verified_at: tr.verified_at || null,
+                  })
+                  .eq('id', old.id)
+                if (updError) {
+                  return {
+                    success: false,
+                    error: {
+                      message: `Erro ao atualizar treinamentos: ${updError.message}`,
+                    },
+                  }
+                }
+              }
+
+              // 2) EXCLUIR: apenas os itens que o usuário removeu no formulário,
+              //    UM comando por registro (nunca em lote acima do guard).
+              const removedRows = (oldRows || []).filter(
+                (o: any) => !formRecsByTraining.has(o.training_id),
+              )
+              for (const row of removedRows) {
+                const { error: delError } = await supabase
+                  .from('employee_training_records')
+                  .delete()
+                  .eq('id', row.id)
+                if (delError) {
+                  return {
+                    success: false,
+                    error: {
+                      message: `Erro ao atualizar treinamentos: ${delError.message}`,
+                    },
+                  }
+                }
+              }
+
+              // 3) INSERIR: somente os treinamentos que não existiam para o colaborador.
+              const newPayload = formRecs
+                .filter((tr: any) => !oldByTraining.has(tr.training_id))
+                .map((tr: any) => ({
+                  client_id: updateClientId,
+                  employee_id: id,
+                  training_id: tr.training_id,
+                  document_url: tr.document_url || '',
+                  completion_date: tr.completion_date || new Date().toISOString().split('T')[0],
+                  verification_status: tr.verification_status || 'pending',
+                  verification_notes: tr.verification_notes || null,
+                  verification_signed_name: tr.verification_signed_name || null,
+                  verification_confidence: tr.verification_confidence ?? null,
+                  verified_at: tr.verified_at || null,
+                }))
+              if (newPayload.length > 0) {
+                // Lotes pequenos (máx. 5 por comando), padrão consistente com o
+                // restante do módulo (guard de operações em massa).
+                const insertBatchSize = 5
+                let trError: any = null
+                for (let b = 0; b < newPayload.length; b += insertBatchSize) {
+                  const r = await supabase
+                    .from('employee_training_records')
+                    .insert(newPayload.slice(b, b + insertBatchSize))
+                  if (r.error) {
+                    trError = r.error
+                    break
+                  }
+                }
                 if (trError) {
                   return {
                     success: false,
@@ -478,60 +585,62 @@ export default function Cadastros() {
                   'training_record_created',
                   `Colaborador ID: ${id}`,
                 )
-                // Portão: checa se há alguma lista com anexo que NÃO esteja validada.
-                // 1) Listas pré-existentes não modificadas (old.document_url === tr.document_url)
-                //    são preservadas com o status do banco (se já estavam verified ou pending histórico,
-                //    uma edição que não tocou naquele anexo não bloqueia o salvamento).
-                // 2) Listas novas ou trocadas no formulário precisam estar validadas (isListValidated).
-                // 3) Se o formulário já exibe a badge verde (tr.verification_status === 'verified'),
-                //    isListValidated(tr) retorna true e o salvamento é autorizado.
-                // Mapeamento SEMPRE por training_id — NUNCA por índice posicional.
-                const formRecs = training_records.filter((tr: any) => tr.training_id)
-                const formRecsByTraining = new Map<string, any>(
-                  formRecs.map((f: any) => [f.training_id, f]),
-                )
-
-                const invalid = (trPayload || []).filter((p: any) => {
-                  if (!p.document_url) return false
-                  const tr = formRecsByTraining.get(p.training_id) || p
-                  const old = oldByTraining.get(p.training_id)
-                  const isUnchanged = !!old && (old.document_url || '') === (p.document_url || '')
-                  // Se o usuário na UI vê a lista validada (tr.verification_status === 'verified')
-                  // OU se a lista pré-existente não foi alterada e o usuário não trocou o documento,
-                  // o salvamento é permitido. Só bloqueia se o anexo foi trocado/adicionado e não validado.
-                  if (isListValidated(tr)) return false
-                  if (isUnchanged) return false
-                  return true
-                })
-                if (invalid.length > 0) {
-                  // desfaz: restaura os registros anteriores
-                  await supabase.from('employee_training_records').delete().eq('employee_id', id)
-                  if (oldRows && oldRows.length > 0) {
-                    await supabase.from('employee_training_records').insert(oldRows)
-                  }
+              }
+            }
+            if (training_records && config.tableName === 'functions') {
+              // SALVAMENTO POR DIFERENÇA (delta): o guard do banco bloqueia DELETE de
+              // mais de 5 registros no mesmo comando, portanto não apagamos a lista
+              // inteira. Removemos apenas o que o usuário tirou (um comando por
+              // registro), atualizamos nada (a tabela só guarda vínculo) e inserimos
+              // somente os novos vínculos.
+              const { data: oldFrRows } = await supabase
+                .from('function_required_trainings')
+                .select('id, training_id')
+                .eq('function_id', id)
+              const formFrIds = new Set<string>(
+                training_records
+                  .filter((tr: any) => tr.training_id)
+                  .map((tr: any) => tr.training_id),
+              )
+              const removedFr = (oldFrRows || []).filter((o: any) => !formFrIds.has(o.training_id))
+              for (const row of removedFr) {
+                const { error: frDelError } = await supabase
+                  .from('function_required_trainings')
+                  .delete()
+                  .eq('id', row.id)
+                if (frDelError) {
                   return {
                     success: false,
                     error: {
-                      message:
-                        'Alteração não salva: há lista de presença não validada pelo agente (anexe uma lista válida e aguarde a conferência no momento do anexo).',
+                      message: `Erro ao atualizar treinamentos da função: ${frDelError.message}`,
                     },
                   }
                 }
               }
-            }
-            if (training_records && config.tableName === 'functions') {
-              await supabase.from('function_required_trainings').delete().eq('function_id', id)
+              const existingFrIds = new Set<string>(
+                (oldFrRows || []).map((o: any) => o.training_id),
+              )
               const frPayload = training_records
-                .filter((tr: any) => tr.training_id)
+                .filter((tr: any) => tr.training_id && !existingFrIds.has(tr.training_id))
                 .map((tr: any) => ({
                   client_id: updateClientId,
                   function_id: id,
                   training_id: tr.training_id,
                 }))
               if (frPayload.length > 0) {
-                const { error: frError } = await supabase
-                  .from('function_required_trainings')
-                  .insert(frPayload)
+                // Lotes pequenos (máx. 5 por comando), padrão consistente com o
+                // restante do módulo (guard de operações em massa).
+                const frBatchSize = 5
+                let frError: any = null
+                for (let b = 0; b < frPayload.length; b += frBatchSize) {
+                  const r = await supabase
+                    .from('function_required_trainings')
+                    .insert(frPayload.slice(b, b + frBatchSize))
+                  if (r.error) {
+                    frError = r.error
+                    break
+                  }
+                }
                 if (frError) {
                   return {
                     success: false,

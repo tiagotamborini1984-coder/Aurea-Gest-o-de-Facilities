@@ -139,8 +139,15 @@ export function DuplicateHeadcountDialog({
           .eq('reference_month', `${dupTarget}-01`) as any)
       }
 
-      const { error } = await (supabase.from(tableName as any).insert(newEntries) as any)
-      if (error) throw error
+      // Insere em lotes pequenos (máx. 5 por comando), mantendo cada comando
+      // dentro do limite aceito pelo guard de operações em massa.
+      const headcountBatchSize = 5
+      for (let b = 0; b < newEntries.length; b += headcountBatchSize) {
+        const { error } = await (supabase
+          .from(tableName as any)
+          .insert(newEntries.slice(b, b + headcountBatchSize)) as any)
+        if (error) throw error
+      }
 
       if (tableName === 'employees') {
         const oldIds = Array.from(idMap.keys())
@@ -168,13 +175,18 @@ export function DuplicateHeadcountDialog({
                 }
               })
 
-              const { error: insertError } = await supabase
-                .from('employee_training_records')
-                .insert(newTrainings)
+              // Insere em lotes pequenos (máx. 5 por comando), mantendo cada
+              // comando dentro do limite aceito pelo guard de operações em massa.
+              const insertBatchSize = 5
+              for (let b = 0; b < newTrainings.length; b += insertBatchSize) {
+                const { error: insertError } = await supabase
+                  .from('employee_training_records')
+                  .insert(newTrainings.slice(b, b + insertBatchSize))
 
-              if (insertError) {
-                console.error('Erro ao inserir treinamentos:', insertError)
-                throw new Error('Falha ao copiar anexos e datas dos treinamentos.')
+                if (insertError) {
+                  console.error('Erro ao inserir treinamentos:', insertError)
+                  throw new Error('Falha ao copiar anexos e datas dos treinamentos.')
+                }
               }
             }
           }
