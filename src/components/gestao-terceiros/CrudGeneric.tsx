@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -98,6 +98,31 @@ export function CrudGeneric({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<any>(null)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+
+  // Guarda de foco da janela: quando o usuário abre o seletor de arquivos do
+  // sistema operacional (ou troca de janela) com o modal aberto, o navegador
+  // dispara blur/focus e o Radix interpreta o primeiro clique/pointerdown ao
+  // voltar como interação FORA do modal, fechando-o — o usuário era expulso da
+  // edição e voltava para a listagem. Ignoramos qualquer interação externa por
+  // um curto intervalo após a janela retomar o foco.
+  const windowBlurAtRef = useRef<number>(0)
+
+  useEffect(() => {
+    if (!isModalOpen) return
+    const handleBlur = () => {
+      windowBlurAtRef.current = Date.now()
+    }
+    window.addEventListener('blur', handleBlur)
+    return () => window.removeEventListener('blur', handleBlur)
+  }, [isModalOpen])
+
+  const guardDismiss = (e: Event) => {
+    const recentWindowBlur = Date.now() - windowBlurAtRef.current < 2000
+    if (recentWindowBlur || isUploading || isSubmitting) {
+      e.preventDefault()
+      return
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -558,7 +583,16 @@ export function CrudGeneric({
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent
+          className="sm:max-w-xl"
+          onPointerDownOutside={guardDismiss}
+          onInteractOutside={guardDismiss}
+          onFocusOutside={guardDismiss}
+          onEscapeKeyDown={(e) => {
+            // Upload/assinatura em andamento: fechar agora perderia o anexo
+            if (isUploading || isSubmitting) e.preventDefault()
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Editar' : 'Adicionar'} Registro</DialogTitle>
           </DialogHeader>
