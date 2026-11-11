@@ -53,6 +53,7 @@ import { AppProvider } from './store/AppContext'
 import { AuthProvider } from './hooks/use-auth'
 import { ThemeProvider } from './components/theme-provider'
 import { AutoLogout } from './components/AutoLogout'
+import { WindowFocusReturnGuard } from './components/WindowFocusReturnGuard'
 
 // Limpeza e Jardinagem Pages
 import MapaLJ from './pages/gestao-terceiros/limpeza-jardinagem/Mapa'
@@ -138,6 +139,7 @@ const App = () => (
       <AppProvider>
         <BrowserRouter>
           <AutoLogout />
+          <WindowFocusReturnGuard />
           <TooltipProvider>
             <Toaster />
             <Sonner />
