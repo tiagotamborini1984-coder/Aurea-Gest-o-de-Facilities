@@ -128,12 +128,25 @@ export default function Usuarios() {
     const token = sessionData?.session?.access_token
     if (!token) return { success: false, error: { message: 'Sem sessão' } }
 
+    // client_id do novo usuário: para não-Master criado pelo Master, usa o cliente
+    // escolhido no formulário, senão o cliente filtrado no seletor do topo
+    // (profile.client_id é null para o Master — nunca usar como fallback).
+    let newClientId: string | null = form.client_id || null
+    if (form.role !== 'Master' && !newClientId) {
+      newClientId =
+        profile?.role === 'Master'
+          ? selectedMasterClient !== 'all'
+            ? selectedMasterClient
+            : null
+          : profile?.client_id || null
+    }
+
     const payload = {
       email: form.email,
       password: form.password,
       name: form.name,
       role: form.role,
-      client_id: form.client_id || profile?.client_id,
+      client_id: newClientId,
       accessible_menus: form.accessible_menus || [],
       authorized_plants: form.authorized_plants || [],
       feature_permissions: form.feature_permissions || {},
