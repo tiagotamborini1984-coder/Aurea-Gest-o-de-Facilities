@@ -29,6 +29,19 @@ export function useMasterData() {
     const isAdmin = profile.role === 'Administrador' || profile.role === 'Master'
     const authorizedPlants = profile.authorized_plants || []
 
+    // Escopo de cliente (v0.0.1876+, correção do Master): todas as tabelas deste
+    // hook têm client_id (verificado no banco). Quando Master seleciona uma
+    // empresa no seletor do topo, TODOS os dados passam a ser dela — sem isso, o
+    // dashboard e os cadastros mostravam plantas/métricas de outras empresas.
+    // 'all' = visão consolidada (sem filtro no frontend; RLS continua valendo).
+    // Perfis não-Master ficam sempre presos à própria empresa (client_id do perfil).
+    const isMaster = profile.role === 'Master'
+    const scopedClientId = isMaster
+      ? selectedMasterClient && selectedMasterClient !== 'all'
+        ? selectedMasterClient
+        : null
+      : profile.client_id || null
+
     async function query(table: string) {
       const allRows: any[] = []
       const pageSize = 1000
@@ -38,10 +51,11 @@ export function useMasterData() {
       while (hasMore) {
         const start = page * pageSize
         const end = start + pageSize - 1
-        const { data, error } = await supabase
-          .from(table as any)
-          .select('*')
-          .range(start, end)
+        let q = supabase.from(table as any).select('*')
+        if (scopedClientId) {
+          q = q.eq('client_id', scopedClientId)
+        }
+        const { data, error } = await q.range(start, end)
         if (error) {
           console.error(`Erro ao carregar dados da tabela ${table}: ${error.message}`)
           return []

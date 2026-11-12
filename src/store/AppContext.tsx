@@ -408,6 +408,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [fetchClients],
   )
 
+  // Quando Master troca a empresa do seletor, a planta global escolhida pode
+  // pertencer a outra empresa — se não for limpa, telas filtradas por planta
+  // continuariam puxando dados da empresa anterior.
+  const handleSetSelectedMasterClient = useCallback((id: string | 'all') => {
+    setSelectedMasterClient((prev) => {
+      if (prev !== id) setSelectedPlant('all')
+      return id
+    })
+  }, [])
+
   const contextValue = useMemo(
     () => ({
       clients,
@@ -417,7 +427,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       activeClient,
       activePlant: selectedPlant !== 'all' ? selectedPlant : undefined,
       selectedMasterClient,
-      setSelectedMasterClient,
+      setSelectedMasterClient: handleSetSelectedMasterClient,
       selectedPlant,
       setSelectedPlant,
       addClient,
@@ -437,6 +447,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateClient,
       deleteClient,
       reloadProfile,
+      handleSetSelectedMasterClient,
     ],
   )
 

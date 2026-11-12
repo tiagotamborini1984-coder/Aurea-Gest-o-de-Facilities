@@ -96,7 +96,12 @@ export default function DashboardGestor() {
   }, [absenteeismTarget])
 
   const { plants, contracted, locations, goals, employees, equipment } = useMasterData()
-  const activeClientId = activeClient?.id || (profile as any)?.client_id
+  const isMaster = profile?.role === 'Master'
+  const activeClientId = isMaster
+    ? selectedMasterClient && selectedMasterClient !== 'all'
+      ? selectedMasterClient
+      : null
+    : activeClient?.id || (profile as any)?.client_id
 
   // "hasLoadedOnce" só é declarado depois do hook de logs; placeholder vira
   // estado de "primeira carga em andamento" via render abaixo.
@@ -130,7 +135,7 @@ export default function DashboardGestor() {
 
   useEffect(() => {
     async function fetchNWD() {
-      if (!activeClient?.id) return
+      if (!activeClientId) return
       const allNwd: any[] = []
       const pageSize = 1000
       let page = 0
@@ -140,7 +145,7 @@ export default function DashboardGestor() {
         const { data, error } = await supabase
           .from('plant_non_working_days')
           .select('*')
-          .eq('client_id', activeClient.id)
+          .eq('client_id', activeClientId)
           .gte('date', dateFrom)
           .lte('date', dateTo)
           .range(page * pageSize, (page + 1) * pageSize - 1)
@@ -165,7 +170,7 @@ export default function DashboardGestor() {
     }
 
     fetchNWD()
-  }, [activeClient?.id, dateFrom, dateTo])
+  }, [activeClientId, dateFrom, dateTo])
 
   const safeFilteredPlants = useMemo(
     () => (filteredPlants.length > 0 ? filteredPlants : [{ id: 'none', name: 'Nenhuma' }]),
