@@ -293,6 +293,11 @@ export default function Usuarios() {
 
     const authPlants = form.authorized_plants || []
 
+    // Lista bruta: preserva chaves que não pertencem a ALL_MODULES/ALL_MENUS (ex.: 'Chaves API')
+    const rawAccessibleMenus: string[] = Array.isArray(form.accessible_menus)
+      ? form.accessible_menus
+      : []
+
     let accModules: string[] = []
     let accMenus: string[] = []
 
@@ -333,6 +338,18 @@ export default function Usuarios() {
       return accModules.includes(mod)
     }
 
+    const otherItems = rawAccessibleMenus.filter(
+      (m: string) =>
+        !ALL_MODULES.includes(m) &&
+        !ALL_MENUS.includes(m) &&
+        !m.startsWith('Auditoria e Checklist:') &&
+        m !== 'Chaves API',
+    )
+
+    const audSubKeys = rawAccessibleMenus.filter((m: string) =>
+      m.startsWith('Auditoria e Checklist:'),
+    )
+
     const toggleModule = (mod: string) => {
       let newModules = [...accModules]
       if (isMaintenanceModule(mod)) {
@@ -358,21 +375,6 @@ export default function Usuarios() {
         accessible_menus: [...newModules, ...accMenus, ...otherItems, ...audSubKeys],
       })
     }
-
-    const rawAccessibleMenus: string[] = Array.isArray(form.accessible_menus)
-      ? form.accessible_menus
-      : []
-
-    const otherItems = rawAccessibleMenus.filter(
-      (m: string) =>
-        !ALL_MODULES.includes(m) &&
-        !ALL_MENUS.includes(m) &&
-        !m.startsWith('Auditoria e Checklist:'),
-    )
-
-    const audSubKeys = rawAccessibleMenus.filter((m: string) =>
-      m.startsWith('Auditoria e Checklist:'),
-    )
 
     const toggleAuditoriaSubmenu = (sub: string) => {
       const key = `Auditoria e Checklist:${sub}`
@@ -414,6 +416,18 @@ export default function Usuarios() {
         ...form,
         accessible_menus: [...accModules, ...newMenus, ...otherItems, ...audSubKeys],
       })
+    }
+
+    // 'Chaves API' não pertence a ALL_MODULES/ALL_MENUS: alterna direto na lista bruta
+    const toggleChavesApi = () => {
+      if (rawAccessibleMenus.includes('Chaves API')) {
+        setForm({
+          ...form,
+          accessible_menus: rawAccessibleMenus.filter((m: string) => m !== 'Chaves API'),
+        })
+      } else {
+        setForm({ ...form, accessible_menus: [...rawAccessibleMenus, 'Chaves API'] })
+      }
     }
 
     const featurePerms = form.feature_permissions || {}
@@ -488,6 +502,25 @@ export default function Usuarios() {
                 Nenhum módulo disponível no cliente.
               </span>
             )}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-brand-graphite mb-3">Menus Administrativos</h4>
+          <div className="grid grid-cols-1 gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="menu-chaves-api"
+                checked={rawAccessibleMenus.includes('Chaves API')}
+                onCheckedChange={() => toggleChavesApi()}
+              />
+              <Label
+                htmlFor="menu-chaves-api"
+                className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Chaves API (Horas Extras)
+              </Label>
+            </div>
           </div>
         </div>
 
