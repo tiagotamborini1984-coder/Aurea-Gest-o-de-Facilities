@@ -46,6 +46,7 @@ import { exportHorasExtrasToPdf, exportHorasExtrasToXml } from './utils/horas-ex
 import { HorasExtrasTable, type SolicitacaoHe } from './components/HorasExtrasTable'
 import { SolicitacaoHeDialog } from './components/SolicitacaoHeDialog'
 import { DecisaoHeDialog } from './components/DecisaoHeDialog'
+import { CostCenterEditDialog } from './components/CostCenterEditDialog'
 
 type FilterState = Record<string, unknown> & {
   plant: string
@@ -134,6 +135,11 @@ export default function HorasExtras() {
     solicitacao: null,
     action: null,
   })
+  // Correção pontual de Centro de Custo (Master/Admin) — HEs antigas criadas sem o dado
+  const [costCenterModal, setCostCenterModal] = useState<{
+    open: boolean
+    solicitacao: SolicitacaoHe | null
+  }>({ open: false, solicitacao: null })
 
   const effectiveClientId = useMemo(() => {
     if (isMaster) {
@@ -457,6 +463,29 @@ export default function HorasExtras() {
     toast.success('Solicitação de Horas Extras atualizada com sucesso!')
     setIsEditDialogOpen(false)
     setEditingSolicitacao(null)
+    fetchSolicitacoes()
+  }
+
+  // Correção de Centro de Custo em solicitação existente (Master/Admin, qualquer status):
+  // atualiza SOMENTE cost_center_text — não muda status, não reenvia e-mails.
+  const handleUpdateCostCenter = async (solicitacao: SolicitacaoHe, costCenterText: string) => {
+    if (!isAdminOrMaster) {
+      toast.error('Apenas usuários Master/Administradores podem corrigir o Centro de Custo.')
+      return
+    }
+
+    const { error } = await supabase
+      .from('horas_extras_solicitacoes')
+      .update({ cost_center_text: costCenterText })
+      .eq('id', solicitacao.id)
+
+    if (error) {
+      toast.error('Erro ao salvar o Centro de Custo: ' + error.message)
+      throw error
+    }
+
+    toast.success('Centro de Custo da solicitação atualizado com sucesso!')
+    setCostCenterModal({ open: false, solicitacao: null })
     fetchSolicitacoes()
   }
 
@@ -842,6 +871,8 @@ export default function HorasExtras() {
         loading={loading}
         canManage={isAdminOrMaster}
         canEdit={canEditSolicitacao}
+        canEditCostCenter={isAdminOrMaster}
+        onEditCostCenter={(sol) => setCostCenterModal({ open: true, solicitacao: sol })}
         onEdit={(sol) => {
           setEditingSolicitacao(sol)
           setIsEditDialogOpen(true)
@@ -873,6 +904,14 @@ export default function HorasExtras() {
         companies={companies}
         editingSolicitacao={editingSolicitacao}
         onSubmit={handleUpdateSolicitacao}
+      />
+
+      {/* Modal: Correção de Centro de Custo (Master/Admin, qualquer status) */}
+      <CostCenterEditDialog
+        open={costCenterModal.open}
+        onOpenChange={(open) => setCostCenterModal((prev) => ({ ...prev, open }))}
+        solicitacao={costCenterModal.solicitacao}
+        onConfirm={handleUpdateCostCenter}
       />
 
       {/* Modal: Decisão (Aprovar / Recusar) */}

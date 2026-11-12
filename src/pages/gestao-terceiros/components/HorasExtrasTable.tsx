@@ -77,6 +77,9 @@ interface HorasExtrasTableProps {
   loading: boolean
   canManage: boolean
   canEdit: (solicitacao: SolicitacaoHe) => boolean
+  /** Master/Admin: permite corrigir o Centro de Custo pagador de qualquer registro */
+  canEditCostCenter?: boolean
+  onEditCostCenter?: (solicitacao: SolicitacaoHe) => void
   onEdit: (solicitacao: SolicitacaoHe) => void
   onApprove: (solicitacao: SolicitacaoHe) => void
   onReject: (solicitacao: SolicitacaoHe) => void
@@ -88,6 +91,8 @@ export function HorasExtrasTable({
   loading,
   canManage,
   canEdit,
+  canEditCostCenter = false,
+  onEditCostCenter,
   onEdit,
   onApprove,
   onReject,
@@ -106,6 +111,8 @@ export function HorasExtrasTable({
       setIsDeleting(false)
     }
   }
+
+  const hasCostCenterActions = !!canEditCostCenter && !!onEditCostCenter
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -160,7 +167,7 @@ export function HorasExtrasTable({
               <TableHead>Motivo / Justificativa</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Gestor / Histórico</TableHead>
-              {(canManage || solicitacoes.some((s) => canEdit(s))) && (
+              {(canManage || hasCostCenterActions || solicitacoes.some((s) => canEdit(s))) && (
                 <TableHead className="text-right">Ações</TableHead>
               )}
             </TableRow>
@@ -169,7 +176,7 @@ export function HorasExtrasTable({
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={canManage ? 10 : 9}
+                  colSpan={canManage || hasCostCenterActions ? 10 : 9}
                   className="text-center py-10 text-slate-500"
                 >
                   Carregando solicitações de horas extras...
@@ -178,7 +185,7 @@ export function HorasExtrasTable({
             ) : solicitacoes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={canManage ? 10 : 9}
+                  colSpan={canManage || hasCostCenterActions ? 10 : 9}
                   className="text-center py-10 text-slate-500"
                 >
                   Nenhuma solicitação de horas extras encontrada com os filtros atuais.
@@ -285,6 +292,19 @@ export function HorasExtrasTable({
                   {canManage && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {hasCostCenterActions && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-slate-400 hover:text-brand-vividBlue hover:bg-brand-vividBlue/10 h-8 w-8 p-0"
+                            title={`Corrigir Centro de Custo da HE de ${item.employee_name} (disponível mesmo para HEs já decididas)`}
+                            aria-label={`Corrigir Centro de Custo da HE de ${item.employee_name}`}
+                            onClick={() => onEditCostCenter?.(item)}
+                          >
+                            <Wallet className="h-4 w-4" />
+                            <span className="sr-only">Corrigir Centro de Custo</span>
+                          </Button>
+                        )}
                         {item.status === 'pendente' && (
                           <>
                             <Button

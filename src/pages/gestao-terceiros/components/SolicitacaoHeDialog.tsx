@@ -103,6 +103,11 @@ export function SolicitacaoHeDialog({
   // Modo edição quando uma solicitação é passada
   const isEditMode = !!editingSolicitacao
 
+  // Centro de Custo pagador é OBRIGATÓRIO: feedback imediato enquanto digita
+  const normalizedCostCenterPreview = costCenterText.trim().toUpperCase()
+  const isCostCenterInvalid =
+    normalizedCostCenterPreview.length > 0 && !isValidCostCenterPagador(normalizedCostCenterPreview)
+
   const uniqueEmployees = useMemo(() => {
     return resolveActiveEmployees(employees as any[])
   }, [employees])
@@ -416,11 +421,19 @@ export function SolicitacaoHeDialog({
                 onChange={(e) => setCostCenterText(maskCostCenterPagador(e.target.value))}
                 autoComplete="off"
                 required
+                aria-invalid={isCostCenterInvalid}
+                className={isCostCenterInvalid ? 'border-rose-400 focus-visible:ring-rose-300' : ''}
               />
-              <p className="text-[11px] text-slate-500">
-                Formato: <strong>1111aaa</strong> (4 números + 3 letras). Letras minúsculas são
-                convertidas para maiúsculas automaticamente.
-              </p>
+              {isCostCenterInvalid ? (
+                <p className="text-[11px] text-rose-600">
+                  Formato inválido: use 4 números seguidos de 3 letras (ex.: 1234abc).
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Obrigatório. Formato: <strong>1111aaa</strong> (4 números + 3 letras). Letras
+                  minúsculas são convertidas para maiúsculas automaticamente.
+                </p>
+              )}
             </div>
 
             {/* E-mail do destinatário (pré-preenchido com o e-mail da Empresa Parceira) */}
@@ -530,7 +543,7 @@ export function SolicitacaoHeDialog({
             <Button
               type="submit"
               className="bg-brand-vividBlue hover:bg-brand-deepBlue text-white"
-              disabled={isSubmitting || !selectedEmployeeId}
+              disabled={isSubmitting || !selectedEmployeeId || isCostCenterInvalid}
             >
               {isEditMode
                 ? isSubmitting
