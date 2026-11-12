@@ -40,6 +40,7 @@ const MAIN_MENUS = [
   'Gestão de EPIs',
   'Gestão de Férias',
   'Pesquisa de Satisfação',
+  'Chaves API',
 ]
 
 const MAINTENANCE_MODULE_VARIATIONS = [

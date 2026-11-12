@@ -311,7 +311,14 @@ export function AppSidebar() {
           }
 
           if (item.title === 'Chaves de API (HE)') {
-            if (role !== 'Master' && role !== 'Administrador') return null
+            // Master/Administrador sempre veem; Gestor/Operacional só com o
+            // menu 'Chaves API' atribuído na configuração de acessos.
+            if (
+              role !== 'Master' &&
+              role !== 'Administrador' &&
+              !accessibleMenus.includes('Chaves API')
+            )
+              return null
             return item
           }
 
