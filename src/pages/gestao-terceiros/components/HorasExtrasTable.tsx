@@ -350,9 +350,9 @@ export function HorasExtrasTable({
             )}
           </TableBody>
         </Table>
-        {/* Barra de rolagem horizontal pegajosa: fica fixa no rodapé da área
-           visível enquanto a tabela larga estiver na tela — o usuário alcança
-           o botão "Aprovar" sem rolar a página até o pé da tabela. */}
+        {/* Barra de rolagem horizontal CONGELADA no rodapé do viewport (portal
+           position: fixed): visível já ao abrir a tela, sem rolar a página —
+           o usuário alcança o botão "Aprovar" a qualquer momento. */}
         <StickyHorizontalScrollbar tableRef={tableRef} />
       </CardContent>
 
