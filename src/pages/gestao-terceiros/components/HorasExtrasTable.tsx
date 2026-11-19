@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StickyHorizontalScrollbar } from '@/components/StickyHorizontalScrollbar'
 import {
   Table,
   TableBody,
@@ -100,6 +101,8 @@ export function HorasExtrasTable({
 }: HorasExtrasTableProps) {
   const [itemToDelete, setItemToDelete] = useState<SolicitacaoHe | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Ref da <table>: o pai direto dela é o wrapper overflow-auto que rola na horizontal
+  const tableRef = useRef<HTMLTableElement>(null)
 
   const handleConfirmDelete = async () => {
     if (!itemToDelete || !onDelete) return
@@ -155,7 +158,7 @@ export function HorasExtrasTable({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
+        <Table ref={tableRef}>
           <TableHeader>
             <TableRow>
               <TableHead>Colaborador Terceiro</TableHead>
@@ -347,6 +350,10 @@ export function HorasExtrasTable({
             )}
           </TableBody>
         </Table>
+        {/* Barra de rolagem horizontal pegajosa: fica fixa no rodapé da área
+           visível enquanto a tabela larga estiver na tela — o usuário alcança
+           o botão "Aprovar" sem rolar a página até o pé da tabela. */}
+        <StickyHorizontalScrollbar tableRef={tableRef} />
       </CardContent>
 
       {/* Confirmação de Exclusão (Apenas Administrador) */}
