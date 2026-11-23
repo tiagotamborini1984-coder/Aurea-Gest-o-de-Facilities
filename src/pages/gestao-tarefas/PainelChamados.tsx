@@ -51,12 +51,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { TaskDetailsSheet } from './TaskDetailsSheet'
-import {
-  clearOpenTaskSession,
-  getOpenTaskId,
-  logSheetCloseDiag,
-  saveOpenTaskId,
-} from './sheet-session'
+import { getOpenTaskId, logSheetCloseDiag, saveOpenTaskId } from './sheet-session'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
 import { Navigate, useSearchParams, useLocation } from 'react-router-dom'

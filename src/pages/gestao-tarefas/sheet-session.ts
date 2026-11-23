@@ -30,6 +30,7 @@ export const GHOST_CLOSE_MS = 1500
 // ---- Rastreio de interação real do usuário -------------------------------
 
 let lastUserInteractionAt = 0
+let lastFocusReturnAt = 0
 let interactionListenerInstalled = false
 
 function installInteractionListener(): void {
@@ -38,9 +39,21 @@ function installInteractionListener(): void {
   const mark = () => {
     lastUserInteractionAt = Date.now()
   }
+  const markFocusReturn = () => {
+    lastFocusReturnAt = Date.now()
+  }
+  const markVisibility = () => {
+    if (!document.hidden) lastFocusReturnAt = Date.now()
+  }
   // Captura: marca antes de qualquer handler que possa parar a propagação.
   window.addEventListener('pointerdown', mark, true)
   window.addEventListener('keydown', mark, true)
+  // Retorno de foco/visibilidade da aba (Alt+Tab, volta de outro sistema):
+  // interação anterior a este instante não conta como "recente" — o usuário
+  // pode ter digitado até 1s antes de sair e o fechamento ao voltar segue
+  // sendo fantasma (a causa residual da classificação errada).
+  window.addEventListener('focus', markFocusReturn)
+  document.addEventListener('visibilitychange', markVisibility)
 }
 
 /** ms desde a última interação real (pointerdown/keydown); null se nenhuma. */
@@ -50,10 +63,29 @@ export function msSinceLastUserInteraction(): number | null {
   return Date.now() - lastUserInteractionAt
 }
 
-/** Indica se o fechamento atual parece ter vindo de interação do usuário. */
+// Instala CEDO (na importação do módulo, antes de qualquer fechamento): o
+// timestamp do retorno de foco precisa existir ANTES do fechamento fantasma
+// acontecer — instalado só no fechamento, lastFocusReturnAt estaria a zero e
+// a classificação legítimo/fantasma erraria.
+try {
+  installInteractionListener()
+} catch {
+  // ambiente sem window: sem rastreio, sem quebra.
+}
+
+/**
+ * Indica se o fechamento atual parece ter vindo de interação do usuário.
+ *
+ * Legítimo só quando a ÚLTIMA interação é recente E aconteceu DEPOIS do último
+ * retorno de foco da aba: se o usuário digitou e saiu da janela, a interação
+ * ficou para trás do retorno — fechar logo ao voltar é fantasma, mesmo com a
+ * interação a menos de GHOST_CLOSE_MS.
+ */
 export function closeLooksLegit(): boolean {
   const since = msSinceLastUserInteraction()
-  return since !== null && since < GHOST_CLOSE_MS
+  if (since === null || since >= GHOST_CLOSE_MS) return false
+  if (lastFocusReturnAt > 0 && lastUserInteractionAt <= lastFocusReturnAt) return false
+  return true
 }
 
 // ---- Chaves de sessão -----------------------------------------------------

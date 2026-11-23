@@ -46,7 +46,6 @@ import {
 } from './audit-draft-storage'
 import {
   closeLooksLegit,
-  clearOpenAuditIfTask,
   clearOpenTaskSession,
   getOpenAuditStep,
   logSheetCloseDiag,
