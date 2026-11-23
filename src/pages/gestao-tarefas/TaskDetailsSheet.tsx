@@ -384,7 +384,7 @@ export function TaskDetailsSheet({
     // 3. Salva o executor atual em previous_assignee_id para permitir devolução se reprovado;
     // 4. Marca approval_status como 'pending'.
     if (
-      isNcTask &&
+      isPersonalTask &&
       (status?.is_terminal || statusName.includes('finaliz') || statusName.includes('conclu'))
     ) {
       // Se já estiver aguardando aprovação e for admin/solicitante querendo fechar diretamente
@@ -408,12 +408,14 @@ export function TaskDetailsSheet({
         await supabase.from('task_timeline').insert({
           task_id: task.id,
           user_id: profile.id,
-          content: `Demanda finalizada pelo responsável. Status movido para Aguardando Aprovação e responsabilidade transferida ao solicitante ${requesterUser?.name || 'Solicitante'}.`,
+          content: isNcTask
+            ? `Demanda finalizada pelo responsável. Status movido para Aguardando Aprovação e responsabilidade transferida ao solicitante ${requesterUser?.name || 'Solicitante'}.`
+            : `Tarefa finalizada pelo responsável. Status movido para Aguardando Aprovação e responsabilidade transferida ao solicitante ${requesterUser?.name || 'Solicitante'} para validar a execução.`,
           action_type: 'delegation',
         })
 
         toast({
-          title: 'Não Conformidade finalizada!',
+          title: isNcTask ? 'Não Conformidade finalizada!' : 'Tarefa finalizada!',
           description: `A demanda foi movida para "Aguardando Aprovação" e a responsabilidade transferida para ${requesterUser?.name || 'o solicitante'} aprovar ou reprovar.`,
           className: 'bg-amber-50 text-amber-900 border-amber-200',
         })
@@ -959,25 +961,40 @@ export function TaskDetailsSheet({
         task.title.toLowerCase().startsWith('nao conformidade') ||
         task.title.toLowerCase().startsWith('nc:')))
 
+  // Verification whether the task is of type "Tarefas Pessoais"
+  const isPersonalTask =
+    !isNcTask && currentTaskType?.name?.toLowerCase().includes('tarefa pessoal') === true
+
   // Find status "Aguardando Aprovação"
-  const pendingApprovalStatus = taskStatuses.find((s: any) =>
-    s.name.toLowerCase().includes('aguardando aprova'),
+  // Status "Aguardando Aprovação" deve ser do MESMO cliente da tarefa (exige
+  // client_id na task_statuses) — senão, com todas as empresas no escopo
+  // (Master com 'all'), o find() pega o status de outra empresa.
+  const pendingApprovalStatus = taskStatuses.find(
+    (s: any) =>
+      s.name.toLowerCase().includes('aguardando aprova') &&
+      (!s.client_id || !task?.client_id || s.client_id === task.client_id),
   )
 
-  // Find status "Finalizado" / Concluído
+  // Find status "Finalizado" / Concluído — do mesmo cliente da tarefa
   const finalizedStatus =
     taskStatuses.find(
+      (s: any) => s.client_id === task?.client_id && s.name.toLowerCase().includes('finaliz'),
+    ) ||
+    taskStatuses.find(
       (s: any) =>
-        s.name.toLowerCase().includes('finaliz') ||
-        (s.is_terminal &&
-          !s.name.toLowerCase().includes('exclu') &&
-          !s.name.toLowerCase().includes('canc')),
-    ) || taskStatuses.find((s: any) => s.is_terminal)
+        s.client_id === task?.client_id &&
+        s.is_terminal &&
+        !s.name.toLowerCase().includes('exclu') &&
+        !s.name.toLowerCase().includes('canc'),
+    ) ||
+    taskStatuses.find((s: any) => s.is_terminal)
 
   const currentStatus = taskStatuses.find((s: any) => s.id === task?.status_id)
   const isAwaitingApproval =
-    currentStatus?.name?.toLowerCase().includes('aguardando aprova') ||
-    task?.approval_status === 'pending'
+    (currentStatus?.name?.toLowerCase().includes('aguardando aprova') ||
+      task?.approval_status === 'pending') &&
+    // Transição só faz sentido para NC e Tarefa Pessoal
+    (isNcTask || isPersonalTask)
 
   // The requester can approve/reject, or admin/master
   const isRequesterOrAdmin =
@@ -991,10 +1008,27 @@ export function TaskDetailsSheet({
     if (!profile) return
     setIsApproving(true)
     try {
-      // Find a terminal/completed status (e.g., Concluído, Finalizado, etc.)
+      // Status terminal de CONCLUSÃO (ex.: Finalizado/Concluído) — nunca Cancelado/Excluída.
       const completedStatus =
-        taskStatuses.find((s: any) => s.is_terminal && !s.name.toLowerCase().includes('exclu')) ||
-        taskStatuses.find((s: any) => s.is_terminal)
+        taskStatuses.find(
+          (s: any) =>
+            s.client_id === task?.client_id &&
+            s.is_terminal &&
+            (s.name.toLowerCase().includes('finaliz') || s.name.toLowerCase().includes('conclu')),
+        ) ||
+        taskStatuses.find(
+          (s: any) =>
+            s.client_id === task?.client_id &&
+            s.is_terminal &&
+            !s.name.toLowerCase().includes('exclu') &&
+            !s.name.toLowerCase().includes('canc'),
+        ) ||
+        taskStatuses.find(
+          (s: any) =>
+            s.client_id === task?.client_id &&
+            s.is_terminal &&
+            !s.name.toLowerCase().includes('exclu'),
+        )
 
       // Se tiver previous_assignee_id registrado, mantemos guardado para histórico
       const executorName =
@@ -1018,17 +1052,18 @@ export function TaskDetailsSheet({
       if (error) throw error
 
       const executorText = executorName ? ` Executada por: ${executorName}.` : ''
+      const subjectLabel = isNcTask ? 'Demanda de Não Conformidade' : 'Tarefa'
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
-        content: `Demanda de Não Conformidade APROVADA por ${profile.name || 'Solicitante'}.${executorText}${
+        content: `${subjectLabel} APROVADA por ${profile.name || 'Solicitante'}.${executorText}${
           completedStatus ? ` Status alterado para: ${completedStatus.name}.` : ''
         }`,
         action_type: 'status_change',
       })
 
       toast({
-        title: 'Não Conformidade aprovada!',
+        title: isNcTask ? 'Não Conformidade aprovada!' : 'Tarefa aprovada!',
         description: 'A demanda foi validada e concluída com sucesso.',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
@@ -1063,6 +1098,7 @@ export function TaskDetailsSheet({
       const openStatus =
         taskStatuses.find(
           (s: any) =>
+            s.client_id === task?.client_id &&
             !s.is_terminal &&
             (s.name.toLowerCase().includes('andamento') ||
               s.name.toLowerCase().includes('aberto') ||
@@ -1070,7 +1106,10 @@ export function TaskDetailsSheet({
             !s.name.toLowerCase().includes('aguardando aprova'),
         ) ||
         taskStatuses.find(
-          (s: any) => !s.is_terminal && !s.name.toLowerCase().includes('aguardando'),
+          (s: any) =>
+            s.client_id === task?.client_id &&
+            !s.is_terminal &&
+            !s.name.toLowerCase().includes('aguardando'),
         ) ||
         taskStatuses[0]
 
@@ -1105,17 +1144,18 @@ export function TaskDetailsSheet({
       const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
       if (error) throw error
 
+      const subjectLabel = isNcTask ? 'Demanda de Não Conformidade' : 'Tarefa'
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
-        content: `Demanda de Não Conformidade REPROVADA por ${profile.name || 'Solicitante'}. Justificativa: "${rejectionReason.trim()}". Devolvida ao responsável ${returnedAssigneeUser?.name || 'anterior'}.${
+        content: `${subjectLabel} REPROVADA por ${profile.name || 'Solicitante'}. Justificativa: "${rejectionReason.trim()}". Devolvida ao responsável ${returnedAssigneeUser?.name || 'anterior'}.${
           openStatus ? ` Status alterado para: ${openStatus.name}.` : ''
         }`,
         action_type: 'status_change',
       })
 
       toast({
-        title: 'Não Conformidade reprovada',
+        title: isNcTask ? 'Não Conformidade reprovada' : 'Tarefa reprovada',
         description: 'A demanda retornou para o responsável refazer com as observações.',
         className: 'bg-amber-50 text-amber-900 border-amber-200',
       })
@@ -1403,7 +1443,7 @@ export function TaskDetailsSheet({
                   Não Conformidade
                 </Badge>
               )}
-              {isNcTask && isAwaitingApproval && (
+              {(isNcTask || isPersonalTask) && isAwaitingApproval && (
                 <Badge
                   variant="outline"
                   className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium"
@@ -1411,12 +1451,12 @@ export function TaskDetailsSheet({
                   Aguardando Aprovação
                 </Badge>
               )}
-              {isNcTask && task?.approval_status === 'approved' && (
+              {(isNcTask || isPersonalTask) && task?.approval_status === 'approved' && (
                 <Badge className="bg-green-600 text-white font-medium border-0">
                   Aprovada pelo Solicitante
                 </Badge>
               )}
-              {isNcTask && task?.approval_status === 'rejected' && (
+              {(isNcTask || isPersonalTask) && task?.approval_status === 'rejected' && (
                 <Badge variant="destructive" className="font-medium">
                   Reprovada - Retornada
                 </Badge>
@@ -1645,8 +1685,8 @@ export function TaskDetailsSheet({
               </div>
             )}
 
-            {/* Action card for NC assignee when pending completion */}
-            {isNcTask &&
+            {/* Action card for NC / Tarefa Pessoal assignee when pending completion */}
+            {(isNcTask || isPersonalTask) &&
               !isAwaitingApproval &&
               task?.approval_status !== 'approved' &&
               isCurrentAssignee && (
@@ -1658,10 +1698,12 @@ export function TaskDetailsSheet({
                       </div>
                       <div>
                         <h5 className="font-semibold text-foreground text-sm sm:text-base">
-                          Conclusão da Não Conformidade
+                          {isNcTask ? 'Conclusão da Não Conformidade' : 'Conclusão da Tarefa'}
                         </h5>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Após tomar as ações corretivas e anexar as evidências, marque como{' '}
+                          {isNcTask
+                            ? 'Após tomar as ações corretivas e anexar as evidências, marque como '
+                            : 'Ao concluir o que foi pedido, marque como '}
                           <strong className="text-foreground">Finalizado</strong>. O sistema moverá
                           a demanda para aprovação do solicitante{' '}
                           <strong className="text-foreground">
@@ -1685,14 +1727,14 @@ export function TaskDetailsSheet({
                       size="sm"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      Finalizar Não Conformidade
+                      {isNcTask ? 'Finalizar Não Conformidade' : 'Finalizar Tarefa'}
                     </Button>
                   </div>
                 </div>
               )}
 
-            {/* Approval banner for Não Conformidade demands */}
-            {isNcTask && isAwaitingApproval && (
+            {/* Approval banner for Não Conformidade / Tarefa Pessoal demands */}
+            {(isNcTask || isPersonalTask) && isAwaitingApproval && (
               <div className="p-4 sm:p-5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3 animate-in fade-in">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -1704,7 +1746,9 @@ export function TaskDetailsSheet({
                         Aguardando Aprovação do Solicitante
                       </h5>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        O executor concluiu o atendimento desta Não Conformidade. A responsabilidade
+                        {isNcTask
+                          ? 'O executor concluiu o atendimento desta Não Conformidade. A responsabilidade'
+                          : 'O responsável concluiu a execução desta tarefa. A responsabilidade'}{' '}
                         foi transferida ao solicitante{' '}
                         <strong className="text-foreground">
                           ({getAssigneeName(task?.requester_id)})
@@ -1758,12 +1802,14 @@ export function TaskDetailsSheet({
               </div>
             )}
 
-            {isNcTask && task?.approval_status === 'approved' && (
+            {(isNcTask || isPersonalTask) && task?.approval_status === 'approved' && (
               <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-between text-green-700 dark:text-green-400">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 shrink-0" />
                   <div>
-                    <span className="font-semibold text-sm">Não Conformidade Aprovada</span>
+                    <span className="font-semibold text-sm">
+                      {isNcTask ? 'Não Conformidade Aprovada' : 'Tarefa Aprovada'}
+                    </span>
                     <p className="text-xs text-muted-foreground">
                       Validada por{' '}
                       <span className="font-medium text-foreground">
@@ -1778,17 +1824,19 @@ export function TaskDetailsSheet({
               </div>
             )}
 
-            {isNcTask && task?.approval_status === 'rejected' && task?.rejection_reason && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl space-y-1 text-red-700 dark:text-red-400">
-                <div className="flex items-center gap-2">
-                  <X className="w-4 h-4 shrink-0 text-red-600" />
-                  <span className="font-semibold text-sm">Última Reprovação do Solicitante</span>
+            {(isNcTask || isPersonalTask) &&
+              task?.approval_status === 'rejected' &&
+              task?.rejection_reason && (
+                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl space-y-1 text-red-700 dark:text-red-400">
+                  <div className="flex items-center gap-2">
+                    <X className="w-4 h-4 shrink-0 text-red-600" />
+                    <span className="font-semibold text-sm">Última Reprovação do Solicitante</span>
+                  </div>
+                  <p className="text-xs text-foreground bg-background/60 p-2.5 rounded-lg border border-red-500/20">
+                    {task.rejection_reason}
+                  </p>
                 </div>
-                <p className="text-xs text-foreground bg-background/60 p-2.5 rounded-lg border border-red-500/20">
-                  {task.rejection_reason}
-                </p>
-              </div>
-            )}
+              )}
 
             <div className="space-y-4 pt-4">
               <h4 className="font-semibold text-foreground">Linha do Tempo</h4>
@@ -1839,7 +1887,7 @@ export function TaskDetailsSheet({
                     onValueChange={handleStatusChange}
                     disabled={
                       (auditExecution && auditExecution.status !== 'Finalizado') ||
-                      (isNcTask && isAwaitingApproval && !isRequesterOrAdmin)
+                      ((isNcTask || isPersonalTask) && isAwaitingApproval && !isRequesterOrAdmin)
                     }
                   >
                     <SelectTrigger className="bg-background border-input w-full sm:min-w-[140px]">
@@ -1852,7 +1900,7 @@ export function TaskDetailsSheet({
                           // O responsável deve ver as opções de trabalho e a opção "Finalizado" (ou Concluído),
                           // que ao ser escolhida dispara a transição automática para "Aguardando Aprovação" com o solicitante.
                           // Ele só vê "Aguardando Aprovação" se a tarefa já estiver nesse status (para exibição no Select).
-                          if (isNcTask && !isRequesterOrAdmin) {
+                          if ((isNcTask || isPersonalTask) && !isRequesterOrAdmin) {
                             const isPendingApp = s.name.toLowerCase().includes('aguardando aprova')
                             if (isPendingApp && s.id !== task?.status_id) return false
                           }
@@ -2019,11 +2067,11 @@ export function TaskDetailsSheet({
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for rejecting NC task */}
+      {/* Dialog for rejecting NC task / Tarefa Pessoal */}
       <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reprovar Não Conformidade</DialogTitle>
+            <DialogTitle>{isNcTask ? 'Reprovar Não Conformidade' : 'Reprovar Tarefa'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">

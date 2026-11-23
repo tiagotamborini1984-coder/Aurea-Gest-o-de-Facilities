@@ -1083,6 +1083,7 @@ export default function PainelChamados() {
                       <div className="flex flex-col gap-1 items-start">
                         <span>{task.title || '-'}</span>
                         {task.approval_status === 'pending' && (
+                          /* Aguardando Validação: reaproveitado do fluxo de NC, exibido para NC e Tarefa Pessoal */
                           <Badge
                             variant="outline"
                             className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
@@ -1121,6 +1122,12 @@ export default function PainelChamados() {
                               title="Não Conformidade"
                             />
                           )}
+                        {type?.name && type.name.toLowerCase().includes('tarefa pessoal') && (
+                          <span
+                            className="w-2 h-2 rounded-full bg-blue-500 shrink-0"
+                            title="Tarefa Pessoal"
+                          />
+                        )}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
