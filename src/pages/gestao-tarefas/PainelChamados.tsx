@@ -198,6 +198,46 @@ export default function PainelChamados() {
     }
   }, [selectedTask?.id])
 
+  // Redundância garantida contra o retorno do Alt+Tab (v0.0.1886): ao voltar o
+  // foco ou a visibilidade da aba, se o storage diz que havia uma tarefa de
+  // detalhes aberta e o estado em memória foi perdido por QUALQUER caminho
+  // (dismiss do Radix que escapou do WindowFocusReturnGuard, erro de render,
+  // efeito de terceiros), reabre a tela de detalhes exatamente como estava —
+  // o wizard da auditoria volta pelo rascunho em localStorage (v0.0.1884).
+  // Fechamento legítimo não é afetado: ao fechar, o storage é limpo no efeito
+  // acima, então o restaurador não tem o que reabrir.
+  const selectedTaskRef = useRef<any>(null)
+  const tasksRef = useRef<any[]>([])
+  useEffect(() => {
+    selectedTaskRef.current = selectedTask
+  }, [selectedTask])
+  useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
+
+  useEffect(() => {
+    const restoreOpenTask = () => {
+      let savedTaskId: string | null = null
+      try {
+        savedTaskId = window.sessionStorage.getItem('aurea_gestao_tarefas:open_task')
+      } catch {
+        return
+      }
+      if (!savedTaskId || selectedTaskRef.current?.id === savedTaskId) return
+      const task = tasksRef.current.find((t: any) => t.id === savedTaskId)
+      if (task) setSelectedTask(task)
+    }
+    const handleVisibility = () => {
+      if (!document.hidden) restoreOpenTask()
+    }
+    window.addEventListener('focus', restoreOpenTask)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', restoreOpenTask)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<any>(null)
   const [deleteJustification, setDeleteJustification] = useState('')

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { useWindowFocusGuard } from '@/hooks/use-window-focus-guard'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -95,6 +96,14 @@ export function TaskDetailsSheet({
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null)
   const [poDateDialogOpen, setPoDateDialogOpen] = useState(false)
   const [poGeneratedDate, setPoGeneratedDate] = useState('')
+
+  // Guarda de retorno de foco (Alt+Tab / seletor de arquivos): dentro de 2s do
+  // retorno, qualquer pointerdown/interact/focus "fora" da camada é o eco
+  // fantasma do navegador, não um clique do usuário — preventDefault impede o
+  // dismiss. Clique legítimo fora (depois dos 2s) continua fechando.
+  const guardWindowDismiss = useWindowFocusGuard(isOpen, {
+    isBusy: isSavingAudit || isUploadingAttachment || isDeleting,
+  })
 
   // NC approval modal & processing state
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
@@ -1282,7 +1291,12 @@ export function TaskDetailsSheet({
           }
         }}
       >
-        <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-[100dvh] p-0 bg-background border-l border-border overflow-hidden">
+        <SheetContent
+          className="sm:max-w-xl md:max-w-2xl flex flex-col h-[100dvh] p-0 bg-background border-l border-border overflow-hidden"
+          onPointerDownOutside={guardWindowDismiss}
+          onInteractOutside={guardWindowDismiss}
+          onFocusOutside={guardWindowDismiss}
+        >
           <SheetHeader className="p-4 sm:p-6 pb-4 bg-card border-b border-border shrink-0">
             <div className="flex items-center justify-between gap-2">
               <SheetTitle className="text-xl text-foreground">
