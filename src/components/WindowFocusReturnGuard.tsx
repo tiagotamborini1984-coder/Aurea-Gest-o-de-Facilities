@@ -25,7 +25,15 @@ import { useEffect } from 'react'
  *    restauração de foco do navegador; nenhum clique humano acontece nesse
  *    intervalo, e dismissal por pointerdown não é afetado);
  *  - enquanto a janela segue desfocada (ex.: seletor de arquivos aberto por
- *    cima).
+ *    cima);
+ *  - APÓS o retorno, enquanto o usuário não interagir (nenhum pointerdown/
+ *    keydown desde a volta): o navegador pode devolver o foco ao ELEMENTO
+ *    ATIVO (o trigger "Detalhes" do sheet, por exemplo) bem depois dos 250ms —
+ *    Alt+Tab para outro sistema que rouba o foco do navegador faz o retorno
+ *    restaurar o foco no trigger, fora da camada Radix aberta, e o sheet fecha
+ *    sozinho. Sem interação humana nenhum focusin legítimo ocorre: suprimir
+ *    até a primeira interação (pointerdown/keydown) é seguro — dismissal por
+ *    pointerdown e navegação por teclado não dependem de focusin anterior.
  *
  * Os guards por modal (useWindowFocusGuard) e o salvamento por diferença dos
  * treinamentos continuam valendo sem alteração.
@@ -40,6 +48,9 @@ export function WindowFocusReturnGuard() {
     // Timestamp do último blur — se for mais recente que o retorno de foco,
     // a janela ainda está desfocada (ex.: seletor de arquivos aberto por cima).
     let blurAt = 0
+    // Timestamp da ÚLTIMA interação real do usuário (pointerdown/keydown) —
+    // um focusin sem interação anterior desde o retorno é fantasma.
+    let userInteractedAt = 0
 
     const handleFocus = () => {
       focusReturnedAt = Date.now()
@@ -49,6 +60,9 @@ export function WindowFocusReturnGuard() {
     }
     const handleVisibility = () => {
       if (!document.hidden) focusReturnedAt = Date.now()
+    }
+    const handleUserInteraction = () => {
+      userInteractedAt = Date.now()
     }
 
     const isGhost = (e: FocusEvent) => {
@@ -66,7 +80,12 @@ export function WindowFocusReturnGuard() {
       // (possivelmente fora da camada aberta) — não é interação do usuário.
       const isRestoreStorm = sinceReturn < RESTORE_STORM_MS
 
-      return isGhostBodyFocus || isRestoreStorm
+      // Restauração de foco tardia (janela que ficou >2s em outro sistema):
+      // qualquer focusin antes da primeira interação do usuário é fantasma.
+      const noUserInteractionSinceReturn =
+        focusReturnedAt > 0 && userInteractedAt <= focusReturnedAt
+
+      return isGhostBodyFocus || isRestoreStorm || noUserInteractionSinceReturn
     }
 
     const handleFocusIn = (e: FocusEvent) => {
@@ -79,12 +98,16 @@ export function WindowFocusReturnGuard() {
 
     window.addEventListener('focus', handleFocus)
     window.addEventListener('blur', handleBlur)
+    window.addEventListener('pointerdown', handleUserInteraction, true)
+    window.addEventListener('keydown', handleUserInteraction, true)
     document.addEventListener('visibilitychange', handleVisibility)
     document.addEventListener('focusin', handleFocusIn, true)
 
     return () => {
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('pointerdown', handleUserInteraction, true)
+      window.removeEventListener('keydown', handleUserInteraction, true)
       document.removeEventListener('visibilitychange', handleVisibility)
       document.removeEventListener('focusin', handleFocusIn, true)
     }
