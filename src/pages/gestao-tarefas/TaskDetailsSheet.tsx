@@ -44,6 +44,15 @@ import {
   saveAuditDraft,
   type AuditDraft,
 } from './audit-draft-storage'
+import {
+  closeLooksLegit,
+  clearOpenAuditIfTask,
+  clearOpenTaskSession,
+  getOpenAuditStep,
+  logSheetCloseDiag,
+  msSinceLastUserInteraction,
+  saveOpenAuditStep,
+} from './sheet-session'
 import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
@@ -105,6 +114,49 @@ export function TaskDetailsSheet({
     isBusy: isSavingAudit || isUploadingAttachment || isDeleting,
   })
 
+  // Diagnóstico (v0.0.1888): registra TODO fechamento com o gatilho. Fechamento
+  // sem interação recente do usuário = fantasma (retorno de Alt+Tab): a sessão
+  // (tarefa + passo do wizard) PERMANECE no sessionStorage para o restaurador do
+  // PainelChamados reabrir tudo. Fechamento legítimo: chaves limpadas aqui —
+  // nada reabre sozinho depois de uma intenção real do usuário.
+  const handleSheetOpenChange = (open: boolean) => {
+    if (open) return
+    flushPendingObservationSaves()
+    const legit = closeLooksLegit()
+    logSheetCloseDiag({
+      trigger: 'onOpenChange',
+      action: legit ? 'closed_legit' : 'ghost_close_session_kept',
+      sinceInteractionMs: msSinceLastUserInteraction(),
+      taskId: task?.id,
+      wizardStep,
+      documentHidden: document.hidden,
+    })
+    if (legit) {
+      clearOpenTaskSession()
+      onClose()
+    }
+    // Fantasma: onClose() NÃO é chamado — o PainelChamados mantém selectedTask
+    // e o Sheet volta a renderizar como estava.
+  }
+  const guardWindowDismissWithLog = (e: Event) => {
+    const legit = closeLooksLegit()
+    logSheetCloseDiag({
+      trigger: e.type,
+      action: legit ? 'dismiss_allowed' : 'dismiss_blocked_ghost',
+      sinceInteractionMs: msSinceLastUserInteraction(),
+      taskId: task?.id,
+      wizardStep,
+      documentHidden: document.hidden,
+      isTrusted: (e as FocusEvent | PointerEvent).isTrusted,
+    })
+    guardWindowDismiss(e)
+    if (!legit && e.cancelable) {
+      // Reforço: guardas por-tempo podem não cobrir todos os caminhos; sem
+      // interação recente, o dismiss é fantasma — bloqueia em qualquer caso.
+      e.preventDefault()
+    }
+  }
+
   // NC approval modal & processing state
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -159,6 +211,14 @@ export function TaskDetailsSheet({
     }
   }, [wizardStep])
 
+  // Qual passo do wizard está aberto em detalhes vai para o sessionStorage
+  // (aurea_gestao_tarefas:open_audit) — o restaurador do PainelChamados reabre
+  // a tarefa E o passo exato da auditoria, não só a listagem.
+  useEffect(() => {
+    if (!isOpen || !task || !auditExecution) return
+    saveOpenAuditStep(task.id, wizardStep)
+  }, [isOpen, task, auditExecution, wizardStep])
+
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/[^0-9]/g, '')
     setPageInput(val)
@@ -167,13 +227,13 @@ export function TaskDetailsSheet({
   const handlePageJump = () => {
     const parsed = parseInt(pageInput, 10)
     if (isNaN(parsed) || parsed < 1) {
-      setWizardStep(1)
+      goToStep(1)
       setPageInput('1')
     } else if (parsed > auditActions.length) {
-      setWizardStep(auditActions.length)
+      goToStep(auditActions.length)
       setPageInput(String(auditActions.length))
     } else if (parsed !== wizardStep) {
-      setWizardStep(parsed)
+      goToStep(parsed)
     } else {
       setPageInput(String(wizardStep))
     }
@@ -217,6 +277,11 @@ export function TaskDetailsSheet({
     const draft = pendingDraftRef.current
     pendingDraftRef.current = null
     const draftHasContent = hasDraftContent(draft)
+    // Passo do wizard salvo no retorno da aba (v0.0.1888): quando a subjanela é
+    // reaberta pelo restaurador do PainelChamados, o wizard volta no MESMO
+    // passo em que estava — não no "primeiro não respondido" nem no passo 0.
+    const restoredStep = getOpenAuditStep(task.id)
+    const restoreRef = restoredStep !== null ? { step: restoredStep } : null
 
     if (exec) {
       const draftAnswers = (draft?.answers || {}) as Record<string, any>
@@ -254,6 +319,9 @@ export function TaskDetailsSheet({
 
       if (exec.status === 'Finalizado') {
         setWizardStep(-1)
+      } else if (restoreRef && restoreRef.step >= 0 && restoreRef.step <= (actions?.length || 1)) {
+        // Retorno da aba: passo exato que estava aberto antes de sair.
+        setWizardStep(restoreRef.step)
       } else if (draftHasContent && (draft?.wizardStep ?? -1) >= 0) {
         setWizardStep(draft!.wizardStep)
       } else if (exec.realization_date) {
@@ -271,6 +339,15 @@ export function TaskDetailsSheet({
 
     // Habilita o auto-save do rascunho só depois do estado inicial montado.
     draftLoadedRef.current = true
+  }
+
+  // Wizard navega entre passos: a chave open_audit reflete o passo atual (a
+  // sessão de fechamento fantasma depende disso para restaurar exatamente).
+  const goToStep = (step: number) => {
+    setWizardStep(step)
+    if (task && auditExecution && step >= 0) {
+      saveOpenAuditStep(task.id, step)
+    }
   }
 
   const handleAddComment = async () => {
@@ -523,6 +600,7 @@ export function TaskDetailsSheet({
         className: 'bg-green-50 text-green-900 border-green-200',
       })
       setIsDeleteDialogOpen(false)
+      clearOpenTaskSession()
       onClose()
       onTaskUpdated()
     } catch (e: any) {
@@ -595,6 +673,9 @@ export function TaskDetailsSheet({
       })
       // Rascunho consumido: auditoria finalizada, nada a restaurar.
       clearAuditDraft(task.id)
+      // Fechamento legítimo (ação do usuário no botão Enviar): limpa a sessão
+      // de tarefa + passo para nada reabrir sozinho depois.
+      clearOpenTaskSession()
       onClose()
       onTaskUpdated()
     } catch (e: any) {
@@ -640,7 +721,7 @@ export function TaskDetailsSheet({
         .eq('id', auditExecution.id)
         .then()
 
-      setWizardStep(1)
+      goToStep(1)
       return
     }
 
@@ -656,7 +737,7 @@ export function TaskDetailsSheet({
     }
 
     if (wizardStep < auditActions.length) {
-      setWizardStep(wizardStep + 1)
+      goToStep(wizardStep + 1)
     } else {
       setShowConfirm(true)
     }
@@ -1232,7 +1313,7 @@ export function TaskDetailsSheet({
           <Button
             type="button"
             variant="outline"
-            onClick={() => setWizardStep(wizardStep - 1)}
+            onClick={() => goToStep(wizardStep - 1)}
             className="h-12 px-4 sm:px-6 border-border text-muted-foreground hover:bg-accent"
           >
             <ChevronLeft className="w-4 h-4 mr-2 shrink-0" /> Voltar
@@ -1282,20 +1363,12 @@ export function TaskDetailsSheet({
 
   return (
     <>
-      <Sheet
-        open={isOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            flushPendingObservationSaves()
-            onClose()
-          }
-        }}
-      >
+      <Sheet open={isOpen} onOpenChange={handleSheetOpenChange}>
         <SheetContent
           className="sm:max-w-xl md:max-w-2xl flex flex-col h-[100dvh] p-0 bg-background border-l border-border overflow-hidden"
-          onPointerDownOutside={guardWindowDismiss}
-          onInteractOutside={guardWindowDismiss}
-          onFocusOutside={guardWindowDismiss}
+          onPointerDownOutside={guardWindowDismissWithLog}
+          onInteractOutside={guardWindowDismissWithLog}
+          onFocusOutside={guardWindowDismissWithLog}
         >
           <SheetHeader className="p-4 sm:p-6 pb-4 bg-card border-b border-border shrink-0">
             <div className="flex items-center justify-between gap-2">

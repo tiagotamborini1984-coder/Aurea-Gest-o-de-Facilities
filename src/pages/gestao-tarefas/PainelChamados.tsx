@@ -51,6 +51,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { TaskDetailsSheet } from './TaskDetailsSheet'
+import {
+  clearOpenTaskSession,
+  getOpenTaskId,
+  logSheetCloseDiag,
+  saveOpenTaskId,
+} from './sheet-session'
 import { calculateSLA } from '@/lib/sla-utils'
 import { cn } from '@/lib/utils'
 import { Navigate, useSearchParams, useLocation } from 'react-router-dom'
@@ -181,33 +187,29 @@ export default function PainelChamados() {
   const [selectedTask, setSelectedTask] = useState<any>(null)
 
   // Tarefa aberta sobrevive ao recarregamento da aba (Chrome descarta/recarrega
-  // abas em segundo plano e o estado em memória morre): guarda o id da tarefa
-  // selecionada em sessionStorage e reabre o sheet ao voltar.
-  const openTaskIdRef = useRef<string | null>(null)
+  // abas em segundo plano e o estado em memória morre). v0.0.1888: as chaves
+  // open_task/open_audit NÃO são limpas aqui quando selectedTask vai a null —
+  // o fechamento fantasma do Radix também passa por esse caminho e apagava a
+  // sessão antes de o restaurador reagir (a causa da 3ª rodada). Quem limpa é
+  // APENAS o fechamento legítimo, dentro do TaskDetailsSheet (sheet-session).
   useEffect(() => {
     try {
-      if (selectedTask?.id) {
-        openTaskIdRef.current = selectedTask.id
-        window.sessionStorage.setItem('aurea_gestao_tarefas:open_task', selectedTask.id)
-      } else {
-        openTaskIdRef.current = null
-        window.sessionStorage.removeItem('aurea_gestao_tarefas:open_task')
-      }
+      if (selectedTask?.id) saveOpenTaskId(selectedTask.id)
     } catch {
       // sessionStorage indisponível: sem persistência, sem quebra.
     }
   }, [selectedTask?.id])
 
-  // Redundância garantida contra o retorno do Alt+Tab (v0.0.1886): ao voltar o
-  // foco ou a visibilidade da aba, se o storage diz que havia uma tarefa de
-  // detalhes aberta e o estado em memória foi perdido por QUALQUER caminho
-  // (dismiss do Radix que escapou do WindowFocusReturnGuard, erro de render,
-  // efeito de terceiros), reabre a tela de detalhes exatamente como estava —
-  // o wizard da auditoria volta pelo rascunho em localStorage (v0.0.1884).
-  // Fechamento legítimo não é afetado: ao fechar, o storage é limpo no efeito
-  // acima, então o restaurador não tem o que reabrir.
+  // Redundância garantida contra o retorno do Alt+Tab: ao voltar o foco ou a
+  // visibilidade da aba, se o storage diz que havia detalhes abertos e o estado
+  // em memória foi perdido por QUALQUER caminho, reabre a tarefa — e o wizard
+  // volta ao passo exato via chave open_audit lida no checkAudit do Sheet.
+  // Se os dados ainda não terminaram de carregar, agenda a restauração para
+  // logo após o loadData concluir (não restaura antes e ser sobrescrito).
   const selectedTaskRef = useRef<any>(null)
   const tasksRef = useRef<any[]>([])
+  const tasksLoadedRef = useRef(false)
+  const restorePendingRef = useRef(false)
   useEffect(() => {
     selectedTaskRef.current = selectedTask
   }, [selectedTask])
@@ -215,18 +217,37 @@ export default function PainelChamados() {
     tasksRef.current = tasks
   }, [tasks])
 
-  useEffect(() => {
-    const restoreOpenTask = () => {
-      let savedTaskId: string | null = null
-      try {
-        savedTaskId = window.sessionStorage.getItem('aurea_gestao_tarefas:open_task')
-      } catch {
-        return
-      }
-      if (!savedTaskId || selectedTaskRef.current?.id === savedTaskId) return
-      const task = tasksRef.current.find((t: any) => t.id === savedTaskId)
-      if (task) setSelectedTask(task)
+  const restoreOpenTask = () => {
+    const savedTaskId = getOpenTaskId()
+    if (!savedTaskId || selectedTaskRef.current?.id === savedTaskId) return
+    if (!tasksLoadedRef.current) {
+      // loadData ainda em curso: marca pendência; o efeito de dados chama de novo.
+      restorePendingRef.current = true
+      return
     }
+    const task = tasksRef.current.find((t: any) => String(t.id) === savedTaskId)
+    if (task) {
+      setSelectedTask(task)
+      logSheetCloseDiag({
+        trigger: 'focus_restore',
+        action: 'auto_restore_task',
+        taskId: task.id,
+        documentHidden: document.hidden,
+      })
+    } else {
+      // Tarefa não está mais na lista (ex.: filtro mudou) — não reabre, mas
+      // registra para diagnóstico.
+      logSheetCloseDiag({
+        trigger: 'focus_restore',
+        action: 'restore_task_not_in_list',
+        taskId: savedTaskId,
+        documentHidden: document.hidden,
+      })
+    }
+    restorePendingRef.current = false
+  }
+
+  useEffect(() => {
     const handleVisibility = () => {
       if (!document.hidden) restoreOpenTask()
     }
@@ -383,33 +404,40 @@ export default function PainelChamados() {
           // Clean state to prevent reopening on refresh
           window.history.replaceState({}, document.title)
         }
+      } else if (restorePendingRef.current) {
+        // Restauração pendente do retorno de foco/visibilidade: roda AGORA, com
+        // os dados já no estado (tasksRef só se atualiza no próximo commit, por
+        // isso a busca direta em `data`).
+        restorePendingRef.current = false
+        const savedTaskId = getOpenTaskId()
+        const savedTask = savedTaskId ? data?.find((t: any) => String(t.id) === savedTaskId) : null
+        if (savedTask) {
+          setSelectedTask(savedTask)
+          logSheetCloseDiag({
+            trigger: 'focus_restore',
+            action: 'auto_restore_task_after_load',
+            taskId: savedTask.id,
+            documentHidden: document.hidden,
+          })
+        }
       } else {
         // Restaura a tarefa aberta antes do recarregamento da aba: o navegador
         // (Memory Saver / mobile) pode descartar a aba e recarregá-la ao voltar,
         // matando o estado em memória. Sem isso o usuário volta ao painel com o
-        // formulário de auditoria perdido.
-        let savedTaskId: string | null = null
-        try {
-          savedTaskId = window.sessionStorage.getItem('aurea_gestao_tarefas:open_task')
-        } catch {
-          savedTaskId = null
-        }
+        // formulário de auditoria perdido. A chave NÃO é removida quando a
+        // tarefa sai da lista — só o fechamento legítimo limpa a sessão.
+        const savedTaskId = getOpenTaskId()
         if (savedTaskId && data) {
-          const savedTask = data.find((t: any) => t.id === savedTaskId)
+          const savedTask = data.find((t: any) => String(t.id) === savedTaskId)
           if (savedTask) {
             setSelectedTask(savedTask)
-          } else {
-            try {
-              window.sessionStorage.removeItem('aurea_gestao_tarefas:open_task')
-            } catch {
-              // ignore
-            }
           }
         }
       }
     } catch (err) {
       console.error(err)
     } finally {
+      tasksLoadedRef.current = true
       setLoading(false)
     }
   }
@@ -1569,7 +1597,17 @@ export default function PainelChamados() {
       <TaskDetailsSheet
         task={selectedTask}
         isOpen={!!selectedTask}
-        onClose={() => setSelectedTask(null)}
+        onClose={() => {
+          // Só chega aqui em fechamento LEGÍTIMO: o próprio Sheet decide isso
+          // em handleSheetOpenChange e limpa a sessão antes de chamar onClose.
+          logSheetCloseDiag({
+            trigger: 'onClose',
+            action: 'task_deselected',
+            taskId: selectedTask?.id,
+            documentHidden: document.hidden,
+          })
+          setSelectedTask(null)
+        }}
         taskStatuses={taskStatuses}
         taskTypes={taskTypes}
         users={users}
