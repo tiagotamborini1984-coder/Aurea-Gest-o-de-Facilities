@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -36,6 +36,13 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { submitAuditExecution } from '@/services/audit'
+import {
+  clearAuditDraft,
+  hasDraftContent,
+  loadAuditDraft,
+  saveAuditDraft,
+  type AuditDraft,
+} from './audit-draft-storage'
 import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
@@ -95,16 +102,47 @@ export function TaskDetailsSheet({
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
 
+  // Rascunho da auditoria: restaurado ao abrir a tarefa, salvo a cada mudança
+  // (draft local em localStorage) e limpo quando a auditoria é enviada.
+  const draftLoadedRef = useRef(false)
+  // Rascunho carregado antes do checkAudit() resolver: o checkAudit faz merge
+  // com ele (rascunho vence onde tem conteúdo) em vez de sobrescrever.
+  const pendingDraftRef = useRef<AuditDraft | null>(null)
+
   useEffect(() => {
     if (isOpen && task) {
       loadTimeline()
-      checkAudit()
       setDeleteJustification('')
+      const draft = loadAuditDraft(task.id)
+      pendingDraftRef.current = draft
+      // Campos fora do wizard (comentário) são restaurados direto — o
+      // checkAudit() não os conhece.
+      if (draft?.comment) setComment(draft.comment)
+      checkAudit()
     } else {
+      draftLoadedRef.current = false
+      pendingDraftRef.current = null
       setWizardStep(-1)
       setAuditAnswers({})
+      setAuditRealizationDate('')
+      setAuditParticipants('')
+      setComment('')
+      setAuditExecution(null)
+      setAuditActions([])
     }
   }, [isOpen, task])
+  // Salva o rascunho sempre que qualquer campo do formulário muda (o merge do
+  // checkAudit entra aqui como mudança e persiste o resultado consolidado).
+  useEffect(() => {
+    if (!isOpen || !task || !draftLoadedRef.current) return
+    saveAuditDraft(task.id, {
+      wizardStep,
+      answers: auditAnswers,
+      realizationDate: auditRealizationDate,
+      participants: auditParticipants,
+      comment,
+    })
+  }, [isOpen, task, wizardStep, auditAnswers, auditRealizationDate, auditParticipants, comment])
 
   useEffect(() => {
     if (wizardStep > 0) {
@@ -163,10 +201,21 @@ export function TaskDetailsSheet({
       .select('*, audits(*)')
       .eq('task_id', task.id)
       .single()
+
+    // Rascunho salvo localmente (digitado antes de sair da tela) tem prioridade
+    // sobre o que veio do banco: o que o usuário digitou e não salvou ainda é
+    // restaurado; o que já está no banco continua como base.
+    const draft = pendingDraftRef.current
+    pendingDraftRef.current = null
+    const draftHasContent = hasDraftContent(draft)
+
     if (exec) {
+      const draftAnswers = (draft?.answers || {}) as Record<string, any>
       setAuditExecution(exec)
-      setAuditRealizationDate(exec.realization_date || format(new Date(), 'yyyy-MM-dd'))
-      setAuditParticipants(exec.participants || '')
+      setAuditRealizationDate(
+        draft?.realizationDate || exec.realization_date || format(new Date(), 'yyyy-MM-dd'),
+      )
+      setAuditParticipants(draft?.participants || exec.participants || '')
 
       const { data: actions } = await supabase
         .from('audit_actions')
@@ -183,17 +232,26 @@ export function TaskDetailsSheet({
       answers?.forEach((a) => {
         ansMap[a.action_id] = a
       })
-      setAuditAnswers(ansMap)
+
+      // Merge: rascunho vence onde tem conteúdo; o resto vem do banco.
+      const merged: Record<string, any> = { ...ansMap }
+      if (draftHasContent) {
+        Object.entries(draftAnswers).forEach(([actionId, saved]) => {
+          const dbAnswer = ansMap[actionId]
+          merged[actionId] = { ...(dbAnswer || {}), ...(saved as any) }
+        })
+      }
+      setAuditAnswers(merged)
 
       if (exec.status === 'Finalizado') {
         setWizardStep(-1)
+      } else if (draftHasContent && (draft?.wizardStep ?? -1) >= 0) {
+        setWizardStep(draft!.wizardStep)
+      } else if (exec.realization_date) {
+        const index = actions?.findIndex((a) => !merged[a.id]?.score) ?? -1
+        setWizardStep(index >= 0 ? index + 1 : actions?.length || 1)
       } else {
-        if (exec.realization_date) {
-          const index = actions?.findIndex((a) => !ansMap[a.id]?.score) ?? -1
-          setWizardStep(index >= 0 ? index + 1 : actions?.length || 1)
-        } else {
-          setWizardStep(0)
-        }
+        setWizardStep(0)
       }
     } else {
       setAuditExecution(null)
@@ -201,6 +259,9 @@ export function TaskDetailsSheet({
       setAuditAnswers({})
       setWizardStep(-1)
     }
+
+    // Habilita o auto-save do rascunho só depois do estado inicial montado.
+    draftLoadedRef.current = true
   }
 
   const handleAddComment = async () => {
@@ -462,6 +523,19 @@ export function TaskDetailsSheet({
     }
   }
 
+  // Persiste observações no banco enquanto o usuário digita (debounce de 800ms
+  // por ação) — o onBlur continua como rede de segurança para o último caractere.
+  const observationsTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  const queueObservationSave = (actionId: string, value: string) => {
+    const timers = observationsTimerRef.current
+    if (timers[actionId]) clearTimeout(timers[actionId])
+    timers[actionId] = setTimeout(() => {
+      saveAnswerToDb(actionId, { observations: value })
+      delete timers[actionId]
+    }, 800)
+  }
+
   const handleEvidenceUpload = async (actionId: string, file: File | undefined) => {
     if (!file || !profile) return
     setAuditAnswers((prev) => ({ ...prev, [actionId]: { ...prev[actionId], uploading: true } }))
@@ -510,6 +584,8 @@ export function TaskDetailsSheet({
         description: 'Não conformidades foram geradas automaticamente pelo sistema.',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
+      // Rascunho consumido: auditoria finalizada, nada a restaurar.
+      clearAuditDraft(task.id)
       onClose()
       onTaskUpdated()
     } catch (e: any) {
@@ -518,6 +594,26 @@ export function TaskDetailsSheet({
       setIsSavingAudit(false)
     }
   }
+
+  // Ao fechar, dispara o save pendente de observações imediatamente (não perde
+  // os últimos caracteres digitados por causa do debounce).
+  const flushPendingObservationSaves = () => {
+    const timers = observationsTimerRef.current
+    Object.keys(timers).forEach((actionId) => {
+      clearTimeout(timers[actionId])
+      delete timers[actionId]
+      const ans = auditAnswers[actionId]
+      if (ans && typeof ans.observations === 'string') {
+        saveAnswerToDb(actionId, { observations: ans.observations })
+      }
+    })
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.values(observationsTimerRef.current).forEach((t) => clearTimeout(t))
+    }
+  }, [])
 
   const handleNextStep = () => {
     if (wizardStep === 0) {
@@ -1108,12 +1204,14 @@ export function TaskDetailsSheet({
             <Label className="mb-2 block text-foreground">Observações (Opcional)</Label>
             <Textarea
               value={ans.observations || ''}
-              onChange={(e) =>
-                setAuditAnswers({
-                  ...auditAnswers,
-                  [action.id]: { ...ans, observations: e.target.value },
-                })
-              }
+              onChange={(e) => {
+                const value = e.target.value
+                setAuditAnswers((prev) => ({
+                  ...prev,
+                  [action.id]: { ...(prev[action.id] || {}), observations: value },
+                }))
+                queueObservationSave(action.id, value)
+              }}
               onBlur={(e) => saveAnswerToDb(action.id, { observations: e.target.value })}
               placeholder="Adicione detalhes ou justificativas sobre esta ação..."
               className="resize-none h-24 bg-background border-input"
@@ -1175,7 +1273,15 @@ export function TaskDetailsSheet({
 
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Sheet
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            flushPendingObservationSaves()
+            onClose()
+          }
+        }}
+      >
         <SheetContent className="sm:max-w-xl md:max-w-2xl flex flex-col h-[100dvh] p-0 bg-background border-l border-border overflow-hidden">
           <SheetHeader className="p-4 sm:p-6 pb-4 bg-card border-b border-border shrink-0">
             <div className="flex items-center justify-between gap-2">

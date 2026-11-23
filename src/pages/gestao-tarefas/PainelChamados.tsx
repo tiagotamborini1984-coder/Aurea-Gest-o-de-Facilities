@@ -180,6 +180,24 @@ export default function PainelChamados() {
 
   const [selectedTask, setSelectedTask] = useState<any>(null)
 
+  // Tarefa aberta sobrevive ao recarregamento da aba (Chrome descarta/recarrega
+  // abas em segundo plano e o estado em memória morre): guarda o id da tarefa
+  // selecionada em sessionStorage e reabre o sheet ao voltar.
+  const openTaskIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    try {
+      if (selectedTask?.id) {
+        openTaskIdRef.current = selectedTask.id
+        window.sessionStorage.setItem('aurea_gestao_tarefas:open_task', selectedTask.id)
+      } else {
+        openTaskIdRef.current = null
+        window.sessionStorage.removeItem('aurea_gestao_tarefas:open_task')
+      }
+    } catch {
+      // sessionStorage indisponível: sem persistência, sem quebra.
+    }
+  }, [selectedTask?.id])
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<any>(null)
   const [deleteJustification, setDeleteJustification] = useState('')
@@ -324,6 +342,29 @@ export default function PainelChamados() {
           setSelectedTask(taskToOpen)
           // Clean state to prevent reopening on refresh
           window.history.replaceState({}, document.title)
+        }
+      } else {
+        // Restaura a tarefa aberta antes do recarregamento da aba: o navegador
+        // (Memory Saver / mobile) pode descartar a aba e recarregá-la ao voltar,
+        // matando o estado em memória. Sem isso o usuário volta ao painel com o
+        // formulário de auditoria perdido.
+        let savedTaskId: string | null = null
+        try {
+          savedTaskId = window.sessionStorage.getItem('aurea_gestao_tarefas:open_task')
+        } catch {
+          savedTaskId = null
+        }
+        if (savedTaskId && data) {
+          const savedTask = data.find((t: any) => t.id === savedTaskId)
+          if (savedTask) {
+            setSelectedTask(savedTask)
+          } else {
+            try {
+              window.sessionStorage.removeItem('aurea_gestao_tarefas:open_task')
+            } catch {
+              // ignore
+            }
+          }
         }
       }
     } catch (err) {
