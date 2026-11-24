@@ -1,11 +1,17 @@
 // AVOID UPDATING THIS FILE DIRECTLY. It is automatically generated.
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.4'
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -54,32 +60,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'accidents_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "accidents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'accidents_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "accidents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'accidents_company_id_fkey'
-            columns: ['company_id']
+            foreignKeyName: "accidents_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: 'companies'
-            referencedColumns: ['id']
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'accidents_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "accidents_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -119,18 +125,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_actions_audit_id_fkey'
-            columns: ['audit_id']
+            foreignKeyName: "audit_actions_audit_id_fkey"
+            columns: ["audit_id"]
             isOneToOne: false
-            referencedRelation: 'audits'
-            referencedColumns: ['id']
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_actions_category_id_fkey'
-            columns: ['category_id']
+            foreignKeyName: "audit_actions_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: 'audit_question_categories'
-            referencedColumns: ['id']
+            referencedRelation: "audit_question_categories"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -191,39 +197,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_ai_reports_audit_id_fkey'
-            columns: ['audit_id']
+            foreignKeyName: "audit_ai_reports_audit_id_fkey"
+            columns: ["audit_id"]
             isOneToOne: false
-            referencedRelation: 'audits'
-            referencedColumns: ['id']
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_ai_reports_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audit_ai_reports_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_ai_reports_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audit_ai_reports_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_ai_reports_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "audit_ai_reports_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_ai_reports_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "audit_ai_reports_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -251,25 +257,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_assignments_assignee_id_fkey'
-            columns: ['assignee_id']
+            foreignKeyName: "audit_assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_assignments_audit_id_fkey'
-            columns: ['audit_id']
+            foreignKeyName: "audit_assignments_audit_id_fkey"
+            columns: ["audit_id"]
             isOneToOne: false
-            referencedRelation: 'audits'
-            referencedColumns: ['id']
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_assignments_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "audit_assignments_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -312,25 +318,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_execution_answers_action_id_fkey'
-            columns: ['action_id']
+            foreignKeyName: "audit_execution_answers_action_id_fkey"
+            columns: ["action_id"]
             isOneToOne: false
-            referencedRelation: 'audit_actions'
-            referencedColumns: ['id']
+            referencedRelation: "audit_actions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_execution_answers_corrective_assignee_id_fkey'
-            columns: ['corrective_assignee_id']
+            foreignKeyName: "audit_execution_answers_corrective_assignee_id_fkey"
+            columns: ["corrective_assignee_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_execution_answers_execution_id_fkey'
-            columns: ['execution_id']
+            foreignKeyName: "audit_execution_answers_execution_id_fkey"
+            columns: ["execution_id"]
             isOneToOne: false
-            referencedRelation: 'audit_executions'
-            referencedColumns: ['id']
+            referencedRelation: "audit_executions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -382,32 +388,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_executions_assignee_id_fkey'
-            columns: ['assignee_id']
+            foreignKeyName: "audit_executions_assignee_id_fkey"
+            columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_executions_audit_id_fkey'
-            columns: ['audit_id']
+            foreignKeyName: "audit_executions_audit_id_fkey"
+            columns: ["audit_id"]
             isOneToOne: false
-            referencedRelation: 'audits'
-            referencedColumns: ['id']
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_executions_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "audit_executions_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_executions_task_id_fkey'
-            columns: ['task_id']
+            foreignKeyName: "audit_executions_task_id_fkey"
+            columns: ["task_id"]
             isOneToOne: false
-            referencedRelation: 'tasks'
-            referencedColumns: ['id']
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -438,18 +444,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_logs_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audit_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_logs_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audit_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -483,18 +489,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audit_question_categories_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audit_question_categories_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audit_question_categories_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audit_question_categories_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -549,25 +555,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'audits_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audits_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audits_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "audits_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'audits_parent_audit_id_fkey'
-            columns: ['parent_audit_id']
+            foreignKeyName: "audits_parent_audit_id_fkey"
+            columns: ["parent_audit_id"]
             isOneToOne: false
-            referencedRelation: 'audits'
-            referencedColumns: ['id']
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -925,18 +931,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'budget_accounts_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "budget_accounts_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'budget_accounts_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "budget_accounts_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -964,18 +970,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'budget_cost_centers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "budget_cost_centers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'budget_cost_centers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "budget_cost_centers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1018,32 +1024,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'budget_entries_account_id_fkey'
-            columns: ['account_id']
+            foreignKeyName: "budget_entries_account_id_fkey"
+            columns: ["account_id"]
             isOneToOne: false
-            referencedRelation: 'budget_accounts'
-            referencedColumns: ['id']
+            referencedRelation: "budget_accounts"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'budget_entries_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "budget_entries_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'budget_entries_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "budget_entries_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'budget_entries_cost_center_id_fkey'
-            columns: ['cost_center_id']
+            foreignKeyName: "budget_entries_cost_center_id_fkey"
+            columns: ["cost_center_id"]
             isOneToOne: false
-            referencedRelation: 'budget_cost_centers'
-            referencedColumns: ['id']
+            referencedRelation: "budget_cost_centers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1083,25 +1089,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cleaning_gardening_areas_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "cleaning_gardening_areas_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_areas_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "cleaning_gardening_areas_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_areas_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "cleaning_gardening_areas_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1138,32 +1144,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cleaning_gardening_goals_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "cleaning_gardening_goals_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'cleaning_gardening_areas'
-            referencedColumns: ['id']
+            referencedRelation: "cleaning_gardening_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_goals_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "cleaning_gardening_goals_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_goals_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "cleaning_gardening_goals_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_goals_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "cleaning_gardening_goals_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1218,32 +1224,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'cleaning_gardening_schedules_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "cleaning_gardening_schedules_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'cleaning_gardening_areas'
-            referencedColumns: ['id']
+            referencedRelation: "cleaning_gardening_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_schedules_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "cleaning_gardening_schedules_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_schedules_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "cleaning_gardening_schedules_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'cleaning_gardening_schedules_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "cleaning_gardening_schedules_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1337,18 +1343,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'companies_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "companies_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'companies_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "companies_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1394,53 +1400,53 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'contracted_headcount_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "contracted_headcount_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'contracted_headcount_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "contracted_headcount_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'contracted_headcount_company_id_fkey'
-            columns: ['company_id']
+            foreignKeyName: "contracted_headcount_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: 'companies'
-            referencedColumns: ['id']
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'contracted_headcount_equipment_id_fkey'
-            columns: ['equipment_id']
+            foreignKeyName: "contracted_headcount_equipment_id_fkey"
+            columns: ["equipment_id"]
             isOneToOne: false
-            referencedRelation: 'equipment'
-            referencedColumns: ['id']
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'contracted_headcount_function_id_fkey'
-            columns: ['function_id']
+            foreignKeyName: "contracted_headcount_function_id_fkey"
+            columns: ["function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'contracted_headcount_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "contracted_headcount_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'contracted_headcount_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "contracted_headcount_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1483,32 +1489,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'daily_logs_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "daily_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'daily_logs_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "daily_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'daily_logs_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "daily_logs_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'daily_logs_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "daily_logs_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1557,32 +1563,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'employee_training_records_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "employee_training_records_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employee_training_records_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "employee_training_records_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employee_training_records_employee_id_fkey'
-            columns: ['employee_id']
+            foreignKeyName: "employee_training_records_employee_id_fkey"
+            columns: ["employee_id"]
             isOneToOne: false
-            referencedRelation: 'employees'
-            referencedColumns: ['id']
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employee_training_records_training_id_fkey'
-            columns: ['training_id']
+            foreignKeyName: "employee_training_records_training_id_fkey"
+            columns: ["training_id"]
             isOneToOne: false
-            referencedRelation: 'trainings'
-            referencedColumns: ['id']
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1634,46 +1640,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'employees_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "employees_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employees_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "employees_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employees_company_id_fkey'
-            columns: ['company_id']
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: 'companies'
-            referencedColumns: ['id']
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employees_function_id_fkey'
-            columns: ['function_id']
+            foreignKeyName: "employees_function_id_fkey"
+            columns: ["function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employees_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "employees_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'employees_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "employees_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1710,25 +1716,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'equipment_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "equipment_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'equipment_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "equipment_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'equipment_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "equipment_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1765,18 +1771,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'facilita_answer_cache_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_answer_cache_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'facilita_answer_cache_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_answer_cache_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1810,25 +1816,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'facilita_chunks_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_chunks_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'facilita_chunks_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_chunks_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'facilita_chunks_document_id_fkey'
-            columns: ['document_id']
+            foreignKeyName: "facilita_chunks_document_id_fkey"
+            columns: ["document_id"]
             isOneToOne: false
-            referencedRelation: 'facilita_documents'
-            referencedColumns: ['id']
+            referencedRelation: "facilita_documents"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1859,18 +1865,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'facilita_conversations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_conversations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'facilita_conversations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_conversations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1907,18 +1913,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'facilita_dashboard_snapshot_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_dashboard_snapshot_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'facilita_dashboard_snapshot_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_dashboard_snapshot_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1970,18 +1976,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'facilita_documents_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_documents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'facilita_documents_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "facilita_documents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2015,11 +2021,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'facilita_messages_conversation_id_fkey'
-            columns: ['conversation_id']
+            foreignKeyName: "facilita_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: 'facilita_conversations'
-            referencedColumns: ['id']
+            referencedRelation: "facilita_conversations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2044,32 +2050,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'function_required_trainings_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "function_required_trainings_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'function_required_trainings_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "function_required_trainings_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'function_required_trainings_function_id_fkey'
-            columns: ['function_id']
+            foreignKeyName: "function_required_trainings_function_id_fkey"
+            columns: ["function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'function_required_trainings_training_id_fkey'
-            columns: ['training_id']
+            foreignKeyName: "function_required_trainings_training_id_fkey"
+            columns: ["training_id"]
             isOneToOne: false
-            referencedRelation: 'trainings'
-            referencedColumns: ['id']
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2103,32 +2109,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'functions_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "functions_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'functions_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "functions_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'functions_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "functions_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'functions_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "functions_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2159,18 +2165,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'goals_book_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "goals_book_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'goals_book_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "goals_book_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2216,32 +2222,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'horas_extras_api_keys_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_api_keys_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_api_keys_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_api_keys_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_api_keys_company_id_fkey'
-            columns: ['company_id']
+            foreignKeyName: "horas_extras_api_keys_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: 'companies'
-            referencedColumns: ['id']
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_api_keys_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "horas_extras_api_keys_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2272,25 +2278,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'horas_extras_config_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_config_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: true
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_config_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_config_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: true
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_config_default_approver_id_fkey'
-            columns: ['default_approver_id']
+            foreignKeyName: "horas_extras_config_default_approver_id_fkey"
+            columns: ["default_approver_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2321,32 +2327,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'horas_extras_plant_approvers_approver_id_fkey'
-            columns: ['approver_id']
+            foreignKeyName: "horas_extras_plant_approvers_approver_id_fkey"
+            columns: ["approver_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_plant_approvers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_plant_approvers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_plant_approvers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_plant_approvers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_plant_approvers_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "horas_extras_plant_approvers_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2431,60 +2437,60 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'horas_extras_solicitacoes_approved_by_fkey'
-            columns: ['approved_by']
+            foreignKeyName: "horas_extras_solicitacoes_approved_by_fkey"
+            columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_solicitacoes_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "horas_extras_solicitacoes_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_company_id_fkey'
-            columns: ['company_id']
+            foreignKeyName: "horas_extras_solicitacoes_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: 'companies'
-            referencedColumns: ['id']
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_cost_center_id_fkey'
-            columns: ['cost_center_id']
+            foreignKeyName: "horas_extras_solicitacoes_cost_center_id_fkey"
+            columns: ["cost_center_id"]
             isOneToOne: false
-            referencedRelation: 'budget_cost_centers'
-            referencedColumns: ['id']
+            referencedRelation: "budget_cost_centers"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "horas_extras_solicitacoes_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_employee_id_fkey'
-            columns: ['employee_id']
+            foreignKeyName: "horas_extras_solicitacoes_employee_id_fkey"
+            columns: ["employee_id"]
             isOneToOne: false
-            referencedRelation: 'employees'
-            referencedColumns: ['id']
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'horas_extras_solicitacoes_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "horas_extras_solicitacoes_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2527,32 +2533,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'import_logs_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "import_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'import_logs_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "import_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'import_logs_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: "import_logs_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'import_logs_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "import_logs_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2577,18 +2583,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'inventory_categories_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_categories_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_categories_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_categories_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2643,18 +2649,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'inventory_products_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_products_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_products_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_products_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2682,25 +2688,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'inventory_request_items_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "inventory_request_items_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'inventory_products'
-            referencedColumns: ['id']
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_request_items_product_id_fkey'
-            columns: ['product_id']
+            foreignKeyName: "inventory_request_items_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: 'v_inventory_product_diagnostics'
-            referencedColumns: ['id']
+            referencedRelation: "v_inventory_product_diagnostics"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_request_items_request_id_fkey'
-            columns: ['request_id']
+            foreignKeyName: "inventory_request_items_request_id_fkey"
+            columns: ["request_id"]
             isOneToOne: false
-            referencedRelation: 'inventory_requests'
-            referencedColumns: ['id']
+            referencedRelation: "inventory_requests"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2752,46 +2758,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'inventory_requests_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "inventory_requests_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_areas'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_requests_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_requests_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_requests_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_requests_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_requests_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "inventory_requests_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_requests_processed_by_fkey'
-            columns: ['processed_by']
+            foreignKeyName: "inventory_requests_processed_by_fkey"
+            columns: ["processed_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_requests_requester_id_fkey'
-            columns: ['requester_id']
+            foreignKeyName: "inventory_requests_requester_id_fkey"
+            columns: ["requester_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2822,25 +2828,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'locations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "locations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "locations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locations_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "locations_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2880,25 +2886,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'locker_collaborators_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "locker_collaborators_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locker_collaborators_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "locker_collaborators_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locker_collaborators_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "locker_collaborators_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2938,32 +2944,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'locker_occupations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "locker_occupations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locker_occupations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "locker_occupations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locker_occupations_collaborator_id_fkey'
-            columns: ['collaborator_id']
+            foreignKeyName: "locker_occupations_collaborator_id_fkey"
+            columns: ["collaborator_id"]
             isOneToOne: false
-            referencedRelation: 'locker_collaborators'
-            referencedColumns: ['id']
+            referencedRelation: "locker_collaborators"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'locker_occupations_locker_id_fkey'
-            columns: ['locker_id']
+            foreignKeyName: "locker_occupations_locker_id_fkey"
+            columns: ["locker_id"]
             isOneToOne: false
-            referencedRelation: 'lockers'
-            referencedColumns: ['id']
+            referencedRelation: "lockers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2997,25 +3003,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'lockers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "lockers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'lockers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "lockers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'lockers_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "lockers_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3043,25 +3049,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_areas_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_areas_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_areas_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_areas_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_areas_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "maintenance_areas_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3104,46 +3110,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_assets_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "maintenance_assets_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_areas'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_assets_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_assets_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_assets_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_assets_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_assets_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "maintenance_assets_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_assets_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "maintenance_assets_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_assets_sublocation_id_fkey'
-            columns: ['sublocation_id']
+            foreignKeyName: "maintenance_assets_sublocation_id_fkey"
+            columns: ["sublocation_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_sublocations'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_sublocations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3171,11 +3177,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_plan_checklist_items_plan_id_fkey'
-            columns: ['plan_id']
+            foreignKeyName: "maintenance_plan_checklist_items_plan_id_fkey"
+            columns: ["plan_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_preventive_plans'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_preventive_plans"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3239,60 +3245,60 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_preventive_plans_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "maintenance_preventive_plans_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_areas'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_asset_id_fkey'
-            columns: ['asset_id']
+            foreignKeyName: "maintenance_preventive_plans_asset_id_fkey"
+            columns: ["asset_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_assets'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_assets"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_preventive_plans_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_preventive_plans_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "maintenance_preventive_plans_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "maintenance_preventive_plans_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_priority_id_fkey'
-            columns: ['priority_id']
+            foreignKeyName: "maintenance_preventive_plans_priority_id_fkey"
+            columns: ["priority_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_priorities'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_priorities"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_preventive_plans_type_id_fkey'
-            columns: ['type_id']
+            foreignKeyName: "maintenance_preventive_plans_type_id_fkey"
+            columns: ["type_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_types'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_types"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3323,18 +3329,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_priorities_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_priorities_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_priorities_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_priorities_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3371,18 +3377,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_statuses_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_statuses_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_statuses_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_statuses_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3413,32 +3419,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_sublocations_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "maintenance_sublocations_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_areas'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_sublocations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_sublocations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_sublocations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_sublocations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_sublocations_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "maintenance_sublocations_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3472,11 +3478,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_ticket_logs_ticket_id_fkey'
-            columns: ['ticket_id']
+            foreignKeyName: "maintenance_ticket_logs_ticket_id_fkey"
+            columns: ["ticket_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_tickets'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3582,95 +3588,95 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_tickets_area_id_fkey'
-            columns: ['area_id']
+            foreignKeyName: "maintenance_tickets_area_id_fkey"
+            columns: ["area_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_areas'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_areas"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_asset_id_fkey'
-            columns: ['asset_id']
+            foreignKeyName: "maintenance_tickets_asset_id_fkey"
+            columns: ["asset_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_assets'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_assets"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_assignee_id_fkey'
-            columns: ['assignee_id']
+            foreignKeyName: "maintenance_tickets_assignee_id_fkey"
+            columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_tickets_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_tickets_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_location_id_fkey'
-            columns: ['location_id']
+            foreignKeyName: "maintenance_tickets_location_id_fkey"
+            columns: ["location_id"]
             isOneToOne: false
-            referencedRelation: 'locations'
-            referencedColumns: ['id']
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_parent_ticket_id_fkey'
-            columns: ['parent_ticket_id']
+            foreignKeyName: "maintenance_tickets_parent_ticket_id_fkey"
+            columns: ["parent_ticket_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_tickets'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_plan_id_fkey'
-            columns: ['plan_id']
+            foreignKeyName: "maintenance_tickets_plan_id_fkey"
+            columns: ["plan_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_preventive_plans'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_preventive_plans"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "maintenance_tickets_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_priority_id_fkey'
-            columns: ['priority_id']
+            foreignKeyName: "maintenance_tickets_priority_id_fkey"
+            columns: ["priority_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_priorities'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_priorities"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_status_id_fkey'
-            columns: ['status_id']
+            foreignKeyName: "maintenance_tickets_status_id_fkey"
+            columns: ["status_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_statuses'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_statuses"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_sublocation_id_fkey'
-            columns: ['sublocation_id']
+            foreignKeyName: "maintenance_tickets_sublocation_id_fkey"
+            columns: ["sublocation_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_sublocations'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_sublocations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_tickets_type_id_fkey'
-            columns: ['type_id']
+            foreignKeyName: "maintenance_tickets_type_id_fkey"
+            columns: ["type_id"]
             isOneToOne: false
-            referencedRelation: 'maintenance_types'
-            referencedColumns: ['id']
+            referencedRelation: "maintenance_types"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3698,18 +3704,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_types_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_types_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_types_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_types_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3743,25 +3749,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'maintenance_workers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_workers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_workers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "maintenance_workers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'maintenance_workers_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "maintenance_workers_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3795,32 +3801,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'monthly_goals_data_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "monthly_goals_data_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'monthly_goals_data_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "monthly_goals_data_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'monthly_goals_data_goal_id_fkey'
-            columns: ['goal_id']
+            foreignKeyName: "monthly_goals_data_goal_id_fkey"
+            columns: ["goal_id"]
             isOneToOne: false
-            referencedRelation: 'goals_book'
-            referencedColumns: ['id']
+            referencedRelation: "goals_book"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'monthly_goals_data_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "monthly_goals_data_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3848,32 +3854,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'org_collaborator_plants_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_collaborator_plants_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborator_plants_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_collaborator_plants_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborator_plants_collaborator_id_fkey'
-            columns: ['collaborator_id']
+            foreignKeyName: "org_collaborator_plants_collaborator_id_fkey"
+            columns: ["collaborator_id"]
             isOneToOne: false
-            referencedRelation: 'org_collaborators'
-            referencedColumns: ['id']
+            referencedRelation: "org_collaborators"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborator_plants_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "org_collaborator_plants_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3922,46 +3928,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'org_collaborators_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_collaborators_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborators_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_collaborators_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborators_function_id_fkey'
-            columns: ['function_id']
+            foreignKeyName: "org_collaborators_function_id_fkey"
+            columns: ["function_id"]
             isOneToOne: false
-            referencedRelation: 'org_functions'
-            referencedColumns: ['id']
+            referencedRelation: "org_functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborators_manager_id_fkey'
-            columns: ['manager_id']
+            foreignKeyName: "org_collaborators_manager_id_fkey"
+            columns: ["manager_id"]
             isOneToOne: false
-            referencedRelation: 'org_collaborators'
-            referencedColumns: ['id']
+            referencedRelation: "org_collaborators"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborators_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "org_collaborators_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_collaborators_unit_id_fkey'
-            columns: ['unit_id']
+            foreignKeyName: "org_collaborators_unit_id_fkey"
+            columns: ["unit_id"]
             isOneToOne: false
-            referencedRelation: 'org_units'
-            referencedColumns: ['id']
+            referencedRelation: "org_units"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3989,18 +3995,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'org_functions_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_functions_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_functions_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_functions_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4031,25 +4037,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'org_units_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_units_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_units_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "org_units_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'org_units_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "org_units_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4074,18 +4080,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'package_types_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "package_types_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'package_types_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "package_types_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4146,32 +4152,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'packages_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "packages_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'packages_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "packages_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'packages_package_type_id_fkey'
-            columns: ['package_type_id']
+            foreignKeyName: "packages_package_type_id_fkey"
+            columns: ["package_type_id"]
             isOneToOne: false
-            referencedRelation: 'package_types'
-            referencedColumns: ['id']
+            referencedRelation: "package_types"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'packages_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "packages_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4202,25 +4208,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'plant_non_working_days_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "plant_non_working_days_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'plant_non_working_days_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "plant_non_working_days_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'plant_non_working_days_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "plant_non_working_days_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4260,25 +4266,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'plant_tools_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "plant_tools_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'plant_tools_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "plant_tools_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'plant_tools_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "plant_tools_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4312,18 +4318,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'plants_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "plants_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'plants_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "plants_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4363,25 +4369,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'ppe_items_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "ppe_items_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'ppe_items_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "ppe_items_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'ppe_items_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "ppe_items_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4433,39 +4439,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'ppe_loans_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "ppe_loans_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'ppe_loans_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "ppe_loans_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'ppe_loans_collaborator_id_fkey'
-            columns: ['collaborator_id']
+            foreignKeyName: "ppe_loans_collaborator_id_fkey"
+            columns: ["collaborator_id"]
             isOneToOne: false
-            referencedRelation: 'org_collaborators'
-            referencedColumns: ['id']
+            referencedRelation: "org_collaborators"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'ppe_loans_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "ppe_loans_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'ppe_loans_ppe_id_fkey'
-            columns: ['ppe_id']
+            foreignKeyName: "ppe_loans_ppe_id_fkey"
+            columns: ["ppe_id"]
             isOneToOne: false
-            referencedRelation: 'ppe_items'
-            referencedColumns: ['id']
+            referencedRelation: "ppe_items"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4499,25 +4505,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'process_flowcharts_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "process_flowcharts_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'process_flowcharts_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "process_flowcharts_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'process_flowcharts_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "process_flowcharts_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4560,18 +4566,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'profiles_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "profiles_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'profiles_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "profiles_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4611,18 +4617,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'properties_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "properties_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'properties_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "properties_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4647,18 +4653,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'property_cost_centers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_cost_centers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_cost_centers_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_cost_centers_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4695,25 +4701,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'property_guests_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_guests_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_guests_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_guests_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_guests_cost_center_id_fkey'
-            columns: ['cost_center_id']
+            foreignKeyName: "property_guests_cost_center_id_fkey"
+            columns: ["cost_center_id"]
             isOneToOne: false
-            referencedRelation: 'property_cost_centers'
-            referencedColumns: ['id']
+            referencedRelation: "property_cost_centers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4762,39 +4768,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'property_reservations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_reservations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_reservations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_reservations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_reservations_guest_id_fkey'
-            columns: ['guest_id']
+            foreignKeyName: "property_reservations_guest_id_fkey"
+            columns: ["guest_id"]
             isOneToOne: false
-            referencedRelation: 'property_guests'
-            referencedColumns: ['id']
+            referencedRelation: "property_guests"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_reservations_property_id_fkey'
-            columns: ['property_id']
+            foreignKeyName: "property_reservations_property_id_fkey"
+            columns: ["property_id"]
             isOneToOne: false
-            referencedRelation: 'properties'
-            referencedColumns: ['id']
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_reservations_room_id_fkey'
-            columns: ['room_id']
+            foreignKeyName: "property_reservations_room_id_fkey"
+            columns: ["room_id"]
             isOneToOne: false
-            referencedRelation: 'property_rooms'
-            referencedColumns: ['id']
+            referencedRelation: "property_rooms"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4834,25 +4840,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'property_rooms_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_rooms_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_rooms_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "property_rooms_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'property_rooms_property_id_fkey'
-            columns: ['property_id']
+            foreignKeyName: "property_rooms_property_id_fkey"
+            columns: ["property_id"]
             isOneToOne: false
-            referencedRelation: 'properties'
-            referencedColumns: ['id']
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4928,18 +4934,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'satisfaction_survey_questions_parent_question_id_fkey'
-            columns: ['parent_question_id']
+            foreignKeyName: "satisfaction_survey_questions_parent_question_id_fkey"
+            columns: ["parent_question_id"]
             isOneToOne: false
-            referencedRelation: 'satisfaction_survey_questions'
-            referencedColumns: ['id']
+            referencedRelation: "satisfaction_survey_questions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_survey_questions_survey_id_fkey'
-            columns: ['survey_id']
+            foreignKeyName: "satisfaction_survey_questions_survey_id_fkey"
+            columns: ["survey_id"]
             isOneToOne: false
-            referencedRelation: 'satisfaction_surveys'
-            referencedColumns: ['id']
+            referencedRelation: "satisfaction_surveys"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4970,18 +4976,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'satisfaction_survey_response_answers_question_id_fkey'
-            columns: ['question_id']
+            foreignKeyName: "satisfaction_survey_response_answers_question_id_fkey"
+            columns: ["question_id"]
             isOneToOne: false
-            referencedRelation: 'satisfaction_survey_questions'
-            referencedColumns: ['id']
+            referencedRelation: "satisfaction_survey_questions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_survey_response_answers_response_id_fkey'
-            columns: ['response_id']
+            foreignKeyName: "satisfaction_survey_response_answers_response_id_fkey"
+            columns: ["response_id"]
             isOneToOne: false
-            referencedRelation: 'satisfaction_survey_responses'
-            referencedColumns: ['id']
+            referencedRelation: "satisfaction_survey_responses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5015,32 +5021,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'satisfaction_survey_responses_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "satisfaction_survey_responses_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_survey_responses_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "satisfaction_survey_responses_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_survey_responses_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "satisfaction_survey_responses_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_survey_responses_survey_id_fkey'
-            columns: ['survey_id']
+            foreignKeyName: "satisfaction_survey_responses_survey_id_fkey"
+            columns: ["survey_id"]
             isOneToOne: false
-            referencedRelation: 'satisfaction_surveys'
-            referencedColumns: ['id']
+            referencedRelation: "satisfaction_surveys"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5074,11 +5080,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'satisfaction_survey_schedules_survey_id_fkey'
-            columns: ['survey_id']
+            foreignKeyName: "satisfaction_survey_schedules_survey_id_fkey"
+            columns: ["survey_id"]
             isOneToOne: false
-            referencedRelation: 'satisfaction_surveys'
-            referencedColumns: ['id']
+            referencedRelation: "satisfaction_surveys"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5130,25 +5136,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'satisfaction_surveys_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "satisfaction_surveys_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_surveys_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "satisfaction_surveys_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'satisfaction_surveys_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "satisfaction_surveys_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5194,25 +5200,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'sector_documents_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "sector_documents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'sector_documents_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "sector_documents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'sector_documents_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "sector_documents_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35438,18 +35444,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'task_statuses_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "task_statuses_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'task_statuses_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "task_statuses_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35480,18 +35486,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'task_timeline_task_id_fkey'
-            columns: ['task_id']
+            foreignKeyName: "task_timeline_task_id_fkey"
+            columns: ["task_id"]
             isOneToOne: false
-            referencedRelation: 'tasks'
-            referencedColumns: ['id']
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'task_timeline_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "task_timeline_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35519,18 +35525,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'task_types_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "task_types_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'task_types_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "task_types_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35624,81 +35630,81 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'tasks_accident_id_fkey'
-            columns: ['accident_id']
+            foreignKeyName: "tasks_accident_id_fkey"
+            columns: ["accident_id"]
             isOneToOne: false
-            referencedRelation: 'accidents'
-            referencedColumns: ['id']
+            referencedRelation: "accidents"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_approved_by_fkey'
-            columns: ['approved_by']
+            foreignKeyName: "tasks_approved_by_fkey"
+            columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_assignee_id_fkey'
-            columns: ['assignee_id']
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_audit_id_fkey'
-            columns: ['audit_id']
+            foreignKeyName: "tasks_audit_id_fkey"
+            columns: ["audit_id"]
             isOneToOne: false
-            referencedRelation: 'audits'
-            referencedColumns: ['id']
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "tasks_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_previous_assignee_id_fkey'
-            columns: ['previous_assignee_id']
+            foreignKeyName: "tasks_previous_assignee_id_fkey"
+            columns: ["previous_assignee_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_requester_id_fkey'
-            columns: ['requester_id']
+            foreignKeyName: "tasks_requester_id_fkey"
+            columns: ["requester_id"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_status_id_fkey'
-            columns: ['status_id']
+            foreignKeyName: "tasks_status_id_fkey"
+            columns: ["status_id"]
             isOneToOne: false
-            referencedRelation: 'task_statuses'
-            referencedColumns: ['id']
+            referencedRelation: "task_statuses"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tasks_type_id_fkey'
-            columns: ['type_id']
+            foreignKeyName: "tasks_type_id_fkey"
+            columns: ["type_id"]
             isOneToOne: false
-            referencedRelation: 'task_types'
-            referencedColumns: ['id']
+            referencedRelation: "task_types"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35780,18 +35786,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'trainings_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "trainings_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'trainings_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "trainings_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35816,11 +35822,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'user_plants_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "user_plants_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35863,39 +35869,39 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'vacations_approved_by_fkey'
-            columns: ['approved_by']
+            foreignKeyName: "vacations_approved_by_fkey"
+            columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'vacations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "vacations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'vacations_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "vacations_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'vacations_collaborator_id_fkey'
-            columns: ['collaborator_id']
+            foreignKeyName: "vacations_collaborator_id_fkey"
+            columns: ["collaborator_id"]
             isOneToOne: false
-            referencedRelation: 'org_collaborators'
-            referencedColumns: ['id']
+            referencedRelation: "org_collaborators"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'vacations_plant_id_fkey'
-            columns: ['plant_id']
+            foreignKeyName: "vacations_plant_id_fkey"
+            columns: ["plant_id"]
             isOneToOne: false
-            referencedRelation: 'plants'
-            referencedColumns: ['id']
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -35950,18 +35956,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'inventory_products_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_products_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'clients'
-            referencedColumns: ['id']
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'inventory_products_client_id_fkey'
-            columns: ['client_id']
+            foreignKeyName: "inventory_products_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: 'public_clients_branding'
-            referencedColumns: ['id']
+            referencedRelation: "public_clients_branding"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -36048,8 +36054,8 @@ export type Database = {
               updated_at: string | null
             }[]
             SetofOptions: {
-              from: '*'
-              to: 'employees'
+              from: "*"
+              to: "employees"
               isOneToOne: false
               isSetofReturn: true
             }
@@ -36076,8 +36082,8 @@ export type Database = {
               updated_at: string | null
             }[]
             SetofOptions: {
-              from: '*'
-              to: 'employees'
+              from: "*"
+              to: "employees"
               isOneToOne: false
               isSetofReturn: true
             }
@@ -36135,7 +36141,7 @@ export type Database = {
       }
       run_daily_snapshot_job: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { '': string }; Returns: string[] }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       submit_audit_execution: {
         Args: {
           p_answers: Json
@@ -36176,7 +36182,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: Json
       }
-      unaccent: { Args: { '': string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -36187,31 +36193,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -36220,23 +36228,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -36245,23 +36253,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -36270,36 +36278,36 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
@@ -36307,3 +36315,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
