@@ -284,7 +284,9 @@ export function HorasExtrasTable({
                           disabled={busyAttachmentId === item.id}
                           className="text-brand-vividBlue hover:text-brand-deepBlue hover:bg-brand-vividBlue/10 h-8 w-8 p-0"
                           title={`Abrir anexo: ${item.attachment_name || 'arquivo'}${
-                            item.attachment_size ? ` (${formatAttachmentSize(item.attachment_size)})` : ''
+                            item.attachment_size
+                              ? ` (${formatAttachmentSize(item.attachment_size)})`
+                              : ''
                           }`}
                           aria-label={`Abrir anexo da HE de ${item.employee_name}`}
                           onClick={() => handleAttachment(item, 'open')}
@@ -305,8 +307,8 @@ export function HorasExtrasTable({
                           aria-label={`Baixar anexo da HE de ${item.employee_name}`}
                           onClick={() => handleAttachment(item, 'download')}
                         >
-                        <span className="sr-only">Baixar Anexo</span>
-                        <Download className="h-4 w-4" />
+                          <span className="sr-only">Baixar Anexo</span>
+                          <Download className="h-4 w-4" />
                         </Button>
                       </div>
                     ) : (

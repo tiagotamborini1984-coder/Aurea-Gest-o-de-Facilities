@@ -18,7 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, UserCheck, Building2, MapPin, Search, Wallet, Mail, Paperclip, X } from 'lucide-react'
+import {
+  Clock,
+  UserCheck,
+  Building2,
+  MapPin,
+  Search,
+  Wallet,
+  Mail,
+  Paperclip,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
@@ -29,6 +39,7 @@ import {
   HE_ATTACHMENT_LABEL,
   validateHeAttachment,
 } from '@/lib/he-attachment'
+import { formatAttachmentSize } from '@/lib/he-attachment-ui'
 
 interface EmployeeOption {
   id: string
@@ -611,7 +622,9 @@ export function SolicitacaoHeDialog({
                       setAttachment(null)
                       setAttachmentError(null)
                       if (selectedFileRef) selectedFileRef.current = null
-                      const input = document.getElementById('heAttachment') as HTMLInputElement | null
+                      const input = document.getElementById(
+                        'heAttachment',
+                      ) as HTMLInputElement | null
                       if (input) input.value = ''
                     }}
                   >
