@@ -10,8 +10,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, Paperclip } from 'lucide-react'
 import type { SolicitacaoHe } from './HorasExtrasTable'
+import { HeAttachmentLink } from '@/lib/he-attachment-ui'
 
 /** Rótulo do centro de custo pagador: texto digitado (novo) ou nome/código do legado */
 export function getCostCenterLabel(item: SolicitacaoHe): string {
@@ -93,6 +94,13 @@ export function DecisaoHeDialog({
             {solicitacao.reason && (
               <div className="text-xs text-slate-500 pt-1 border-t mt-1">
                 <strong>Motivo informado:</strong> {solicitacao.reason}
+              </div>
+            )}
+            {solicitacao.attachment_bucket && solicitacao.attachment_path && (
+              <div className="text-xs pt-1 border-t mt-1 flex items-center gap-2 flex-wrap">
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-brand-vividBlue" />
+                <span className="text-slate-700">Anexo:</span>
+                <HeAttachmentLink solicitacao={solicitacao} />
               </div>
             )}
           </div>

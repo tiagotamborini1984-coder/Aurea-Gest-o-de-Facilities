@@ -21,7 +21,15 @@ import {
   Pencil,
   MailCheck,
   MailWarning,
+  Paperclip,
+  Download,
+  Loader2,
 } from 'lucide-react'
+import {
+  openHeAttachment,
+  downloadHeAttachment,
+  formatAttachmentSize,
+} from '@/lib/he-attachment-ui'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +41,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { format } from 'date-fns'
+import { toast } from 'sonner'
 import { ptBR } from 'date-fns/locale'
 import { getCostCenterLabel } from './DecisaoHeDialog'
 
@@ -49,6 +58,11 @@ export interface SolicitacaoHe {
   hours: number
   cost_center_id?: string | null
   cost_center_text?: string | null
+  attachment_bucket?: string | null
+  attachment_path?: string | null
+  attachment_name?: string | null
+  attachment_size?: number | null
+  attachment_content_type?: string | null
   budget_cost_centers?: {
     id: string
     name: string
@@ -101,6 +115,7 @@ export function HorasExtrasTable({
 }: HorasExtrasTableProps) {
   const [itemToDelete, setItemToDelete] = useState<SolicitacaoHe | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [busyAttachmentId, setBusyAttachmentId] = useState<string | null>(null)
   // Ref da <table>: o pai direto dela é o wrapper overflow-auto que rola na horizontal
   const tableRef = useRef<HTMLTableElement>(null)
 
@@ -116,6 +131,21 @@ export function HorasExtrasTable({
   }
 
   const hasCostCenterActions = !!canEditCostCenter && !!onEditCostCenter
+
+  // Abre o anexo em nova aba / baixa o arquivo (Signed URL autenticada do bucket privado)
+  const handleAttachment = async (item: SolicitacaoHe, mode: 'open' | 'download') => {
+    if (!item.attachment_path || busyAttachmentId) return
+    setBusyAttachmentId(item.id)
+    try {
+      if (mode === 'open') await openHeAttachment(item.attachment_path)
+      else await downloadHeAttachment(item.attachment_path, item.attachment_name || 'anexo')
+    } catch (err: any) {
+      console.error('Erro ao acessar o anexo da HE:', err)
+      toast.error(err?.message || 'Não foi possível acessar o anexo da solicitação.')
+    } finally {
+      setBusyAttachmentId(null)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -168,6 +198,7 @@ export function HorasExtrasTable({
               <TableHead className="text-right">Qtd. Horas previstas</TableHead>
               <TableHead>Centro de Custo pagador</TableHead>
               <TableHead>Motivo / Justificativa</TableHead>
+              <TableHead className="text-center">Anexo</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Gestor / Histórico</TableHead>
               {(canManage || hasCostCenterActions || solicitacoes.some((s) => canEdit(s))) && (
@@ -243,6 +274,44 @@ export function HorasExtrasTable({
                     title={item.reason || ''}
                   >
                     {item.reason || <span className="text-slate-400 italic">Sem observação</span>}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {item.attachment_path ? (
+                      <div className="flex items-center justify-center gap-0.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busyAttachmentId === item.id}
+                          className="text-brand-vividBlue hover:text-brand-deepBlue hover:bg-brand-vividBlue/10 h-8 w-8 p-0"
+                          title={`Abrir anexo: ${item.attachment_name || 'arquivo'}${
+                            item.attachment_size ? ` (${formatAttachmentSize(item.attachment_size)})` : ''
+                          }`}
+                          aria-label={`Abrir anexo da HE de ${item.employee_name}`}
+                          onClick={() => handleAttachment(item, 'open')}
+                        >
+                          {busyAttachmentId === item.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Paperclip className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Abrir Anexo</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busyAttachmentId === item.id}
+                          className="text-slate-400 hover:text-brand-vividBlue hover:bg-brand-vividBlue/10 h-8 w-8 p-0"
+                          title={`Baixar anexo: ${item.attachment_name || 'arquivo'}`}
+                          aria-label={`Baixar anexo da HE de ${item.employee_name}`}
+                          onClick={() => handleAttachment(item, 'download')}
+                        >
+                        <span className="sr-only">Baixar Anexo</span>
+                        <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell className="text-xs text-slate-500">

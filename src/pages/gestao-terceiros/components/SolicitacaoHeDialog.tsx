@@ -18,12 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, UserCheck, Building2, MapPin, Search, Wallet, Mail } from 'lucide-react'
+import { Clock, UserCheck, Building2, MapPin, Search, Wallet, Mail, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { maskCostCenterPagador, isValidCostCenterPagador } from './cost-center-mask'
 import type { SolicitacaoHe } from './HorasExtrasTable'
+import {
+  HE_ATTACHMENT_ACCEPT,
+  HE_ATTACHMENT_LABEL,
+  validateHeAttachment,
+} from '@/lib/he-attachment'
 
 interface EmployeeOption {
   id: string
@@ -59,6 +64,11 @@ interface SolicitacaoHeDialogProps {
   companies?: CompanyOption[]
   /** Solicitação em edição (modo edição quando preenchido) */
   editingSolicitacao?: SolicitacaoHe | null
+  /**
+   * Ref controlada pelo pai: guarda o arquivo escolhido para o pai fazer o upload
+   * após o INSERT da solicitação (evita duplicar o upload entre os dois diálogos).
+   */
+  selectedFileRef?: React.MutableRefObject<File | null>
   onSubmit: (data: {
     employee_id: string
     employee_name: string
@@ -70,6 +80,8 @@ interface SolicitacaoHeDialogProps {
     date: string
     hours: number
     reason: string
+    /** Arquivo escolhido (validado) — o upload em si acontece no componente pai, após o INSERT */
+    attachment?: { name: string; size: number; type: string | null } | null
   }) => Promise<void>
 }
 
@@ -88,6 +100,7 @@ export function SolicitacaoHeDialog({
   plants,
   companies = [],
   editingSolicitacao = null,
+  selectedFileRef,
   onSubmit,
 }: SolicitacaoHeDialogProps) {
   const [selectedPlantId, setSelectedPlantId] = useState('')
@@ -98,6 +111,8 @@ export function SolicitacaoHeDialog({
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [hours, setHours] = useState('2')
   const [reason, setReason] = useState('')
+  const [attachment, setAttachment] = useState<File | null>(null)
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Modo edição quando uma solicitação é passada
@@ -155,6 +170,8 @@ export function SolicitacaoHeDialog({
       setHours(String(Number(editingSolicitacao.hours)).replace('.', ','))
       setReason(editingSolicitacao.reason || '')
       setCompanyEmail(editingSolicitacao.company_email || '')
+      setAttachment(null)
+      setAttachmentError(null)
     } else {
       resetForm()
       setDate(format(new Date(), 'yyyy-MM-dd'))
@@ -193,6 +210,8 @@ export function SolicitacaoHeDialog({
     setSearchEmployeeText('')
     setHours('2')
     setReason('')
+    setAttachment(null)
+    setAttachmentError(null)
   }
 
   // Pré-preenche o e-mail a partir do cadastro da Empresa Parceira do colaborador
@@ -286,10 +305,14 @@ export function SolicitacaoHeDialog({
         date,
         hours: sanitizedHours,
         reason: reason.trim(),
+        attachment: attachment
+          ? { name: attachment.name, size: attachment.size, type: attachment.type || null }
+          : null,
       })
 
       // Reset
       resetForm()
+      if (selectedFileRef) selectedFileRef.current = null
       onOpenChange(false)
     } catch (err) {
       // Toast já tratado no pai
@@ -528,6 +551,74 @@ export function SolicitacaoHeDialog({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
+            </div>
+
+            {/* Anexo (opcional): PDF, e-mail (.eml/.msg), JPEG ou PNG — máx. 10 MB */}
+            <div className="space-y-2">
+              <Label htmlFor="heAttachment" className="flex items-center gap-1.5">
+                <Paperclip className="h-3.5 w-3.5 text-brand-vividBlue" />
+                <span>Anexo (opcional)</span>
+              </Label>
+              <Input
+                id="heAttachment"
+                type="file"
+                accept={HE_ATTACHMENT_ACCEPT}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null
+                  if (!file) {
+                    setAttachment(null)
+                    setAttachmentError(null)
+                    return
+                  }
+                  const err = validateHeAttachment(file)
+                  if (err) {
+                    setAttachmentError(err)
+                    setAttachment(null)
+                    e.target.value = ''
+                    return
+                  }
+                  setAttachmentError(null)
+                  setAttachment(file)
+                  if (selectedFileRef) selectedFileRef.current = file
+                }}
+                disabled={isSubmitting}
+                className="file:mr-3 file:rounded-md file:border-0 file:bg-brand-vividBlue/10 file:px-3 file:py-1 file:text-xs file:font-medium file:text-brand-deepBlue"
+              />
+              {attachmentError ? (
+                <p className="text-[11px] text-rose-600">{attachmentError}</p>
+              ) : (
+                <p className="text-[11px] text-slate-500">{HE_ATTACHMENT_LABEL}</p>
+              )}
+              {attachment && (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-brand-vividBlue" />
+                    <span className="truncate text-xs text-slate-700" title={attachment.name}>
+                      {attachment.name}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-slate-500">
+                      ({formatAttachmentSize(attachment.size)})
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 shrink-0 p-0 text-slate-400 hover:text-rose-600"
+                    aria-label="Remover anexo"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      setAttachment(null)
+                      setAttachmentError(null)
+                      if (selectedFileRef) selectedFileRef.current = null
+                      const input = document.getElementById('heAttachment') as HTMLInputElement | null
+                      if (input) input.value = ''
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 

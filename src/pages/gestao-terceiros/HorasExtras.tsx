@@ -45,6 +45,7 @@ import { resolveActiveEmployees } from '@/lib/employee-vigencia'
 import { exportHorasExtrasToPdf, exportHorasExtrasToXml } from './utils/horas-extras-export'
 import { HorasExtrasTable, type SolicitacaoHe } from './components/HorasExtrasTable'
 import { SolicitacaoHeDialog } from './components/SolicitacaoHeDialog'
+import { uploadHeAttachment, heAttachmentColumns } from '@/lib/he-attachment'
 import { DecisaoHeDialog } from './components/DecisaoHeDialog'
 import { CostCenterEditDialog } from './components/CostCenterEditDialog'
 
@@ -121,6 +122,9 @@ export default function HorasExtras() {
   // Colaboradores terceiros e empresas para o formulário
   const [employees, setEmployees] = useState<any[]>([])
   const [companies, setCompanies] = useState<any[]>([])
+
+  // Arquivo de anexo escolhido no diálogo de solicitação (lido no submit para o upload)
+  const selectedAttachmentFileRef = useRef<File | null>(null)
 
   // Modais
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false)
@@ -209,6 +213,11 @@ export default function HorasExtras() {
             name,
             code
           ),
+          attachment_bucket,
+          attachment_path,
+          attachment_name,
+          attachment_size,
+          attachment_content_type,
           reason,
           status,
           created_by,
@@ -287,6 +296,7 @@ export default function HorasExtras() {
     date: string
     hours: number
     reason: string
+    attachment?: { name: string; size: number; type: string | null } | null
   }) => {
     const targetClientId = effectiveClientId || profile?.client_id || activeClient?.id
     if (!targetClientId) {
@@ -329,6 +339,27 @@ export default function HorasExtras() {
     if (error) {
       toast.error('Erro ao registrar solicitação: ' + error.message)
       throw error
+    }
+
+    // Anexo (opcional): envia o arquivo para o bucket PRIVADO e grava a referência na solicitação.
+    // Falha no upload não desfaz a solicitação — o usuário é avisado e pode reenviar depois.
+    if (inserted?.id && data.attachment) {
+      try {
+        const file = selectedAttachmentFileRef.current
+        if (file) {
+          const meta = await uploadHeAttachment(targetClientId, inserted.id, file)
+          const { error: attErr } = await supabase
+            .from('horas_extras_solicitacoes')
+            .update(heAttachmentColumns(meta))
+            .eq('id', inserted.id)
+          if (attErr) throw attErr
+        }
+      } catch (attErr: any) {
+        console.error('Falha ao enviar anexo da HE:', attErr)
+        toast.error(
+          'A solicitação foi registrada, mas o anexo não pôde ser enviado. Use "Editar" para anexar novamente.',
+        )
+      }
     }
 
     toast.success('Solicitação de Horas Extras registrada com status Pendente!')
@@ -890,6 +921,7 @@ export default function HorasExtras() {
         plants={visiblePlants}
         companies={companies}
         onSubmit={handleCreateSolicitacao}
+        selectedFileRef={selectedAttachmentFileRef}
       />
 
       {/* Modal: Editar Solicitação (apenas criador, enquanto Pendente) */}
@@ -904,6 +936,7 @@ export default function HorasExtras() {
         companies={companies}
         editingSolicitacao={editingSolicitacao}
         onSubmit={handleUpdateSolicitacao}
+        selectedFileRef={selectedAttachmentFileRef}
       />
 
       {/* Modal: Correção de Centro de Custo (Master/Admin, qualquer status) */}

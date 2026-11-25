@@ -2361,6 +2361,11 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           approved_by_name: string | null
+          attachment_bucket: string | null
+          attachment_content_type: string | null
+          attachment_name: string | null
+          attachment_path: string | null
+          attachment_size: number | null
           client_id: string
           company_email: string | null
           company_id: string | null
@@ -2387,6 +2392,11 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           approved_by_name?: string | null
+          attachment_bucket?: string | null
+          attachment_content_type?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
           client_id: string
           company_email?: string | null
           company_id?: string | null
@@ -2413,6 +2423,11 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           approved_by_name?: string | null
+          attachment_bucket?: string | null
+          attachment_content_type?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_size?: number | null
           client_id?: string
           company_email?: string | null
           company_id?: string | null
