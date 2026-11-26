@@ -317,112 +317,81 @@ export default function QuadroContratado() {
       </div>
 
       <Card className="p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:flex-wrap gap-4 items-end md:items-center justify-between">
-          <div className="flex flex-col md:flex-row md:flex-wrap gap-4 flex-1 min-w-0">
-            <div className="w-full md:w-64">
-              <Label>Planta</Label>
-              <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+          <div className="min-w-0">
+            <Label>Planta</Label>
+            <Select value={selectedPlant} onValueChange={setSelectedPlant}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a Planta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Plantas</SelectItem>
+                {plants.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-0">
+            <Label>Tipo</Label>
+            <Select value={selectedType} onValueChange={(val: any) => setSelectedType(val)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="colaborador">Colaboradores</SelectItem>
+                <SelectItem value="equipamento">Equipamentos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-0">
+            <Label>Mês de Referência</Label>
+            <Input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <Label>Empresa</Label>
+            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas as Empresas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Empresas</SelectItem>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedType === 'colaborador' && (
+            <div className="min-w-0">
+              <Label>Função</Label>
+              <Select value={selectedFunction} onValueChange={setSelectedFunction}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a Planta" />
+                  <SelectValue placeholder="Todas as Funções" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Plantas</SelectItem>
-                  {plants.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
+                  <SelectItem value="all">Todas as Funções</SelectItem>
+                  {functions.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="w-full md:w-48">
-              <Label>Tipo</Label>
-              <Select value={selectedType} onValueChange={(val: any) => setSelectedType(val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="colaborador">Colaboradores</SelectItem>
-                  <SelectItem value="equipamento">Equipamentos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="w-full md:w-48">
-              <Label>Mês de Referência</Label>
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              />
-            </div>
-
-            <div className="w-full md:w-48">
-              <Label>Empresa</Label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas as Empresas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Empresas</SelectItem>
-                  {companies.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedType === 'colaborador' && (
-              <div className="w-full md:w-48">
-                <Label>Função</Label>
-                <Select value={selectedFunction} onValueChange={setSelectedFunction}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as Funções" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Funções</SelectItem>
-                    {functions.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2 w-full md:w-auto md:shrink-0">
-            {(selectedCompany !== 'all' ||
-              (selectedType === 'colaborador' && selectedFunction !== 'all')) && (
-              <Button
-                variant="ghost"
-                className="flex-1 md:flex-none text-slate-600"
-                onClick={() => {
-                  setSelectedCompany('all')
-                  setSelectedFunction('all')
-                }}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Limpar
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="flex-1 md:flex-none"
-              onClick={() => setIsDuplicateOpen(true)}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Duplicar Mês
-            </Button>
-            <Button className="flex-1 md:flex-none" onClick={() => handleOpenModal()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar
-            </Button>
-          </div>
+          )}
         </div>
       </Card>
 
