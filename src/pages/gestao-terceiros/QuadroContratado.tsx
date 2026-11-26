@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePersistentScreenFilters, useFilterField } from '@/hooks/use-persistent-screen-filters'
 import { useMasterData } from '@/hooks/use-master-data'
 import { supabase } from '@/lib/supabase/client'
@@ -28,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Edit2, Trash2, Copy } from 'lucide-react'
+import { Plus, Edit2, Trash2, Copy, X } from 'lucide-react'
 import { useWindowFocusGuard } from '@/hooks/use-window-focus-guard'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
@@ -45,10 +45,14 @@ export default function QuadroContratado() {
     selectedPlant: 'all',
     selectedType: 'colaborador',
     selectedMonth: format(new Date(), 'yyyy-MM'),
+    selectedCompany: 'all',
+    selectedFunction: 'all',
   })
   const [selectedPlant, setSelectedPlant] = useFilterField(filters, 'selectedPlant')
   const [selectedType, setSelectedType] = useFilterField(filters, 'selectedType')
   const [selectedMonth, setSelectedMonth] = useFilterField(filters, 'selectedMonth')
+  const [selectedCompany, setSelectedCompany] = useFilterField(filters, 'selectedCompany')
+  const [selectedFunction, setSelectedFunction] = useFilterField(filters, 'selectedFunction')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<any | null>(null)
@@ -78,9 +82,31 @@ export default function QuadroContratado() {
     fetchCompanies()
   }, [profile, selectedMasterClient])
 
+  // Ao sair de "colaborador", a função filtrada deixa de fazer sentido
+  // (registros de equipamento não têm função) e o filtro some da tela: volta
+  // para "Todas". Regra permanente: ignora a primeira execução (ref do valor
+  // anterior) para não zerar o filtro persistido na montagem (bug v0.0.1835).
+  const prevTypeRef = useRef(selectedType)
+  useEffect(() => {
+    if (prevTypeRef.current !== selectedType) {
+      prevTypeRef.current = selectedType
+      if (selectedType !== 'colaborador' && selectedFunction !== 'all') {
+        setSelectedFunction('all')
+      }
+    }
+  }, [selectedType, selectedFunction, setSelectedFunction])
+
   useEffect(() => {
     fetchData()
-  }, [selectedPlant, selectedType, selectedMonth, profile, selectedMasterClient])
+  }, [
+    selectedPlant,
+    selectedType,
+    selectedMonth,
+    selectedCompany,
+    selectedFunction,
+    profile,
+    selectedMasterClient,
+  ])
 
   const fetchCompanies = async () => {
     if (!profile) return
@@ -105,6 +131,16 @@ export default function QuadroContratado() {
 
     if (selectedPlant !== 'all') {
       q = q.eq('plant_id', selectedPlant)
+    }
+
+    if (selectedCompany !== 'all') {
+      q = q.eq('company_id', selectedCompany)
+    }
+
+    // Função só existe em registros do tipo colaborador — o filtro não se
+    // aplica (e nem aparece) quando o tipo é equipamento.
+    if (selectedType === 'colaborador' && selectedFunction !== 'all') {
+      q = q.eq('function_id', selectedFunction)
     }
 
     if (profile.role === 'Master' && selectedMasterClient !== 'all') {
@@ -321,9 +357,59 @@ export default function QuadroContratado() {
                 onChange={(e) => setSelectedMonth(e.target.value)}
               />
             </div>
+
+            <div className="w-full md:w-48">
+              <Label>Empresa</Label>
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as Empresas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Empresas</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedType === 'colaborador' && (
+              <div className="w-full md:w-48">
+                <Label>Função</Label>
+                <Select value={selectedFunction} onValueChange={setSelectedFunction}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as Funções" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Funções</SelectItem>
+                    {functions.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 w-full md:w-auto">
+            {(selectedCompany !== 'all' ||
+              (selectedType === 'colaborador' && selectedFunction !== 'all')) && (
+              <Button
+                variant="ghost"
+                className="flex-1 md:flex-none text-slate-600"
+                onClick={() => {
+                  setSelectedCompany('all')
+                  setSelectedFunction('all')
+                }}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Limpar
+              </Button>
+            )}
             <Button
               variant="outline"
               className="flex-1 md:flex-none"
