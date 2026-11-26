@@ -309,10 +309,32 @@ export default function QuadroContratado() {
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Quadro Contratado</h1>
           <p className="text-slate-500 mt-1">Gerencie o dimensionamento de equipe e equipamentos</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedCompany('all')
+              setSelectedFunction('all')
+            }}
+          >
+            <X className="w-4 h-4 mr-2" />
+            Limpar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsDuplicateOpen(true)}>
+            <Copy className="w-4 h-4 mr-2" />
+            Duplicar Mês
+          </Button>
+          <Button size="sm" onClick={() => handleOpenModal()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar
+          </Button>
         </div>
       </div>
 
