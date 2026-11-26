@@ -130,7 +130,7 @@ export function AppSidebar() {
         ],
       },
       {
-        title: 'Gestão de Acidentes',
+        title: 'Gestão de Segurança',
         icon: AlertTriangle,
         subItems: [
           { title: 'Dashboard', path: '/gestao-acidentes/dashboard' },
@@ -474,11 +474,13 @@ export function AppSidebar() {
                   userMenus.includes(`Gestão de Chamados:${sub.title}`) ||
                   (sub.title === 'Painel de Chamados' && userMenus.includes('Painel de Chamados')),
               )
-            } else if (item.title === 'Gestão de Acidentes') {
+            } else if (item.title === 'Gestão de Segurança') {
               filteredSubItems = item.subItems.filter(
                 (sub) =>
                   userMenus.includes('Gestão de Acidentes') ||
-                  userMenus.includes(`Gestão de Acidentes:${sub.title}`),
+                  userMenus.includes('Gestão de Segurança') ||
+                  userMenus.includes(`Gestão de Acidentes:${sub.title}`) ||
+                  userMenus.includes(`Gestão de Segurança:${sub.title}`),
               )
             } else if (item.title === 'Organograma e Fluxos') {
               filteredSubItems = item.subItems.filter(
