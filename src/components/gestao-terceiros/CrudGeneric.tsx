@@ -35,6 +35,7 @@ import { Loader2, Trash2, Edit2, Search, Plus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAppStore } from '@/store/AppContext'
 import { useWindowFocusGuard } from '@/hooks/use-window-focus-guard'
+import { closeLooksLegit, useCrudModalSession } from './crud-modal-session'
 import { cn } from '@/lib/utils'
 
 export type FieldDef = {
@@ -83,6 +84,7 @@ export function CrudGeneric({
   extraActions,
   extraFilters,
   extraFormContent,
+  crudId,
 }: any) {
   const { activeClient } = useAppStore()
   const [data, setData] = useState<any[]>([])
@@ -110,6 +112,25 @@ export function CrudGeneric({
     isBusy: isUploading || isSubmitting,
   })
 
+  // ---- Sessão da janela de cadastro (crud-modal-session, mesmo espírito do
+  // sheet-session do PainelChamados): rascunho do formulário em sessionStorage
+  // + classificação legítimo/fantasma do fechamento + restaurador. O retorno
+  // de Alt+Tab devolve o foco ao botão "Novo registro" (fora do modal) e o
+  // Radix fecha a janela como "clique fora"; o fechamento fantasma é ignorado
+  // e, se ainda assim fechar, o rascunho reabre a janela no mesmo estado no
+  // retorno de foco/visibilidade (ou na remontagem da tela).
+  const { openModal, closeLegit, closeGhost } = useCrudModalSession({
+    crudId: crudId || tableName,
+    isModalOpen,
+    form,
+    setForm,
+    editingItem,
+    setEditingItem,
+    setFormErrors,
+    setIsModalOpen,
+    data,
+  })
+
   const load = useCallback(async () => {
     setLoading(true)
     const res = await fetchQuery()
@@ -134,8 +155,7 @@ export function CrudGeneric({
     }
     setForm(initialForm)
     setEditingItem(null)
-    setFormErrors({})
-    setIsModalOpen(true)
+    openModal()
   }
 
   const openEdit = (item: any) => {
@@ -146,8 +166,7 @@ export function CrudGeneric({
     }
     setForm(itemData)
     setEditingItem(item)
-    setFormErrors({})
-    setIsModalOpen(true)
+    openModal()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -245,7 +264,7 @@ export function CrudGeneric({
           title: `${itemName} ${editingItem ? 'atualizado' : 'salvo'} com sucesso!`,
           className: 'bg-green-50 text-green-900 border-green-200',
         })
-        setIsModalOpen(false)
+        closeLegit()
         load()
       } else {
         toast({
@@ -568,7 +587,21 @@ export function CrudGeneric({
         )}
       </div>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setIsModalOpen(true)
+            return
+          }
+          if (closeLooksLegit()) {
+            closeLegit()
+          } else {
+            closeGhost()
+            setIsModalOpen(false)
+          }
+        }}
+      >
         <DialogContent
           className="sm:max-w-xl"
           onPointerDownOutside={guardDismiss}
@@ -842,7 +875,7 @@ export function CrudGeneric({
             </div>
             {extraFormContent && extraFormContent(form, setForm)}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+              <Button type="button" variant="outline" onClick={closeLegit}>
                 Cancelar
               </Button>
               <Button type="submit" variant="tech" disabled={isSubmitting || isUploading}>
