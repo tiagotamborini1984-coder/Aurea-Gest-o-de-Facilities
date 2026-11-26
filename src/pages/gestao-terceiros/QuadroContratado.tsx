@@ -317,8 +317,8 @@ export default function QuadroContratado() {
       </div>
 
       <Card className="p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4 items-end md:items-center justify-between">
-          <div className="flex flex-col md:flex-row gap-4 flex-1">
+        <div className="flex flex-col md:flex-row md:flex-wrap gap-4 items-end md:items-center justify-between">
+          <div className="flex flex-col md:flex-row md:flex-wrap gap-4 flex-1 min-w-0">
             <div className="w-full md:w-64">
               <Label>Planta</Label>
               <Select value={selectedPlant} onValueChange={setSelectedPlant}>
@@ -395,7 +395,7 @@ export default function QuadroContratado() {
             )}
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto md:shrink-0">
             {(selectedCompany !== 'all' ||
               (selectedType === 'colaborador' && selectedFunction !== 'all')) && (
               <Button
