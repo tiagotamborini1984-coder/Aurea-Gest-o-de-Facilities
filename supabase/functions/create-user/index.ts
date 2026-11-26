@@ -60,14 +60,31 @@ Deno.serve(async (req: Request) => {
           ? body.client_id
           : creatorProfile.client_id
 
-    if (creatorProfile.role !== 'Master' && (role === 'Master' || role === 'Administrador')) {
+    // Auto-promoção continua proibida em qualquer cenário.
+    if (role === 'Master' && creatorProfile.role !== 'Master') {
       throw new Error('Cannot create a user with a higher role')
+    }
+    // Administrador só pode criar dentro da própria empresa (mesmo client_id) e sem Master.
+    if (creatorProfile.role === 'Administrador') {
+      if (role === 'Master') {
+        throw new Error('Cannot create a user with a higher role')
+      }
+      if (body.client_id && body.client_id !== creatorProfile.client_id) {
+        throw new Error('Cannot create a user in another company')
+      }
+    }
+
+    if (!email || typeof email !== 'string') throw new Error('E-mail é obrigatório')
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      throw new Error('A senha deve ter pelo menos 6 caracteres')
     }
 
     const { data: userData, error: userError } = await supabaseClient.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      // Confirma o e-mail na criação: a tela /usuarios define a senha, não há fluxo de
+      // convite, e e-mail não confirmado bloquearia o login do novo usuário.
+      email_confirm: true,
       user_metadata: { name },
     })
 
@@ -80,9 +97,9 @@ Deno.serve(async (req: Request) => {
       .update({
         role,
         client_id: finalClientId,
-        accessible_menus,
-        authorized_plants,
-        force_password_change,
+        accessible_menus: accessible_menus || [],
+        authorized_plants: authorized_plants || [],
+        force_password_change: force_password_change || false,
         feature_permissions: feature_permissions || {},
       })
       .eq('id', userData.user.id)
