@@ -209,4 +209,32 @@
   thead {
     display: table-header-group;
   }
+
+  /* ===== Impressão do Cartão de Observação de Segurança (OCS) =====
+     O dialog de impressão mantém o cartão em .ocs-print-root (portal do Radix,
+     irmão de #root no body). Fora do modo de impressão o bloco fica oculto;
+     com body.ocs-printing escondemos o app (#root) e o dialog (irmãos seguintes
+     do bloco) e mostramos SOMENTE o cartão. */
+  .ocs-print-root {
+    display: none;
+  }
+
+  /* Esconde o app inteiro (a listagem/dashboard ficam fora da impressão) */
+  body.ocs-printing #root {
+    display: none !important;
+  }
+
+  /* Esconde irmãos do bloco de impressão (overlays Radix, tooltips, etc.) */
+  body.ocs-printing .ocs-print-root ~ * {
+    display: none !important;
+  }
+
+  body.ocs-printing .ocs-print-root {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    color: black !important;
+    background: white !important;
+  }
 }

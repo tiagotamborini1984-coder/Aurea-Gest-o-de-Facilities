@@ -25,11 +25,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { Plus, Eye, ClipboardList, Loader2 } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, Eye, ClipboardList, Loader2, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { OcsFormDialog } from './OcsFormDialog'
 import { OcsDetailDialog } from './OcsDetailDialog'
+import OcsDashboard from './OcsDashboard'
+import { OcsPrintDialog } from './OcsPrint'
 import type { ChecklistAnswer } from './ocs-checklist'
+import type { OcsAcao } from './ocs-actions'
 
 /** Registro completo de ocs_observacoes (forma carregada da listagem). */
 export type OcsObservacao = {
@@ -66,6 +70,10 @@ export function statusOcsVariant(status: string) {
 
 export default function OcsObservacoes() {
   const { profile, selectedMasterClient } = useAppStore()
+  const [aba, setAba] = useState<'listagem' | 'dashboard'>('listagem')
+  const [filtroPlanta, setFiltroPlanta] = useState('')
+  const [filtroInicio, setFiltroInicio] = useState('')
+  const [filtroFim, setFiltroFim] = useState('')
   const { plants, employees, loading: masterLoading } = useMasterData()
   const { toast } = useToast()
 
@@ -78,6 +86,9 @@ export default function OcsObservacoes() {
   const [editing, setEditing] = useState<OcsObservacao | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [acaoDialogFor, setAcaoDialogFor] = useState<OcsObservacao | null>(null)
+  const [printObs, setPrintObs] = useState<OcsObservacao | null>(null)
+  const [printAcoes, setPrintAcoes] = useState<OcsAcao[]>([])
+  const [loadingPrintAcoes, setLoadingPrintAcoes] = useState(false)
 
   const [acaoDescricao, setAcaoDescricao] = useState('')
   const [acaoResponsavel, setAcaoResponsavel] = useState('')
@@ -134,6 +145,44 @@ export default function OcsObservacoes() {
     () => observacoes.find((o) => o.id === detailId) || null,
     [observacoes, detailId],
   )
+
+  /** Carrega as ações da OCS quando o dialog de impressão abre. */
+  useEffect(() => {
+    if (!printObs) {
+      setPrintAcoes([])
+      return
+    }
+    let cancel = false
+    setLoadingPrintAcoes(true)
+    supabase
+      .from('ocs_acoes')
+      .select('id, ocs_id, descricao, responsavel_id, prazo, status, task_id')
+      .eq('ocs_id', printObs.id)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancel) return
+        if (error) {
+          console.error(`Erro ao carregar ações para impressão: ${error.message}`)
+          setPrintAcoes([])
+        } else {
+          setPrintAcoes((data || []) as unknown as OcsAcao[])
+        }
+        setLoadingPrintAcoes(false)
+      })
+    return () => {
+      cancel = true
+    }
+  }, [printObs])
+
+  /** Observações filtradas por planta e período — alimenta o dashboard.
+   *  Planta vazia = todas as autorizadas; datas vazias = sem limite. */
+  const observacoesFiltradas = useMemo(() => {
+    let lista = observacoes
+    if (filtroPlanta) lista = lista.filter((o) => o.plant_id === filtroPlanta)
+    if (filtroInicio) lista = lista.filter((o) => o.data_observacao >= filtroInicio)
+    if (filtroFim) lista = lista.filter((o) => o.data_observacao <= filtroFim)
+    return lista
+  }, [observacoes, filtroPlanta, filtroInicio, filtroFim])
 
   const plantName = (id: string | null) => plants.find((p: any) => p.id === id)?.name || '—'
 
@@ -245,90 +294,123 @@ export default function OcsObservacoes() {
             com responsável e prazo.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null)
-            setFormOpen(true)
-          }}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Observação
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={aba} onValueChange={(v) => setAba(v as 'listagem' | 'dashboard')}>
+            <TabsList>
+              <TabsTrigger value="listagem">Listagem</TabsTrigger>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {aba === 'listagem' && (
+            <Button
+              onClick={() => {
+                setEditing(null)
+                setFormOpen(true)
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Observação
+            </Button>
+          )}
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ClipboardList className="w-5 h-5 text-brand" />
-            Observações registradas
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading || masterLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : observacoes.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              Nenhuma observação registrada ainda. Clique em "Nova Observação" para começar.
-            </p>
-          ) : (
-            <div className="overflow-x-auto -mx-2">
-              <table className="w-full text-sm min-w-[720px]">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-2 px-2 font-medium">Número</th>
-                    <th className="py-2 px-2 font-medium">Data</th>
-                    <th className="py-2 px-2 font-medium">Turno</th>
-                    <th className="py-2 px-2 font-medium">Local</th>
-                    <th className="py-2 px-2 font-medium">Observador</th>
-                    <th className="py-2 px-2 font-medium">Status</th>
-                    <th className="py-2 px-2 font-medium text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {observacoes.map((o) => (
-                    <tr key={o.id} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="py-2.5 px-2 font-semibold whitespace-nowrap">
-                        {o.number_label || `#${o.number}`}
-                      </td>
-                      <td className="py-2.5 px-2 whitespace-nowrap">
-                        {o.data_observacao
-                          ? format(new Date(`${o.data_observacao}T12:00:00`), 'dd/MM/yyyy')
-                          : '—'}
-                      </td>
-                      <td className="py-2.5 px-2 whitespace-nowrap">{o.turno || '—'}</td>
-                      <td className="py-2.5 px-2">{o.local || '—'}</td>
-                      <td className="py-2.5 px-2">{userName(o.observador)}</td>
-                      <td className="py-2.5 px-2">
-                        <Badge
-                          variant="outline"
-                          className={cn('border', statusOcsVariant(o.status))}
-                        >
-                          {o.status}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5 px-2 text-right whitespace-nowrap">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDetailId(o.id)}
-                          aria-label={`Ver detalhes da observação ${o.number_label || o.number}`}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          Detalhes
-                        </Button>
-                      </td>
+      {aba === 'dashboard' ? (
+        <OcsDashboard
+          plants={plants}
+          plantId={filtroPlanta}
+          onPlantChange={setFiltroPlanta}
+          dataInicio={filtroInicio}
+          dataFim={filtroFim}
+          onDataInicioChange={setFiltroInicio}
+          onDataFimChange={setFiltroFim}
+          observacoes={observacoesFiltradas}
+          loading={loading || masterLoading}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ClipboardList className="w-5 h-5 text-brand" />
+              Observações registradas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading || masterLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : observacoes.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Nenhuma observação registrada ainda. Clique em "Nova Observação" para começar.
+              </p>
+            ) : (
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full text-sm min-w-[720px]">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="py-2 px-2 font-medium">Número</th>
+                      <th className="py-2 px-2 font-medium">Data</th>
+                      <th className="py-2 px-2 font-medium">Turno</th>
+                      <th className="py-2 px-2 font-medium">Local</th>
+                      <th className="py-2 px-2 font-medium">Observador</th>
+                      <th className="py-2 px-2 font-medium">Status</th>
+                      <th className="py-2 px-2 font-medium text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody>
+                    {observacoes.map((o) => (
+                      <tr key={o.id} className="border-b last:border-0 hover:bg-muted/40">
+                        <td className="py-2.5 px-2 font-semibold whitespace-nowrap">
+                          {o.number_label || `#${o.number}`}
+                        </td>
+                        <td className="py-2.5 px-2 whitespace-nowrap">
+                          {o.data_observacao
+                            ? format(new Date(`${o.data_observacao}T12:00:00`), 'dd/MM/yyyy')
+                            : '—'}
+                        </td>
+                        <td className="py-2.5 px-2 whitespace-nowrap">{o.turno || '—'}</td>
+                        <td className="py-2.5 px-2">{o.local || '—'}</td>
+                        <td className="py-2.5 px-2">{userName(o.observador)}</td>
+                        <td className="py-2.5 px-2">
+                          <Badge
+                            variant="outline"
+                            className={cn('border', statusOcsVariant(o.status))}
+                          >
+                            {o.status}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 px-2 text-right whitespace-nowrap">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDetailId(o.id)}
+                            aria-label={`Ver detalhes da observação ${o.number_label || o.number}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Detalhes
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setPrintObs(o)}
+                            aria-label={`Imprimir a observação ${o.number_label || o.number}`}
+                          >
+                            <Printer className="w-4 h-4 mr-1" />
+                            Imprimir
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <OcsFormDialog
         open={formOpen}
@@ -350,6 +432,18 @@ export default function OcsObservacoes() {
           setFormOpen(true)
         }}
         onNovaAcao={(o) => setAcaoDialogFor(o)}
+        onPrint={(o) => setPrintObs(o)}
+      />
+
+      {/* Dialog de impressão do Cartão de Observação completo */}
+      <OcsPrintDialog
+        open={!!printObs}
+        onOpenChange={(open) => !open && setPrintObs(null)}
+        observacao={printObs}
+        acoes={printAcoes}
+        loading={loadingPrintAcoes}
+        plantas={plants}
+        usuarios={usuarios}
       />
 
       {/* Dialog de criação de ação */}

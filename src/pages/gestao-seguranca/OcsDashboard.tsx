@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAppStore } from '@/store/AppContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,13 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { AlertTriangle, BarChart3, ClipboardList, Users } from 'lucide-react'
+import { OcsPrintDialog } from './OcsPrint'
 import { format } from 'date-fns'
 import { statusOcsVariant, type OcsObservacao } from './OcsObservacoes'
+import type { OcsAcao } from './ocs-actions'
 
 type AcaoResumo = {
   id: string
@@ -88,7 +92,16 @@ export default function OcsDashboard({
 }: Props) {
   const { profile, selectedMasterClient } = useAppStore()
   const { toast } = useToast()
-  void OCS_CATEGORIAS
+  const [printTarget, setPrintTarget] = useState<OcsObservacao | null>(null)
+  const [acoesDaPrint, setAcoesDaPrint] = useState<OcsAcao[]>([])
+  const [loadingPrint, setLoadingPrint] = useState(false)
+  const plantasAutorizadas = useMemo(() => {
+    // authorized_plants vazio = todas as plantas do cliente (convenção v0.0.1904)
+    if (profile?.role === 'Master') return plants
+    const auth = (profile?.authorized_plants || []) as string[]
+    if (!auth.length) return plants
+    return plants.filter((p: any) => auth.includes(p.id))
+  }, [plants, profile])
 
   const scopedClientId =
     profile?.role === 'Master'
@@ -222,6 +235,29 @@ export default function OcsDashboard({
 
   const checklistPreenchido = observacoes.some((o) => (o.respostas || []).length > 0)
 
+  /** Abre a impressão do Cartão de Observação completo da OCS selecionada. */
+  const abrirImpressao = useCallback(
+    async (o: OcsObservacao) => {
+      setPrintTarget(o)
+      setLoadingPrint(true)
+      const { data, error } = await supabase
+        .from('ocs_acoes')
+        .select('id, ocs_id, descricao, responsavel_id, prazo, status, task_id')
+        .eq('ocs_id', o.id)
+        .order('created_at', { ascending: true })
+      if (error) {
+        toast({
+          title: 'Erro ao carregar ações para impressão',
+          description: error.message,
+          variant: 'destructive',
+        })
+      }
+      setAcoesDaPrint((data || []) as unknown as OcsAcao[])
+      setLoadingPrint(false)
+    },
+    [toast],
+  )
+
   return (
     <div className="space-y-6">
       {/* Filtros (planta + período) */}
@@ -241,7 +277,7 @@ export default function OcsDashboard({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as unidades</SelectItem>
-                {plants.map((p: any) => (
+                {plantasAutorizadas.map((p: any) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
@@ -421,29 +457,101 @@ export default function OcsDashboard({
                 </p>
               ) : (
                 <ul className="space-y-2">
-                  {acoesFiltradas.map((a) => (
-                    <li
-                      key={a.id}
-                      className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2.5 text-sm"
-                    >
-                      <span className="min-w-0 truncate">{nomeUsuario(a.responsavel_id)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {a.prazo
-                          ? `Prazo: ${format(new Date(`${a.prazo}T12:00:00`), 'dd/MM/yyyy')}`
-                          : 'Sem prazo'}
-                        {a.task_id ? ' · Tarefa vinculada' : ''}
-                      </span>
-                      <Badge variant="outline" className="border">
-                        {a.status}
-                      </Badge>
-                    </li>
-                  ))}
+                  {acoesFiltradas.map((a) => {
+                    const ocsDaAcao = observacoes.find((o) => o.id === a.ocs_id)
+                    return (
+                      <li
+                        key={a.id}
+                        className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2.5 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
+                            {ocsDaAcao?.number_label || `#${ocsDaAcao?.number || ''}`} —{' '}
+                            {nomeUsuario(a.responsavel_id)}
+                          </p>
+                          <span className="text-xs text-muted-foreground">
+                            {a.prazo
+                              ? `Prazo: ${format(new Date(`${a.prazo}T12:00:00`), 'dd/MM/yyyy')}`
+                              : 'Sem prazo'}
+                            {a.task_id ? ' · Tarefa vinculada' : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="outline" className="border">
+                            {a.status}
+                          </Badge>
+                          {ocsDaAcao && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => abrirImpressao(ocsDaAcao)}
+                              aria-label={`Imprimir OCS ${ocsDaAcao.number_label || ocsDaAcao.number}`}
+                            >
+                              <Printer className="w-4 h-4 mr-1" />
+                              Imprimir OCS
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Imprimir Cartão de Observação (OCS)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">
+                Selecione a OCS do período para imprimir o cartão completo com checklist,
+                participantes e ações.
+              </p>
+              <ul className="space-y-2">
+                {observacoes.map((o) => (
+                  <li
+                    key={o.id}
+                    className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2.5 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {o.number_label || `#${o.number}`} ·{' '}
+                        {o.data_observacao
+                          ? format(new Date(`${o.data_observacao}T12:00:00`), 'dd/MM/yyyy')
+                          : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {o.local || 'Sem local'} · {nomeUsuario(o.observador)} · {o.status}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => abrirImpressao(o)}
+                      aria-label={`Imprimir OCS ${o.number_label || o.number}`}
+                    >
+                      <Printer className="w-4 h-4 mr-1" />
+                      Imprimir
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         </>
       )}
+
+      <OcsPrintDialog
+        open={!!printTarget}
+        onOpenChange={(open) => !open && setPrintTarget(null)}
+        observacao={printTarget}
+        acoes={acoesDaPrint}
+        loading={loadingPrint}
+        plantas={plants}
+        usuarios={usuarios}
+      />
     </div>
   )
 }

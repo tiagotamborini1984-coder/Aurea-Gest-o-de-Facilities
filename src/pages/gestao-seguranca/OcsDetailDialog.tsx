@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Loader2, Pencil, Plus } from 'lucide-react'
+import { Loader2, Pencil, Plus, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { statusOcsVariant } from './OcsObservacoes'
@@ -25,9 +25,17 @@ type Props = {
   onClose: () => void
   onEdit: (o: OcsObservacao) => void
   onNovaAcao: (o: OcsObservacao) => void
+  onPrint?: (o: OcsObservacao) => void
 }
 
-export function OcsDetailDialog({ observacao, usuarios, onClose, onEdit, onNovaAcao }: Props) {
+export function OcsDetailDialog({
+  observacao,
+  usuarios,
+  onClose,
+  onEdit,
+  onNovaAcao,
+  onPrint,
+}: Props) {
   const [acoes, setAcoes] = useState<OcsAcao[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -207,10 +215,18 @@ export function OcsDetailDialog({ observacao, usuarios, onClose, onEdit, onNovaA
             Fechar
           </Button>
           {observacao && (
-            <Button onClick={() => onEdit(observacao)}>
-              <Pencil className="w-4 h-4 mr-2" />
-              Editar
-            </Button>
+            <>
+              {onPrint && (
+                <Button variant="outline" onClick={() => onPrint(observacao)}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimir
+                </Button>
+              )}
+              <Button onClick={() => onEdit(observacao)}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Editar
+              </Button>
+            </>
           )}
         </div>
       </DialogContent>
