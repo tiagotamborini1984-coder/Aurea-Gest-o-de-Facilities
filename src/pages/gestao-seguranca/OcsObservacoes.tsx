@@ -64,7 +64,7 @@ export function statusOcsVariant(status: string) {
 }
 
 export default function OcsObservacoes() {
-  const { profile } = useAppStore()
+  const { profile, selectedMasterClient } = useAppStore()
   const { plants, employees, loading: masterLoading } = useMasterData()
   const { toast } = useToast()
 
@@ -82,8 +82,8 @@ export default function OcsObservacoes() {
 
   const scopedClientId =
     profile?.role === 'Master'
-      ? useAppStore().selectedMasterClient && useAppStore().selectedMasterClient !== 'all'
-        ? useAppStore().selectedMasterClient
+      ? selectedMasterClient && selectedMasterClient !== 'all'
+        ? selectedMasterClient
         : null
       : profile?.client_id || null
 
@@ -296,11 +296,15 @@ export default function OcsObservacoes() {
         open={formOpen}
         onOpenChange={setFormOpen}
         editing={editing}
+        plants={plants}
+        employees={employees}
+        currentUserId={profile?.id || null}
         onSave={salvarRespostas}
       />
 
       <OcsDetailDialog
         observacao={detailObs}
+        employees={employees}
         onClose={() => setDetailId(null)}
         onEdit={(o) => {
           setDetailId(null)

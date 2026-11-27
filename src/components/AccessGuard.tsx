@@ -29,6 +29,8 @@ const routeMenuMap: Record<string, string> = {
   '/gestao-terceiros/email-reports': 'Email Reports',
   '/gestao-terceiros/auditoria': 'Log de Auditoria',
   '/admin/api-keys': 'Chaves API',
+  '/gestao-seguranca/ocs': 'OCS',
+  '/gestao-acidentes/ocs': 'OCS',
   '/gestao-terceiros/encomendas': 'Gestão de Encomendas',
   '/gestao-terceiros/encomendas/tipos': 'Gestão de Encomendas',
   '/gestao-terceiros/encomendas/configuracoes': 'Gestão de Encomendas',

@@ -356,7 +356,8 @@ export default function Usuarios() {
         !ALL_MODULES.includes(m) &&
         !ALL_MENUS.includes(m) &&
         !m.startsWith('Auditoria e Checklist:') &&
-        m !== 'Chaves API',
+        m !== 'Chaves API' &&
+        m !== 'OCS',
     )
 
     const audSubKeys = rawAccessibleMenus.filter((m: string) =>
@@ -431,7 +432,7 @@ export default function Usuarios() {
       })
     }
 
-    // 'Chaves API' não pertence a ALL_MODULES/ALL_MENUS: alterna direto na lista bruta
+    // 'Chaves API' e 'OCS' não pertencem a ALL_MODULES/ALL_MENUS: alternam direto na lista bruta
     const toggleChavesApi = () => {
       if (rawAccessibleMenus.includes('Chaves API')) {
         setForm({
@@ -440,6 +441,17 @@ export default function Usuarios() {
         })
       } else {
         setForm({ ...form, accessible_menus: [...rawAccessibleMenus, 'Chaves API'] })
+      }
+    }
+
+    const toggleOcs = () => {
+      if (rawAccessibleMenus.includes('OCS')) {
+        setForm({
+          ...form,
+          accessible_menus: rawAccessibleMenus.filter((m: string) => m !== 'OCS'),
+        })
+      } else {
+        setForm({ ...form, accessible_menus: [...rawAccessibleMenus, 'OCS'] })
       }
     }
 
@@ -521,6 +533,19 @@ export default function Usuarios() {
         <div>
           <h4 className="text-sm font-semibold text-brand-graphite mb-3">Menus Administrativos</h4>
           <div className="grid grid-cols-1 gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="menu-ocs"
+                checked={rawAccessibleMenus.includes('OCS')}
+                onCheckedChange={() => toggleOcs()}
+              />
+              <Label
+                htmlFor="menu-ocs"
+                className="font-medium cursor-pointer text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                OCS - Observação Comportamental de Segurança
+              </Label>
+            </div>
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="menu-chaves-api"

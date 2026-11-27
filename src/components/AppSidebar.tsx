@@ -136,6 +136,7 @@ export function AppSidebar() {
           { title: 'Dashboard', path: '/gestao-acidentes/dashboard' },
           { title: 'Novo Registro', path: '/gestao-acidentes/registro' },
           { title: 'Histórico', path: '/gestao-acidentes/historico' },
+          { title: 'OCS', path: '/gestao-seguranca/ocs' },
         ],
       },
       {
@@ -479,6 +480,8 @@ export function AppSidebar() {
                 (sub) =>
                   userMenus.includes('Gestão de Acidentes') ||
                   userMenus.includes('Gestão de Segurança') ||
+                  userMenus.includes('OCS') ||
+                  sub.title !== 'OCS' ||
                   userMenus.includes(`Gestão de Acidentes:${sub.title}`) ||
                   userMenus.includes(`Gestão de Segurança:${sub.title}`),
               )

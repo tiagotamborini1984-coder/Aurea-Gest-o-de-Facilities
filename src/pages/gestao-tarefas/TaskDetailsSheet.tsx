@@ -56,6 +56,7 @@ import { useAppStore } from '@/store/AppContext'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { concluirAcaoDaTarefa } from '@/pages/gestao-seguranca/ocs-actions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -384,7 +385,7 @@ export function TaskDetailsSheet({
     // 3. Salva o executor atual em previous_assignee_id para permitir devolução se reprovado;
     // 4. Marca approval_status como 'pending'.
     if (
-      isPersonalTask &&
+      (isPersonalTask || isOcsTask) &&
       (status?.is_terminal || statusName.includes('finaliz') || statusName.includes('conclu'))
     ) {
       // Se já estiver aguardando aprovação e for admin/solicitante querendo fechar diretamente
@@ -415,7 +416,11 @@ export function TaskDetailsSheet({
         })
 
         toast({
-          title: isNcTask ? 'Não Conformidade finalizada!' : 'Tarefa finalizada!',
+          title: isOcsTask
+            ? 'Observação de Segurança finalizada!'
+            : isNcTask
+              ? 'Não Conformidade finalizada!'
+              : 'Tarefa finalizada!',
           description: `A demanda foi movida para "Aguardando Aprovação" e a responsabilidade transferida para ${requesterUser?.name || 'o solicitante'} aprovar ou reprovar.`,
           className: 'bg-amber-50 text-amber-900 border-amber-200',
         })
@@ -965,6 +970,12 @@ export function TaskDetailsSheet({
   const isPersonalTask =
     !isNcTask && currentTaskType?.name?.toLowerCase().includes('tarefa pessoal') === true
 
+  // Tarefa gerada por uma Ação da OCS (tipo "Observação de Segurança") —
+  // reutiliza o fluxo de aprovação do solicitante (v0.0.1888).
+  const isOcsTask =
+    currentTaskType?.name?.toLowerCase().includes('observação de segurança') === true ||
+    currentTaskType?.name?.toLowerCase().includes('observacao de seguranca') === true
+
   // Find status "Aguardando Aprovação"
   // Status "Aguardando Aprovação" deve ser do MESMO cliente da tarefa (exige
   // client_id na task_statuses) — senão, com todas as empresas no escopo
@@ -993,8 +1004,8 @@ export function TaskDetailsSheet({
   const isAwaitingApproval =
     (currentStatus?.name?.toLowerCase().includes('aguardando aprova') ||
       task?.approval_status === 'pending') &&
-    // Transição só faz sentido para NC e Tarefa Pessoal
-    (isNcTask || isPersonalTask)
+    // Transição faz sentido para NC, Tarefa Pessoal e tarefa da OCS
+    (isNcTask || isPersonalTask || isOcsTask)
 
   // The requester can approve/reject, or admin/master
   const isRequesterOrAdmin =
@@ -1051,20 +1062,35 @@ export function TaskDetailsSheet({
       const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
       if (error) throw error
 
+      // OCS: aprovar a tarefa conclui a Ação vinculada (ocs_acoes.task_id)
+      if (isOcsTask) {
+        await concluirAcaoDaTarefa(task.id)
+      }
+
       const executorText = executorName ? ` Executada por: ${executorName}.` : ''
-      const subjectLabel = isNcTask ? 'Demanda de Não Conformidade' : 'Tarefa'
+      const subjectLabel = isNcTask
+        ? 'Demanda de Não Conformidade'
+        : isOcsTask
+          ? 'Observação de Segurança'
+          : 'Tarefa'
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
         content: `${subjectLabel} APROVADA por ${profile.name || 'Solicitante'}.${executorText}${
           completedStatus ? ` Status alterado para: ${completedStatus.name}.` : ''
-        }`,
+        }${isOcsTask ? ' Ação da OCS vinculada concluída.' : ''}`,
         action_type: 'status_change',
       })
 
       toast({
-        title: isNcTask ? 'Não Conformidade aprovada!' : 'Tarefa aprovada!',
-        description: 'A demanda foi validada e concluída com sucesso.',
+        title: isOcsTask
+          ? 'Observação de Segurança aprovada!'
+          : isNcTask
+            ? 'Não Conformidade aprovada!'
+            : 'Tarefa aprovada!',
+        description: isOcsTask
+          ? 'A demanda foi validada e a ação da OCS vinculada foi concluída.'
+          : 'A demanda foi validada e concluída com sucesso.',
         className: 'bg-green-50 text-green-900 border-green-200',
       })
 
@@ -1144,7 +1170,11 @@ export function TaskDetailsSheet({
       const { error } = await supabase.from('tasks').update(payload).eq('id', task.id)
       if (error) throw error
 
-      const subjectLabel = isNcTask ? 'Demanda de Não Conformidade' : 'Tarefa'
+      const subjectLabel = isNcTask
+        ? 'Demanda de Não Conformidade'
+        : isOcsTask
+          ? 'Observação de Segurança'
+          : 'Tarefa'
       await supabase.from('task_timeline').insert({
         task_id: task.id,
         user_id: profile.id,
@@ -1155,7 +1185,11 @@ export function TaskDetailsSheet({
       })
 
       toast({
-        title: isNcTask ? 'Não Conformidade reprovada' : 'Tarefa reprovada',
+        title: isOcsTask
+          ? 'Observação de Segurança reprovada'
+          : isNcTask
+            ? 'Não Conformidade reprovada'
+            : 'Tarefa reprovada',
         description: 'A demanda retornou para o responsável refazer com as observações.',
         className: 'bg-amber-50 text-amber-900 border-amber-200',
       })

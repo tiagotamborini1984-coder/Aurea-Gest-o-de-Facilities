@@ -87,6 +87,7 @@ import CentrosCustoBudget from './pages/gestao-budget/CentrosCusto'
 import DashboardAcidentes from './pages/gestao-acidentes/Dashboard'
 import RegistroAcidente from './pages/gestao-acidentes/Registro'
 import HistoricoAcidentes from './pages/gestao-acidentes/Historico'
+import OcsObservacoes from './pages/gestao-seguranca/OcsObservacoes'
 
 // Organograma e Fluxos
 import OrgDashboard from './pages/organograma/Dashboard'
@@ -245,6 +246,10 @@ const App = () => (
                       <Route path="/gestao-acidentes/registro" element={<RegistroAcidente />} />
                       <Route path="/gestao-acidentes/registro/:id" element={<RegistroAcidente />} />
                       <Route path="/gestao-acidentes/historico" element={<HistoricoAcidentes />} />
+
+                      {/* Gestão de Segurança - OCS */}
+                      <Route path="/gestao-seguranca/ocs" element={<OcsObservacoes />} />
+                      <Route path="/gestao-acidentes/ocs" element={<OcsObservacoes />} />
 
                       {/* Gestão de Budget */}
                       <Route path="/gestao-budget/dashboard" element={<DashboardBudget />} />
