@@ -31,7 +31,8 @@ import { OcsFormDialog } from './OcsFormDialog'
 import { OcsDetailDialog } from './OcsDetailDialog'
 import type { ChecklistAnswer } from './ocs-checklist'
 
-type OcsObservacao = {
+/** Registro completo de ocs_observacoes (forma carregada da listagem). */
+export type OcsObservacao = {
   id: string
   number: number
   number_label: string | null
@@ -142,9 +143,14 @@ export default function OcsObservacoes() {
       if (error) throw error
     } else {
       if (!scopedClientId) throw new Error('Selecione uma empresa no topo antes de criar a OCS.')
-      const { error } = await supabase
-        .from('ocs_observacoes')
-        .insert({ ...payload, client_id: scopedClientId, plant_id: campos.plant_id || null })
+      const { error } = await supabase.from('ocs_observacoes').insert({
+        ...payload,
+        client_id: scopedClientId,
+        plant_id: campos.plant_id || null,
+        // Placeholder obrigatório (coluna NOT NULL): o trigger set_ocs_number
+        // substitui qualquer valor <= 0 pelo sequencial real do cliente.
+        number: 0,
+      })
       if (error) throw error
     }
     await carregar()

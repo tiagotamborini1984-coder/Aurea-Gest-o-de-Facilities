@@ -13,16 +13,9 @@ import { Loader2, Pencil, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { statusOcsVariant } from './OcsObservacoes'
+import type { OcsObservacao } from './OcsObservacoes'
 import type { OcsAcao } from './ocs-actions'
 import type { ChecklistAnswer } from './ocs-checklist'
-import type { OcsObservacaoForForm } from './OcsFormDialog'
-
-type OcsObservacao = OcsObservacaoForForm & {
-  id: string
-  number: number
-  number_label: string | null
-  status: string
-}
 
 type Props = {
   observacao: OcsObservacao | null

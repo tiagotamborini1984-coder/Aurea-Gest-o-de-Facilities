@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
+import { ensureOcsTaskType, getInitialTaskStatus } from './ocs-checklist'
 
 export type OcsAcao = {
   id: string
@@ -49,9 +50,27 @@ export async function criarAcaoComTarefa(params: {
     )
   }
 
-  const taskPayload: Record<string, any> = {
+  // tasks.plant_id é NOT NULL: quando a OCS não tem unidade, usa a primeira
+  // planta do cliente como fallback para que a tarefa possa ser criada.
+  let plantId = params.plant_id || null
+  if (!plantId) {
+    const { data: planta } = await supabase
+      .from('plants')
+      .select('id')
+      .eq('client_id', params.client_id)
+      .limit(1)
+      .maybeSingle()
+    plantId = planta?.id || null
+  }
+  if (!plantId) {
+    throw new Error(
+      'A ação foi criada, mas a empresa não possui unidades cadastradas para vincular à tarefa.',
+    )
+  }
+
+  const taskPayload = {
     client_id: params.client_id,
-    plant_id: params.plant_id as any,
+    plant_id: plantId,
     type_id: taskTypeId,
     status_id: statusId,
     title: `OCS ${params.number_label || ''} - ${params.titulo}`.replace(/\s*-\s*$/, '').trim(),
@@ -64,7 +83,7 @@ export async function criarAcaoComTarefa(params: {
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .insert(taskPayload)
+    .insert(taskPayload as any)
     .select('id')
     .single()
 
