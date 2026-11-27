@@ -340,11 +340,19 @@ export function AppSidebar() {
               'Gestão de Manutenção',
               'Gestão de Chamados',
             ]
+            // "Gestão de Segurança" era "Gestão de Acidentes": empresas com o
+            // nome antigo gravado em modules continuam com o menu visível
+            const SECURITY_VARIATIONS = ['Gestão de Segurança', 'Gestão de Acidentes']
+            const moduleVariations =
+              MAINTENANCE_VARIATIONS.includes(item.title) && item.title === 'Gestão da Manutenção'
+                ? MAINTENANCE_VARIATIONS
+                : SECURITY_VARIATIONS.includes(item.title)
+                  ? SECURITY_VARIATIONS
+                  : [item.title]
             let hasModule = false
-            if (MAINTENANCE_VARIATIONS.includes(item.title)) {
+            if (moduleVariations.length > 1) {
               hasModule =
-                activeClient?.modules?.some((m: string) => MAINTENANCE_VARIATIONS.includes(m)) ||
-                false
+                activeClient?.modules?.some((m: string) => moduleVariations.includes(m)) || false
             } else {
               hasModule = activeClient?.modules?.includes(item.title) || false
             }

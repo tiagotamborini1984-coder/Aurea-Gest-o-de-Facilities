@@ -41,6 +41,13 @@ export function useHasAccess(menuName: string) {
     ]
   }
 
+  // "Gestão de Segurança" era "Gestão de Acidentes": aceitar ambos os nomes
+  const SECURITY_MODULE_VARIATIONS = ['Gestão de Segurança', 'Gestão de Acidentes']
+  const userHasSecurityModule = userMenus.some((m) => SECURITY_MODULE_VARIATIONS.includes(m))
+  if (SECURITY_MODULE_VARIATIONS.includes(menuName) && userHasSecurityModule) {
+    return true
+  }
+
   // legacy mapping for old 'Painel' and 'Tipos' keys
   if (
     menuName === 'Gestão de Tarefas:Painel de Chamados' &&

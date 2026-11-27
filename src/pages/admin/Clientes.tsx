@@ -28,7 +28,7 @@ const MODULES = [
   'Gestão de Tarefas',
   'Organograma e Fluxos',
   'Auditoria e Checklist',
-  'Gestão de Acidentes',
+  'Gestão de Segurança',
   'Gestão da Manutenção',
   'Gestão de Budget',
   'Gestão de Lockers',

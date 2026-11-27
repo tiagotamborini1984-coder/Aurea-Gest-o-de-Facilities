@@ -36,7 +36,7 @@ const AVAILABLE_MODULES = [
   'BI Dashboard',
   'Book de Metas',
   'Organograma e Fluxos',
-  'Gestão de Acidentes',
+  'Gestão de Segurança',
   'Gestão da Manutenção',
   'Gestão de Estoque',
   'Gestão de EPIs',
