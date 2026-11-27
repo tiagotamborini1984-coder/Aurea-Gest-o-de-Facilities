@@ -17,15 +17,17 @@ import type { OcsObservacao } from './OcsObservacoes'
 import type { OcsAcao } from './ocs-actions'
 import type { ChecklistAnswer } from './ocs-checklist'
 
+type Usuario = { id: string; name: string; authorized_plants?: string[] | null }
+
 type Props = {
   observacao: OcsObservacao | null
-  employees: any[]
+  usuarios: Usuario[]
   onClose: () => void
   onEdit: (o: OcsObservacao) => void
   onNovaAcao: (o: OcsObservacao) => void
 }
 
-export function OcsDetailDialog({ observacao, employees, onClose, onEdit, onNovaAcao }: Props) {
+export function OcsDetailDialog({ observacao, usuarios, onClose, onEdit, onNovaAcao }: Props) {
   const [acoes, setAcoes] = useState<OcsAcao[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -56,7 +58,7 @@ export function OcsDetailDialog({ observacao, employees, onClose, onEdit, onNova
   const naoConformes = respostas.filter((r) => r.resposta === 'Não Conforme')
   const userName = (id: string | null) => {
     if (!id) return '—'
-    return employees.find((e: any) => e.id === id)?.name || '—'
+    return usuarios.find((u) => u.id === id)?.name || '—'
   }
 
   return (

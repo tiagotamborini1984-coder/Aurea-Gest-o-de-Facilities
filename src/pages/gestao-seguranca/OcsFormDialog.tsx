@@ -37,12 +37,14 @@ export type OcsObservacaoForForm = {
   status?: string
 }
 
+type Usuario = { id: string; name: string; authorized_plants?: string[] | null }
+
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   editing: OcsObservacaoForForm | null
   plants: any[]
-  employees: any[]
+  usuarios: Usuario[]
   currentUserId?: string | null
   /** (respostas, campos, targetId) — targetId definido quando é edição */
   onSave: (respostas: ChecklistAnswer[], campos: any, targetId?: string) => Promise<void>
@@ -61,7 +63,7 @@ export function OcsFormDialog({
   onOpenChange,
   editing,
   plants,
-  employees,
+  usuarios,
   currentUserId,
   onSave,
 }: Props) {
@@ -101,6 +103,24 @@ export function OcsFormDialog({
   }, [open, editing, currentUserId])
 
   const totalItens = useMemo(() => OCS_CATEGORIAS.reduce((acc, c) => acc + c.itens.length, 0), [])
+
+  // Observadores: somente os usuários cadastrados na planta selecionada
+  // (authorized_plants vazio = usuário vale para todas as plantas do cliente).
+  const usuariosDaPlanta = useMemo(() => {
+    if (!plantId) return []
+    return usuarios.filter(
+      (u) => !u.authorized_plants?.length || u.authorized_plants.includes(plantId),
+    )
+  }, [usuarios, plantId])
+
+  // Se a planta trocar e o observador atual não pertence à nova planta, limpa o
+  // campo para não gravar um observador de outra unidade.
+  useEffect(() => {
+    if (!observador) return
+    if (usuariosDaPlanta.some((u) => u.id === observador)) return
+    setObservador('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuariosDaPlanta])
   const respondidos = Object.keys(respostas).length
   const naoConformes = Object.values(respostas).filter((r) => r.resposta === 'Não Conforme').length
 
@@ -206,16 +226,23 @@ export function OcsFormDialog({
               <Label htmlFor="ocs-observador">Observador</Label>
               <Select value={observador} onValueChange={setObservador}>
                 <SelectTrigger id="ocs-observador">
-                  <SelectValue placeholder="Selecione o observador" />
+                  <SelectValue
+                    placeholder={
+                      plantId ? 'Selecione o observador' : 'Selecione a unidade primeiro'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((e: any) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name}
+                  {usuariosDaPlanta.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Somente usuários cadastrados na unidade selecionada.
+              </p>
             </div>
           </div>
 

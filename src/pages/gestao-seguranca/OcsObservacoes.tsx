@@ -70,6 +70,9 @@ export default function OcsObservacoes() {
   const { toast } = useToast()
 
   const [observacoes, setObservacoes] = useState<OcsObservacao[]>([])
+  const [usuarios, setUsuarios] = useState<
+    { id: string; name: string; authorized_plants?: string[] | null }[]
+  >([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<OcsObservacao | null>(null)
@@ -108,6 +111,18 @@ export default function OcsObservacoes() {
     } else {
       setObservacoes((data || []) as unknown as OcsObservacao[])
     }
+    // Usuários do escopo (observador/responsável): perfis do client_id com suas
+    // plantas autorizadas. authorized_plants vazio = todas as plantas do cliente
+    // (mesma convenção de PainelChamados para authorized_plants de perfil).
+    let uq = supabase.from('profiles').select('id, name, authorized_plants').order('name')
+    if (scopedClientId) uq = uq.eq('client_id', scopedClientId)
+    const { data: uData, error: uError } = await uq
+    if (uError) {
+      console.error(`Erro ao carregar usuários: ${uError.message}`)
+      setUsuarios([])
+    } else {
+      setUsuarios((uData || []) as any)
+    }
     setLoading(false)
   }, [profile, scopedClientId, toast])
 
@@ -121,10 +136,27 @@ export default function OcsObservacoes() {
   )
 
   const plantName = (id: string | null) => plants.find((p: any) => p.id === id)?.name || '—'
+
+  /** Somente os usuários cadastrados na planta informada
+   *  (authorized_plants vazio = usuário vale para todas as plantas do cliente). */
+  const usuariosDaPlanta = useCallback(
+    (plantId: string | null | undefined) => {
+      if (!plantId) return []
+      return usuarios.filter(
+        (u) => !u.authorized_plants?.length || u.authorized_plants.includes(plantId),
+      )
+    },
+    [usuarios],
+  )
+
   const userName = (id: string | null) => {
     if (!id) return '—'
     if (id === profile?.id) return profile?.name || 'Você'
-    return employees.find((e: any) => e.id === id)?.name || '—'
+    return (
+      usuarios.find((u: any) => u.id === id)?.name ||
+      employees.find((e: any) => e.id === id)?.name ||
+      '—'
+    )
   }
 
   async function salvarRespostas(respostas: ChecklistAnswer[], campos: any, targetId?: string) {
@@ -303,14 +335,14 @@ export default function OcsObservacoes() {
         onOpenChange={setFormOpen}
         editing={editing}
         plants={plants}
-        employees={employees}
+        usuarios={usuarios}
         currentUserId={profile?.id || null}
         onSave={salvarRespostas}
       />
 
       <OcsDetailDialog
         observacao={detailObs}
-        employees={employees}
+        usuarios={usuarios}
         onClose={() => setDetailId(null)}
         onEdit={(o) => {
           setDetailId(null)
@@ -346,16 +378,25 @@ export default function OcsObservacoes() {
                 <Label htmlFor="acao-responsavel">Responsável *</Label>
                 <Select value={acaoResponsavel} onValueChange={setAcaoResponsavel}>
                   <SelectTrigger id="acao-responsavel">
-                    <SelectValue placeholder="Selecione o responsável" />
+                    <SelectValue
+                      placeholder={
+                        acaoDialogFor?.plant_id
+                          ? 'Selecione o responsável'
+                          : 'OCS sem unidade — cadastre a unidade na observação'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map((e: any) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
+                    {usuariosDaPlanta(acaoDialogFor?.plant_id).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Somente usuários cadastrados na unidade da observação.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="acao-prazo">Prazo</Label>
