@@ -15,6 +15,56 @@ export type ActionForm = {
 }
 
 /**
+ * Checklist do Cartão de Observação de Segurança (COC), por categoria.
+ */
+export const OCS_CATEGORIAS: { categoria: string; itens: string[] }[] = [
+  {
+    categoria: 'EPI',
+    itens: [
+      'Uso correto e completo dos EPIs exigidos para a atividade',
+      'EPIs em bom estado de conservação e higiene',
+    ],
+  },
+  {
+    categoria: 'Procedimentos',
+    itens: [
+      'Executa a atividade conforme o procedimento / instrução de trabalho',
+      'Respeita sinalizações, bloqueios e isolamentos da área',
+    ],
+  },
+  {
+    categoria: 'Ferramentas e Equipamentos',
+    itens: [
+      'Ferramentas e equipamentos adequados e em bom estado',
+      'Uso correto de equipamentos com risco elétrico/mecânico',
+    ],
+  },
+  {
+    categoria: 'Comportamento',
+    itens: [
+      'Postura segura e atenção concentrada na tarefa',
+      'Não improvisa métodos, ferramentas ou proteções',
+      'Comunicação e coordenação adequadas com a equipe',
+    ],
+  },
+  {
+    categoria: 'Ordem e Limpeza',
+    itens: [
+      'Área de trabalho organizada durante e após a atividade',
+      'Destinação correta de resíduos e materiais',
+    ],
+  },
+]
+
+export const OCS_TURNOS = ['1º Turno', '2º Turno', '3º Turno', 'Administrativo']
+
+export const OCS_RESPOSTAS: Array<ChecklistAnswer['resposta']> = [
+  'Conforme',
+  'Não Conforme',
+  'Não Aplica',
+]
+
+/**
  * Garante que existe um task_types "Observação de Segurança" para o cliente e
  * devolve (id, nome). Cria LAZY na primeira geração de ação — sem migração de
  * tipos em massa (decisão registrada do projeto).
